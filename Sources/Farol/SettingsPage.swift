@@ -170,9 +170,6 @@ struct SettingsPage: View {
             }
             .controlSize(.small)
         }
-        Row(title: "Other agents",
-            detail: "They can report with \"$FAROL_CLI\" status, or ring the terminal bell when they need you.",
-            palette: p) { EmptyView() }
 
         GroupTitle(title: "Notifications", palette: p)
         Row(title: "When an agent is waiting for you", palette: p) { toggle($agents.notifyWaiting) }

@@ -50,6 +50,11 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The Shortcuts page lists every shortcut, grouped by sessions, panes, find, terminal and window.
 - The style check also reads interface text in Swift strings.
 
+### Changed
+
+- The accent color is now Farol's own blue, taken from the lighthouse beam in the app icon, instead of each theme's blue.
+- The Agents settings page shows Claude Code as connected or not, with a clear Connect button, and drops the "Other agents" note, which now lives only in the README.
+
 ### Fixed
 
 - The Farol config file now ends with a newline, so settings appended by hand stay on their own line.

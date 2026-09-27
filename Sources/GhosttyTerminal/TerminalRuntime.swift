@@ -83,16 +83,6 @@ public final class TerminalRuntime {
     public var backgroundColor: NSColor { Self.color(config, "background") ?? .black }
     public var foregroundColor: NSColor { Self.color(config, "foreground") ?? .white }
 
-    /// The theme's ANSI blue. Nearly every theme defines it and treats it as its main accent.
-    public var accentColor: NSColor {
-        var palette = ghostty_config_palette_s()
-        let key = "palette"
-        guard ghostty_config_get(config, &palette, key, UInt(key.utf8.count)) else { return .systemBlue }
-        // Swift imports the C array as a 256-element tuple, so read it as a buffer.
-        let blue = withUnsafeBytes(of: &palette.colors) { $0.bindMemory(to: ghostty_config_color_s.self)[4] }
-        return Self.nsColor(blue)
-    }
-
     private static func color(_ config: ghostty_config_t, _ key: String) -> NSColor? {
         var c = ghostty_config_color_s()
         guard ghostty_config_get(config, &c, key, UInt(key.utf8.count)) else { return nil }

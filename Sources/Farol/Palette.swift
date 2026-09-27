@@ -1,7 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// Every chrome color comes from the terminal theme, so Farol looks right with any of them.
+/// Chrome colors come from the terminal theme, so Farol looks right with any of them.
+/// The accent is Farol's own: the blue of the lighthouse beam in the app icon.
 struct Palette: Equatable {
     let background: Color
     let surface: Color
@@ -12,7 +13,9 @@ struct Palette: Equatable {
     let accent: Color
     let isDark: Bool
 
-    init(background bg: NSColor, foreground fg: NSColor, accent: NSColor) {
+    static let beam = NSColor(srgbRed: 0x00 / 255, green: 0x78 / 255, blue: 0xF9 / 255, alpha: 1)
+
+    init(background bg: NSColor, foreground fg: NSColor) {
         isDark = bg.isDark
         background = Color(nsColor: bg)
         surface = Color(nsColor: bg.mixed(with: fg, 0.035))
@@ -20,8 +23,12 @@ struct Palette: Equatable {
         line = Color(nsColor: bg.mixed(with: fg, 0.11))
         text = Color(nsColor: fg)
         muted = Color(nsColor: bg.mixed(with: fg, 0.55))
-        // Some themes use blue as the background itself. Fall back to the text color there.
-        self.accent = Color(nsColor: accent.contrast(with: bg) >= 2.5 ? accent : fg)
+        // Blue backgrounds would swallow the beam, so step it toward the text color until it stands out.
+        var accent = Self.beam
+        for step in stride(from: 0.2, through: 0.8, by: 0.2) where accent.contrast(with: bg) < 3 {
+            accent = Self.beam.mixed(with: fg, step)
+        }
+        self.accent = Color(nsColor: accent)
     }
 }
 

@@ -27,7 +27,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         self.runtime = runtime
         let base = runtime.ghosttyConfigColors
         self.state = WindowState(
-            palette: Palette(background: runtime.backgroundColor, foreground: runtime.foregroundColor, accent: runtime.accentColor),
+            palette: Palette(background: runtime.backgroundColor, foreground: runtime.foregroundColor),
             ghosttyConfigPreview: ThemeColors(background: base.background, foreground: base.foreground))
 
         let window = NSWindow(
@@ -195,7 +195,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     private func applyTheme() {
         let bg = runtime.backgroundColor
-        state.palette = Palette(background: bg, foreground: runtime.foregroundColor, accent: runtime.accentColor)
+        state.palette = Palette(background: bg, foreground: runtime.foregroundColor)
         window?.backgroundColor = bg
         window?.appearance = NSAppearance(named: bg.isDark ? .darkAqua : .aqua)
         content.layer?.backgroundColor = bg.cgColor
