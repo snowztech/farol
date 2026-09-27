@@ -47,7 +47,7 @@ def check(path: Path) -> list[str]:
     open_sentence = False
 
     for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-        where = f"{path.relative_to(ROOT)}:{number}"
+        where = f"{path.relative_to(ROOT) if ROOT in path.parents else path}:{number}"
 
         if EM_DASH in line:
             problems.append(f"{where}: em dash. Use a period, comma or colon.")
