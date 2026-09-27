@@ -15,7 +15,10 @@ let package = Package(
                 .linkedFramework("Carbon"),
             ]
         ),
-        .executableTarget(name: "Farol", dependencies: ["GhosttyTerminal"]),
+        // Logic that can lose work if it's wrong (git, worktrees). No UI, and tested.
+        .target(name: "FarolCore"),
+        .testTarget(name: "FarolCoreTests", dependencies: ["FarolCore"]),
+        .executableTarget(name: "Farol", dependencies: ["GhosttyTerminal", "FarolCore"]),
     ],
     swiftLanguageModes: [.v5]
 )

@@ -1,7 +1,7 @@
 APP := build/Farol.app
 GHOSTTY := vendor/GhosttyKit.xcframework
 
-.PHONY: help build release run install uninstall check icon clean
+.PHONY: help build release run install uninstall test check icon clean
 
 help:
 	@echo "make build      debug build into $(APP)"
@@ -9,6 +9,7 @@ help:
 	@echo "make release    optimized build into $(APP)"
 	@echo "make install    release build copied to /Applications"
 	@echo "make uninstall  remove /Applications/Farol.app"
+	@echo "make test       run the FarolCore tests"
 	@echo "make check      style check for comments and docs"
 	@echo "make icon       regenerate the app icon from assets/icon-source.png"
 	@echo "make clean      remove build output (keeps libghostty)"
@@ -33,6 +34,9 @@ install: release
 
 uninstall:
 	rm -rf /Applications/Farol.app
+
+test: $(GHOSTTY)
+	swift test
 
 check:
 	python3 scripts/check-style.py
