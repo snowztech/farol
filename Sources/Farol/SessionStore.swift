@@ -3,12 +3,8 @@ import FarolCore
 import GhosttyTerminal
 
 final class Session: ObservableObject, Identifiable {
-    enum Status {
-        case running
-        /// The program rang the bell or sent a notification while you were elsewhere.
-        /// Agents like Claude Code do this when they wait for input.
-        case needsAttention
-    }
+    /// What the sidebar lamp shows.
+    enum Activity { case idle, working, waiting, done }
 
     let id = UUID()
     let panes: PaneContainer
@@ -16,7 +12,10 @@ final class Session: ObservableObject, Identifiable {
     /// Set by renaming the session in the sidebar. Wins over every automatic name.
     @Published var customName: String?
     @Published var directory: String
-    @Published var status = Status.running
+    /// Reported per pane by agent hooks through `farol status`.
+    @Published private(set) var agentStatus: [UUID: AgentStatus] = [:]
+    /// The program rang the bell or sent a notification while you were elsewhere. Covers agents without hooks.
+    @Published var bellRang = false
     @Published private(set) var branch: String?
     @Published private(set) var repoName: String?
     /// Set when the session runs in one of Farol's worktrees, even after `cd` into a subfolder.
@@ -37,6 +36,26 @@ final class Session: ObservableObject, Identifiable {
     }
 
     var hasRunningProcess: Bool { panes.terminals.contains { $0.hasRunningProcess } }
+
+    /// The most urgent state across the session's panes. Closed panes no longer count.
+    var activity: Activity {
+        let live = Set(panes.terminals.map(\.id))
+        let statuses = agentStatus.filter { live.contains($0.key) }.values
+        if bellRang || statuses.contains(.waiting) { return .waiting }
+        if statuses.contains(.working) { return .working }
+        if statuses.contains(.done) { return .done }
+        return .idle
+    }
+
+    func setAgentStatus(_ status: AgentStatus?, pane: UUID) {
+        agentStatus[pane] = status
+    }
+
+    /// Looking at the session is the acknowledgement, so the bell and "done" clear.
+    func acknowledge() {
+        bellRang = false
+        agentStatus = agentStatus.filter { $0.value != .done }
+    }
 
     /// Looks up the branch off the main thread. The shell retitles at every prompt, so a `git checkout` shows up too.
     func refreshGit() {
@@ -92,15 +111,55 @@ final class SessionStore: ObservableObject {
     /// Every new terminal, first pane or split, so the window can attach its handlers.
     var onTerminalCreated: ((TerminalView) -> Void)?
 
-    init(runtime: TerminalRuntime) {
+    /// A session's activity changed, from the old value to the new one. Used for notifications.
+    var onActivityChange: ((Session, Session.Activity, Session.Activity) -> Void)?
+
+    private let statusServer: StatusServer
+    private let cliPath: String
+
+    /// `socketPath` is where `farol status` reports. Each app build gets its own, so dev builds never mix with yours.
+    init(runtime: TerminalRuntime, socketPath: String) {
         self.runtime = runtime
+        cliPath = Bundle.main.resourceURL?.appendingPathComponent("bin/farol").path ?? "farol"
+        statusServer = StatusServer(path: socketPath)
+        statusServer.onMessage = { [weak self] in self?.receive($0) }
+        do {
+            try statusServer.start()
+        } catch {
+            NSLog("Farol: agent status is off, the socket failed to start: \(error)")
+        }
+    }
+
+    /// Every terminal gets its id and the socket in its environment, so its shell can report back.
+    private func makeTerminal(in directory: String?) -> TerminalView {
+        let id = UUID()
+        return TerminalView(runtime: runtime, workingDirectory: directory, id: id, environment: [
+            "FAROL_PANE": id.uuidString,
+            "FAROL_SOCKET": statusServer.path,
+            "FAROL_CLI": cliPath,
+        ])
+    }
+
+    private func receive(_ message: StatusMessage) {
+        guard let pane = UUID(uuidString: message.pane),
+              let session = sessions.first(where: { $0.panes.terminals.contains { $0.id == pane } }) else { return }
+        let before = session.activity
+        // A "done" you are already looking at needs no light.
+        let looking = session.id == selectedID && NSApp.isActive
+        session.setAgentStatus(message.status == .done && looking ? nil : message.status, pane: pane)
+        report(session, from: before)
+    }
+
+    private func report(_ session: Session, from before: Session.Activity) {
+        let after = session.activity
+        if after != before { onActivityChange?(session, before, after) }
     }
 
     var selected: Session? { sessions.first { $0.id == selectedID } }
 
     @discardableResult
     func create(directory: String = NSHomeDirectory()) -> Session {
-        create(PaneContainer(TerminalView(runtime: runtime, workingDirectory: directory)), directory: directory)
+        create(PaneContainer(makeTerminal(in: directory)), directory: directory)
     }
 
     /// An empty name goes back to the automatic one.
@@ -135,7 +194,7 @@ final class SessionStore: ObservableObject {
 
     /// Splits the focused pane. The new one opens in the same folder.
     func split(_ session: Session, _ direction: TerminalRequest.Direction) {
-        let terminal = TerminalView(runtime: runtime, workingDirectory: session.panes.focused.workingDirectory)
+        let terminal = makeTerminal(in: session.panes.focused.workingDirectory)
         wire(terminal, to: session)
         session.panes.split(direction, with: terminal)
     }
@@ -187,8 +246,8 @@ final class SessionStore: ObservableObject {
             return
         }
         for entry in usable {
-            let panes = PaneContainer(entry.layout) { [runtime] directory in
-                TerminalView(runtime: runtime, workingDirectory: exists(directory) ? directory : NSHomeDirectory())
+            let panes = PaneContainer(entry.layout) { directory in
+                self.makeTerminal(in: exists(directory) ? directory : NSHomeDirectory())
             }
             create(panes, directory: panes.focused.workingDirectory ?? NSHomeDirectory()).customName = entry.name
         }
@@ -206,7 +265,9 @@ final class SessionStore: ObservableObject {
     }
 
     func select(_ session: Session) {
-        session.status = .running
+        let before = session.activity
+        session.acknowledge()
+        report(session, from: before)
         selectedID = session.id
         onSelectionChange?(session)
         save()
@@ -243,7 +304,9 @@ final class SessionStore: ObservableObject {
 
     private func flag(_ session: Session?) {
         guard let session, session.id != selectedID else { return }
-        session.status = .needsAttention
+        let before = session.activity
+        session.bellRang = true
+        report(session, from: before)
     }
 }
 

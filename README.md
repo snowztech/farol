@@ -18,7 +18,7 @@ Farol is early. It works as a daily terminal, but expect rough edges.
 - **Find in scrollback.** ⌘F searches the focused pane and shows the match count.
 - **Split panes.** ⌘D splits a session, and the new pane opens in the same folder. Layouts come back after a relaunch.
 - **Worktree sessions.** ⇧⌘T asks for a branch and opens a session in its own git worktree, so parallel agents never touch each other's files. Closing it offers to remove the worktree and always keeps the branch.
-- **Attention light.** When a session rings the bell or sends a notification while you look elsewhere, its dot lights up. Coding agents do this when they wait for input.
+- **Agent status.** Each session shows whether its agent is working, waiting for you or done, with a notification when it waits in the background. See [Agent status](#agent-status).
 - **Ghostty rendering and compatibility.** Same fonts, same speed, same escape sequence support. Your existing Ghostty config is loaded.
 - **Themes.** Pick from Ghostty's 600+ themes with live previews. The window chrome follows the theme.
 - **Settings in the window.** Theme, font, size and cursor, plus a config file for everything else.
@@ -27,7 +27,27 @@ Farol is early. It works as a daily terminal, but expect rough edges.
 
 ## Planned
 
-Agent status, tickets from GitHub, GitLab and Jira, and a diff view. See [ROADMAP.md](ROADMAP.md).
+Tickets from GitHub, GitLab and Jira, and a diff view. See [ROADMAP.md](ROADMAP.md).
+
+## Agent status
+
+Each session's dot in the sidebar shows what its agent is doing: working, waiting for you (it pulses) or done (a ring, cleared when you look). When an agent waits while Farol is in the background, you get a notification, and the Dock icon counts the waiting sessions.
+
+Agents report through `farol status`, which Farol puts in every session as `$FAROL_CLI`. For Claude Code, add these hooks to `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status working" }] }],
+    "PostToolUse": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status working" }] }],
+    "Notification": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status waiting" }] }],
+    "Stop": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status done" }] }],
+    "SessionEnd": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status clear" }] }]
+  }
+}
+```
+
+Outside Farol the hooks do nothing. Any other agent can call `"$FAROL_CLI" status working|waiting|done|clear` the same way. Agents without hooks still light the dot when they ring the terminal bell.
 
 ## Build
 

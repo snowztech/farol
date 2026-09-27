@@ -37,8 +37,15 @@ public final class TerminalView: NSView {
 
     private var cursor = NSCursor.iBeam
 
-    /// `command` nil runs the user's login shell.
-    public init(runtime: TerminalRuntime, workingDirectory: String? = nil, command: String? = nil) {
+    /// Stable for the life of the terminal. The app hands it to the shell so the shell can report back.
+    public let id: UUID
+
+    /// `command` nil runs the user's login shell. `environment` is added to what the shell inherits.
+    public init(
+        runtime: TerminalRuntime, workingDirectory: String? = nil, command: String? = nil,
+        id: UUID = UUID(), environment: [String: String] = [:]
+    ) {
+        self.id = id
         self.workingDirectory = workingDirectory
         super.init(frame: NSRect(x: 0, y: 0, width: 900, height: 600))
 
@@ -50,11 +57,22 @@ public final class TerminalView: NSView {
         cfg.scale_factor = Double(NSScreen.main?.backingScaleFactor ?? 2)
         cfg.context = GHOSTTY_SURFACE_CONTEXT_TAB
 
+        // Ghostty copies what it needs during ghostty_surface_new, so these only live for the call.
+        let strings = environment.flatMap { [strdup($0.key)!, strdup($0.value)!] }
+        defer { strings.forEach { free($0) } }
+        var variables = stride(from: 0, to: strings.count, by: 2).map {
+            ghostty_env_var_s(key: strings[$0], value: strings[$0 + 1])
+        }
+
         surface = workingDirectory.withOptionalCString { wd in
             command.withOptionalCString { cmd in
-                cfg.working_directory = wd
-                cfg.command = cmd
-                return ghostty_surface_new(runtime.app, &cfg)
+                variables.withUnsafeMutableBufferPointer { buffer in
+                    cfg.working_directory = wd
+                    cfg.command = cmd
+                    cfg.env_vars = buffer.baseAddress
+                    cfg.env_var_count = buffer.count
+                    return ghostty_surface_new(runtime.app, &cfg)
+                }
             }
         }
 

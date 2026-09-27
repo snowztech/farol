@@ -11,6 +11,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private let runtime: TerminalRuntime
     private let state: WindowState
 
+    private let notifier = AgentNotifier()
     private let content = NSView()
     private let terminalContainer = NSView()
     private var sidebarWidth: NSLayoutConstraint!
@@ -96,6 +97,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         store.onTerminalCreated = { [weak self] in self?.configure($0) }
         store.onPaneExit = { [weak self] in self?.paneExited($1, in: $0) }
         runtime.onRequest = { [weak self] in self?.handle($0) }
+        store.onActivityChange = { [weak self] session, before, after in
+            guard let self else { return }
+            notifier.activityChanged(session, from: before, to: after)
+            notifier.updateBadge(waiting: store.sessions.filter { $0.activity == .waiting }.count)
+        }
+        notifier.onOpen = { [weak self] id in
+            guard let self, let session = store.sessions.first(where: { $0.id == id }) else { return }
+            store.select(session)
+        }
         store.onSelectionChange = { [weak self] in
             self?.state.showingSettings = false
             self?.show($0)

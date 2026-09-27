@@ -10,6 +10,9 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - Rename a session by double-clicking it in the sidebar, or with right-click. An empty name goes back to the automatic one.
 - Drag sessions to reorder them. ⌘1 to ⌘9 follow the new order.
 - Session names and order are saved with the rest of the session.
+- Agent status: the `farol status working|waiting|done|clear` command, available in every session as `$FAROL_CLI`, reports to the app over a private local socket. The sidebar dot shows working, waiting (pulsing) or done (a ring, cleared when you look), and the most urgent pane wins in a split session.
+- Ready-made Claude Code hooks in the README.
+- A notification when an agent waits or finishes while Farol is in the background, and a Dock badge counting waiting sessions. Clicking the notification opens the session.
 
 ## [0.1.0] - 2026-09-27
 

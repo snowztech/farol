@@ -12,7 +12,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let runtime = TerminalRuntime(overrideFiles: [Settings.fileURL])
         settings = Settings()
         settings.onChange = { runtime.reloadConfig() }
-        store = SessionStore(runtime: runtime)
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let socket = support.appendingPathComponent("Farol/\(Bundle.main.bundleIdentifier ?? "farol").sock").path
+        store = SessionStore(runtime: runtime, socketPath: socket)
         store.onLastSessionClosed = { [weak self] in
             // Its program was already confirmed or has exited.
             self?.quitConfirmed = true

@@ -56,37 +56,9 @@ private struct SessionRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Lamp(lit: session.status == .needsAttention, palette: palette)
+            Lamp(activity: session.activity, selected: selected, palette: palette)
 
-            VStack(alignment: .leading, spacing: 1) {
-                if editing {
-                    TextField("", text: $draft)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundStyle(palette.text)
-                        .focused($fieldFocused)
-                        .onSubmit(commit)
-                        .onExitCommand { editing = false }
-                        .onChange(of: fieldFocused) { _, focused in if !focused { commit() } }
-                } else {
-                    Text(session.displayName)
-                        .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
-                        .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
-                }
-                if let branch = session.branch {
-                    Label(branch, systemImage: "arrow.triangle.branch")
-                        .labelStyle(BranchLabelStyle())
-                        .font(.system(size: 11))
-                        .foregroundStyle(palette.muted)
-                        .truncationMode(.middle)
-                } else if let location = session.location {
-                    Text(location)
-                        .font(.system(size: 11))
-                        .foregroundStyle(palette.muted)
-                        .truncationMode(.head)
-                }
-            }
-            .lineLimit(1)
+            labels.lineLimit(1)
 
             Spacer(minLength: 0)
 
@@ -114,6 +86,37 @@ private struct SessionRow: View {
         .contextMenu {
             Button("Rename", action: startEditing)
             Button("Close Session", action: onClose)
+        }
+    }
+
+    private var labels: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            if editing {
+                TextField("", text: $draft)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(palette.text)
+                    .focused($fieldFocused)
+                    .onSubmit(commit)
+                    .onExitCommand { editing = false }
+                    .onChange(of: fieldFocused) { _, focused in if !focused { commit() } }
+            } else {
+                Text(session.displayName)
+                    .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
+                    .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
+            }
+            if let branch = session.branch {
+                Label(branch, systemImage: "arrow.triangle.branch")
+                    .labelStyle(BranchLabelStyle())
+                    .font(.system(size: 11))
+                    .foregroundStyle(palette.muted)
+                    .truncationMode(.middle)
+            } else if let location = session.location {
+                Text(location)
+                    .font(.system(size: 11))
+                    .foregroundStyle(palette.muted)
+                    .truncationMode(.head)
+            }
         }
     }
 
@@ -159,7 +162,9 @@ private struct Reorder: DropDelegate {
 
 /// Dim while the program runs. Lit and slowly pulsing when the session wants you.
 private struct Lamp: View {
-    let lit: Bool
+    let activity: Session.Activity
+    /// A session you are looking at has no need to pulse.
+    let selected: Bool
     let palette: Palette
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -167,7 +172,7 @@ private struct Lamp: View {
 
     var body: some View {
         ZStack {
-            if lit && !reduceMotion {
+            if activity == .waiting && !selected && !reduceMotion {
                 Circle()
                     .fill(palette.accent)
                     .scaleEffect(pulse ? 2.6 : 1)
@@ -177,9 +182,28 @@ private struct Lamp: View {
                     }
                     .onDisappear { pulse = false }
             }
-            Circle().fill(lit ? palette.accent : palette.muted.opacity(0.45))
+            dot
         }
         .frame(width: 7, height: 7)
+        .help(help)
+    }
+
+    @ViewBuilder private var dot: some View {
+        switch activity {
+        case .idle: Circle().fill(palette.muted.opacity(0.45))
+        case .working: Circle().fill(palette.accent.opacity(0.7))
+        case .waiting: Circle().fill(palette.accent)
+        case .done: Circle().strokeBorder(palette.accent, lineWidth: 1.5)
+        }
+    }
+
+    private var help: String {
+        switch activity {
+        case .idle: ""
+        case .working: "Agent working"
+        case .waiting: "Waiting for you"
+        case .done: "Agent finished"
+        }
     }
 }
 

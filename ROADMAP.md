@@ -37,10 +37,11 @@ Worktree logic lives in the `FarolCore` module with tests, since it is the first
 
 Farol knows what each agent is doing, not just that it rang the bell.
 
-- [ ] `farol` command line tool that talks to the app over a local socket, for example `farol status waiting`
-- [ ] Ready-made hooks for Claude Code and Codex that report running, waiting and done
+- [x] `farol` command line tool that talks to the app over a local socket, for example `farol status waiting`
+- [x] Ready-made hooks for Claude Code that report working, waiting and done
+- [ ] The same for Codex, and a one-click setup instead of pasting hooks
 - [ ] Default agent in settings, so a new session can start `claude` or `codex` directly
-- [ ] macOS notification and Dock badge when an agent waits while Farol is in the background
+- [x] macOS notification and Dock badge when an agent waits while Farol is in the background
 - [ ] Sessions grouped by repo in the sidebar
 
 ## v0.3: tickets
