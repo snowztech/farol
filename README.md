@@ -6,34 +6,32 @@
 
 <p align="center">A fast macOS terminal for working with coding agents.</p>
 
-Farol is Portuguese for lighthouse. You run several agents at once, each in its own session, and Farol tells you which one needs you.
+Run several coding agents side by side, each in its own session, and Farol shows you which one is working, which one is done and which one needs you. Farol is Portuguese for lighthouse.
 
-The terminal itself is [libghostty](https://github.com/ghostty-org/ghostty), the engine behind Ghostty. Farol adds a native macOS shell around it: a session sidebar, settings and, later, the agent workflow.
+Underneath is [libghostty](https://github.com/ghostty-org/ghostty), the engine behind Ghostty, so it is as fast as Ghostty and reads your Ghostty config.
 
 Farol is early. It works as a daily terminal, but expect rough edges.
 
 ## Install
 
-Download **Farol.dmg** from the [latest release](https://github.com/snowztech/farol/releases/latest), open it and drag Farol to Applications. It needs a Mac with Apple Silicon and macOS 14 or later.
+1. Download the DMG from the [latest release](https://github.com/snowztech/farol/releases/latest).
+2. Open it and drag Farol to Applications.
+3. Open Farol from Applications or Spotlight.
 
-To build it yourself instead, see [Build](#build).
+It needs a Mac with Apple Silicon and macOS 14 or later. Releases are signed and notarized, so macOS opens Farol without warnings. To build from source instead, see [Build from source](#build-from-source).
 
-## What works today
+## Features
 
-- **Sessions in a sidebar.** Open as many as you like. Hidden sessions keep running but stop rendering, so twenty background agents cost no GPU time. Each row shows the session's git branch. Double-click to rename, drag to reorder.
-- **Find in scrollback.** ⌘F searches the focused pane and shows the match count.
-- **Split panes.** ⌘D splits a session, and the new pane opens in the same folder. Layouts come back after a relaunch.
-- **Worktree sessions.** ⇧⌘T asks for a branch and opens a session in its own git worktree, so parallel agents never touch each other's files. Closing it offers to remove the worktree and always keeps the branch.
 - **Agent status.** Each session shows whether its agent is working, waiting for you or done, with a notification when it waits in the background. See [Agent status](#agent-status).
-- **Ghostty rendering and compatibility.** Same fonts, same speed, same escape sequence support. Your existing Ghostty config is loaded.
-- **Themes.** Pick from Ghostty's 600+ themes with live previews. The window chrome follows the theme.
-- **Settings in the window.** Theme, font, size and cursor, plus a config file for everything else.
-- **Copy and paste.** Pasting text that could run commands asks first. Files copied in Finder paste as their paths.
-- **Accents and input methods.** Dead keys compose as you type, and input methods for other languages work at the cursor.
+- **Worktree sessions.** ⇧⌘T asks for a branch and opens a session in its own git worktree, so parallel agents never touch each other's files. Closing it offers to remove the worktree and always keeps the branch.
+- **Sessions in a sidebar.** Open as many as you like. Hidden sessions keep running but stop rendering, so twenty background agents cost no GPU time. Each row shows its git branch. Double-click to rename, drag to reorder.
+- **Split panes.** ⌘D splits a session, and the new pane opens in the same folder. Layouts come back after a relaunch.
+- **Find in scrollback.** ⌘F searches the focused pane and shows the match count.
+- **Ghostty inside.** Same rendering, speed and escape sequence support, and your Ghostty config is loaded.
+- **Themes and settings.** Ghostty's 600+ themes with live previews, and settings inside the window.
+- **Copy and paste, accents and input methods.** Pasting text that could run commands asks first, dead keys compose as you type, and input methods for other languages work at the cursor.
 
-## Planned
-
-Tickets from GitHub, GitLab and Jira, and a diff view. See [ROADMAP.md](ROADMAP.md).
+Coming next: tickets from GitHub, GitLab and Jira, and a diff view. See [ROADMAP.md](ROADMAP.md).
 
 ## Agent status
 
@@ -67,20 +65,6 @@ When an agent waits or finishes while Farol is in the background, you get a noti
 Outside Farol `$FAROL_CLI` is unset, so the hooks do nothing.
 
 </details>
-
-## Build
-
-You need macOS 14 or later, Xcode 26 and Zig 0.16.
-
-```sh
-brew install zig
-xcodebuild -downloadComponent MetalToolchain   # once, Xcode 26 no longer ships it
-make install                                   # builds from source into /Applications
-```
-
-The first build compiles libghostty and takes a few minutes. After that, `make run` gives you a quick debug build and `make help` lists everything else.
-
-Maintainers: signing and publishing a release are covered in [RELEASING.md](RELEASING.md).
 
 ## Shortcuts
 
@@ -117,6 +101,18 @@ font-size = 14
 
 See the [Ghostty docs](https://ghostty.org/docs/config) for every option.
 
+## Build from source
+
+You need macOS 14 or later, Xcode 26 and Zig 0.16.
+
+```sh
+brew install zig
+xcodebuild -downloadComponent MetalToolchain   # once, Xcode 26 no longer ships it
+make install                                   # builds from source into /Applications
+```
+
+The first build compiles libghostty and takes a few minutes. After that, `make run` gives you a quick debug build and `make help` lists everything else.
+
 ## How it's built
 
 ```
@@ -136,14 +132,14 @@ Farol embeds Ghostty through its internal API (`ghostty.h`). Ghostty makes no st
 
 ## Contributing
 
-Issues and pull requests are welcome. Before you open a PR, run:
+Issues and pull requests are welcome. Before you open a PR, run the tests and the style check:
 
 ```sh
 make test
 make check
 ```
 
-It flags em dashes, semicolons in prose, comment blocks over three lines and filler words. Comments should explain why, not what. CI runs the same check on every pull request.
+`make check` flags em dashes, semicolons in prose, comment blocks over three lines and filler words. Comments should explain why, not what. CI runs the same check on every pull request.
 
 ## License
 

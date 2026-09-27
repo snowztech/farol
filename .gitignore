@@ -4,3 +4,4 @@ vendor/
 .DS_Store
 build/
 .claude/settings.local.json
+RELEASING.md
