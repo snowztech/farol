@@ -7,8 +7,10 @@ final class AgentNotifier: NSObject, UNUserNotificationCenterDelegate {
     var onOpen: ((UUID) -> Void)?
 
     private let center = UNUserNotificationCenter.current()
+    private let settings: AgentSettings
 
-    override init() {
+    init(settings: AgentSettings) {
+        self.settings = settings
         super.init()
         center.delegate = self
     }
@@ -16,9 +18,9 @@ final class AgentNotifier: NSObject, UNUserNotificationCenterDelegate {
     func activityChanged(_ session: Session, from before: Session.Activity, to after: Session.Activity) {
         guard !NSApp.isActive else { return }
         switch after {
-        case .waiting:
+        case .waiting where settings.notifyWaiting:
             post(session, title: "\(session.displayName) is waiting for you", body: "An agent needs your input to continue.")
-        case .done where before == .working:
+        case .done where before == .working && settings.notifyDone:
             post(session, title: "\(session.displayName) is done", body: "The agent finished its turn.")
         default:
             break

@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 import GhosttyTerminal
 
@@ -11,13 +12,17 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private let runtime: TerminalRuntime
     private let state: WindowState
 
-    private let notifier = AgentNotifier()
+    private lazy var notifier = AgentNotifier(settings: agents)
     private let content = NSView()
     private let terminalContainer = NSView()
     private var sidebarWidth: NSLayoutConstraint!
     private var settingsView: NSView!
 
-    init(store: SessionStore, runtime: TerminalRuntime, settings: Settings) {
+    let agents: AgentSettings
+    private var badgeSwitch: AnyCancellable?
+
+    init(store: SessionStore, runtime: TerminalRuntime, settings: Settings, agents: AgentSettings) {
+        self.agents = agents
         self.store = store
         self.runtime = runtime
         let base = runtime.ghosttyConfigColors
@@ -47,7 +52,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let topBar = hosting(TopBar(state: state, store: store, commands: commands))
         let sidebar = hosting(SidebarView(store: store, state: state, commands: commands))
         sidebar.clipsToBounds = true
-        settingsView = hosting(SettingsPage(settings: settings, state: state))
+        settingsView = hosting(SettingsPage(settings: settings, agents: agents, state: state))
         settingsView.isHidden = true
 
         content.wantsLayer = true
@@ -100,8 +105,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         store.onActivityChange = { [weak self] session, before, after in
             guard let self else { return }
             notifier.activityChanged(session, from: before, to: after)
-            notifier.updateBadge(waiting: store.sessions.filter { $0.activity == .waiting }.count)
+            refreshBadge(enabled: agents.dockBadge)
         }
+        // @Published reports the new value before the property changes, so pass it along.
+        badgeSwitch = agents.$dockBadge.dropFirst().sink { [weak self] in self?.refreshBadge(enabled: $0) }
         notifier.onOpen = { [weak self] id in
             guard let self, let session = store.sessions.first(where: { $0.id == id }) else { return }
             store.select(session)
@@ -158,7 +165,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// Opens where you are: the focused pane's folder, or home when there is no session yet.
     func newSession() {
-        store.create(directory: store.selected?.panes.focused.workingDirectory ?? NSHomeDirectory())
+        store.create(directory: store.selected?.panes.focused.workingDirectory ?? NSHomeDirectory(), run: agents.startCommand)
     }
 
     func toggleSidebar() {
@@ -196,6 +203,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private var theme: (background: NSColor, foreground: NSColor) { (runtime.backgroundColor, runtime.foregroundColor) }
+
+    private func refreshBadge(enabled: Bool) {
+        notifier.updateBadge(waiting: enabled ? store.sessions.filter { $0.activity == .waiting }.count : 0)
+    }
 
     // MARK: Find
 

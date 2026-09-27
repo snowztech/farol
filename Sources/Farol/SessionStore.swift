@@ -131,13 +131,14 @@ final class SessionStore: ObservableObject {
     }
 
     /// Every terminal gets its id and the socket in its environment, so its shell can report back.
-    private func makeTerminal(in directory: String?) -> TerminalView {
+    private func makeTerminal(in directory: String?, run: String? = nil) -> TerminalView {
         let id = UUID()
+        let command = run?.trimmingCharacters(in: .whitespaces) ?? ""
         return TerminalView(runtime: runtime, workingDirectory: directory, id: id, environment: [
             "FAROL_PANE": id.uuidString,
             "FAROL_SOCKET": statusServer.path,
             "FAROL_CLI": cliPath,
-        ])
+        ], input: command.isEmpty ? nil : command + "\n")
     }
 
     private func receive(_ message: StatusMessage) {
@@ -157,9 +158,10 @@ final class SessionStore: ObservableObject {
 
     var selected: Session? { sessions.first { $0.id == selectedID } }
 
+    /// `run` is typed into the new shell, for example "claude" to start an agent right away.
     @discardableResult
-    func create(directory: String = NSHomeDirectory()) -> Session {
-        create(PaneContainer(makeTerminal(in: directory)), directory: directory)
+    func create(directory: String = NSHomeDirectory(), run: String? = nil) -> Session {
+        create(PaneContainer(makeTerminal(in: directory, run: run)), directory: directory)
     }
 
     /// An empty name goes back to the automatic one.

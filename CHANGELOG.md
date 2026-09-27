@@ -12,6 +12,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - Session names and order are saved with the rest of the session.
 - Agent status: the `farol status working|waiting|done|clear` command, available in every session as `$FAROL_CLI`, reports to the app over a private local socket. The sidebar dot shows working, waiting (pulsing) or done (a ring, cleared when you look), and the most urgent pane wins in a split session.
 - Ready-made Claude Code hooks in the README.
+- Agents settings page: connect or disconnect Claude Code in one click (only Farol's hooks change, with a backup of the file), switch notifications and the Dock badge, and choose what new sessions start with (shell, Claude Code, Codex or a custom command).
 - A notification when an agent waits or finishes while Farol is in the background, and a Dock badge counting waiting sessions. Clicking the notification opens the session.
 
 ## [0.1.0] - 2026-09-27

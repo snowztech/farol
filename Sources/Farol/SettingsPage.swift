@@ -1,10 +1,21 @@
+import FarolCore
 import SwiftUI
 import GhosttyTerminal
 
 /// Settings live in the window, in place of the terminal, like any other page.
 struct SettingsPage: View {
     @ObservedObject var settings: Settings
+    @ObservedObject var agents: AgentSettings
     @ObservedObject var state: WindowState
+
+    @State private var claudeConnected = false
+    @State private var claudeConfirm: ClaudeChange?
+    @State private var claudeError: String?
+
+    private enum ClaudeChange: Identifiable {
+        case connect, disconnect
+        var id: Self { self }
+    }
 
     @State private var section = Section.appearance
     @State private var themeQuery = ""
@@ -12,6 +23,7 @@ struct SettingsPage: View {
     enum Section: String, CaseIterable {
         case appearance = "Appearance"
         case terminal = "Terminal"
+        case agents = "Agents"
         case shortcuts = "Shortcuts"
         case about = "About"
     }
@@ -44,6 +56,7 @@ struct SettingsPage: View {
                     switch section {
                     case .appearance: appearance(p)
                     case .terminal: terminal(p)
+                    case .agents: agentsSection(p)
                     case .shortcuts: shortcuts(p)
                     case .about: about(p)
                     }
@@ -133,6 +146,103 @@ struct SettingsPage: View {
             .font(.system(size: 12))
             .foregroundStyle(p.muted)
             .padding(.top, 20)
+    }
+
+    @ViewBuilder private func agentsSection(_ p: Palette) -> some View {
+        Heading(title: "Agents", detail: "Connect your coding agents so the sidebar shows what they are doing.", palette: p)
+
+        GroupTitle(title: "Integrations", palette: p)
+        Row(title: "Claude Code",
+            detail: claudeConnected
+                ? "Connected. Its hooks report working, waiting and done."
+                : "Adds five hooks to ~/.claude/settings.json.",
+            palette: p) {
+            Button(claudeConnected ? "Disconnect" : "Set Up") {
+                claudeConfirm = claudeConnected ? .disconnect : .connect
+            }
+        }
+        Row(title: "Other agents",
+            detail: "Any agent can report with \"$FAROL_CLI\" status working, waiting, done or clear. Agents that ring the terminal bell light the dot without setup.",
+            palette: p) { EmptyView() }
+
+        GroupTitle(title: "Notifications", palette: p)
+        Row(title: "When an agent is waiting for you", palette: p) { toggle($agents.notifyWaiting) }
+        Row(title: "When an agent finishes", palette: p) { toggle($agents.notifyDone) }
+        Row(title: "Waiting count on the Dock icon", palette: p) { toggle($agents.dockBadge) }
+
+        GroupTitle(title: "New sessions", palette: p)
+        Row(title: "Start with", detail: "Typed into the shell of every new session, so you are back in the shell when it exits.", palette: p) {
+            Picker("", selection: startPreset) {
+                Text("Shell").tag("")
+                Text("Claude Code").tag("claude")
+                Text("Codex").tag("codex")
+                Text("Custom").tag(Self.custom)
+            }
+            .labelsHidden()
+            .fixedSize()
+        }
+        if isCustomStart {
+            Row(title: "Command", palette: p) {
+                TextField("For example aider", text: $agents.startCommand)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 220)
+            }
+        }
+        EmptyView()
+            .onAppear(perform: refreshClaude)
+            .alert(item: $claudeConfirm) { change in
+                switch change {
+                case .connect:
+                    Alert(
+                        title: Text("Connect Claude Code?"),
+                        message: Text("Farol adds hooks for five events to ~/.claude/settings.json. Your other settings stay as they are, though the file may be reformatted. The current file is kept as settings.json.farol-backup."),
+                        primaryButton: .default(Text("Connect")) { changeClaude(ClaudeHooks.install) },
+                        secondaryButton: .cancel())
+                case .disconnect:
+                    Alert(
+                        title: Text("Disconnect Claude Code?"),
+                        message: Text("Farol removes only its own hooks from ~/.claude/settings.json and keeps a backup of the file."),
+                        primaryButton: .destructive(Text("Disconnect")) { changeClaude(ClaudeHooks.remove) },
+                        secondaryButton: .cancel())
+                }
+            }
+        if let claudeError {
+            Text(claudeError)
+                .font(.system(size: 12))
+                .foregroundStyle(.red)
+                .padding(.top, 12)
+        }
+    }
+
+    private static let custom = "custom"
+
+    private var isCustomStart: Bool {
+        !["", "claude", "codex"].contains(agents.startCommand)
+    }
+
+    /// The picker shows a preset, and "Custom" reveals a field for any other command.
+    private var startPreset: Binding<String> {
+        Binding(
+            get: { isCustomStart ? Self.custom : agents.startCommand },
+            set: { agents.startCommand = $0 == Self.custom ? (isCustomStart ? agents.startCommand : " ") : $0 })
+    }
+
+    private func toggle(_ value: Binding<Bool>) -> some View {
+        Toggle("", isOn: value).labelsHidden().toggleStyle(.switch).controlSize(.small)
+    }
+
+    private func refreshClaude() {
+        claudeConnected = (try? ClaudeHooks.read()).map(ClaudeHooks.isInstalled) ?? false
+    }
+
+    private func changeClaude(_ change: ([String: Any]) -> [String: Any]) {
+        do {
+            try ClaudeHooks.write(change(try ClaudeHooks.read()))
+            claudeError = nil
+        } catch {
+            claudeError = "Could not update ~/.claude/settings.json: \(error.localizedDescription)"
+        }
+        refreshClaude()
     }
 
     @ViewBuilder private func shortcuts(_ p: Palette) -> some View {

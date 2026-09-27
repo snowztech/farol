@@ -41,9 +41,10 @@ public final class TerminalView: NSView {
     public let id: UUID
 
     /// `command` nil runs the user's login shell. `environment` is added to what the shell inherits.
+    /// `input` is typed into the shell once it starts, so a command like "claude\n" runs and leaves the shell behind.
     public init(
         runtime: TerminalRuntime, workingDirectory: String? = nil, command: String? = nil,
-        id: UUID = UUID(), environment: [String: String] = [:]
+        id: UUID = UUID(), environment: [String: String] = [:], input: String? = nil
     ) {
         self.id = id
         self.workingDirectory = workingDirectory
@@ -66,12 +67,15 @@ public final class TerminalView: NSView {
 
         surface = workingDirectory.withOptionalCString { wd in
             command.withOptionalCString { cmd in
-                variables.withUnsafeMutableBufferPointer { buffer in
-                    cfg.working_directory = wd
-                    cfg.command = cmd
-                    cfg.env_vars = buffer.baseAddress
-                    cfg.env_var_count = buffer.count
-                    return ghostty_surface_new(runtime.app, &cfg)
+                input.withOptionalCString { typed in
+                    variables.withUnsafeMutableBufferPointer { buffer in
+                        cfg.working_directory = wd
+                        cfg.command = cmd
+                        cfg.initial_input = typed
+                        cfg.env_vars = buffer.baseAddress
+                        cfg.env_var_count = buffer.count
+                        return ghostty_surface_new(runtime.app, &cfg)
+                    }
                 }
             }
         }

@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let runtime = TerminalRuntime(overrideFiles: [Settings.fileURL])
         settings = Settings()
+        let agents = AgentSettings()
         settings.onChange = { runtime.reloadConfig() }
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let socket = support.appendingPathComponent("Farol/\(Bundle.main.bundleIdentifier ?? "farol").sock").path
@@ -20,7 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.quitConfirmed = true
             NSApp.terminate(nil)
         }
-        windowController = MainWindowController(store: store, runtime: runtime, settings: settings)
+        windowController = MainWindowController(store: store, runtime: runtime, settings: settings, agents: agents)
         NSApp.mainMenu = makeMenu()
 
         windowController.showWindow(nil)

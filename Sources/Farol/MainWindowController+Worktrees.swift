@@ -51,7 +51,7 @@ extension MainWindowController {
                 let result = Result { try Worktrees.default.create(branch: branch, from: directory) }
                 DispatchQueue.main.async {
                     switch result {
-                    case .success(let path): self?.store.create(directory: path)
+                    case .success(let path): self?.store.create(directory: path, run: self?.agents.startCommand)
                     case .failure(let error): self?.showError("Couldn't create the worktree", "\(error)")
                     }
                 }
