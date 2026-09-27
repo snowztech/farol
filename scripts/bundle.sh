@@ -6,6 +6,14 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 config="${1:-release}"
 app="$root/build/Farol.app"
+# Debug builds get their own identity, so testing them never touches the installed app's sessions.
+if [ "$config" = "debug" ]; then
+  bundle_id="dev.farol.Farol.debug"
+  name="Farol Dev"
+else
+  bundle_id="dev.farol.Farol"
+  name="Farol"
+fi
 
 swift build --package-path "$root" -c "$config"
 
@@ -20,8 +28,8 @@ cat > "$app/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleIdentifier</key><string>dev.farol.Farol</string>
-  <key>CFBundleName</key><string>Farol</string>
+  <key>CFBundleIdentifier</key><string>$bundle_id</string>
+  <key>CFBundleName</key><string>$name</string>
   <key>CFBundleExecutable</key><string>Farol</string>
   <key>CFBundleIconFile</key><string>Farol</string>
   <key>CFBundlePackageType</key><string>APPL</string>
