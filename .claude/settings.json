@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/check-style.py\" --hook",
+            "timeout": 10,
+            "statusMessage": "Checking style"
+          }
+        ]
+      }
+    ]
+  }
+}
