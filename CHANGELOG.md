@@ -30,11 +30,16 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - Find in scrollback: ⌘F opens a search bar on the focused pane with a match count, ↩ and ⇧↩ or ⌘G and ⇧⌘G move between matches, ⌘E searches the selected text, and esc closes it.
 
+- Settings: cursor blink, Option key as Alt (off by default so Option still types accents) and copy on select.
+- The Shortcuts page lists every shortcut, grouped by sessions, panes, find, terminal and window.
+- The style check also reads interface text in Swift strings.
+
 ### Fixed
 
 - The Farol config file now ends with a newline, so settings appended by hand stay on their own line.
 - The window's close button no longer closes the window when you cancel the quit.
 - The search bar's field no longer collapses, and its buttons are centered.
+- Settings controls line up on the same edge.
 
 ## First commits
 

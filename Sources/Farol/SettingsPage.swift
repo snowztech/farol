@@ -81,19 +81,23 @@ struct SettingsPage: View {
     }
 
     @ViewBuilder private func terminal(_ p: Palette) -> some View {
-        Heading(title: "Terminal", detail: "Font and cursor for every session.", palette: p)
-        Row(title: "Font", palette: p) {
+        Heading(title: "Terminal", detail: "Applies to every session.", palette: p)
+
+        GroupTitle(title: "Font", palette: p)
+        Row(title: "Family", palette: p) {
             Picker("", selection: $settings.fontFamily) {
                 Text("Default").tag("")
                 ForEach(Settings.monospacedFamilies, id: \.self) { Text($0).tag($0) }
             }
             .labelsHidden()
-            .frame(width: 220)
+            .fixedSize()
         }
         Row(title: "Size", palette: p) {
             Stepper("\(settings.fontSize) pt", value: $settings.fontSize, in: 8...32)
         }
-        Row(title: "Cursor", palette: p) {
+
+        GroupTitle(title: "Cursor", palette: p)
+        Row(title: "Style", palette: p) {
             Picker("", selection: $settings.cursorStyle) {
                 Text("Block").tag("block")
                 Text("Bar").tag("bar")
@@ -101,25 +105,52 @@ struct SettingsPage: View {
             }
             .labelsHidden()
             .pickerStyle(.segmented)
-            .frame(width: 220)
+            .fixedSize()
         }
-        Text("Anything else Ghostty supports can go in the config file. Your Ghostty config loads first; Farol's settings win.")
+        Row(title: "Blink", palette: p) {
+            Toggle("", isOn: $settings.cursorBlink).labelsHidden().toggleStyle(.switch).controlSize(.small)
+        }
+
+        GroupTitle(title: "Keyboard and mouse", palette: p)
+        Row(title: "Option key as Alt",
+            detail: "For shortcuts in programs like vim or emacs. Leave it off to type accents with Option.",
+            palette: p) {
+            Picker("", selection: $settings.optionAsAlt) {
+                Text("Off").tag("false")
+                Text("Left").tag("left")
+                Text("Right").tag("right")
+                Text("Both").tag("true")
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .fixedSize()
+        }
+        Row(title: "Copy on select", detail: "Selecting text copies it to the clipboard.", palette: p) {
+            Toggle("", isOn: $settings.copyOnSelect).labelsHidden().toggleStyle(.switch).controlSize(.small)
+        }
+
+        Text("Anything else Ghostty supports can go in the config file. Your Ghostty config loads first, and these settings override it.")
             .font(.system(size: 12))
             .foregroundStyle(p.muted)
-            .padding(.top, 16)
+            .padding(.top, 20)
     }
 
     @ViewBuilder private func shortcuts(_ p: Palette) -> some View {
-        Heading(title: "Shortcuts", detail: nil, palette: p)
-        ForEach(Self.shortcutList, id: \.0) { action, keys in
-            Row(title: action, palette: p) {
-                Text(keys)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(p.raised, in: RoundedRectangle(cornerRadius: 5))
+        Heading(title: "Shortcuts", detail: "Ghostty's defaults, plus Farol's own for sessions.", palette: p)
+        ForEach(Self.shortcutGroups, id: \.title) { group in
+            GroupTitle(title: group.title, palette: p)
+            ForEach(group.items, id: \.action) { item in
+                Row(title: item.action, palette: p) {
+                    HStack(spacing: 4) {
+                        ForEach(item.keys, id: \.self) { Keycap(keys: $0, palette: p) }
+                    }
+                }
             }
         }
+        Text("Rebind any of them in the config file, for example keybind = cmd+shift+enter=toggle_split_zoom.")
+            .font(.system(size: 12))
+            .foregroundStyle(p.muted)
+            .padding(.top, 20)
     }
 
     @ViewBuilder private func about(_ p: Palette) -> some View {
@@ -135,14 +166,52 @@ struct SettingsPage: View {
 
     private static let themeCount = TerminalRuntime.bundledThemes.count
 
-    private static let shortcutList = [
-        ("New session", "⌘T"),
-        ("Close session", "⌘W"),
-        ("Next session", "⇧⌘]"),
-        ("Previous session", "⇧⌘["),
-        ("Go to session 1–9", "⌘1 – ⌘9"),
-        ("Toggle sidebar", "⌘B"),
-        ("Settings", "⌘,"),
+    private struct ShortcutGroup {
+        let title: String
+        let items: [(action: String, keys: [String])]
+    }
+
+    private static let shortcutGroups = [
+        ShortcutGroup(title: "Sessions", items: [
+            ("New session", ["⌘T", "⌘N"]),
+            ("New worktree session", ["⇧⌘T"]),
+            ("Close pane or session", ["⌘W"]),
+            ("Next and previous session", ["⇧⌘]", "⇧⌘["]),
+            ("Go to session 1 to 9", ["⌘1…⌘9"]),
+        ]),
+        ShortcutGroup(title: "Panes", items: [
+            ("Split right", ["⌘D"]),
+            ("Split down", ["⇧⌘D"]),
+            ("Next and previous pane", ["⌘]", "⌘["]),
+            ("Move to the pane in a direction", ["⌥⌘ arrows"]),
+            ("Resize the focused pane", ["⌃⌘ arrows"]),
+            ("Make panes equal", ["⌃⌘="]),
+            ("Zoom the focused pane", ["⇧⌘↩"]),
+        ]),
+        ShortcutGroup(title: "Find", items: [
+            ("Find", ["⌘F"]),
+            ("Next and previous match", ["⌘G", "⇧⌘G"]),
+            ("Find the selected text", ["⌘E"]),
+            ("Close find", ["esc"]),
+        ]),
+        ShortcutGroup(title: "Terminal", items: [
+            ("Copy, paste, select all", ["⌘C", "⌘V", "⌘A"]),
+            ("Clear the screen", ["⌘K"]),
+            ("Bigger, smaller, reset text", ["⌘+", "⌘−", "⌘0"]),
+            ("Previous and next prompt", ["⌘↑", "⌘↓"]),
+            ("Scroll to top and bottom", ["⌘Home", "⌘End"]),
+            ("Scroll a page", ["⌘Page Up", "⌘Page Down"]),
+            ("Start and end of line", ["⌘←", "⌘→"]),
+            ("Previous and next word", ["⌥←", "⌥→"]),
+            ("Delete to start of line", ["⌘⌫"]),
+        ]),
+        ShortcutGroup(title: "Window", items: [
+            ("Toggle sidebar", ["⌘B"]),
+            ("Full screen", ["⌃⌘F", "⌘↩"]),
+            ("Settings", ["⌘,"]),
+            ("Reload configuration", ["⇧⌘,"]),
+            ("Quit", ["⌘Q"]),
+        ]),
     ]
 }
 
@@ -164,17 +233,50 @@ private struct Heading: View {
 
 private struct Row<Control: View>: View {
     let title: String
+    var detail: String? = nil
     let palette: Palette
     @ViewBuilder let control: Control
 
     var body: some View {
-        HStack {
-            Text(title).font(.system(size: 13))
-            Spacer()
+        HStack(alignment: .center, spacing: 24) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.system(size: 13))
+                if let detail {
+                    Text(detail).font(.system(size: 11.5)).foregroundStyle(palette.muted)
+                }
+            }
+            Spacer(minLength: 0)
             control
         }
-        .padding(.vertical, 11)
+        .padding(.vertical, 10)
         .overlay(alignment: .bottom) { Rectangle().fill(palette.line).frame(height: 1) }
+    }
+}
+
+/// A small heading between rows. Sentence case, a step above the rows, no rule of its own.
+private struct GroupTitle: View {
+    let title: String
+    let palette: Palette
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(palette.muted)
+            .padding(.top, 22)
+            .padding(.bottom, 2)
+    }
+}
+
+private struct Keycap: View {
+    let keys: String
+    let palette: Palette
+
+    var body: some View {
+        Text(keys)
+            .font(.system(size: 12, weight: .medium, design: .rounded))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(palette.raised, in: RoundedRectangle(cornerRadius: 5))
     }
 }
 

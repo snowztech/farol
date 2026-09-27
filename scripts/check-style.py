@@ -74,6 +74,14 @@ def check(path: Path) -> list[str]:
         if comment_run == MAX_COMMENT_LINES + 1:
             problems.append(f"{where}: comment block over {MAX_COMMENT_LINES} lines. Keep only the non-obvious why.")
 
+        # Interface text in Swift strings is prose too, and reads as badly as a doc with the same slip.
+        if suffix == ".swift" and prose is None:
+            for literal in re.findall(r'"((?:[^"\\]|\\.)*)"', line):
+                if "; " in literal:
+                    problems.append(f"{where}: semicolon in interface text. Split it into two sentences.")
+                if match := SLOP.search(literal):
+                    problems.append(f'{where}: "{match.group(0)}" in interface text reads as filler. Say it plainly.')
+
         if prose is None:
             continue
         if ";" in prose:

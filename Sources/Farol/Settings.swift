@@ -10,6 +10,12 @@ final class Settings: ObservableObject {
     @Published var fontFamily: String { didSet { write("font-family", fontFamily) } }
     @Published var fontSize: Int { didSet { write("font-size", String(fontSize)) } }
     @Published var cursorStyle: String { didSet { write("cursor-style", cursorStyle) } }
+    /// Ghostty blinks by default, so only "off" is written.
+    @Published var cursorBlink: Bool { didSet { write("cursor-style-blink", cursorBlink ? "" : "false") } }
+    /// "false", "left", "right" or "true". Off keeps Option for typing accents.
+    @Published var optionAsAlt: String { didSet { write("macos-option-as-alt", optionAsAlt == "false" ? "" : optionAsAlt) } }
+    /// Selecting text copies it to the clipboard right away.
+    @Published var copyOnSelect: Bool { didSet { write("copy-on-select", copyOnSelect ? "clipboard" : "") } }
 
     /// Called after every change so the terminal can reload.
     var onChange: (() -> Void)?
@@ -24,6 +30,9 @@ final class Settings: ObservableObject {
         fontFamily = values["font-family"] ?? ""
         fontSize = values["font-size"].flatMap { Int($0) } ?? 13
         cursorStyle = values["cursor-style"] ?? "block"
+        cursorBlink = values["cursor-style-blink"] != "false"
+        optionAsAlt = values["macos-option-as-alt"] ?? "false"
+        copyOnSelect = values["copy-on-select"] == "clipboard"
     }
 
     /// Empty value removes the key, falling back to the Ghostty default.
