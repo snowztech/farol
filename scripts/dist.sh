@@ -41,6 +41,8 @@ make_dmg() {
   staging=$(mktemp -d)
   cp -R "$app" "$staging/"
   ln -s /Applications "$staging/Applications"
+  # Window size and icon positions, made once with dmgbuild. Finder matches it by item name.
+  cp "$root/assets/dmg.DS_Store" "$staging/.DS_Store"
   rm -f "$dmg"
   hdiutil create -quiet -volname Farol -srcfolder "$staging" -ov -format UDZO "$dmg"
   rm -rf "$staging"
