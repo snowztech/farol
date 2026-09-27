@@ -4,9 +4,12 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-27
+
 ### Changed
 
 - The DMG opens as a small window with Farol next to Applications, ready to drag.
+- Building from source downloads a prebuilt libghostty, so it no longer needs Zig or the Metal toolchain.
 
 ## [0.1.1] - 2026-09-27
 
@@ -81,6 +84,7 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/snowztech/farol/releases/tag/v0.1.2
 [0.1.1]: https://github.com/snowztech/farol/releases/tag/v0.1.1
 [0.1.0]: https://github.com/snowztech/farol/releases/tag/v0.1.0
