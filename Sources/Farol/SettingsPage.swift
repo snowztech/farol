@@ -156,7 +156,7 @@ struct SettingsPage: View {
     @ViewBuilder private func about(_ p: Palette) -> some View {
         Heading(title: "Farol", detail: "A terminal for working with agents.", palette: p)
         Row(title: "Version", palette: p) {
-            Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev")
+            Text(Self.version)
                 .foregroundStyle(p.muted)
         }
         Row(title: "Terminal engine", palette: p) {
@@ -165,6 +165,9 @@ struct SettingsPage: View {
     }
 
     private static let themeCount = TerminalRuntime.bundledThemes.count
+
+    /// Set by scripts/bundle.sh from the latest git tag.
+    private static let version = Bundle.main.object(forInfoDictionaryKey: "FarolVersion") as? String ?? "dev"
 
     private struct ShortcutGroup {
         let title: String

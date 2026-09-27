@@ -4,8 +4,13 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-27
+
+The first tagged version. Build it from source with `make install`. Signed downloads come later.
+
 ### Added
 
+- Session sidebar, themes with live previews, settings inside the window and the app icon.
 - Copy and paste through the Edit menu. Pasting text that could run commands shows a confirmation first.
 - Files copied in Finder paste as shell-escaped paths.
 - A program asking to read or set the clipboard needs your approval.
@@ -41,11 +46,5 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-## First commits
-
-The groundwork before any release:
-
-- libghostty embedded in a native macOS window
-- Session sidebar with shortcuts and an attention light
-- Themes with live previews, and settings inside the window
-- App icon, `make install` and the style check
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/snowztech/farol/releases/tag/v0.1.0

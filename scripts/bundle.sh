@@ -15,6 +15,13 @@ else
   name="Farol"
 fi
 
+# Version from the latest v* tag. Builds after a tag read like 0.1.0-3-gabc1234, and -dirty marks uncommitted changes.
+described=$(git -C "$root" describe --tags --match 'v[0-9]*' --dirty 2>/dev/null || echo "v0.0.0-dev")
+version="${described#v}"
+# macOS wants plain numbers in the short version, so the full string gets its own key.
+short_version="${version%%-*}"
+build_number=$(git -C "$root" rev-list --count HEAD 2>/dev/null || echo 0)
+
 swift build --package-path "$root" -c "$config"
 
 rm -rf "$app"
@@ -33,7 +40,9 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>CFBundleExecutable</key><string>Farol</string>
   <key>CFBundleIconFile</key><string>Farol</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.0.1</string>
+  <key>CFBundleShortVersionString</key><string>$short_version</string>
+  <key>CFBundleVersion</key><string>$build_number</string>
+  <key>FarolVersion</key><string>$version</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>NSHighResolutionCapable</key><true/>
 </dict>
@@ -41,4 +50,4 @@ cat > "$app/Contents/Info.plist" <<PLIST
 PLIST
 
 codesign --force --sign - "$app" >/dev/null
-echo "built $app"
+echo "built $app ($version)"
