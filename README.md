@@ -14,7 +14,7 @@ Farol is early. It works as a daily terminal, but expect rough edges.
 
 ## What works today
 
-- **Sessions in a sidebar.** Open as many as you like. Hidden sessions keep running but stop rendering, so twenty background agents cost no GPU time. Each row shows the session's git branch.
+- **Sessions in a sidebar.** Open as many as you like. Hidden sessions keep running but stop rendering, so twenty background agents cost no GPU time. Each row shows the session's git branch. Double-click to rename, drag to reorder.
 - **Find in scrollback.** ⌘F searches the focused pane and shows the match count.
 - **Split panes.** ⌘D splits a session, and the new pane opens in the same folder. Layouts come back after a relaunch.
 - **Worktree sessions.** ⇧⌘T asks for a branch and opens a session in its own git worktree, so parallel agents never touch each other's files. Closing it offers to remove the worktree and always keeps the branch.

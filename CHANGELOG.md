@@ -4,6 +4,13 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- New sessions open in the focused pane's folder instead of the home folder.
+- Rename a session by double-clicking it in the sidebar, or with right-click. An empty name goes back to the automatic one.
+- Drag sessions to reorder them. ⌘1 to ⌘9 follow the new order.
+- Session names and order are saved with the rest of the session.
+
 ## [0.1.0] - 2026-09-27
 
 The first tagged version. Build it from source with `make install`. Signed downloads come later.

@@ -7,6 +7,8 @@ struct SidebarView: View {
     @ObservedObject var state: WindowState
     let commands: Commands
 
+    @State private var dragging: Session?
+
     var body: some View {
         let p = state.palette
         ScrollView {
@@ -16,8 +18,17 @@ struct SidebarView: View {
                         session: session,
                         selected: session.id == store.selectedID && !state.showingSettings,
                         palette: p,
-                        onSelect: { store.select(session) },
+                        // Reselecting would pull focus back into the terminal, which a rename would lose.
+                        onSelect: {
+                            if session.id != store.selectedID || state.showingSettings { store.select(session) }
+                        },
+                        onRename: { store.rename(session, to: $0) },
                         onClose: { commands.closeSession(session) })
+                    .onDrag {
+                        dragging = session
+                        return NSItemProvider(object: session.id.uuidString as NSString)
+                    }
+                    .onDrop(of: [.text], delegate: Reorder(target: session, store: store, dragging: $dragging))
                 }
             }
             .padding(8)
@@ -35,18 +46,33 @@ private struct SessionRow: View {
     let selected: Bool
     let palette: Palette
     let onSelect: () -> Void
+    let onRename: (String) -> Void
     let onClose: () -> Void
 
     @State private var hovering = false
+    @State private var editing = false
+    @State private var draft = ""
+    @FocusState private var fieldFocused: Bool
 
     var body: some View {
         HStack(spacing: 10) {
             Lamp(lit: session.status == .needsAttention, palette: palette)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text(session.displayName)
-                    .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
-                    .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
+                if editing {
+                    TextField("", text: $draft)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(palette.text)
+                        .focused($fieldFocused)
+                        .onSubmit(commit)
+                        .onExitCommand { editing = false }
+                        .onChange(of: fieldFocused) { _, focused in if !focused { commit() } }
+                } else {
+                    Text(session.displayName)
+                        .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
+                        .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
+                }
                 if let branch = session.branch {
                     Label(branch, systemImage: "arrow.triangle.branch")
                         .labelStyle(BranchLabelStyle())
@@ -64,7 +90,7 @@ private struct SessionRow: View {
 
             Spacer(minLength: 0)
 
-            if hovering {
+            if hovering && !editing {
                 Button(action: onClose) {
                     Image(systemName: "xmark")
                         .font(.system(size: 9, weight: .bold))
@@ -81,14 +107,53 @@ private struct SessionRow: View {
         .background { background }
         .contentShape(Rectangle())
         .onTapGesture(perform: onSelect)
+        // Alongside the single tap, not instead of it, so selecting never waits for a possible second click.
+        .simultaneousGesture(TapGesture(count: 2).onEnded { startEditing() })
         .onHover { hovering = $0 }
         .help(session.directory)
+        .contextMenu {
+            Button("Rename", action: startEditing)
+            Button("Close Session", action: onClose)
+        }
+    }
+
+    private func startEditing() {
+        draft = session.displayName
+        editing = true
+        // The field only exists after this update, so focus it on the next turn.
+        DispatchQueue.main.async { fieldFocused = true }
+    }
+
+    private func commit() {
+        guard editing else { return }
+        editing = false
+        onRename(draft)
     }
 
     /// Selection stays neutral. The accent is reserved for "this session needs you".
     private var background: some View {
         RoundedRectangle(cornerRadius: 6)
             .fill(selected ? palette.raised : hovering ? palette.raised.opacity(0.5) : .clear)
+    }
+}
+
+/// Moves the dragged session live as it passes over other rows.
+private struct Reorder: DropDelegate {
+    let target: Session
+    let store: SessionStore
+    @Binding var dragging: Session?
+
+    func dropEntered(info: DropInfo) {
+        guard let dragging, dragging !== target,
+              let index = store.sessions.firstIndex(where: { $0 === target }) else { return }
+        withAnimation(.easeOut(duration: 0.15)) { store.move(dragging, to: index) }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
+
+    func performDrop(info: DropInfo) -> Bool {
+        dragging = nil
+        return true
     }
 }
 

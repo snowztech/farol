@@ -146,7 +146,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         alert.beginSheetModal(for: window) { reply($0 == .alertFirstButtonReturn) }
     }
 
-    func newSession() { store.create() }
+    /// Opens where you are: the focused pane's folder, or home when there is no session yet.
+    func newSession() {
+        store.create(directory: store.selected?.panes.focused.workingDirectory ?? NSHomeDirectory())
+    }
 
     func toggleSidebar() {
         let open = sidebarWidth.constant == 0

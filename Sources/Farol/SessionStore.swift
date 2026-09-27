@@ -13,6 +13,8 @@ final class Session: ObservableObject, Identifiable {
     let id = UUID()
     let panes: PaneContainer
     @Published var title = ""
+    /// Set by renaming the session in the sidebar. Wins over every automatic name.
+    @Published var customName: String?
     @Published var directory: String
     @Published var status = Status.running
     @Published private(set) var branch: String?
@@ -54,6 +56,7 @@ final class Session: ObservableObject, Identifiable {
     /// Programs that set a real title (Claude Code, vim, htop) keep it.
     /// A worktree folder is named after its branch, so the repo name says more there.
     var displayName: String {
+        if let customName { return customName }
         if hasProgramTitle { return title }
         if worktree != nil, let repoName { return repoName }
         return folderName
@@ -98,6 +101,21 @@ final class SessionStore: ObservableObject {
     @discardableResult
     func create(directory: String = NSHomeDirectory()) -> Session {
         create(PaneContainer(TerminalView(runtime: runtime, workingDirectory: directory)), directory: directory)
+    }
+
+    /// An empty name goes back to the automatic one.
+    func rename(_ session: Session, to name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        session.customName = trimmed.isEmpty ? nil : trimmed
+        save()
+    }
+
+    /// Moves a session to another place in the sidebar. ⌘1 to ⌘9 follow the new order.
+    func move(_ session: Session, to index: Int) {
+        guard let from = sessions.firstIndex(where: { $0 === session }), from != index,
+              sessions.indices.contains(index) else { return }
+        sessions.move(fromOffsets: IndexSet(integer: from), toOffset: index > from ? index + 1 : index)
+        save()
     }
 
     private func create(_ panes: PaneContainer, directory: String) -> Session {
@@ -145,6 +163,8 @@ final class SessionStore: ObservableObject {
 
     // MARK: Restore
 
+    private static let savedSessions = "sessions.saved"
+    /// Earlier formats: pane layouts without names, and before that one folder per session.
     private static let savedLayouts = "sessions.layouts"
     /// The format before split panes: one folder per session.
     private static let savedDirectories = "sessions.directories"
@@ -155,20 +175,22 @@ final class SessionStore: ObservableObject {
         let defaults = UserDefaults.standard
         // Read before creating sessions, since each one saves over it.
         let selected = defaults.integer(forKey: Self.savedSelection)
-        let layouts = defaults.data(forKey: Self.savedLayouts)
-            .flatMap { try? JSONDecoder().decode([PaneLayout].self, from: $0) }
-            ?? (defaults.stringArray(forKey: Self.savedDirectories) ?? []).map { .terminal(directory: $0) }
+        let decoder = JSONDecoder()
+        let saved = defaults.data(forKey: Self.savedSessions).flatMap { try? decoder.decode([SavedSession].self, from: $0) }
+            ?? defaults.data(forKey: Self.savedLayouts)
+                .flatMap { try? decoder.decode([PaneLayout].self, from: $0) }?.map { SavedSession(layout: $0) }
+            ?? (defaults.stringArray(forKey: Self.savedDirectories) ?? []).map { SavedSession(layout: .terminal(directory: $0)) }
         let exists = { FileManager.default.fileExists(atPath: $0) }
-        let usable = layouts.filter { $0.directories.contains(where: exists) }
+        let usable = saved.filter { $0.layout.directories.contains(where: exists) }
         guard !usable.isEmpty else {
             create()
             return
         }
-        for layout in usable {
-            let panes = PaneContainer(layout) { [runtime] directory in
+        for entry in usable {
+            let panes = PaneContainer(entry.layout) { [runtime] directory in
                 TerminalView(runtime: runtime, workingDirectory: exists(directory) ? directory : NSHomeDirectory())
             }
-            create(panes, directory: panes.focused.workingDirectory ?? NSHomeDirectory())
+            create(panes, directory: panes.focused.workingDirectory ?? NSHomeDirectory()).customName = entry.name
         }
         select(index: min(selected, sessions.count - 1))
     }
@@ -176,8 +198,9 @@ final class SessionStore: ObservableObject {
     /// Saved on every change rather than at quit, so a crash keeps the sessions too.
     private func save() {
         let defaults = UserDefaults.standard
-        let layouts = sessions.map(\.panes.layoutSnapshot)
-        defaults.set(try? JSONEncoder().encode(layouts), forKey: Self.savedLayouts)
+        let saved = sessions.map { SavedSession(layout: $0.panes.layoutSnapshot, name: $0.customName) }
+        defaults.set(try? JSONEncoder().encode(saved), forKey: Self.savedSessions)
+        defaults.removeObject(forKey: Self.savedLayouts)
         defaults.removeObject(forKey: Self.savedDirectories)
         defaults.set(sessions.firstIndex { $0.id == selectedID } ?? 0, forKey: Self.savedSelection)
     }
@@ -222,4 +245,10 @@ final class SessionStore: ObservableObject {
         guard let session, session.id != selectedID else { return }
         session.status = .needsAttention
     }
+}
+
+/// What a session keeps between launches.
+private struct SavedSession: Codable {
+    var layout: PaneLayout
+    var name: String?
 }
