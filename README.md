@@ -91,7 +91,7 @@ Closing the last session quits Farol. Closing a session or quitting asks first w
 
 ## Configuration
 
-Farol reads your Ghostty config first, then `~/.config/farol/config`, so Farol's values win. Both use Ghostty's config syntax. The settings page edits a few keys in the Farol file and leaves every other line alone.
+Use the settings page (⌘,) or edit `~/.config/farol/config` directly. They are the same thing: the page writes to that file, and saving the file updates the page and every session right away. Settings → Terminal has a button that opens it.
 
 ```
 theme = Catppuccin Mocha
@@ -99,7 +99,19 @@ font-family = JetBrains Mono
 font-size = 14
 ```
 
-See the [Ghostty docs](https://ghostty.org/docs/config) for every option.
+The file uses Ghostty's format, so every option in the [Ghostty docs](https://ghostty.org/docs/config) works. If you also use Ghostty, your Ghostty config loads first and Farol's file wins.
+
+### Custom themes
+
+Drop a theme file in `~/.config/farol/themes` and it shows up first in Settings → Appearance. Settings has a **Themes folder** button that opens it. A theme file is a few lines of Ghostty config:
+
+```
+background = #1e1e2e
+foreground = #cdd6f4
+cursor-color = #f5e0dc
+palette = 0=#45475a
+palette = 1=#f38ba8
+```
 
 ## Build from source
 

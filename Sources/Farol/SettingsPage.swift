@@ -21,6 +21,7 @@ struct SettingsPage: View {
 
     @State private var section = Section.terminal
     @State private var themeQuery = ""
+    @State private var themes = Theme.all()
 
     enum Section: String, CaseIterable {
         case terminal = "Terminal"
@@ -105,22 +106,34 @@ struct SettingsPage: View {
         }
         .padding(.bottom, 32)
 
+        Heading(title: "Theme",
+                detail: "Applies to every session as soon as you pick it. To add your own, drop a Ghostty theme file in the themes folder.",
+                palette: p)
+        HStack(spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass").foregroundStyle(p.muted)
+                TextField("Search \(themes.count - 1) themes", text: $themeQuery)
+                    .textFieldStyle(.plain)
+            }
+            .font(.system(size: 13))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(p.surface, in: RoundedRectangle(cornerRadius: 7))
+            .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(p.line))
 
-        Heading(title: "Theme", detail: "Applies to every session as soon as you pick it.", palette: p)
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass").foregroundStyle(p.muted)
-            TextField("Search \(Self.themeCount) themes", text: $themeQuery)
-                .textFieldStyle(.plain)
+            Button("Themes folder", action: openThemesFolder)
         }
-        .font(.system(size: 13))
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(p.surface, in: RoundedRectangle(cornerRadius: 7))
-        .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(p.line))
         .padding(.bottom, 20)
 
         ThemeGallery(query: themeQuery, selected: $settings.theme,
-                     ghosttyConfig: state.ghosttyConfigPreview, palette: p)
+                     ghosttyConfig: state.ghosttyConfigPreview, palette: p, themes: themes)
+            // Picks up themes added while Farol runs.
+            .onAppear { themes = Theme.all() }
+    }
+
+    private func openThemesFolder() {
+        try? FileManager.default.createDirectory(at: Theme.userDirectory, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(Theme.userDirectory)
     }
 
     @ViewBuilder private func terminal(_ p: Palette) -> some View {
@@ -172,10 +185,12 @@ struct SettingsPage: View {
             Toggle("", isOn: $settings.copyOnSelect).labelsHidden().toggleStyle(.switch).controlSize(.small)
         }
 
-        Text("More options go in the config file, which uses Ghostty's format. If you also use Ghostty, its config loads first and Farol's wins.")
-            .font(.system(size: 12))
-            .foregroundStyle(p.muted)
-            .padding(.top, 20)
+        GroupTitle(title: "Config file", palette: p)
+        Row(title: "~/.config/farol/config",
+            detail: "Everything on this page is saved here. Add any other option and save, and it applies right away. If you also use Ghostty, its config loads first and Farol's wins.",
+            palette: p) {
+            Button("Open", action: settings.openFile)
+        }
     }
 
     @ViewBuilder private func agentsSection(_ p: Palette) -> some View {
@@ -352,8 +367,6 @@ struct SettingsPage: View {
     }
 
     private static let repo = "https://github.com/snowztech/farol"
-
-    private static let themeCount = TerminalRuntime.bundledThemes.count
 
     /// Set by scripts/bundle.sh from the latest git tag.
     private static let version = Bundle.main.object(forInfoDictionaryKey: "FarolVersion") as? String ?? "dev"

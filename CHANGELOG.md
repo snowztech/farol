@@ -4,6 +4,22 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Custom themes: files in `~/.config/farol/themes` show up first in the theme gallery.
+- Editing `~/.config/farol/config` applies as soon as you save, and the settings page follows.
+
+### Changed
+
+- Every sidebar row shows a second line with the branch or folder, so rows line up.
+- The sidebar dot only appears when an agent is working, waiting or done.
+- Agent status glyphs such as Claude Code's ✳ no longer show in session names.
+- Settings name the fallback theme Default and explain where the config file lives.
+
+### Fixed
+
+- Changing a setting in the app no longer undoes edits you made to the config file while Farol was open.
+
 ## [0.1.2] - 2026-09-27
 
 ### Changed
