@@ -38,7 +38,9 @@ final class Settings: ObservableObject {
 
         try? FileManager.default.createDirectory(
             at: Self.fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? lines.joined(separator: "\n").write(to: Self.fileURL, atomically: true, encoding: .utf8)
+        // A trailing newline, so a line appended with `echo >>` stays its own line.
+        let text = lines.filter { !$0.isEmpty }.joined(separator: "\n") + "\n"
+        try? text.write(to: Self.fileURL, atomically: true, encoding: .utf8)
         onChange?()
     }
 
