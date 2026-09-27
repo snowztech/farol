@@ -66,7 +66,8 @@ struct SettingsPage: View {
                 .padding(.top, 28)
                 .padding(.bottom, 40)
                 .frame(maxWidth: 820, alignment: .leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                // Centered in whatever room there is, so hiding the sidebar doesn't leave an empty strip on the right.
+                .frame(maxWidth: .infinity)
             }
         }
         .background(p.background)
