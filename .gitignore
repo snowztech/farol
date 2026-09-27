@@ -1,0 +1,6 @@
+.build/
+.ghostty-src/
+vendor/
+.DS_Store
+build/
+.claude/settings.local.json
