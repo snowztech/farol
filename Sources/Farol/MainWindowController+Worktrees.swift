@@ -58,8 +58,22 @@ extension MainWindowController {
         }
     }
 
-    /// Closes a session. For a worktree session, first asks whether to remove the worktree folder.
+    /// Closes a session. Asks first when a program is still running, then whether to remove its worktree.
     func requestClose(_ session: Session) {
+        guard session.terminal.hasRunningProcess, let window else { return closeAskingAboutWorktree(session) }
+        let alert = NSAlert()
+        alert.messageText = "Close this session?"
+        alert.informativeText = "A program is still running in it. Closing stops it."
+        alert.addButton(withTitle: "Close")
+        alert.addButton(withTitle: "Cancel")
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard response == .alertFirstButtonReturn else { return }
+            // The next sheet can only start once this one is gone.
+            DispatchQueue.main.async { self?.closeAskingAboutWorktree(session) }
+        }
+    }
+
+    private func closeAskingAboutWorktree(_ session: Session) {
         guard let worktree = session.worktree, let window else {
             store.close(session)
             return

@@ -3,7 +3,7 @@ import SwiftUI
 import GhosttyTerminal
 
 /// Top bar, session sidebar, and the selected terminal or the settings page.
-final class MainWindowController: NSWindowController {
+final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// Same height as the native title bar, so the buttons line up with the traffic lights.
     private static let topBarHeight: CGFloat = 28
 
@@ -34,6 +34,7 @@ final class MainWindowController: NSWindowController {
         window.minSize = NSSize(width: 640, height: 360)
 
         super.init(window: window)
+        window.delegate = self
 
         let commands = Commands(
             newSession: { [weak self] in self?.newSession() },
@@ -93,6 +94,7 @@ final class MainWindowController: NSWindowController {
         runtime.onConfigChange = { [weak self] in self?.applyTheme() }
         store.onSessionCreated = { [weak self] in self?.host($0.terminal) }
         store.onCloseRequest = { [weak self] in self?.requestClose($0) }
+        runtime.onRequest = { [weak self] in self?.handle($0) }
         store.onSelectionChange = { [weak self] in
             self?.state.showingSettings = false
             self?.show($0)
@@ -102,6 +104,39 @@ final class MainWindowController: NSWindowController {
     required init?(coder: NSCoder) { fatalError("not used") }
 
     // MARK: Commands
+
+    /// Key bindings from Ghostty's defaults or the user's config that need the app.
+    func handle(_ request: TerminalRequest) {
+        switch request {
+        case .newSession: newSession()
+        case .closeSession: store.selected.map(requestClose)
+        case .closeWindow, .quit: NSApp.terminate(nil)
+        case .gotoSession(let index): store.select(index: index)
+        case .previousSession: store.selectNext(offset: -1)
+        case .nextSession: store.selectNext(offset: 1)
+        case .lastSession: store.select(index: store.sessions.count - 1)
+        case .toggleFullscreen: window?.toggleFullScreen(nil)
+        case .reloadConfig: runtime.reloadConfig()
+        case .openSettings: if !state.showingSettings { toggleSettings() }
+        }
+    }
+
+    /// Farol is one window, so closing it quits, which asks first when programs are running.
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        NSApp.terminate(nil)
+        return false
+    }
+
+    /// Asks before quitting kills running programs.
+    func confirmQuit(_ reply: @escaping (Bool) -> Void) {
+        guard runtime.hasRunningProcesses, let window else { return reply(true) }
+        let alert = NSAlert()
+        alert.messageText = "Quit Farol?"
+        alert.informativeText = "Programs are still running. Quitting stops them."
+        alert.addButton(withTitle: "Quit")
+        alert.addButton(withTitle: "Cancel")
+        alert.beginSheetModal(for: window) { reply($0 == .alertFirstButtonReturn) }
+    }
 
     func newSession() { store.create() }
 
@@ -142,6 +177,7 @@ final class MainWindowController: NSWindowController {
         terminal.frame = terminalContainer.bounds
         terminal.autoresizingMask = [.width, .height]
         terminal.onClipboardRequest = { [weak self] request, reply in self?.confirm(request, reply: reply) }
+        terminal.onRequest = { [weak self] in self?.handle($0) }
         terminalContainer.addSubview(terminal)
     }
 

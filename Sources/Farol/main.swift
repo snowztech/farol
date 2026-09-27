@@ -5,13 +5,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var store: SessionStore!
     private var windowController: MainWindowController!
     private var settings: Settings!
+    /// Set once quitting is already decided, so it isn't asked twice.
+    private var quitConfirmed = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let runtime = TerminalRuntime(overrideFiles: [Settings.fileURL])
         settings = Settings()
         settings.onChange = { runtime.reloadConfig() }
         store = SessionStore(runtime: runtime)
-        store.onLastSessionClosed = { NSApp.terminate(nil) }
+        store.onLastSessionClosed = { [weak self] in
+            // Its program was already confirmed or has exited.
+            self?.quitConfirmed = true
+            NSApp.terminate(nil)
+        }
         windowController = MainWindowController(store: store, runtime: runtime, settings: settings)
         NSApp.mainMenu = makeMenu()
 
@@ -22,6 +28,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if quitConfirmed { return .terminateNow }
+        windowController.confirmQuit { ok in
+            self.quitConfirmed = ok
+            NSApp.reply(toApplicationShouldTerminate: ok)
+        }
+        return .terminateLater
+    }
+
     @objc func newSession(_ sender: Any?) { windowController.newSession() }
     @objc func newWorktreeSession(_ sender: Any?) { windowController.newWorktreeSession() }
     @objc func closeSession(_ sender: Any?) { store.selected.map(windowController.requestClose) }
@@ -31,12 +46,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func toggleSettings(_ sender: Any?) { windowController.toggleSettings() }
     @objc func toggleSidebar(_ sender: Any?) { windowController.toggleSidebar() }
+    @objc func reloadConfig(_ sender: Any?) { windowController.handle(.reloadConfig) }
 
     private func makeMenu() -> NSMenu {
         let main = NSMenu()
 
         let app = NSMenu()
         app.addItem(withTitle: "Settings…", action: #selector(toggleSettings), keyEquivalent: ",")
+        app.addItem(withTitle: "Reload Configuration", action: #selector(reloadConfig), keyEquivalent: "<")
         app.addItem(.separator())
         app.addItem(withTitle: "Quit Farol", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         main.addItem(submenu: app, title: "Farol")

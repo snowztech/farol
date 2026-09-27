@@ -43,15 +43,17 @@ The first build compiles libghostty and takes a few minutes. After that, `make r
 
 | Action | Keys |
 | --- | --- |
-| New session | ⌘T |
+| New session | ⌘T or ⌘N |
 | New worktree session | ⇧⌘T |
 | Close session | ⌘W |
 | Next or previous session | ⇧⌘] and ⇧⌘[ |
 | Go to session 1 to 9 | ⌘1 to ⌘9 |
 | Toggle sidebar | ⌘B |
+| Full screen | ⌃⌘F |
 | Settings | ⌘, |
+| Reload configuration | ⇧⌘, |
 
-Closing the last session quits Farol.
+Closing the last session quits Farol. Closing a session or quitting asks first when a program is still running. Ghostty's other default shortcuts, such as ⌘K to clear and ⌘+ to zoom, work as in Ghostty.
 
 ## Configuration
 

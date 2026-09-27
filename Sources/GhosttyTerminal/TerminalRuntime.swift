@@ -10,6 +10,12 @@ public final class TerminalRuntime {
     /// Colors from the user's Ghostty config alone, before Farol's overrides.
     public private(set) var ghosttyConfigColors: (background: NSColor, foreground: NSColor) = (.black, .white)
 
+    /// App level requests from key bindings, like quitting. Surface level ones go to TerminalView.onRequest.
+    public var onRequest: ((TerminalRequest) -> Void)?
+
+    /// True while any terminal runs a program that quitting would kill.
+    public var hasRunningProcesses: Bool { ghostty_app_needs_confirm_quit(app) }
+
     /// Called on the main thread after reloadConfig() applied new settings.
     public var onConfigChange: (() -> Void)?
 
@@ -33,10 +39,15 @@ public final class TerminalRuntime {
             let runtime = Unmanaged<TerminalRuntime>.fromOpaque(ud!).takeUnretainedValue()
             DispatchQueue.main.async { ghostty_app_tick(runtime.app) }
         }
-        rt.action_cb = { _, target, action in
-            guard target.tag == GHOSTTY_TARGET_SURFACE,
-                  let ud = ghostty_surface_userdata(target.target.surface) else { return false }
-            return TerminalView.from(ud).handle(action)
+        rt.action_cb = { app, target, action in
+            if target.tag == GHOSTTY_TARGET_SURFACE, let ud = ghostty_surface_userdata(target.target.surface) {
+                return TerminalView.from(ud).handle(action)
+            }
+            guard let app, let ud = ghostty_app_userdata(app), let request = TerminalRequest(action) else { return false }
+            let runtime = Unmanaged<TerminalRuntime>.fromOpaque(ud).takeUnretainedValue()
+            guard let onRequest = runtime.onRequest else { return false }
+            DispatchQueue.main.async { onRequest(request) }
+            return true
         }
         rt.close_surface_cb = { ud, _ in
             guard let ud else { return }

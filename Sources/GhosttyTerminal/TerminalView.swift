@@ -13,6 +13,15 @@ public final class TerminalView: NSView {
     /// Asks the user to approve a clipboard access. Without it, such requests are denied.
     public var onClipboardRequest: ((ClipboardRequest, @escaping (Bool) -> Void) -> Void)?
     public var onClose: (() -> Void)?
+    /// A key binding asked for something only the app can do. Called on the next main loop turn.
+    public var onRequest: ((TerminalRequest) -> Void)?
+
+    /// True while a program other than the idle shell is running, so closing would kill it.
+    public var hasRunningProcess: Bool {
+        surface.map { ghostty_surface_needs_confirm_quit($0) } ?? false
+    }
+
+    private var cursor = NSCursor.iBeam
 
     /// `command` nil runs the user's login shell.
     public init(runtime: TerminalRuntime, workingDirectory: String? = nil, command: String? = nil) {
@@ -36,7 +45,7 @@ public final class TerminalView: NSView {
 
         addTrackingArea(NSTrackingArea(
             rect: .zero,
-            options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect],
+            options: [.mouseMoved, .cursorUpdate, .activeInKeyWindow, .inVisibleRect],
             owner: self))
     }
 
@@ -70,10 +79,33 @@ public final class TerminalView: NSView {
             onNotification?(n.title.map { String(cString: $0) } ?? "", n.body.map { String(cString: $0) } ?? "")
         case GHOSTTY_ACTION_RING_BELL:
             onBell?()
+        case GHOSTTY_ACTION_OPEN_URL:
+            let link = action.action.open_url
+            guard let ptr = link.url else { return false }
+            open(String(decoding: Data(bytes: ptr, count: Int(link.len)), as: UTF8.self))
+        case GHOSTTY_ACTION_MOUSE_SHAPE:
+            cursor = .ghostty(action.action.mouse_shape)
+            if let window, bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil)) {
+                cursor.set()
+            }
+        case GHOSTTY_ACTION_MOUSE_VISIBILITY:
+            NSCursor.setHiddenUntilMouseMoves(action.action.mouse_visibility == GHOSTTY_MOUSE_HIDDEN)
         default:
-            return false
+            guard let request = TerminalRequest(action), let onRequest else { return false }
+            // Requests like closing this session free the surface Ghostty is still calling from.
+            DispatchQueue.main.async { onRequest(request) }
         }
         return true
+    }
+
+    public override func cursorUpdate(with event: NSEvent) {
+        cursor.set()
+    }
+
+    /// Opens a clicked link. Anything without a scheme is treated as a file path.
+    private func open(_ link: String) {
+        let url = URL(string: link).flatMap { $0.scheme == nil ? nil : $0 } ?? URL(fileURLWithPath: link)
+        NSWorkspace.shared.open(url)
     }
 
     // MARK: Edit menu

@@ -19,9 +19,14 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - The sidebar shows the git branch of every session and updates after a checkout.
 - `FarolCore` module with tests for the git and worktree logic, run with `make test`.
 
+- Ghostty's default window shortcuts: ⌘N opens a session, ⇧⌘W quits, ⌃⌘F toggles full screen and ⇧⌘, reloads the config. Rebinding them in your config works too.
+- ⌘-click opens links, and the pointer changes shape over them.
+- Closing a session or quitting asks first when a program is still running.
+
 ### Fixed
 
 - The Farol config file now ends with a newline, so settings appended by hand stay on their own line.
+- The window's close button no longer closes the window when you cancel the quit.
 
 ## First commits
 
