@@ -30,7 +30,10 @@
     h1 { font-size: 28px; font-weight: 600; margin: 12px 0 4px; letter-spacing: -0.01em; }
     .tagline { color: var(--sn-fg-muted); margin: 0 0 28px; }
     .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-    .actions .sn-btn { text-decoration: none; }
+    .actions .sn-btn { text-decoration: none; transition: opacity var(--sn-base) var(--sn-ease), border-color var(--sn-base) var(--sn-ease); }
+    /* ui-css colors every a:hover with the accent, which wins over the button's own text color. */
+    .actions a.sn-btn--primary:hover { color: var(--sn-fg-inverse); background: var(--sn-fg); border-color: var(--sn-fg); opacity: 0.85; }
+    .actions a.sn-btn--secondary:hover { color: var(--sn-fg); }
     .fine { color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); margin-top: 14px; }
 
     /* A sketch of the sidebar, so the page shows what Farol does before any screenshot. */
