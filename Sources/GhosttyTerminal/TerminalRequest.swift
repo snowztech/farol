@@ -16,6 +16,15 @@ public enum TerminalRequest {
     case toggleFullscreen
     case reloadConfig
     case openSettings
+    case newSplit(Direction)
+    case gotoSplit(SplitTarget)
+    /// Moves the divider toward `Direction` by `amount` points.
+    case resizeSplit(Direction, amount: CGFloat)
+    case equalizeSplits
+    case toggleSplitZoom
+
+    public enum Direction { case up, down, left, right }
+    public enum SplitTarget { case previous, next, direction(Direction) }
 
     init?(_ action: ghostty_action_s) {
         switch action.tag {
@@ -26,6 +35,33 @@ public enum TerminalRequest {
         case GHOSTTY_ACTION_TOGGLE_FULLSCREEN: self = .toggleFullscreen
         case GHOSTTY_ACTION_RELOAD_CONFIG: self = .reloadConfig
         case GHOSTTY_ACTION_OPEN_CONFIG: self = .openSettings
+        case GHOSTTY_ACTION_NEW_SPLIT:
+            switch action.action.new_split {
+            case GHOSTTY_SPLIT_DIRECTION_LEFT: self = .newSplit(.left)
+            case GHOSTTY_SPLIT_DIRECTION_UP: self = .newSplit(.up)
+            case GHOSTTY_SPLIT_DIRECTION_DOWN: self = .newSplit(.down)
+            default: self = .newSplit(.right)
+            }
+        case GHOSTTY_ACTION_GOTO_SPLIT:
+            switch action.action.goto_split {
+            case GHOSTTY_GOTO_SPLIT_PREVIOUS: self = .gotoSplit(.previous)
+            case GHOSTTY_GOTO_SPLIT_NEXT: self = .gotoSplit(.next)
+            case GHOSTTY_GOTO_SPLIT_UP: self = .gotoSplit(.direction(.up))
+            case GHOSTTY_GOTO_SPLIT_DOWN: self = .gotoSplit(.direction(.down))
+            case GHOSTTY_GOTO_SPLIT_LEFT: self = .gotoSplit(.direction(.left))
+            default: self = .gotoSplit(.direction(.right))
+            }
+        case GHOSTTY_ACTION_RESIZE_SPLIT:
+            let resize = action.action.resize_split
+            let direction: Direction = switch resize.direction {
+            case GHOSTTY_RESIZE_SPLIT_UP: .up
+            case GHOSTTY_RESIZE_SPLIT_DOWN: .down
+            case GHOSTTY_RESIZE_SPLIT_LEFT: .left
+            default: .right
+            }
+            self = .resizeSplit(direction, amount: CGFloat(resize.amount))
+        case GHOSTTY_ACTION_EQUALIZE_SPLITS: self = .equalizeSplits
+        case GHOSTTY_ACTION_TOGGLE_SPLIT_ZOOM: self = .toggleSplitZoom
         case GHOSTTY_ACTION_GOTO_TAB:
             switch action.action.goto_tab {
             case GHOSTTY_GOTO_TAB_PREVIOUS: self = .previousSession

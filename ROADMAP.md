@@ -12,6 +12,7 @@ Three rules decide what gets in:
 
 - Terminal engine: libghostty embedded through `GhosttyTerminal`
 - Session sidebar, shortcuts, closing the last session quits
+- Split panes with Ghostty's shortcuts, restored after a relaunch
 - Attention light when a session rings the bell or sends a notification
 - Themes with live previews, chrome that follows the theme
 - In-window settings and `~/.config/farol/config`
@@ -62,7 +63,6 @@ Check what an agent did and ship it from the same window.
 ## Later
 
 - Command palette
-- Split panes
 - Search in the terminal scrollback
 - Language server support in the editor
 

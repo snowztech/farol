@@ -11,7 +11,7 @@ final class Session: ObservableObject, Identifiable {
     }
 
     let id = UUID()
-    let terminal: TerminalView
+    let panes: PaneContainer
     @Published var title = ""
     @Published var directory: String
     @Published var status = Status.running
@@ -20,12 +20,21 @@ final class Session: ObservableObject, Identifiable {
     /// Set when the session runs in one of Farol's worktrees, even after `cd` into a subfolder.
     let worktree: String?
 
-    init(terminal: TerminalView, directory: String) {
-        self.terminal = terminal
+    init(panes: PaneContainer, directory: String) {
+        self.panes = panes
         self.directory = directory
         worktree = Worktrees.default.root(of: directory)
         refreshGit()
     }
+
+    /// The name, folder and branch follow whichever pane has focus.
+    func show(_ terminal: TerminalView) {
+        title = terminal.title
+        if let folder = terminal.workingDirectory { directory = folder }
+        refreshGit()
+    }
+
+    var hasRunningProcess: Bool { panes.terminals.contains { $0.hasRunningProcess } }
 
     /// Looks up the branch off the main thread. The shell retitles at every prompt, so a `git checkout` shows up too.
     func refreshGit() {
@@ -75,8 +84,10 @@ final class SessionStore: ObservableObject {
     var onSessionCreated: ((Session) -> Void)?
     var onSelectionChange: ((Session?) -> Void)?
     var onLastSessionClosed: (() -> Void)?
-    /// Every way of closing a session goes through here first, so worktree sessions can ask.
-    var onCloseRequest: ((Session) -> Void)?
+    /// A pane's shell exited. The window decides whether that closes a pane or the whole session.
+    var onPaneExit: ((Session, TerminalView) -> Void)?
+    /// Every new terminal, first pane or split, so the window can attach its handlers.
+    var onTerminalCreated: ((TerminalView) -> Void)?
 
     init(runtime: TerminalRuntime) {
         self.runtime = runtime
@@ -86,23 +97,17 @@ final class SessionStore: ObservableObject {
 
     @discardableResult
     func create(directory: String = NSHomeDirectory()) -> Session {
-        let terminal = TerminalView(runtime: runtime, workingDirectory: directory)
-        let session = Session(terminal: terminal, directory: directory)
+        create(PaneContainer(TerminalView(runtime: runtime, workingDirectory: directory)), directory: directory)
+    }
 
-        terminal.onTitleChange = { [weak session] in
-            session?.title = $0
-            session?.refreshGit()
-        }
-        terminal.onWorkingDirectoryChange = { [weak self, weak session] in
-            session?.directory = $0
-            session?.refreshGit()
+    private func create(_ panes: PaneContainer, directory: String) -> Session {
+        let session = Session(panes: panes, directory: directory)
+        panes.terminals.forEach { wire($0, to: session) }
+        panes.onFocusChange = { [weak self, weak session] in
+            session?.show($0)
             self?.save()
         }
-        terminal.onBell = { [weak self, weak session] in self?.flag(session) }
-        terminal.onNotification = { [weak self, weak session] _, _ in self?.flag(session) }
-        terminal.onClose = { [weak self, weak session] in
-            if let session { self?.onCloseRequest?(session) }
-        }
+        panes.onLayoutChange = { [weak self] in self?.save() }
 
         sessions.append(session)
         onSessionCreated?(session)
@@ -110,30 +115,70 @@ final class SessionStore: ObservableObject {
         return session
     }
 
+    /// Splits the focused pane. The new one opens in the same folder.
+    func split(_ session: Session, _ direction: TerminalRequest.Direction) {
+        let terminal = TerminalView(runtime: runtime, workingDirectory: session.panes.focused.workingDirectory)
+        wire(terminal, to: session)
+        session.panes.split(direction, with: terminal)
+    }
+
+    /// Every terminal reports to its session, but only the focused pane decides what the session shows.
+    private func wire(_ terminal: TerminalView, to session: Session) {
+        onTerminalCreated?(terminal)
+        terminal.onTitleChange = { [weak session, weak terminal] in
+            guard let session, terminal === session.panes.focused else { return }
+            session.title = $0
+            session.refreshGit()
+        }
+        terminal.onWorkingDirectoryChange = { [weak self, weak session, weak terminal] in
+            guard let session, terminal === session.panes.focused else { return }
+            session.directory = $0
+            session.refreshGit()
+            self?.save()
+        }
+        terminal.onBell = { [weak self, weak session] in self?.flag(session) }
+        terminal.onNotification = { [weak self, weak session] _, _ in self?.flag(session) }
+        terminal.onClose = { [weak self, weak session, weak terminal] in
+            if let session, let terminal { self?.onPaneExit?(session, terminal) }
+        }
+    }
+
     // MARK: Restore
 
+    private static let savedLayouts = "sessions.layouts"
+    /// The format before split panes: one folder per session.
     private static let savedDirectories = "sessions.directories"
     private static let savedSelection = "sessions.selected"
 
-    /// Reopens the folders from the last run, skipping any that no longer exist.
+    /// Reopens the sessions and panes from the last run. Missing folders fall back to home, and empty sessions are skipped.
     func restore() {
         let defaults = UserDefaults.standard
         // Read before creating sessions, since each one saves over it.
         let selected = defaults.integer(forKey: Self.savedSelection)
-        let directories = (defaults.stringArray(forKey: Self.savedDirectories) ?? [])
-            .filter { FileManager.default.fileExists(atPath: $0) }
-        guard !directories.isEmpty else {
+        let layouts = defaults.data(forKey: Self.savedLayouts)
+            .flatMap { try? JSONDecoder().decode([PaneLayout].self, from: $0) }
+            ?? (defaults.stringArray(forKey: Self.savedDirectories) ?? []).map { .terminal(directory: $0) }
+        let exists = { FileManager.default.fileExists(atPath: $0) }
+        let usable = layouts.filter { $0.directories.contains(where: exists) }
+        guard !usable.isEmpty else {
             create()
             return
         }
-        directories.forEach { create(directory: $0) }
+        for layout in usable {
+            let panes = PaneContainer(layout) { [runtime] directory in
+                TerminalView(runtime: runtime, workingDirectory: exists(directory) ? directory : NSHomeDirectory())
+            }
+            create(panes, directory: panes.focused.workingDirectory ?? NSHomeDirectory())
+        }
         select(index: min(selected, sessions.count - 1))
     }
 
     /// Saved on every change rather than at quit, so a crash keeps the sessions too.
     private func save() {
         let defaults = UserDefaults.standard
-        defaults.set(sessions.map(\.directory), forKey: Self.savedDirectories)
+        let layouts = sessions.map(\.panes.layoutSnapshot)
+        defaults.set(try? JSONEncoder().encode(layouts), forKey: Self.savedLayouts)
+        defaults.removeObject(forKey: Self.savedDirectories)
         defaults.set(sessions.firstIndex { $0.id == selectedID } ?? 0, forKey: Self.savedSelection)
     }
 
@@ -164,7 +209,7 @@ final class SessionStore: ObservableObject {
             onLastSessionClosed?()
             return
         }
-        session.terminal.removeFromSuperview()
+        session.panes.removeFromSuperview()
         sessions.remove(at: index)
         if session.id == selectedID {
             select(sessions[min(index, sessions.count - 1)])

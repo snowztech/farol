@@ -15,6 +15,7 @@ Farol is early. It works as a daily terminal, but expect rough edges.
 ## What works today
 
 - **Sessions in a sidebar.** Open as many as you like. Hidden sessions keep running but stop rendering, so twenty background agents cost no GPU time. Each row shows the session's git branch.
+- **Split panes.** ⌘D splits a session, and the new pane opens in the same folder. Layouts come back after a relaunch.
 - **Worktree sessions.** ⇧⌘T asks for a branch and opens a session in its own git worktree, so parallel agents never touch each other's files. Closing it offers to remove the worktree and always keeps the branch.
 - **Attention light.** When a session rings the bell or sends a notification while you look elsewhere, its dot lights up. Coding agents do this when they wait for input.
 - **Ghostty rendering and compatibility.** Same fonts, same speed, same escape sequence support. Your existing Ghostty config is loaded.
@@ -45,9 +46,14 @@ The first build compiles libghostty and takes a few minutes. After that, `make r
 | --- | --- |
 | New session | ⌘T or ⌘N |
 | New worktree session | ⇧⌘T |
-| Close session | ⌘W |
+| Close pane or session | ⌘W |
 | Next or previous session | ⇧⌘] and ⇧⌘[ |
 | Go to session 1 to 9 | ⌘1 to ⌘9 |
+| Split right or down | ⌘D and ⇧⌘D |
+| Move between panes | ⌘[ and ⌘], or ⌘⌥ with arrows |
+| Resize the focused pane | ⌘⌃ with arrows |
+| Equal pane sizes | ⌘⌃= |
+| Zoom the focused pane | ⇧⌘↩ |
 | Toggle sidebar | ⌘B |
 | Full screen | ⌃⌘F |
 | Settings | ⌘, |

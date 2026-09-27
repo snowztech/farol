@@ -13,6 +13,12 @@ public final class TerminalView: NSView {
     /// Asks the user to approve a clipboard access. Without it, such requests are denied.
     public var onClipboardRequest: ((ClipboardRequest, @escaping (Bool) -> Void) -> Void)?
     public var onClose: (() -> Void)?
+    /// This terminal became the focused one, by click or keyboard.
+    public var onFocus: (() -> Void)?
+
+    /// The latest title and folder the program reported, kept so a pane regaining focus can show them.
+    public private(set) var title = ""
+    public private(set) var workingDirectory: String?
     /// A key binding asked for something only the app can do. Called on the next main loop turn.
     public var onRequest: ((TerminalRequest) -> Void)?
 
@@ -25,6 +31,7 @@ public final class TerminalView: NSView {
 
     /// `command` nil runs the user's login shell.
     public init(runtime: TerminalRuntime, workingDirectory: String? = nil, command: String? = nil) {
+        self.workingDirectory = workingDirectory
         super.init(frame: NSRect(x: 0, y: 0, width: 900, height: 600))
 
         var cfg = ghostty_surface_config_new()
@@ -70,10 +77,12 @@ public final class TerminalView: NSView {
         switch action.tag {
         case GHOSTTY_ACTION_SET_TITLE:
             guard let title = action.action.set_title.title else { return false }
-            onTitleChange?(String(cString: title))
+            self.title = String(cString: title)
+            onTitleChange?(self.title)
         case GHOSTTY_ACTION_PWD:
             guard let pwd = action.action.pwd.pwd else { return false }
-            onWorkingDirectoryChange?(String(cString: pwd))
+            workingDirectory = String(cString: pwd)
+            onWorkingDirectoryChange?(workingDirectory!)
         case GHOSTTY_ACTION_DESKTOP_NOTIFICATION:
             let n = action.action.desktop_notification
             onNotification?(n.title.map { String(cString: $0) } ?? "", n.body.map { String(cString: $0) } ?? "")
@@ -140,6 +149,7 @@ public final class TerminalView: NSView {
 
     public override func becomeFirstResponder() -> Bool {
         if let surface { ghostty_surface_set_focus(surface, true) }
+        onFocus?()
         return true
     }
 

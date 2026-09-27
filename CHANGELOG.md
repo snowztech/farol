@@ -23,6 +23,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - ⌘-click opens links, and the pointer changes shape over them.
 - Closing a session or quitting asks first when a program is still running.
 
+- Split panes with Ghostty's shortcuts: ⌘D and ⇧⌘D to split, ⌘[ ⌘] and ⌘⌥ arrows to move, ⌘⌃ arrows to resize, ⌘⌃= to equalize and ⇧⌘↩ to zoom. Dividers can be dragged. A new pane opens in the focused pane's folder, and unfocused panes dim.
+- ⌘W closes the focused pane, and the session with its last one.
+- Pane layouts are saved with the sessions and restored after a relaunch.
+- Debug builds run as "Farol Dev" with their own saved sessions, so testing never touches the installed app.
+
 ### Fixed
 
 - The Farol config file now ends with a newline, so settings appended by hand stay on their own line.

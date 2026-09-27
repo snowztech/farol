@@ -1,5 +1,6 @@
 import AppKit
 import FarolCore
+import GhosttyTerminal
 
 extension MainWindowController {
     /// Asks for a branch and opens a session in a new worktree of the current session's repo.
@@ -58,9 +59,32 @@ extension MainWindowController {
         }
     }
 
-    /// Closes a session. Asks first when a program is still running, then whether to remove its worktree.
+    /// ⌘W: closes the focused pane, or the whole session when it is the last one.
+    func requestClosePane(_ session: Session) {
+        let terminal = session.panes.focused
+        guard session.panes.terminals.count > 1 else { return requestClose(session) }
+        guard terminal.hasRunningProcess, let window else {
+            _ = session.panes.remove(terminal)
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = "Close this pane?"
+        alert.informativeText = "A program is still running in it. Closing stops it."
+        alert.addButton(withTitle: "Close")
+        alert.addButton(withTitle: "Cancel")
+        alert.beginSheetModal(for: window) { response in
+            if response == .alertFirstButtonReturn { _ = session.panes.remove(terminal) }
+        }
+    }
+
+    /// A pane's shell exited: drop the pane, or close the session when it was the last one.
+    func paneExited(_ terminal: TerminalView, in session: Session) {
+        if !session.panes.remove(terminal) { closeAskingAboutWorktree(session) }
+    }
+
+    /// Closes a whole session. Asks first when a program is still running, then whether to remove its worktree.
     func requestClose(_ session: Session) {
-        guard session.terminal.hasRunningProcess, let window else { return closeAskingAboutWorktree(session) }
+        guard session.hasRunningProcess, let window else { return closeAskingAboutWorktree(session) }
         let alert = NSAlert()
         alert.messageText = "Close this session?"
         alert.informativeText = "A program is still running in it. Closing stops it."

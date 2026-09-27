@@ -92,8 +92,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
         applyTheme()
         runtime.onConfigChange = { [weak self] in self?.applyTheme() }
-        store.onSessionCreated = { [weak self] in self?.host($0.terminal) }
-        store.onCloseRequest = { [weak self] in self?.requestClose($0) }
+        store.onSessionCreated = { [weak self] in self?.host($0) }
+        store.onTerminalCreated = { [weak self] in self?.configure($0) }
+        store.onPaneExit = { [weak self] in self?.paneExited($1, in: $0) }
         runtime.onRequest = { [weak self] in self?.handle($0) }
         store.onSelectionChange = { [weak self] in
             self?.state.showingSettings = false
@@ -118,6 +119,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         case .toggleFullscreen: window?.toggleFullScreen(nil)
         case .reloadConfig: runtime.reloadConfig()
         case .openSettings: if !state.showingSettings { toggleSettings() }
+        case .newSplit(let direction): store.selected.map { store.split($0, direction) }
+        case .gotoSplit(let target): store.selected?.panes.goto(target)
+        case .resizeSplit(let direction, let amount): store.selected?.panes.resize(direction, by: amount)
+        case .equalizeSplits: store.selected?.panes.equalize()
+        case .toggleSplitZoom:
+            store.selected?.panes.toggleZoom()
+            store.selected?.panes.setVisible(true)
         }
     }
 
@@ -171,14 +179,21 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         window?.backgroundColor = bg
         window?.appearance = NSAppearance(named: bg.isDark ? .darkAqua : .aqua)
         content.layer?.backgroundColor = bg.cgColor
+        store.sessions.forEach { $0.panes.dividerColor = dividerColor }
     }
 
-    private func host(_ terminal: TerminalView) {
-        terminal.frame = terminalContainer.bounds
-        terminal.autoresizingMask = [.width, .height]
+    private var dividerColor: NSColor { runtime.backgroundColor.mixed(with: runtime.foregroundColor, 0.11) }
+
+    private func host(_ session: Session) {
+        session.panes.frame = terminalContainer.bounds
+        session.panes.autoresizingMask = [.width, .height]
+        session.panes.dividerColor = dividerColor
+        terminalContainer.addSubview(session.panes)
+    }
+
+    private func configure(_ terminal: TerminalView) {
         terminal.onClipboardRequest = { [weak self] request, reply in self?.confirm(request, reply: reply) }
         terminal.onRequest = { [weak self] in self?.handle($0) }
-        terminalContainer.addSubview(terminal)
     }
 
     private func confirm(_ request: ClipboardRequest, reply: @escaping (Bool) -> Void) {
@@ -210,8 +225,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         settingsView.isHidden = !settings
         terminalContainer.isHidden = settings
         for s in store.sessions {
-            s.terminal.setVisible(!settings && s.id == session?.id)
+            s.panes.setVisible(!settings && s.id == session?.id)
         }
-        if !settings, let session { window?.makeFirstResponder(session.terminal) }
+        if !settings, let session { window?.makeFirstResponder(session.panes.focused) }
     }
 }

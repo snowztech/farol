@@ -39,7 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func newSession(_ sender: Any?) { windowController.newSession() }
     @objc func newWorktreeSession(_ sender: Any?) { windowController.newWorktreeSession() }
-    @objc func closeSession(_ sender: Any?) { store.selected.map(windowController.requestClose) }
+    @objc func closeSession(_ sender: Any?) { store.selected.map(windowController.requestClosePane) }
     @objc func nextSession(_ sender: Any?) { store.selectNext(offset: 1) }
     @objc func previousSession(_ sender: Any?) { store.selectNext(offset: -1) }
     @objc func selectSession(_ sender: NSMenuItem) { store.select(index: sender.tag) }
