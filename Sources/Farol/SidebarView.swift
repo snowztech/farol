@@ -133,7 +133,7 @@ private struct SessionRow: View {
         onRename(draft)
     }
 
-    /// Selection stays neutral. The accent is reserved for "this session needs you".
+    /// Selection stays neutral, so color only ever means agent status.
     private var background: some View {
         RoundedRectangle(cornerRadius: 6)
             .fill(selected ? palette.raised : hovering ? palette.raised.opacity(0.5) : .clear)
@@ -171,12 +171,12 @@ private struct Lamp: View {
         ZStack {
             switch activity {
             case .idle: Circle().strokeBorder(palette.muted.opacity(0.5), lineWidth: 1.2)
-            case .working: Breathing(color: palette.accent)
+            case .working: Breathing(color: palette.working)
             case .waiting:
                 // A ripple asks for attention, which a working dot never does.
-                if !selected { Ripple(color: palette.accent) }
-                Circle().fill(palette.accent)
-            case .done: Circle().fill(palette.accent)
+                if !selected { Ripple(color: palette.waiting) }
+                Circle().fill(palette.waiting)
+            case .done: Circle().fill(palette.done)
             }
         }
         .frame(width: 7, height: 7)
