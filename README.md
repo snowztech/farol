@@ -31,9 +31,20 @@ Tickets from GitHub, GitLab and Jira, and a diff view. See [ROADMAP.md](ROADMAP.
 
 ## Agent status
 
-Each session's dot in the sidebar shows what its agent is doing: working, waiting for you (it pulses) or done (a ring, cleared when you look). When an agent waits while Farol is in the background, you get a notification, and the Dock icon counts the waiting sessions.
+Each session's dot in the sidebar shows what its agent is doing:
 
-Agents report through `farol status`, which Farol puts in every session as `$FAROL_CLI`. For Claude Code, add these hooks to `~/.claude/settings.json`:
+- **Working:** a steady dot.
+- **Waiting for you:** the dot pulses, for a permission prompt or a question.
+- **Done:** a ring, cleared when you open the session.
+
+When an agent waits or finishes while Farol is in the background, you get a notification, and the Dock icon counts the sessions that are waiting.
+
+**Claude Code:** open Settings → Agents and click **Connect**. Farol adds its hooks to `~/.claude/settings.json`, leaves everything else in the file alone and keeps a backup. **Disconnect** removes only Farol's hooks.
+
+**Other agents** can report with `"$FAROL_CLI" status working|waiting|done|clear`, which Farol makes available in every session. Agents that ring the terminal bell light the dot without any setup.
+
+<details>
+<summary>The Claude Code hooks, if you prefer to add them by hand</summary>
 
 ```json
 {
@@ -47,7 +58,9 @@ Agents report through `farol status`, which Farol puts in every session as `$FAR
 }
 ```
 
-Outside Farol the hooks do nothing. Any other agent can call `"$FAROL_CLI" status working|waiting|done|clear` the same way. Agents without hooks still light the dot when they ring the terminal bell.
+Outside Farol `$FAROL_CLI` is unset, so the hooks do nothing.
+
+</details>
 
 ## Build
 
