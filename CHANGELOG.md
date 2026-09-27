@@ -12,6 +12,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - CI runs the style check on every push and pull request.
 - Dead keys and input methods. Accents compose as you type, the pending accent shows at the cursor, and Japanese, Chinese and Korean input places its candidate window at the cursor.
 - The emoji picker and dictation type into the terminal.
+- Sessions come back after a relaunch, in the same folders and order, with the same one selected. Folders that no longer exist are skipped, and closing the last session starts the next launch fresh.
 
 ### Fixed
 

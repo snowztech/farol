@@ -62,7 +62,10 @@ final class SessionStore: ObservableObject {
         let session = Session(terminal: terminal, directory: directory)
 
         terminal.onTitleChange = { [weak session] in session?.title = $0 }
-        terminal.onWorkingDirectoryChange = { [weak session] in session?.directory = $0 }
+        terminal.onWorkingDirectoryChange = { [weak self, weak session] in
+            session?.directory = $0
+            self?.save()
+        }
         terminal.onBell = { [weak self, weak session] in self?.flag(session) }
         terminal.onNotification = { [weak self, weak session] _, _ in self?.flag(session) }
         terminal.onClose = { [weak self, weak session] in
@@ -75,10 +78,38 @@ final class SessionStore: ObservableObject {
         return session
     }
 
+    // MARK: Restore
+
+    private static let savedDirectories = "sessions.directories"
+    private static let savedSelection = "sessions.selected"
+
+    /// Reopens the folders from the last run, skipping any that no longer exist.
+    func restore() {
+        let defaults = UserDefaults.standard
+        // Read before creating sessions, since each one saves over it.
+        let selected = defaults.integer(forKey: Self.savedSelection)
+        let directories = (defaults.stringArray(forKey: Self.savedDirectories) ?? [])
+            .filter { FileManager.default.fileExists(atPath: $0) }
+        guard !directories.isEmpty else {
+            create()
+            return
+        }
+        directories.forEach { create(directory: $0) }
+        select(index: min(selected, sessions.count - 1))
+    }
+
+    /// Saved on every change rather than at quit, so a crash keeps the sessions too.
+    private func save() {
+        let defaults = UserDefaults.standard
+        defaults.set(sessions.map(\.directory), forKey: Self.savedDirectories)
+        defaults.set(sessions.firstIndex { $0.id == selectedID } ?? 0, forKey: Self.savedSelection)
+    }
+
     func select(_ session: Session) {
         session.status = .running
         selectedID = session.id
         onSelectionChange?(session)
+        save()
     }
 
     func select(index: Int) {
@@ -95,6 +126,9 @@ final class SessionStore: ObservableObject {
     func close(_ session: Session) {
         guard let index = sessions.firstIndex(where: { $0.id == session.id }) else { return }
         if sessions.count == 1 {
+            // Nothing to restore: the next launch starts fresh in the home folder.
+            sessions.removeAll()
+            save()
             onLastSessionClosed?()
             return
         }
@@ -102,6 +136,8 @@ final class SessionStore: ObservableObject {
         sessions.remove(at: index)
         if session.id == selectedID {
             select(sessions[min(index, sessions.count - 1)])
+        } else {
+            save()
         }
     }
 

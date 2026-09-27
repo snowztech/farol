@@ -23,7 +23,7 @@ Farol can replace Ghostty or Warp for everyday work, and sessions start to be ab
 
 - [x] Copy and paste
 - [x] Dead keys and input methods (accents, CJK)
-- [ ] Restore sessions on relaunch, same folders and titles
+- [x] Restore sessions on relaunch, same folders in the same order
 - [ ] Worktree sessions: "New session in repo" creates a branch and a git worktree, and opens the terminal there
 - [ ] Sidebar shows the repo and branch of each session
 - [ ] Closing a worktree session offers to remove the worktree

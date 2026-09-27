@@ -16,7 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.mainMenu = makeMenu()
 
         windowController.showWindow(nil)
-        store.create()
+        store.restore()
         NSApp.activate(ignoringOtherApps: true)
     }
 
