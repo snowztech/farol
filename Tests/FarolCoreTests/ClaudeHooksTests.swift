@@ -73,3 +73,44 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
     try Data("[1,2]".utf8).write(to: url)
     #expect(throws: (any Error).self) { try ClaudeHooks.read(url) }
 }
+
+/// A busy settings file survives Connect then Disconnect with nothing lost or changed.
+@Test func connectThenDisconnectGivesBackTheSameSettings() throws {
+    let original = #"""
+    {
+      "model": "opus",
+      "includeCoAuthoredBy": false,
+      "cleanupPeriodDays": 30,
+      "env": { "DISABLE_TELEMETRY": "1" },
+      "permissions": { "allow": ["Bash(git status)", "Read(~/docs/**)"], "deny": ["Bash(rm -rf /)"] },
+      "statusLine": { "type": "command", "command": "~/.claude/status.sh" },
+      "enabledPlugins": { "caveman@plugins": true },
+      "hooks": {
+        "PreToolUse": [{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "~/guard.sh", "timeout": 5 }] }],
+        "Stop": [
+          { "hooks": [{ "type": "command", "command": "say done" }] },
+          { "matcher": "", "hooks": [{ "type": "command", "command": "afplay ~/ding.aiff" }] }
+        ],
+        "Notification": [{ "hooks": [{ "type": "command", "command": "terminal-notifier -message 'Claude a besoin de toi'" }] }]
+      }
+    }
+    """#
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("farol-hooks-\(UUID().uuidString)")
+    let url = dir.appendingPathComponent("settings.json")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    try Data(original.utf8).write(to: url)
+    let before = try ClaudeHooks.read(url) as NSDictionary
+
+    try ClaudeHooks.write(ClaudeHooks.install(into: try ClaudeHooks.read(url)), to: url)
+    let connected = try ClaudeHooks.read(url)
+    #expect(ClaudeHooks.isInstalled(in: connected))
+    // Farol's hook comes after the user's own, never in place of them.
+    #expect(commands(connected, "Stop") == ["say done", "afplay ~/ding.aiff", ClaudeHooks.command("done")])
+    #expect(commands(connected, "PreToolUse") == ["~/guard.sh"])
+    var withoutFarol = ClaudeHooks.remove(from: connected)
+    #expect((withoutFarol as NSDictionary).isEqual(to: before as! [AnyHashable: Any]))
+
+    try ClaudeHooks.write(ClaudeHooks.remove(from: connected), to: url)
+    withoutFarol = try ClaudeHooks.read(url)
+    #expect((withoutFarol as NSDictionary).isEqual(to: before as! [AnyHashable: Any]))
+}
