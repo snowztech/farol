@@ -10,6 +10,7 @@ struct SettingsPage: View {
 
     @AppStorage(AppIcon.key) private var appIcon = AppIcon.default.rawValue
     @State private var claudeConnected = false
+    @State private var versionCopied = false
     @State private var claudeConfirm: ClaudeChange?
     @State private var claudeError: String?
 
@@ -52,22 +53,27 @@ struct SettingsPage: View {
 
             Rectangle().fill(p.line).frame(width: 1)
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    switch section {
-                    case .appearance: appearance(p)
-                    case .terminal: terminal(p)
-                    case .agents: agentsSection(p)
-                    case .shortcuts: shortcuts(p)
-                    case .about: about(p)
+            if section == .about {
+                // A centered identity block rather than a scrolling list.
+                about(p).frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        switch section {
+                        case .appearance: appearance(p)
+                        case .terminal: terminal(p)
+                        case .agents: agentsSection(p)
+                        case .shortcuts: shortcuts(p)
+                        case .about: EmptyView()
+                        }
                     }
+                    .padding(.horizontal, 40)
+                    .padding(.top, 28)
+                    .padding(.bottom, 40)
+                    .frame(maxWidth: 820, alignment: .leading)
+                    // Centered in whatever room there is, so hiding the sidebar doesn't leave an empty strip on the right.
+                    .frame(maxWidth: .infinity)
                 }
-                .padding(.horizontal, 40)
-                .padding(.top, 28)
-                .padding(.bottom, 40)
-                .frame(maxWidth: 820, alignment: .leading)
-                // Centered in whatever room there is, so hiding the sidebar doesn't leave an empty strip on the right.
-                .frame(maxWidth: .infinity)
             }
         }
         .background(p.background)
@@ -292,15 +298,58 @@ struct SettingsPage: View {
     }
 
     @ViewBuilder private func about(_ p: Palette) -> some View {
-        Heading(title: "Farol", detail: "A terminal for working with agents.", palette: p)
-        Row(title: "Version", palette: p) {
-            Text(Self.version)
+        VStack(spacing: 0) {
+            if let image = (AppIcon(rawValue: appIcon) ?? .default).image {
+                Image(nsImage: image).resizable().interpolation(.high).frame(width: 112, height: 112)
+            }
+            Text("Farol")
+                .font(.system(size: 26, weight: .semibold))
+                .padding(.top, 8)
+            Text("A terminal for working with agents.")
+                .font(.system(size: 13))
                 .foregroundStyle(p.muted)
+                .padding(.top, 4)
+
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(Self.version, forType: .string)
+                versionCopied = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { versionCopied = false }
+            } label: {
+                HStack(spacing: 6) {
+                    Text("Version \(Self.version)").font(.system(size: 12, design: .monospaced))
+                    Image(systemName: versionCopied ? "checkmark" : "doc.on.doc").font(.system(size: 10.5))
+                }
+                .foregroundStyle(p.muted)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(p.raised, in: RoundedRectangle(cornerRadius: 6))
+            }
+            .buttonStyle(.plain)
+            .help("Copy the version")
+            .padding(.top, 20)
+
+            HStack(spacing: 18) {
+                link("GitHub", Self.repo)
+                link("Changelog", Self.repo + "/blob/main/CHANGELOG.md")
+                link("Report an issue", Self.repo + "/issues/new")
+            }
+            .font(.system(size: 12.5))
+            .padding(.top, 24)
+
+            Text("Built on libghostty. Copyright 2026 Lucas Neves Pereira.")
+                .font(.system(size: 11))
+                .foregroundStyle(p.muted.opacity(0.8))
+                .padding(.top, 28)
         }
-        Row(title: "Terminal engine", palette: p) {
-            Text("libghostty").foregroundStyle(p.muted)
-        }
+        .padding(40)
     }
+
+    private func link(_ title: String, _ url: String) -> some View {
+        Link(title, destination: URL(string: url)!).foregroundStyle(state.palette.text)
+    }
+
+    private static let repo = "https://github.com/snowztech/farol"
 
     private static let themeCount = TerminalRuntime.bundledThemes.count
 
