@@ -337,16 +337,12 @@ struct SettingsPage: View {
             .font(.system(size: 12.5))
             .padding(.top, 24)
 
-            Link(destination: URL(string: "https://github.com/snowztech")!) {
-                Text("A snowztech project").font(.system(size: 12, weight: .medium))
-            }
-            .foregroundStyle(p.muted)
-            .padding(.top, 32)
-
-            Text("Built on libghostty. Copyright 2026 Lucas Neves Pereira.")
+            // The string literal is read as Markdown, so snowztech becomes a quiet link in the same line.
+            Text("Built on libghostty. © 2026 Lucas Neves Pereira, [snowztech](https://github.com/snowztech)")
                 .font(.system(size: 11))
                 .foregroundStyle(p.muted.opacity(0.8))
-                .padding(.top, 6)
+                .tint(p.muted)
+                .padding(.top, 28)
         }
         .padding(40)
     }
