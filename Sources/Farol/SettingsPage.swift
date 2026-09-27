@@ -112,7 +112,7 @@ struct SettingsPage: View {
         HStack(spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(p.muted)
-                TextField("Search \(themes.count - 1) themes", text: $themeQuery)
+                TextField("Search \(themes.filter { $0.url != nil }.count) themes", text: $themeQuery)
                     .textFieldStyle(.plain)
             }
             .font(.system(size: 13))

@@ -160,50 +160,27 @@ private struct Reorder: DropDelegate {
     }
 }
 
-/// Dim while the program runs. Lit and slowly pulsing when the session wants you.
+/// Hollow when nothing is happening, breathing while the agent works, rippling when it waits for you, filled when it is done.
 private struct Lamp: View {
     let activity: Session.Activity
-    /// A session you are looking at has no need to pulse.
+    /// A session you are looking at has no need to ripple.
     let selected: Bool
     let palette: Palette
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var pulse = false
-
-    /// Hollow when nothing is happening, breathing while the agent works, filled when it is done.
     var body: some View {
         ZStack {
             switch activity {
-            case .idle:
-                Circle().strokeBorder(palette.muted.opacity(0.5), lineWidth: 1.2)
-            case .working:
-                Circle()
-                    .fill(palette.accent)
-                    .opacity(pulse ? 0.25 : 0.9)
-                    .onAppear { animate(.easeInOut(duration: 0.8).repeatForever()) }
-                    .onDisappear { pulse = false }
+            case .idle: Circle().strokeBorder(palette.muted.opacity(0.5), lineWidth: 1.2)
+            case .working: Breathing(color: palette.accent)
             case .waiting:
                 // A ripple asks for attention, which a working dot never does.
-                if !selected && !reduceMotion {
-                    Circle()
-                        .fill(palette.accent)
-                        .scaleEffect(pulse ? 2.6 : 1)
-                        .opacity(pulse ? 0 : 0.5)
-                        .onAppear { animate(.easeOut(duration: 1.8).repeatForever(autoreverses: false)) }
-                        .onDisappear { pulse = false }
-                }
+                if !selected { Ripple(color: palette.accent) }
                 Circle().fill(palette.accent)
-            case .done:
-                Circle().fill(palette.accent)
+            case .done: Circle().fill(palette.accent)
             }
         }
         .frame(width: 7, height: 7)
         .help(help)
-    }
-
-    private func animate(_ animation: Animation) {
-        guard !reduceMotion else { return }
-        withAnimation(animation) { pulse = true }
     }
 
     private var help: String {
@@ -213,6 +190,40 @@ private struct Lamp: View {
         case .waiting: "Waiting for you"
         case .done: "Agent finished"
         }
+    }
+}
+
+/// Each animation keeps its own state, so switching between them always starts clean.
+private struct Breathing: View {
+    let color: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var dim = false
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .opacity(dim ? 0.25 : 0.9)
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.easeInOut(duration: 0.8).repeatForever()) { dim = true }
+            }
+    }
+}
+
+private struct Ripple: View {
+    let color: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var out = false
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .scaleEffect(out ? 2.6 : 1)
+            .opacity(out ? 0 : (reduceMotion ? 0 : 0.5))
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.easeOut(duration: 1.8).repeatForever(autoreverses: false)) { out = true }
+            }
     }
 }
 

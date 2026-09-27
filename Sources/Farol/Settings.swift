@@ -10,8 +10,11 @@ final class Settings: ObservableObject {
     @Published var fontFamily = "" { didSet { write("font-family", fontFamily) } }
     @Published var fontSize = 13 { didSet { write("font-size", String(fontSize)) } }
     @Published var cursorStyle = "block" { didSet { write("cursor-style", cursorStyle) } }
+    /// Ghostty blinks by default, so only "off" is written.
     @Published var cursorBlink = true { didSet { write("cursor-style-blink", cursorBlink ? "" : "false") } }
+    /// "false", "left", "right" or "true". Off keeps Option for typing accents.
     @Published var optionAsAlt = "false" { didSet { write("macos-option-as-alt", optionAsAlt == "false" ? "" : optionAsAlt) } }
+    /// Selecting text copies it to the clipboard right away.
     @Published var copyOnSelect = false { didSet { write("copy-on-select", copyOnSelect ? "clipboard" : "") } }
 
     /// Called after every change, from the page or from the file, so the terminal can reload.
@@ -68,7 +71,7 @@ final class Settings: ObservableObject {
         watcher = source
     }
 
-    /// Changes one line and keeps everything else in the file as you wrote it.
+    /// Changes one line and keeps everything else in the file as you wrote it. An empty value removes the key.
     private func write(_ key: String, _ value: String) {
         guard !loading else { return }
         var lines = Self.read()
