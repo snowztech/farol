@@ -17,6 +17,10 @@ if [ -z "${FROM_SOURCE:-}" ] && curl -fsSL "$prebuilt" -o "$root/.ghostty.zip"; 
   exit 0
 fi
 rm -f "$root/.ghostty.zip"
+if [ -n "${CI:-}" ] && [ -z "${FROM_SOURCE:-}" ]; then
+  echo "no prebuilt libghostty for $GHOSTTY_REV. Run the libghostty workflow first." >&2
+  exit 1
+fi
 
 if [ ! -d "$src/.git" ]; then
   git clone https://github.com/ghostty-org/ghostty.git "$src"

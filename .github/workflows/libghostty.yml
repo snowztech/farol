@@ -1,0 +1,26 @@
+name: libghostty
+
+# Builds libghostty for the pinned commit and publishes it as the ghostty-<rev> pre-release.
+# Runs when the pin changes, or by hand from the Actions tab.
+on:
+  push:
+    paths: [scripts/build-ghostty.sh]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - name: Use Xcode 26
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+      - name: Build and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: FROM_SOURCE=1 ./scripts/build-ghostty.sh --publish

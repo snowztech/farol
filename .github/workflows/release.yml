@@ -20,15 +20,9 @@ jobs:
       - name: Use Xcode 26
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
 
-      - uses: mlugg/setup-zig@v2
-        with:
-          version: 0.16.0
-
-      # Downloads the prebuilt libghostty, or builds and publishes it after a Ghostty bump.
+      # The prebuilt from the libghostty workflow.
       - name: libghostty
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: ./scripts/build-ghostty.sh --publish
+        run: ./scripts/build-ghostty.sh
 
       - name: Test
         run: make test check
