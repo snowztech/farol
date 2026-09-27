@@ -29,13 +29,12 @@ struct ThemeColors {
 
     private static var cache: [String: ThemeColors] = [:]
 
-    static func load(_ name: String) -> ThemeColors {
-        if let cached = cache[name] { return cached }
+    static func load(_ url: URL) -> ThemeColors {
+        if let cached = cache[url.path] { return cached }
 
         var values: [String: String] = [:]
         var palette: [Int: Color] = [:]
-        let url = TerminalRuntime.themesDirectory?.appendingPathComponent(name)
-        let text = url.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+        let text = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
         for line in text.split(separator: "\n") {
             let parts = line.split(separator: "=", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
             guard parts.count == 2 else { continue }
@@ -55,8 +54,32 @@ struct ThemeColors {
             foreground: fg,
             cursor: values["cursor-color"].flatMap(Color.init(hex:)) ?? fg,
             ansi: (0..<8).map { palette[$0] ?? defaultANSI[$0] })
-        cache[name] = colors
+        cache[url.path] = colors
         return colors
+    }
+}
+
+/// One card in the gallery. `value` is what goes after `theme =` in the config file.
+struct Theme: Hashable {
+    let name: String
+    let value: String
+    let url: URL?
+
+    static let userDirectory = Settings.fileURL.deletingLastPathComponent().appendingPathComponent("themes")
+
+    /// Your own themes first, then Ghostty's. Yours are set by full path, since Ghostty only looks for names in its own folders.
+    static func all() -> [Theme] {
+        let user = ((try? FileManager.default.contentsOfDirectory(atPath: userDirectory.path)) ?? [])
+            .filter { !$0.hasPrefix(".") }
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+            .map { name -> Theme in
+                let url = userDirectory.appendingPathComponent(name)
+                return Theme(name: name, value: url.path, url: url)
+            }
+        let bundled = TerminalRuntime.bundledThemes.map {
+            Theme(name: $0, value: $0, url: TerminalRuntime.themesDirectory?.appendingPathComponent($0))
+        }
+        return [Theme(name: "Default", value: "", url: nil)] + user + bundled
     }
 }
 
@@ -66,20 +89,20 @@ struct ThemeGallery: View {
     let ghosttyConfig: ThemeColors
     let palette: Palette
 
-    private static let names = [""] + TerminalRuntime.bundledThemes
+    let themes: [Theme]
 
     var body: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 172), spacing: 14)], spacing: 18) {
-            ForEach(filtered, id: \.self) { name in
-                ThemeCard(name: name, colors: name.isEmpty ? ghosttyConfig : ThemeColors.load(name),
-                          selected: name == selected, palette: palette)
-                    .onTapGesture { selected = name }
+            ForEach(filtered, id: \.self) { theme in
+                ThemeCard(name: theme.name, colors: theme.url.map(ThemeColors.load) ?? ghosttyConfig,
+                          selected: theme.value == selected, palette: palette)
+                    .onTapGesture { selected = theme.value }
             }
         }
     }
 
-    private var filtered: [String] {
-        query.isEmpty ? Self.names : Self.names.filter { $0.localizedCaseInsensitiveContains(query) }
+    private var filtered: [Theme] {
+        query.isEmpty ? themes : themes.filter { $0.name.localizedCaseInsensitiveContains(query) }
     }
 }
 
@@ -119,7 +142,7 @@ private struct ThemeCard: View {
                     .strokeBorder(selected ? palette.accent : hovering ? palette.muted : palette.line,
                                   lineWidth: selected ? 2 : 1))
 
-            Text(name.isEmpty ? "Your Ghostty config" : name)
+            Text(name)
                 .font(.system(size: 11.5, weight: selected ? .semibold : .regular))
                 .foregroundStyle(selected ? palette.text : palette.muted)
                 .lineLimit(1)

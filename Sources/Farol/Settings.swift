@@ -6,26 +6,42 @@ final class Settings: ObservableObject {
     static let fileURL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".config/farol/config")
 
-    @Published var theme: String { didSet { write("theme", theme) } }
-    @Published var fontFamily: String { didSet { write("font-family", fontFamily) } }
-    @Published var fontSize: Int { didSet { write("font-size", String(fontSize)) } }
-    @Published var cursorStyle: String { didSet { write("cursor-style", cursorStyle) } }
+    @Published var theme = "" { didSet { write("theme", theme) } }
+    @Published var fontFamily = "" { didSet { write("font-family", fontFamily) } }
+    @Published var fontSize = 13 { didSet { write("font-size", String(fontSize)) } }
+    @Published var cursorStyle = "block" { didSet { write("cursor-style", cursorStyle) } }
     /// Ghostty blinks by default, so only "off" is written.
-    @Published var cursorBlink: Bool { didSet { write("cursor-style-blink", cursorBlink ? "" : "false") } }
+    @Published var cursorBlink = true { didSet { write("cursor-style-blink", cursorBlink ? "" : "false") } }
     /// "false", "left", "right" or "true". Off keeps Option for typing accents.
-    @Published var optionAsAlt: String { didSet { write("macos-option-as-alt", optionAsAlt == "false" ? "" : optionAsAlt) } }
+    @Published var optionAsAlt = "false" { didSet { write("macos-option-as-alt", optionAsAlt == "false" ? "" : optionAsAlt) } }
     /// Selecting text copies it to the clipboard right away.
-    @Published var copyOnSelect: Bool { didSet { write("copy-on-select", copyOnSelect ? "clipboard" : "") } }
+    @Published var copyOnSelect = false { didSet { write("copy-on-select", copyOnSelect ? "clipboard" : "") } }
 
-    /// Called after every change so the terminal can reload.
+    /// Called after every change, from the page or from the file, so the terminal can reload.
     var onChange: (() -> Void)?
 
-    private var lines: [String]
+    /// Set while values come from the file, so they are not written straight back.
+    private var loading = false
+    /// What Farol last wrote, to tell its own saves from yours.
+    private var lastWritten: String?
+    private var watcher: DispatchSourceFileSystemObject?
 
     init() {
-        lines = (try? String(contentsOf: Self.fileURL, encoding: .utf8))?
-            .components(separatedBy: "\n") ?? []
-        let values = Self.parse(lines)
+        reload()
+        watch()
+    }
+
+    private static func read() -> [String] {
+        var lines = ((try? String(contentsOf: fileURL, encoding: .utf8)) ?? "").components(separatedBy: "\n")
+        while lines.last?.isEmpty == true { lines.removeLast() }
+        return lines
+    }
+
+    /// Reads the file again. Also runs on Reload Configuration, for editors that save in place.
+    func reload() {
+        loading = true
+        defer { loading = false }
+        let values = Self.parse(Self.read())
         theme = values["theme"] ?? ""
         fontFamily = values["font-family"] ?? ""
         fontSize = values["font-size"].flatMap { Int($0) } ?? 13
@@ -35,26 +51,57 @@ final class Settings: ObservableObject {
         copyOnSelect = values["copy-on-select"] == "clipboard"
     }
 
-    /// Empty value removes the key, falling back to the Ghostty default.
+    /// Editors save by replacing the file, so this watches the folder rather than the file.
+    private func watch() {
+        let folder = Self.fileURL.deletingLastPathComponent()
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let fd = open(folder.path, O_EVTONLY)
+        guard fd >= 0 else { return }
+        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: .write, queue: .main)
+        source.setEventHandler { [weak self] in
+            guard let self else { return }
+            let text = try? String(contentsOf: Self.fileURL, encoding: .utf8)
+            guard text != self.lastWritten else { return }
+            self.lastWritten = text
+            self.reload()
+            self.onChange?()
+        }
+        source.setCancelHandler { close(fd) }
+        source.resume()
+        watcher = source
+    }
+
+    /// Changes one line and keeps everything else in the file as you wrote it. An empty value removes the key.
     private func write(_ key: String, _ value: String) {
+        guard !loading else { return }
+        var lines = Self.read()
+        if lines.isEmpty { lines = Self.template }
         let index = lines.firstIndex { Self.key(of: $0) == key }
         switch (index, value.isEmpty) {
         case let (i?, true): lines.remove(at: i)
         case let (i?, false): lines[i] = "\(key) = \(value)"
-        case (nil, false): lines.insert("\(key) = \(value)", at: 0)
+        case (nil, false): lines.append("\(key) = \(value)")
         case (nil, true): return
         }
-
-        try? FileManager.default.createDirectory(
-            at: Self.fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        // A trailing newline, so a line appended with `echo >>` stays its own line.
-        let text = lines.filter { !$0.isEmpty }.joined(separator: "\n") + "\n"
-        try? text.write(to: Self.fileURL, atomically: true, encoding: .utf8)
+        save(lines)
         onChange?()
     }
 
+    private func save(_ lines: [String]) {
+        let text = lines.joined(separator: "\n") + "\n"
+        lastWritten = text
+        try? text.write(to: Self.fileURL, atomically: true, encoding: .utf8)
+    }
+
+    private static let template = [
+        "# Farol settings. Save this file and the change applies right away.",
+        "# The settings page writes here too, so use whichever you like.",
+        "# Every option is listed at https://ghostty.org/docs/config",
+        "",
+    ]
+
     func openFile() {
-        if !FileManager.default.fileExists(atPath: Self.fileURL.path) { write("cursor-style", cursorStyle) }
+        if Self.read().isEmpty { save(Self.template) }
         NSWorkspace.shared.open(Self.fileURL)
     }
 

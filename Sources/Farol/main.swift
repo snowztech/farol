@@ -50,7 +50,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func toggleSettings(_ sender: Any?) { windowController.toggleSettings() }
     @objc func toggleSidebar(_ sender: Any?) { windowController.toggleSidebar() }
-    @objc func reloadConfig(_ sender: Any?) { windowController.handle(.reloadConfig) }
+    @objc func reloadConfig(_ sender: Any?) {
+        settings.reload()
+        windowController.handle(.reloadConfig)
+    }
     @objc func find(_ sender: Any?) { windowController.find() }
     @objc func findNext(_ sender: Any?) { windowController.findNext() }
     @objc func findPrevious(_ sender: Any?) { windowController.findPrevious() }
