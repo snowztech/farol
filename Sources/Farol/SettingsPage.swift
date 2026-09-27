@@ -172,7 +172,7 @@ struct SettingsPage: View {
             Toggle("", isOn: $settings.copyOnSelect).labelsHidden().toggleStyle(.switch).controlSize(.small)
         }
 
-        Text("Anything else Ghostty supports can go in the config file. Your Ghostty config loads first, and these settings override it.")
+        Text("More options go in the config file, which uses Ghostty's format. If you also use Ghostty, its config loads first and Farol's wins.")
             .font(.system(size: 12))
             .foregroundStyle(p.muted)
             .padding(.top, 20)
@@ -280,7 +280,7 @@ struct SettingsPage: View {
     }
 
     @ViewBuilder private func shortcuts(_ p: Palette) -> some View {
-        Heading(title: "Shortcuts", detail: "Ghostty's defaults, plus Farol's own for sessions.", palette: p)
+        Heading(title: "Shortcuts", detail: "Standard terminal shortcuts, plus Farol's own for sessions.", palette: p)
         ForEach(Self.shortcutGroups, id: \.title) { group in
             GroupTitle(title: group.title, palette: p)
             ForEach(group.items, id: \.action) { item in

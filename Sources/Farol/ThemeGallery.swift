@@ -119,7 +119,7 @@ private struct ThemeCard: View {
                     .strokeBorder(selected ? palette.accent : hovering ? palette.muted : palette.line,
                                   lineWidth: selected ? 2 : 1))
 
-            Text(name.isEmpty ? "Your Ghostty config" : name)
+            Text(name.isEmpty ? "Default" : name)
                 .font(.system(size: 11.5, weight: selected ? .semibold : .regular))
                 .foregroundStyle(selected ? palette.text : palette.muted)
                 .lineLimit(1)
