@@ -190,7 +190,8 @@ private struct Lamp: View {
 
     @ViewBuilder private var dot: some View {
         switch activity {
-        case .idle: Circle().fill(palette.muted.opacity(0.45))
+        // Nothing to report, so no dot. The frame keeps titles aligned.
+        case .idle: Color.clear
         case .working: Circle().fill(palette.accent.opacity(0.6))
         case .waiting: Circle().fill(palette.accent)
         case .done: Circle().strokeBorder(palette.accent, lineWidth: 1.5)

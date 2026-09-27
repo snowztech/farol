@@ -76,16 +76,21 @@ final class Session: ObservableObject, Identifiable {
     /// A worktree folder is named after its branch, so the repo name says more there.
     var displayName: String {
         if let customName { return customName }
-        if hasProgramTitle { return title }
+        if hasProgramTitle { return programTitle }
         if worktree != nil, let repoName { return repoName }
         return folderName
     }
 
-    /// The folder, when a program title took the name slot and there is no branch to show instead.
+    /// The second line when there is no branch, so every row has the same height.
     var location: String? {
-        guard hasProgramTitle, branch == nil else { return nil }
+        guard branch == nil else { return nil }
         let home = NSHomeDirectory()
         return directory.hasPrefix(home) ? "~" + directory.dropFirst(home.count) : directory
+    }
+
+    /// Agents like Claude Code put a status glyph in front of the title. The sidebar dot already shows that.
+    private var programTitle: String {
+        String(title.drop { $0.isWhitespace || $0.unicodeScalars.allSatisfy { $0.properties.generalCategory == .otherSymbol } })
     }
 
     private var hasProgramTitle: Bool {
