@@ -24,12 +24,12 @@ Farol can replace Ghostty or Warp for everyday work, and sessions start to be ab
 - [x] Copy and paste
 - [x] Dead keys and input methods (accents, CJK)
 - [x] Restore sessions on relaunch, same folders in the same order
-- [ ] Worktree sessions: "New session in repo" creates a branch and a git worktree, and opens the terminal there
-- [ ] Sidebar shows the repo and branch of each session
-- [ ] Closing a worktree session offers to remove the worktree
+- [x] Worktree sessions: "New session in repo" creates a branch and a git worktree, and opens the terminal there
+- [x] Sidebar shows the repo and branch of each session
+- [x] Closing a worktree session offers to remove the worktree
 - [ ] Release: signed and notarized build on GitHub Releases, Homebrew cask
 
-Worktree logic goes in a new `FarolCore` module with tests, since it is the first code that can lose work if it is wrong.
+Worktree logic lives in the `FarolCore` module with tests, since it is the first code that can lose work if it is wrong.
 
 ## v0.2: agents
 

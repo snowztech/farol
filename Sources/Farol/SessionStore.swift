@@ -1,4 +1,5 @@
 import AppKit
+import FarolCore
 import GhosttyTerminal
 
 final class Session: ObservableObject, Identifiable {
@@ -14,19 +15,44 @@ final class Session: ObservableObject, Identifiable {
     @Published var title = ""
     @Published var directory: String
     @Published var status = Status.running
+    @Published private(set) var branch: String?
+    @Published private(set) var repoName: String?
+    /// Set when the session runs in one of Farol's worktrees, even after `cd` into a subfolder.
+    let worktree: String?
 
     init(terminal: TerminalView, directory: String) {
         self.terminal = terminal
         self.directory = directory
+        worktree = Worktrees.default.root(of: directory)
+        refreshGit()
+    }
+
+    /// Looks up the branch off the main thread. The shell retitles at every prompt, so a `git checkout` shows up too.
+    func refreshGit() {
+        let directory = directory
+        DispatchQueue.global(qos: .userInitiated).async {
+            let branch = Git.branch(of: directory)
+            let repo = Git.repoRoot(of: directory).map { URL(fileURLWithPath: $0).lastPathComponent }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.directory == directory else { return }
+                self.branch = branch
+                self.repoName = repo
+            }
+        }
     }
 
     /// Shells default to titles like "user@host:~/dir", which read worse than the folder name.
     /// Programs that set a real title (Claude Code, vim, htop) keep it.
-    var displayName: String { hasProgramTitle ? title : folderName }
+    /// A worktree folder is named after its branch, so the repo name says more there.
+    var displayName: String {
+        if hasProgramTitle { return title }
+        if worktree != nil, let repoName { return repoName }
+        return folderName
+    }
 
-    /// Shown under a program title, so you still know where it runs.
-    var subtitle: String? {
-        guard hasProgramTitle else { return nil }
+    /// The folder, when a program title took the name slot and there is no branch to show instead.
+    var location: String? {
+        guard hasProgramTitle, branch == nil else { return nil }
         let home = NSHomeDirectory()
         return directory.hasPrefix(home) ? "~" + directory.dropFirst(home.count) : directory
     }
@@ -49,6 +75,8 @@ final class SessionStore: ObservableObject {
     var onSessionCreated: ((Session) -> Void)?
     var onSelectionChange: ((Session?) -> Void)?
     var onLastSessionClosed: (() -> Void)?
+    /// Every way of closing a session goes through here first, so worktree sessions can ask.
+    var onCloseRequest: ((Session) -> Void)?
 
     init(runtime: TerminalRuntime) {
         self.runtime = runtime
@@ -61,15 +89,19 @@ final class SessionStore: ObservableObject {
         let terminal = TerminalView(runtime: runtime, workingDirectory: directory)
         let session = Session(terminal: terminal, directory: directory)
 
-        terminal.onTitleChange = { [weak session] in session?.title = $0 }
+        terminal.onTitleChange = { [weak session] in
+            session?.title = $0
+            session?.refreshGit()
+        }
         terminal.onWorkingDirectoryChange = { [weak self, weak session] in
             session?.directory = $0
+            session?.refreshGit()
             self?.save()
         }
         terminal.onBell = { [weak self, weak session] in self?.flag(session) }
         terminal.onNotification = { [weak self, weak session] _, _ in self?.flag(session) }
         terminal.onClose = { [weak self, weak session] in
-            if let session { self?.close(session) }
+            if let session { self?.onCloseRequest?(session) }
         }
 
         sessions.append(session)

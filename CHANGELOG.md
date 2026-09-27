@@ -14,6 +14,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - The emoji picker and dictation type into the terminal.
 - Sessions come back after a relaunch, in the same folders and order, with the same one selected. Folders that no longer exist are skipped, and closing the last session starts the next launch fresh.
 
+- Worktree sessions with ⇧⌘T. Farol asks for a branch name and opens a session in its own git worktree under `~/.farol/worktrees/<repo>/<branch>`. A new branch starts from the current one, and an existing branch opens as it is.
+- Closing a worktree session offers to remove the worktree. The branch always stays, and a worktree with uncommitted changes is kept.
+- The sidebar shows the git branch of every session and updates after a checkout.
+- `FarolCore` module with tests for the git and worktree logic, run with `make test`.
+
 ### Fixed
 
 - The Farol config file now ends with a newline, so settings appended by hand stay on their own line.

@@ -7,7 +7,7 @@ final class MainWindowController: NSWindowController {
     /// Same height as the native title bar, so the buttons line up with the traffic lights.
     private static let topBarHeight: CGFloat = 28
 
-    private let store: SessionStore
+    let store: SessionStore
     private let runtime: TerminalRuntime
     private let state: WindowState
 
@@ -37,12 +37,13 @@ final class MainWindowController: NSWindowController {
 
         let commands = Commands(
             newSession: { [weak self] in self?.newSession() },
+            closeSession: { [weak self] in self?.requestClose($0) },
             toggleSidebar: { [weak self] in self?.toggleSidebar() },
             toggleSettings: { [weak self] in self?.toggleSettings() })
 
         let root = NSView()
         let topBar = hosting(TopBar(state: state, store: store, commands: commands))
-        let sidebar = hosting(SidebarView(store: store, state: state))
+        let sidebar = hosting(SidebarView(store: store, state: state, commands: commands))
         sidebar.clipsToBounds = true
         settingsView = hosting(SettingsPage(settings: settings, state: state))
         settingsView.isHidden = true
@@ -91,6 +92,7 @@ final class MainWindowController: NSWindowController {
         applyTheme()
         runtime.onConfigChange = { [weak self] in self?.applyTheme() }
         store.onSessionCreated = { [weak self] in self?.host($0.terminal) }
+        store.onCloseRequest = { [weak self] in self?.requestClose($0) }
         store.onSelectionChange = { [weak self] in
             self?.state.showingSettings = false
             self?.show($0)

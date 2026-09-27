@@ -23,7 +23,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     @objc func newSession(_ sender: Any?) { windowController.newSession() }
-    @objc func closeSession(_ sender: Any?) { store.selected.map(store.close) }
+    @objc func newWorktreeSession(_ sender: Any?) { windowController.newWorktreeSession() }
+    @objc func closeSession(_ sender: Any?) { store.selected.map(windowController.requestClose) }
     @objc func nextSession(_ sender: Any?) { store.selectNext(offset: 1) }
     @objc func previousSession(_ sender: Any?) { store.selectNext(offset: -1) }
     @objc func selectSession(_ sender: NSMenuItem) { store.select(index: sender.tag) }
@@ -49,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let sessions = NSMenu(title: "Session")
         sessions.addItem(withTitle: "New Session", action: #selector(newSession), keyEquivalent: "t")
+        sessions.addItem(withTitle: "New Worktree Session…", action: #selector(newWorktreeSession), keyEquivalent: "T")
         sessions.addItem(withTitle: "Close Session", action: #selector(closeSession), keyEquivalent: "w")
         sessions.addItem(.separator())
         sessions.addItem(withTitle: "Next Session", action: #selector(nextSession), keyEquivalent: "]")

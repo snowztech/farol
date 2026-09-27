@@ -5,6 +5,7 @@ struct SidebarView: View {
 
     @ObservedObject var store: SessionStore
     @ObservedObject var state: WindowState
+    let commands: Commands
 
     var body: some View {
         let p = state.palette
@@ -16,7 +17,7 @@ struct SidebarView: View {
                         selected: session.id == store.selectedID && !state.showingSettings,
                         palette: p,
                         onSelect: { store.select(session) },
-                        onClose: { store.close(session) })
+                        onClose: { commands.closeSession(session) })
                 }
             }
             .padding(8)
@@ -46,8 +47,14 @@ private struct SessionRow: View {
                 Text(session.displayName)
                     .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
-                if let subtitle = session.subtitle {
-                    Text(subtitle)
+                if let branch = session.branch {
+                    Label(branch, systemImage: "arrow.triangle.branch")
+                        .labelStyle(BranchLabelStyle())
+                        .font(.system(size: 11))
+                        .foregroundStyle(palette.muted)
+                        .truncationMode(.middle)
+                } else if let location = session.location {
+                    Text(location)
                         .font(.system(size: 11))
                         .foregroundStyle(palette.muted)
                         .truncationMode(.head)
@@ -108,5 +115,15 @@ private struct Lamp: View {
             Circle().fill(lit ? palette.accent : palette.muted.opacity(0.45))
         }
         .frame(width: 7, height: 7)
+    }
+}
+
+/// A small glyph tight against the branch name.
+private struct BranchLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 3) {
+            configuration.icon.font(.system(size: 9, weight: .medium))
+            configuration.title
+        }
     }
 }

@@ -14,7 +14,8 @@ Farol is early. It works as a daily terminal, but expect rough edges.
 
 ## What works today
 
-- **Sessions in a sidebar.** Open as many as you like. Hidden sessions keep running but stop rendering, so twenty background agents cost no GPU time.
+- **Sessions in a sidebar.** Open as many as you like. Hidden sessions keep running but stop rendering, so twenty background agents cost no GPU time. Each row shows the session's git branch.
+- **Worktree sessions.** ⇧⌘T asks for a branch and opens a session in its own git worktree, so parallel agents never touch each other's files. Closing it offers to remove the worktree and always keeps the branch.
 - **Attention light.** When a session rings the bell or sends a notification while you look elsewhere, its dot lights up. Coding agents do this when they wait for input.
 - **Ghostty rendering and compatibility.** Same fonts, same speed, same escape sequence support. Your existing Ghostty config is loaded.
 - **Themes.** Pick from Ghostty's 600+ themes with live previews. The window chrome follows the theme.
@@ -24,7 +25,7 @@ Farol is early. It works as a daily terminal, but expect rough edges.
 
 ## Planned
 
-Worktree sessions, agent status, tickets from GitHub, GitLab and Jira, and a diff view. See [ROADMAP.md](ROADMAP.md).
+Agent status, tickets from GitHub, GitLab and Jira, and a diff view. See [ROADMAP.md](ROADMAP.md).
 
 ## Build
 
@@ -43,6 +44,7 @@ The first build compiles libghostty and takes a few minutes. After that, `make r
 | Action | Keys |
 | --- | --- |
 | New session | ⌘T |
+| New worktree session | ⇧⌘T |
 | Close session | ⌘W |
 | Next or previous session | ⇧⌘] and ⇧⌘[ |
 | Go to session 1 to 9 | ⌘1 to ⌘9 |
@@ -68,7 +70,9 @@ See the [Ghostty docs](https://ghostty.org/docs/config) for every option.
 ```
 Sources/
   GhosttyTerminal/   the only code that touches Ghostty's C API
+  FarolCore/         git and worktree logic, no UI, tested
   Farol/             the app: sessions, sidebar, window, settings
+Tests/               FarolCore tests, run with `make test`
 scripts/
   build-ghostty.sh   builds libghostty from a pinned commit
   bundle.sh          assembles build/Farol.app
@@ -83,6 +87,7 @@ Farol embeds Ghostty through its internal API (`ghostty.h`). Ghostty makes no st
 Issues and pull requests are welcome. Before you open a PR, run:
 
 ```sh
+make test
 make check
 ```
 
