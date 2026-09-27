@@ -22,10 +22,7 @@ Farol is early. It works as a daily terminal, but expect rough edges.
 
 ## Planned
 
-- A git worktree per session, so parallel agents never touch each other's files.
-- Start a session from a GitHub, GitLab or Jira ticket.
-- A diff view to review what an agent changed.
-- Copy and paste, and input methods for dead keys and CJK text.
+Worktree sessions, agent status, tickets from GitHub, GitLab and Jira, and a diff view. See [ROADMAP.md](ROADMAP.md).
 
 ## Build
 
@@ -34,11 +31,10 @@ You need macOS 14 or later, Xcode 26 and Zig 0.16.
 ```sh
 brew install zig
 xcodebuild -downloadComponent MetalToolchain   # once, Xcode 26 no longer ships it
-./scripts/build-ghostty.sh                     # builds libghostty into vendor/
-./scripts/bundle.sh && open build/Farol.app
+make install                                   # builds from source into /Applications
 ```
 
-Always run the bundle. Ghostty finds its shell integration and terminfo inside the `.app`, so a bare `swift run` binary works but loses them.
+The first build compiles libghostty and takes a few minutes. After that, `make run` gives you a quick debug build and `make help` lists everything else.
 
 ## Shortcuts
 
@@ -85,7 +81,7 @@ Farol embeds Ghostty through its internal API (`ghostty.h`). Ghostty makes no st
 Issues and pull requests are welcome. Before you open a PR, run:
 
 ```sh
-python3 scripts/check-style.py
+make check
 ```
 
 It flags em dashes, semicolons in prose, comment blocks over three lines and filler words. Comments should explain why, not what. If you use Claude Code in this repo, the same check runs after every edit.
