@@ -37,10 +37,12 @@ Coming next: tickets from GitHub, GitLab and Jira, and a diff view. See [ROADMAP
 
 The dot next to each session shows what its agent is doing:
 
-- **Idle:** a hollow dot.
-- **Working:** the dot breathes.
-- **Waiting for you:** the dot sends out a ripple, for a permission prompt or a question.
-- **Done:** the dot fills, and goes back to hollow when you open the session.
+- **Idle:** a hollow gray dot.
+- **Working:** a cyan dot that breathes.
+- **Waiting for you:** a yellow dot that sends out a ripple, for a permission prompt or a question.
+- **Done:** a green dot, back to hollow when you open the session.
+
+The colors come from your theme's own cyan, yellow and green, so they always match it.
 
 When an agent waits or finishes while Farol is in the background, you get a notification, and the Dock icon counts the sessions that are waiting.
 

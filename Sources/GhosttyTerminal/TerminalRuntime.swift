@@ -83,6 +83,15 @@ public final class TerminalRuntime {
     public var backgroundColor: NSColor { Self.color(config, "background") ?? .black }
     public var foregroundColor: NSColor { Self.color(config, "foreground") ?? .white }
 
+    /// The theme's 16 ANSI colors, the ones programs like `ls` use. Empty if Ghostty cannot report them.
+    public var ansiColors: [NSColor] {
+        var palette = ghostty_config_palette_s()
+        let key = "palette"
+        guard ghostty_config_get(config, &palette, key, UInt(key.utf8.count)) else { return [] }
+        return withUnsafeBytes(of: palette.colors) { Array($0.bindMemory(to: ghostty_config_color_s.self).prefix(16)) }
+            .map(Self.nsColor)
+    }
+
     private static func color(_ config: ghostty_config_t, _ key: String) -> NSColor? {
         var c = ghostty_config_color_s()
         guard ghostty_config_get(config, &c, key, UInt(key.utf8.count)) else { return nil }

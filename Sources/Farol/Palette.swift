@@ -1,8 +1,9 @@
 import AppKit
+import GhosttyTerminal
 import SwiftUI
 
-/// Every chrome color comes from the terminal theme, so Farol looks right with any of them.
-/// Farol is monochrome: marks use the text color, and motion, not hue, is what calls for attention.
+/// Every color comes from the terminal theme, so Farol looks right with any of them.
+/// The chrome is monochrome. Only agent status gets a hue, taken from the theme's own ANSI colors.
 struct Palette: Equatable {
     let background: Color
     let surface: Color
@@ -12,11 +13,19 @@ struct Palette: Equatable {
     let muted: Color
     /// Selected marks and the agent dot.
     let accent: Color
+    /// Agent status. Cyan is calm for busy, yellow asks for you, green means finished.
+    let working: Color
+    let waiting: Color
+    let done: Color
     /// Tint for macOS switches and pickers. A mid gray, since white on a switch would hide its white knob.
     let control: Color
     let isDark: Bool
 
-    init(background bg: NSColor, foreground fg: NSColor) {
+    init(_ runtime: TerminalRuntime) {
+        self.init(background: runtime.backgroundColor, foreground: runtime.foregroundColor, ansi: runtime.ansiColors)
+    }
+
+    init(background bg: NSColor, foreground fg: NSColor, ansi: [NSColor]) {
         isDark = bg.isDark
         background = Color(nsColor: bg)
         surface = Color(nsColor: bg.mixed(with: fg, 0.035))
@@ -26,6 +35,10 @@ struct Palette: Equatable {
         muted = Color(nsColor: bg.mixed(with: fg, 0.55))
         accent = Color(nsColor: fg)
         control = Color(nsColor: bg.mixed(with: fg, 0.42))
+        let ansi = { (i: Int) in Color(nsColor: ansi.count > i ? ansi[i] : fg) }
+        working = ansi(6)
+        waiting = ansi(3)
+        done = ansi(2)
     }
 }
 

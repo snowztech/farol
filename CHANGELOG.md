@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- Agent status dots use color from your theme: cyan while working, yellow when waiting for you, green when done. The rest of the window stays monochrome.
+
 ## [0.2.0] - 2026-09-27
 
 Settings and the config file now work together, you can add your own themes, and the sidebar shows agent status more clearly.
