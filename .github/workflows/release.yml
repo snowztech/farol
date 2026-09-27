@@ -12,7 +12,7 @@ jobs:
   release:
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # The version comes from git describe, which needs the tags.
           fetch-depth: 0
