@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Farol</title>
+  <meta name="description" content="A fast macOS terminal for working with coding agents. Built on libghostty.">
+  <meta property="og:title" content="Farol">
+  <meta property="og:description" content="A fast macOS terminal for working with coding agents.">
+  <meta property="og:image" content="https://farol.snowztech.com/icon.png">
+  <link rel="icon" href="icon.png">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.2/dist/snowztech-ui.min.css">
+  <script>
+    if (matchMedia("(prefers-color-scheme: light)").matches) document.documentElement.dataset.theme = "light";
+  </script>
+  <style>
+    body {
+      margin: 0;
+      background: var(--sn-bg);
+      color: var(--sn-fg);
+      font-family: var(--sn-font-mono);
+      font-size: var(--sn-text-base);
+      line-height: var(--sn-leading-normal);
+    }
+    main { max-width: 640px; margin: 0 auto; padding: 96px 20px 48px; }
+    a { color: inherit; }
+
+    .hero { text-align: center; }
+    .hero img { width: 112px; height: 112px; }
+    h1 { font-size: 28px; font-weight: 600; margin: 12px 0 4px; letter-spacing: -0.01em; }
+    .tagline { color: var(--sn-fg-muted); margin: 0 0 28px; }
+    .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .actions .sn-btn { text-decoration: none; transition: opacity var(--sn-base) var(--sn-ease), border-color var(--sn-base) var(--sn-ease); }
+    /* ui-css colors every a:hover with the accent, which wins over the button's own text color. */
+    .actions a.sn-btn--primary:hover { color: var(--sn-fg-inverse); background: var(--sn-fg); border-color: var(--sn-fg); opacity: 0.85; }
+    .actions a.sn-btn--secondary:hover { color: var(--sn-fg); }
+    .fine { color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); margin-top: 14px; }
+
+    /* A sketch of the sidebar, so the page shows what Farol does before any screenshot. */
+    .window {
+      margin: 56px 0 48px;
+      border: 1px solid var(--sn-border);
+      border-radius: var(--sn-r-lg);
+      background: var(--sn-bg-inset);
+      overflow: hidden;
+    }
+    .bar { display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--sn-border-subtle); }
+    .bar i { width: 10px; height: 10px; border-radius: 50%; background: var(--sn-border-strong); }
+    .rows { padding: 8px; }
+    .row { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: var(--sn-r-md); }
+    .row.selected { background: var(--sn-border-subtle); }
+    .row b { display: block; font-weight: 500; font-size: var(--sn-text-sm); }
+    .row small { color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); }
+    .row .state { margin-left: auto; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); }
+
+    .dot { position: relative; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .dot.idle { box-shadow: inset 0 0 0 1.2px var(--sn-fg-faint); }
+    .dot.working { background: var(--sn-accent); animation: breathe 1.6s ease-in-out infinite; }
+    .dot.waiting { background: var(--sn-warning); }
+    .dot.waiting::after {
+      content: ""; position: absolute; inset: 0; border-radius: 50%;
+      background: var(--sn-warning); animation: ripple 1.8s ease-out infinite;
+    }
+    .dot.done { background: var(--sn-success); }
+    @keyframes breathe { 50% { opacity: 0.25; } }
+    @keyframes ripple { from { transform: scale(1); opacity: 0.5; } to { transform: scale(2.6); opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { .dot, .dot::after { animation: none; } }
+
+    ul.features { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+    .features b { font-weight: 500; }
+    .features span { color: var(--sn-fg-muted); }
+
+    footer {
+      margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--sn-border-subtle);
+      display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+      color: var(--sn-fg-subtle); font-size: var(--sn-text-xs);
+    }
+    footer a { color: var(--sn-fg-muted); text-decoration: none; }
+    footer a:hover { color: var(--sn-fg); }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <img src="icon.png" alt="Farol icon">
+      <h1>Farol</h1>
+      <p class="tagline">A fast macOS terminal for working with coding agents.</p>
+      <div class="actions">
+        <a class="sn-btn sn-btn--primary sn-btn--lg" href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Download for Mac</a>
+        <a class="sn-btn sn-btn--secondary sn-btn--lg" href="https://github.com/snowztech/farol">GitHub</a>
+      </div>
+      <p class="fine">Apple Silicon, macOS 14 or later. Signed and notarized. Free and open source.</p>
+    </section>
+
+    <div class="window" aria-hidden="true">
+      <div class="bar"><i></i><i></i><i></i></div>
+      <div class="rows">
+        <div class="row"><span class="dot working"></span><div><b>Refactor the parser</b><small>feat/parser</small></div><span class="state">working</span></div>
+        <div class="row"><span class="dot waiting"></span><div><b>Fix flaky tests</b><small>fix/ci</small></div><span class="state">needs you</span></div>
+        <div class="row"><span class="dot done"></span><div><b>Write the docs</b><small>docs/api</small></div><span class="state">done</span></div>
+        <div class="row selected"><span class="dot idle"></span><div><b>farol</b><small>~/dev/farol</small></div></div>
+      </div>
+    </div>
+
+    <ul class="features">
+      <li><b>One worktree per agent.</b> <span>Parallel agents never touch each other's files.</span></li>
+      <li><b>Built on libghostty.</b> <span>Ghostty's speed, themes and config.</span></li>
+      <li><b>A real Mac app.</b> <span>Splits, search and settings in the app or in a file.</span></li>
+    </ul>
+
+    <footer>
+      <span>© 2026 Lucas Neves Pereira, <a href="https://github.com/snowztech">snowztech</a></span>
+      <span><a href="https://github.com/snowztech/farol/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://github.com/snowztech/farol/blob/main/LICENSE">MIT</a></span>
+    </footer>
+  </main>
+</body>
+</html>
