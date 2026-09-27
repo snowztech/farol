@@ -103,15 +103,15 @@ See the [Ghostty docs](https://ghostty.org/docs/config) for every option.
 
 ## Build from source
 
-You need macOS 14 or later, Xcode 26 and Zig 0.16.
+You need macOS 14 or later and Xcode 26.
 
 ```sh
-brew install zig
-xcodebuild -downloadComponent MetalToolchain   # once, Xcode 26 no longer ships it
-make install                                   # builds from source into /Applications
+make install   # builds Farol into /Applications
 ```
 
-The first build compiles libghostty and takes a few minutes. After that, `make run` gives you a quick debug build and `make help` lists everything else.
+The first build downloads a prebuilt libghostty for the pinned Ghostty commit. After that, `make run` gives you a quick debug build and `make help` lists everything else.
+
+To compile libghostty yourself, install Zig 0.16 and the Metal toolchain (`xcodebuild -downloadComponent MetalToolchain`), then run `FROM_SOURCE=1 ./scripts/build-ghostty.sh`.
 
 ## How it's built
 
@@ -122,7 +122,7 @@ Sources/
   Farol/             the app: sessions, sidebar, window, settings
 Tests/               FarolCore tests, run with `make test`
 scripts/
-  build-ghostty.sh   builds libghostty from a pinned commit
+  build-ghostty.sh   fetches or builds libghostty for a pinned commit
   bundle.sh          assembles build/Farol.app
   make-icon.swift    builds the app icons from assets/icons/source
   check-style.py     keeps comments and docs plain

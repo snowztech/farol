@@ -12,7 +12,7 @@ jobs:
   release:
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # The version comes from git describe, which needs the tags.
           fetch-depth: 0
@@ -24,19 +24,11 @@ jobs:
         with:
           version: 0.16.0
 
-      # libghostty takes minutes to build, so it is kept until the pinned Ghostty commit changes.
-      - name: Restore libghostty
-        id: ghostty
-        uses: actions/cache@v4
-        with:
-          path: vendor
-          key: ghostty-${{ hashFiles('scripts/build-ghostty.sh') }}
-
-      - name: Build libghostty
-        if: steps.ghostty.outputs.cache-hit != 'true'
-        run: |
-          xcodebuild -downloadComponent MetalToolchain
-          ./scripts/build-ghostty.sh
+      # Downloads the prebuilt libghostty, or builds and publishes it after a Ghostty bump.
+      - name: libghostty
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/build-ghostty.sh --publish
 
       - name: Test
         run: make test check
