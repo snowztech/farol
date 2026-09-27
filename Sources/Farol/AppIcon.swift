@@ -14,6 +14,15 @@ enum AppIcon: String, CaseIterable {
         Bundle.main.resourceURL.flatMap { NSImage(contentsOf: $0.appendingPathComponent("icons/\(rawValue).png")) }
     }
 
+    /// Small enough for a menu item.
+    var menuImage: NSImage? {
+        guard let image else { return nil }
+        return NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
+            image.draw(in: rect)
+            return true
+        }
+    }
+
     static var current: AppIcon {
         UserDefaults.standard.string(forKey: key).flatMap(AppIcon.init) ?? .default
     }

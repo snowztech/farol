@@ -52,7 +52,7 @@ The first tagged version. Build it from source with `make install`. Signed downl
 
 ### Changed
 
-- New app icon, Beam: the lighthouse with a lit blue lamp. Settings → Appearance offers three more (Dark, Navy, Light) for the Dock icon.
+- New app icon, Beam: the lighthouse with a lit blue lamp. Settings → Appearance offers three more (Dark, Navy, Light) for the Dock icon, in a dropdown with previews.
 
 - The accent color is now Farol's own blue, taken from the lighthouse beam in the app icon, instead of each theme's blue.
 - The Agents settings page shows Claude Code as connected or not, with a clear Connect button, and drops the "Other agents" note, which now lives only in the README.
@@ -62,7 +62,7 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The Farol config file now ends with a newline, so settings appended by hand stay on their own line.
 - The window's close button no longer closes the window when you cancel the quit.
 - Choosing the Beam icon no longer shows an old cached icon in the Dock, and `make install` refreshes the icon macOS caches.
-- The lighthouse fills more of the app icon, and a faint edge keeps dark icons visible on a dark Dock.
+- A faint edge keeps dark app icons visible on a dark Dock.
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 

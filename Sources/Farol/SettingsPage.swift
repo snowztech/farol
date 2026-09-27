@@ -81,13 +81,23 @@ struct SettingsPage: View {
     // MARK: Sections
 
     @ViewBuilder private func appearance(_ p: Palette) -> some View {
-        Heading(title: "App icon", detail: "Shown in the Dock while Farol runs.", palette: p)
-        HStack(spacing: 10) {
-            ForEach(AppIcon.allCases, id: \.self) { icon in
-                IconChoice(icon: icon, selected: appIcon == icon.rawValue, palette: p) { appIcon = icon.rawValue }
+        Heading(title: "Appearance", detail: nil, palette: p)
+        Row(title: "App icon", detail: "Shown in the Dock while Farol runs.", palette: p) {
+            Picker("", selection: $appIcon) {
+                ForEach(AppIcon.allCases, id: \.self) { icon in
+                    Label {
+                        Text(icon == .default ? "\(icon.title) (default)" : icon.title)
+                    } icon: {
+                        if let image = icon.menuImage { Image(nsImage: image) }
+                    }
+                    .tag(icon.rawValue)
+                }
             }
+            .labelsHidden()
+            .fixedSize()
         }
-        .padding(.bottom, 36)
+        .padding(.bottom, 32)
+
 
         Heading(title: "Theme", detail: "Applies to every session as soon as you pick it.", palette: p)
         HStack(spacing: 8) {
@@ -392,50 +402,6 @@ private struct GroupTitle: View {
             .foregroundStyle(palette.muted)
             .padding(.top, 22)
             .padding(.bottom, 2)
-    }
-}
-
-/// One icon option: a card that lifts on hover, with an accent ring and a check when chosen.
-private struct IconChoice: View {
-    let icon: AppIcon
-    let selected: Bool
-    let palette: Palette
-    let action: () -> Void
-
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
-                ZStack(alignment: .topTrailing) {
-                    Group {
-                        if let image = icon.image {
-                            Image(nsImage: image).resizable().interpolation(.high)
-                        } else {
-                            RoundedRectangle(cornerRadius: 14).fill(palette.raised)
-                        }
-                    }
-                    .frame(width: 76, height: 76)
-
-                    if selected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundStyle(.white, palette.accent)
-                            .offset(x: 4, y: -2)
-                    }
-                }
-                Text(icon == .default ? "\(icon.title) (default)" : icon.title)
-                    .font(.system(size: 11.5, weight: selected ? .semibold : .regular))
-                    .foregroundStyle(selected ? palette.text : palette.muted)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(RoundedRectangle(cornerRadius: 12).fill(selected || hovering ? palette.raised : .clear))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(selected ? palette.accent : .clear, lineWidth: 1.5))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
     }
 }
 

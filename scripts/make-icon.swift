@@ -8,10 +8,6 @@ let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingL
 let assets = root.appendingPathComponent("assets")
 let sources = assets.appendingPathComponent("icons/source")
 
-/// The artwork has wide margins, so it is drawn larger than the tile and the edges are cut off.
-/// Without this the lighthouse looks small next to other Dock icons.
-let zoom: CGFloat = 1.3
-
 /// Apple's grid: 1024 canvas, 824 artwork, corner radius about 22.5% of the artwork.
 /// A faint edge keeps dark tiles visible on a dark Dock, and light ones on a light Dock.
 func render(_ art: CGImage, size: Int) -> Data {
@@ -26,7 +22,7 @@ func render(_ art: CGImage, size: Int) -> Data {
     ctx.saveGState()
     ctx.addPath(tile)
     ctx.clip()
-    ctx.draw(art, in: rect.insetBy(dx: -rect.width * (zoom - 1) / 2, dy: -rect.height * (zoom - 1) / 2))
+    ctx.draw(art, in: rect)
     ctx.restoreGState()
 
     let edge: CGFloat = max(1, s / 512)
