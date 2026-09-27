@@ -35,7 +35,7 @@ Coming next: tickets from GitHub, GitLab and Jira, and a diff view. See [ROADMAP
 
 ## Agent status
 
-Each session's dot in the sidebar shows what its agent is doing:
+The icon next to each session shows what its agent is doing:
 
 - **Working:** a spinner.
 - **Waiting for you:** a pulsing dot, for a permission prompt or a question.
@@ -45,7 +45,7 @@ When an agent waits or finishes while Farol is in the background, you get a noti
 
 **Claude Code:** open Settings → Agents and click **Connect**. Farol adds its hooks to `~/.claude/settings.json`, leaves everything else in the file alone and keeps a backup. **Disconnect** removes only Farol's hooks.
 
-**Other agents** can report with `"$FAROL_CLI" status working|waiting|done|clear`, which Farol makes available in every session. Agents that ring the terminal bell light the dot without any setup.
+**Other agents** can report with `"$FAROL_CLI" status working|waiting|done|clear`, which Farol makes available in every session. Agents that ring the terminal bell show as waiting without any setup.
 
 <details>
 <summary>The Claude Code hooks, if you prefer to add them by hand</summary>
