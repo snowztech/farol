@@ -51,6 +51,10 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The Shortcuts page lists every shortcut, grouped by sessions, panes, find, terminal and window.
 - The style check also reads interface text in Swift strings.
 
+### Added
+
+- `make dist` builds a signed and notarized zip. Farol runs with the hardened runtime and asks macOS for camera, microphone, AppleScript and similar access on behalf of programs running in it.
+
 ### Changed
 
 - The top bar has no rule under it, and each part takes the color of the column below, so the terminal reaches the top edge.

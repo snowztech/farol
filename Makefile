@@ -1,7 +1,7 @@
 APP := build/Farol.app
 GHOSTTY := vendor/GhosttyKit.xcframework
 
-.PHONY: help build release run install uninstall test check icon clean
+.PHONY: help build release run install uninstall dist test check icon clean
 
 help:
 	@echo "make build      debug build into $(APP)"
@@ -9,6 +9,7 @@ help:
 	@echo "make release    optimized build into $(APP)"
 	@echo "make install    release build copied to /Applications"
 	@echo "make uninstall  remove /Applications/Farol.app"
+	@echo "make dist       signed and notarized zip for sharing (see scripts/dist.sh)"
 	@echo "make test       run the FarolCore tests"
 	@echo "make check      style check for comments and docs"
 	@echo "make icon       regenerate the app icon from assets/icon-source.png"
@@ -33,6 +34,9 @@ install: release
 	@# Tell macOS the app changed, so Finder and the Dock drop the icon they cached.
 	@/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/Farol.app
 	@echo "Installed /Applications/Farol.app"
+
+dist: $(GHOSTTY)
+	./scripts/dist.sh
 
 uninstall:
 	rm -rf /Applications/Farol.app

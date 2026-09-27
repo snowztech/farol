@@ -50,6 +50,18 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>FarolVersion</key><string>$version</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>NSHighResolutionCapable</key><true/>
+  <!-- Shown when a program in a session asks macOS for access. -->
+  <key>NSAppleEventsUsageDescription</key><string>A program running in Farol would like to use AppleScript.</string>
+  <key>NSCameraUsageDescription</key><string>A program running in Farol would like to use the camera.</string>
+  <key>NSMicrophoneUsageDescription</key><string>A program running in Farol would like to use your microphone.</string>
+  <key>NSAudioCaptureUsageDescription</key><string>A program running in Farol would like to access your system's audio.</string>
+  <key>NSContactsUsageDescription</key><string>A program running in Farol would like to access your Contacts.</string>
+  <key>NSCalendarsUsageDescription</key><string>A program running in Farol would like to access your Calendar.</string>
+  <key>NSRemindersUsageDescription</key><string>A program running in Farol would like to access your reminders.</string>
+  <key>NSPhotoLibraryUsageDescription</key><string>A program running in Farol would like to access your Photo Library.</string>
+  <key>NSLocationUsageDescription</key><string>A program running in Farol would like to access your location.</string>
+  <key>NSLocalNetworkUsageDescription</key><string>A program running in Farol would like to access the local network.</string>
+  <key>NSBluetoothAlwaysUsageDescription</key><string>A program running in Farol would like to use Bluetooth.</string>
 </dict>
 </plist>
 PLIST

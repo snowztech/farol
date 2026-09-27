@@ -74,6 +74,16 @@ make install                                   # builds from source into /Applic
 
 The first build compiles libghostty and takes a few minutes. After that, `make run` gives you a quick debug build and `make help` lists everything else.
 
+### Signed builds
+
+`make dist` builds a zip that opens on any Mac without warnings: signed with a Developer ID, notarized by Apple and stapled. It needs a Developer ID Application certificate in your keychain and a notarization key stored once:
+
+```sh
+xcrun notarytool store-credentials farol --key AuthKey_XXXX.p8 --key-id <Key ID> --issuer <Issuer ID>
+```
+
+The key comes from App Store Connect, under Users and Access, Integrations, App Store Connect API.
+
 ## Shortcuts
 
 | Action | Keys |
