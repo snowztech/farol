@@ -28,6 +28,8 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - Pane layouts are saved with the sessions and restored after a relaunch.
 - Debug builds run as "Farol Dev" with their own saved sessions, so testing never touches the installed app.
 
+- Find in scrollback: ⌘F opens a search bar on the focused pane with a match count, ↩ and ⇧↩ or ⌘G and ⇧⌘G move between matches, ⌘E searches the selected text, and esc closes it.
+
 ### Fixed
 
 - The Farol config file now ends with a newline, so settings appended by hand stay on their own line.

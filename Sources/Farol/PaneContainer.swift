@@ -30,7 +30,15 @@ final class PaneContainer: NSView {
     private var zoomed = false
     private var dragging: Node?
 
-    var dividerColor = NSColor.separatorColor { didSet { needsDisplay = true } }
+    /// The terminal theme's background and text colors, which the dividers and search bar are mixed from.
+    var theme = (background: NSColor.black, foreground: NSColor.white) {
+        didSet {
+            needsDisplay = true
+            searchBar?.apply(background: theme.background, foreground: theme.foreground)
+        }
+    }
+    private var dividerColor: NSColor { theme.background.mixed(with: theme.foreground, 0.11) }
+    private var searchBar: SearchBar?
     var onFocusChange: ((TerminalView) -> Void)?
     /// Panes were added, removed or resized, so the saved layout is out of date.
     var onLayoutChange: (() -> Void)?
@@ -105,6 +113,7 @@ final class PaneContainer: NSView {
         parent.children = sibling.children
         parent.ratio = sibling.ratio
         parent.children.forEach { $0.parent = parent }
+        if searchBar?.terminal === terminal { hideSearch() }
         terminal.removeFromSuperview()
         zoomed = false
         if terminal === focused { focus(parent.leaves[0]) }
@@ -183,6 +192,7 @@ final class PaneContainer: NSView {
             place(root, in: bounds)
         }
         applyFocus()
+        placeSearchBar()
         window?.invalidateCursorRects(for: self)
         needsDisplay = true
     }
@@ -211,6 +221,43 @@ final class PaneContainer: NSView {
                     CGRect(x: rect.minX, y: rect.minY + height + Self.divider,
                            width: rect.width, height: rect.height - height - Self.divider))
         }
+    }
+
+    // MARK: Search
+
+    /// The pane search acts on: the one showing the bar, or the focused one.
+    var searchTarget: TerminalView { searchBar?.terminal ?? focused }
+
+    private func showSearch(in terminal: TerminalView, needle: String) {
+        if let bar = searchBar, bar.terminal !== terminal {
+            bar.terminal?.endSearch()
+            hideSearch()
+        }
+        let bar = searchBar ?? SearchBar(for: terminal)
+        bar.apply(background: theme.background, foreground: theme.foreground)
+        bar.onClose = { [weak self, weak terminal] in
+            terminal?.endSearch()
+            self?.hideSearch()
+        }
+        searchBar = bar
+        placeSearchBar()
+        bar.begin(with: needle)
+    }
+
+    private func hideSearch() {
+        guard let bar = searchBar else { return }
+        searchBar = nil
+        bar.removeFromSuperview()
+        if let terminal = bar.terminal { focus(terminal) }
+    }
+
+    /// Top right of its pane, above every terminal.
+    private func placeSearchBar() {
+        guard let bar = searchBar, let terminal = bar.terminal else { return }
+        let size = SearchBar.size
+        bar.frame = NSRect(x: terminal.frame.maxX - size.width - 10, y: terminal.frame.minY + 8,
+                           width: min(size.width, terminal.frame.width - 20), height: size.height)
+        if subviews.last !== bar { addSubview(bar, positioned: .above, relativeTo: nil) }
     }
 
     // MARK: Dividers
@@ -280,6 +327,12 @@ final class PaneContainer: NSView {
         terminal.autoresizingMask = []
         terminal.onFocus = { [weak self, weak terminal] in
             if let self, let terminal { self.noteFocused(terminal) }
+        }
+        terminal.onSearchStart = { [weak self, weak terminal] needle in
+            if let self, let terminal { self.showSearch(in: terminal, needle: needle) }
+        }
+        terminal.onSearchEnd = { [weak self, weak terminal] in
+            if self?.searchBar?.terminal === terminal { self?.hideSearch() }
         }
         addSubview(terminal)
         needsLayout = true

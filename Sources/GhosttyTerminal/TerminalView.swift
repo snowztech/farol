@@ -16,6 +16,14 @@ public final class TerminalView: NSView {
     /// This terminal became the focused one, by click or keyboard.
     public var onFocus: (() -> Void)?
 
+    /// Search started, from ⌘F or a key binding. The text is pre-filled, for example from ⌘E.
+    public var onSearchStart: ((String) -> Void)?
+    public var onSearchEnd: (() -> Void)?
+    /// The selected match (0 based) and the match count, nil while unknown.
+    public var onSearchResults: ((_ selected: Int?, _ total: Int?) -> Void)?
+    private var searchSelected: Int?
+    private var searchTotal: Int?
+
     /// The latest title and folder the program reported, kept so a pane regaining focus can show them.
     public private(set) var title = ""
     public private(set) var workingDirectory: String?
@@ -97,6 +105,21 @@ public final class TerminalView: NSView {
             if let window, bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil)) {
                 cursor.set()
             }
+        case GHOSTTY_ACTION_START_SEARCH:
+            let needle = action.action.start_search.needle.map { String(cString: $0) } ?? ""
+            DispatchQueue.main.async { self.onSearchStart?(needle) }
+        case GHOSTTY_ACTION_END_SEARCH:
+            searchSelected = nil
+            searchTotal = nil
+            DispatchQueue.main.async { self.onSearchEnd?() }
+        case GHOSTTY_ACTION_SEARCH_TOTAL:
+            let total = action.action.search_total.total
+            searchTotal = total >= 0 ? Int(total) : nil
+            onSearchResults?(searchSelected, searchTotal)
+        case GHOSTTY_ACTION_SEARCH_SELECTED:
+            let selected = action.action.search_selected.selected
+            searchSelected = selected >= 0 ? Int(selected) : nil
+            onSearchResults?(searchSelected, searchTotal)
         case GHOSTTY_ACTION_MOUSE_VISIBILITY:
             NSCursor.setHiddenUntilMouseMoves(action.action.mouse_visibility == GHOSTTY_MOUSE_HIDDEN)
         default:
@@ -122,6 +145,15 @@ public final class TerminalView: NSView {
     @objc public func copy(_ sender: Any?) { perform("copy_to_clipboard") }
     @objc public func paste(_ sender: Any?) { perform("paste_from_clipboard") }
     @objc public override func selectAll(_ sender: Any?) { perform("select_all") }
+
+    // MARK: Search
+
+    public func startSearch() { perform("start_search") }
+    public func searchSelection() { perform("search_selection") }
+    public func search(_ needle: String) { perform("search:\(needle)") }
+    public func searchNext() { perform("navigate_search:next") }
+    public func searchPrevious() { perform("navigate_search:previous") }
+    public func endSearch() { perform("end_search") }
 
     private func perform(_ action: String) {
         guard let surface else { return }

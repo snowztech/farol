@@ -47,6 +47,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func toggleSettings(_ sender: Any?) { windowController.toggleSettings() }
     @objc func toggleSidebar(_ sender: Any?) { windowController.toggleSidebar() }
     @objc func reloadConfig(_ sender: Any?) { windowController.handle(.reloadConfig) }
+    @objc func find(_ sender: Any?) { windowController.find() }
+    @objc func findNext(_ sender: Any?) { windowController.findNext() }
+    @objc func findPrevious(_ sender: Any?) { windowController.findPrevious() }
+    @objc func findSelection(_ sender: Any?) { windowController.findSelection() }
 
     private func makeMenu() -> NSMenu {
         let main = NSMenu()
@@ -63,6 +67,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         edit.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
         edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        edit.addItem(.separator())
+        let findItems = [
+            edit.addItem(withTitle: "Find…", action: #selector(find), keyEquivalent: "f"),
+            edit.addItem(withTitle: "Find Next", action: #selector(findNext), keyEquivalent: "g"),
+            edit.addItem(withTitle: "Find Previous", action: #selector(findPrevious), keyEquivalent: "G"),
+            edit.addItem(withTitle: "Use Selection for Find", action: #selector(findSelection), keyEquivalent: "e"),
+        ]
+        // Find acts on the session, not on whatever text field has focus.
+        findItems.forEach { $0.target = self }
         main.addItem(submenu: edit, title: "Edit")
 
         let sessions = NSMenu(title: "Session")

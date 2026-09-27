@@ -179,15 +179,22 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         window?.backgroundColor = bg
         window?.appearance = NSAppearance(named: bg.isDark ? .darkAqua : .aqua)
         content.layer?.backgroundColor = bg.cgColor
-        store.sessions.forEach { $0.panes.dividerColor = dividerColor }
+        store.sessions.forEach { $0.panes.theme = theme }
     }
 
-    private var dividerColor: NSColor { runtime.backgroundColor.mixed(with: runtime.foregroundColor, 0.11) }
+    private var theme: (background: NSColor, foreground: NSColor) { (runtime.backgroundColor, runtime.foregroundColor) }
+
+    // MARK: Find
+
+    func find() { store.selected?.panes.focused.startSearch() }
+    func findNext() { store.selected?.panes.searchTarget.searchNext() }
+    func findPrevious() { store.selected?.panes.searchTarget.searchPrevious() }
+    func findSelection() { store.selected?.panes.focused.searchSelection() }
 
     private func host(_ session: Session) {
         session.panes.frame = terminalContainer.bounds
         session.panes.autoresizingMask = [.width, .height]
-        session.panes.dividerColor = dividerColor
+        session.panes.theme = theme
         terminalContainer.addSubview(session.panes)
     }
 
