@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- The DMG opens as a small window with Farol next to Applications, ready to drag.
+
 ## [0.1.1] - 2026-09-27
 
 The first signed release: download the DMG, drag Farol to Applications and open it.
