@@ -53,7 +53,7 @@ The first tagged version. Build it from source with `make install`. Signed downl
 
 ### Added
 
-- `make dist` builds a signed and notarized zip. Farol runs with the hardened runtime and asks macOS for camera, microphone, AppleScript and similar access on behalf of programs running in it.
+- `make dist` builds a signed and notarized DMG and zip, and pushing a version tag publishes them on GitHub Releases. Farol runs with the hardened runtime and asks macOS for camera, microphone, AppleScript and similar access on behalf of programs running in it.
 
 ### Changed
 

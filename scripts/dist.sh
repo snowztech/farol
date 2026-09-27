@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds a signed, notarized build/Farol-<version>.zip that opens on any Mac without warnings.
+# Builds a signed, notarized build/Farol-<version>.dmg and .zip that open on any Mac without warnings.
 # Needs a Developer ID Application certificate and a notarytool profile named farol (see README).
 # NOTARIZE=0 signs without notarizing, and CONFIG=debug signs the debug build.
 set -euo pipefail
@@ -24,17 +24,49 @@ sign "$app"
 codesign --verify --strict --deep "$app"
 echo "signed with $identity"
 
-rm -f "$zip"
-ditto -c -k --keepParent "$app" "$zip"
+dmg="$root/build/Farol-$version.dmg"
+
+# Locally the key lives in a keychain profile. CI passes the key file instead.
+notarize() {
+  if [ -n "${NOTARY_KEY_PATH:-}" ]; then
+    xcrun notarytool submit "$1" --key "$NOTARY_KEY_PATH" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" --wait
+  else
+    xcrun notarytool submit "$1" --keychain-profile "$profile" --wait
+  fi
+}
+
+# The drag-to-Applications window: the app next to a link to /Applications.
+make_dmg() {
+  local staging
+  staging=$(mktemp -d)
+  cp -R "$app" "$staging/"
+  ln -s /Applications "$staging/Applications"
+  rm -f "$dmg"
+  hdiutil create -quiet -volname Farol -srcfolder "$staging" -ov -format UDZO "$dmg"
+  rm -rf "$staging"
+  codesign --force --timestamp --sign "$identity" "$dmg"
+}
+
 if [ "${NOTARIZE:-1}" = "0" ]; then
-  echo "built $zip (signed, not notarized)"
+  rm -f "$zip"
+  ditto -c -k --keepParent "$app" "$zip"
+  make_dmg
+  echo "built $zip and $dmg (signed, not notarized)"
   exit 0
 fi
 
-xcrun notarytool submit "$zip" --keychain-profile "$profile" --wait
-# Stapling attaches Apple's approval to the app, so it opens even offline. The zip is rebuilt to include it.
+# The app first, so its ticket is stapled before it goes into the zip and the disk image.
+rm -f "$zip"
+ditto -c -k --keepParent "$app" "$zip"
+notarize "$zip"
 xcrun stapler staple "$app"
 rm -f "$zip"
 ditto -c -k --keepParent "$app" "$zip"
+
+make_dmg
+notarize "$dmg"
+xcrun stapler staple "$dmg"
+
 spctl --assess --type execute --verbose "$app"
-echo "built $zip (signed and notarized)"
+spctl --assess --type open --context context:primary-signature --verbose "$dmg"
+echo "built $zip and $dmg (signed and notarized)"

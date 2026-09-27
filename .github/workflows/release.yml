@@ -1,0 +1,79 @@
+name: Release
+
+# Push a tag like v0.1.1 to publish a signed, notarized DMG and zip on GitHub Releases.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The version comes from git describe, which needs the tags.
+          fetch-depth: 0
+
+      - name: Use Xcode 26
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
+
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+
+      # libghostty takes minutes to build, so it is kept until the pinned Ghostty commit changes.
+      - name: Restore libghostty
+        id: ghostty
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ghostty-${{ hashFiles('scripts/build-ghostty.sh') }}
+
+      - name: Build libghostty
+        if: steps.ghostty.outputs.cache-hit != 'true'
+        run: |
+          xcodebuild -downloadComponent MetalToolchain
+          ./scripts/build-ghostty.sh
+
+      - name: Test
+        run: make test check
+
+      - name: Import the signing certificate
+        env:
+          P12: ${{ secrets.DEVELOPER_ID_P12 }}
+          P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          password=$(openssl rand -hex 24)
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          echo "$P12" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/certificate.p12"
+
+      - name: Build, sign and notarize
+        env:
+          NOTARY_KEY: ${{ secrets.NOTARY_KEY }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          echo "$NOTARY_KEY" | base64 --decode > "$RUNNER_TEMP/notary.p8"
+          NOTARY_KEY_PATH="$RUNNER_TEMP/notary.p8" ./scripts/dist.sh
+          rm "$RUNNER_TEMP/notary.p8"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          ./scripts/release-notes.sh "$version" > "$RUNNER_TEMP/notes.md"
+          # Tags like v0.2.0-beta become pre-releases.
+          prerelease=$([[ "$version" == *-* ]] && echo "--prerelease" || true)
+          gh release create "$GITHUB_REF_NAME" build/Farol-"$version".dmg build/Farol-"$version".zip \
+            --title "Farol $version" --notes-file "$RUNNER_TEMP/notes.md" $prerelease
