@@ -71,7 +71,7 @@ struct SettingsPage: View {
         }
         .background(p.background)
         .foregroundStyle(p.text)
-        .tint(p.accent)
+        .tint(p.control)
         .onAppear(perform: refreshClaude)
         .onChange(of: section) { _, _ in refreshClaude() }
         .alert(item: $claudeConfirm, content: claudeAlert)
@@ -176,7 +176,9 @@ struct SettingsPage: View {
 
         GroupTitle(title: "Integrations", palette: p)
         Row(title: "Claude Code",
-            detail: claudeConnected ? "Reports working, waiting and done through hooks." : "Adds hooks to ~/.claude/settings.json.",
+            detail: claudeConnected
+                ? "The sidebar shows when Claude is working, waiting for you or done."
+                : "Show in the sidebar when Claude is working, waiting for you or done.",
             palette: p) {
             HStack(spacing: 12) {
                 ConnectionState(connected: claudeConnected, palette: p)
@@ -185,7 +187,7 @@ struct SettingsPage: View {
                         .buttonStyle(.bordered)
                 } else {
                     Button("Connect") { claudeConfirm = .connect }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.bordered)
                 }
             }
             .controlSize(.small)

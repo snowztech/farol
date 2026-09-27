@@ -191,7 +191,7 @@ private struct Lamp: View {
     @ViewBuilder private var dot: some View {
         switch activity {
         case .idle: Circle().fill(palette.muted.opacity(0.45))
-        case .working: Circle().fill(palette.accent.opacity(0.7))
+        case .working: Circle().fill(palette.accent.opacity(0.6))
         case .waiting: Circle().fill(palette.accent)
         case .done: Circle().strokeBorder(palette.accent, lineWidth: 1.5)
         }

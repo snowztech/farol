@@ -54,7 +54,7 @@ The first tagged version. Build it from source with `make install`. Signed downl
 
 - New app icon, Beam: the lighthouse with a lit blue lamp. Settings → Appearance offers three more (Dark, Navy, Light) for the Dock icon, in a dropdown with previews.
 
-- The accent color is now Farol's own blue, taken from the lighthouse beam in the app icon, instead of each theme's blue.
+- Farol is monochrome: selected marks and the agent dot use the theme's text color instead of an accent hue, and switches use a neutral gray.
 - The Agents settings page shows Claude Code as connected or not, with a clear Connect button, and drops the "Other agents" note, which now lives only in the README.
 
 ### Fixed
