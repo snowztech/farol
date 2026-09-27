@@ -75,5 +75,8 @@ jobs:
           ./scripts/release-notes.sh "$version" > "$RUNNER_TEMP/notes.md"
           # Tags like v0.2.0-beta become pre-releases.
           prerelease=$([[ "$version" == *-* ]] && echo "--prerelease" || true)
-          gh release create "$GITHUB_REF_NAME" build/Farol-"$version".dmg build/Farol-"$version".zip \
+          # Fixed names keep releases/latest/download/Farol.dmg working as a direct link.
+          cp build/Farol-"$version".dmg build/Farol.dmg
+          cp build/Farol-"$version".zip build/Farol.zip
+          gh release create "$GITHUB_REF_NAME" build/Farol.dmg build/Farol.zip \
             --title "Farol $version" --notes-file "$RUNNER_TEMP/notes.md" $prerelease

@@ -14,7 +14,7 @@ Farol is early. It works as a daily terminal, but expect rough edges.
 
 ## Install
 
-1. Download the DMG from the [latest release](https://github.com/snowztech/farol/releases/latest).
+1. Download [Farol.dmg](https://github.com/snowztech/farol/releases/latest/download/Farol.dmg), the latest release.
 2. Open it and drag Farol to Applications.
 3. Open Farol from Applications or Spotlight.
 
