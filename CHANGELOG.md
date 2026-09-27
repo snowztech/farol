@@ -61,6 +61,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 
 - The Farol config file now ends with a newline, so settings appended by hand stay on their own line.
 - The window's close button no longer closes the window when you cancel the quit.
+- Choosing the Beam icon no longer shows an old cached icon in the Dock, and `make install` refreshes the icon macOS caches.
+- The lighthouse fills more of the app icon, and a faint edge keeps dark icons visible on a dark Dock.
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 

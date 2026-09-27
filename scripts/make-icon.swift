@@ -8,7 +8,12 @@ let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingL
 let assets = root.appendingPathComponent("assets")
 let sources = assets.appendingPathComponent("icons/source")
 
+/// The artwork has wide margins, so it is drawn larger than the tile and the edges are cut off.
+/// Without this the lighthouse looks small next to other Dock icons.
+let zoom: CGFloat = 1.3
+
 /// Apple's grid: 1024 canvas, 824 artwork, corner radius about 22.5% of the artwork.
+/// A faint edge keeps dark tiles visible on a dark Dock, and light ones on a light Dock.
 func render(_ art: CGImage, size: Int) -> Data {
     let s = CGFloat(size)
     let ctx = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0,
@@ -16,10 +21,27 @@ func render(_ art: CGImage, size: Int) -> Data {
                         bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
     ctx.interpolationQuality = .high
     let rect = CGRect(x: s * 100 / 1024, y: s * 100 / 1024, width: s * 824 / 1024, height: s * 824 / 1024)
-    ctx.addPath(CGPath(roundedRect: rect, cornerWidth: rect.width * 0.225, cornerHeight: rect.width * 0.225, transform: nil))
+    let tile = CGPath(roundedRect: rect, cornerWidth: rect.width * 0.225, cornerHeight: rect.width * 0.225, transform: nil)
+
+    ctx.saveGState()
+    ctx.addPath(tile)
     ctx.clip()
-    ctx.draw(art, in: rect)
+    ctx.draw(art, in: rect.insetBy(dx: -rect.width * (zoom - 1) / 2, dy: -rect.height * (zoom - 1) / 2))
+    ctx.restoreGState()
+
+    let edge: CGFloat = max(1, s / 512)
+    ctx.addPath(CGPath(roundedRect: rect.insetBy(dx: edge / 2, dy: edge / 2),
+                       cornerWidth: rect.width * 0.225, cornerHeight: rect.width * 0.225, transform: nil))
+    ctx.setLineWidth(edge)
+    ctx.setStrokeColor(isDark(art) ? CGColor(gray: 1, alpha: 0.14) : CGColor(gray: 0, alpha: 0.12))
+    ctx.strokePath()
     return NSBitmapImageRep(cgImage: ctx.makeImage()!).representation(using: .png, properties: [:])!
+}
+
+/// Judged from a corner, which is always background.
+func isDark(_ art: CGImage) -> Bool {
+    guard let corner = NSBitmapImageRep(cgImage: art).colorAt(x: 4, y: 4)?.usingColorSpace(.sRGB) else { return true }
+    return corner.brightnessComponent < 0.5
 }
 
 func artwork(_ name: String) -> CGImage {

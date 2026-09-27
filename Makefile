@@ -30,6 +30,8 @@ run: build
 install: release
 	rm -rf /Applications/Farol.app
 	cp -R $(APP) /Applications/Farol.app
+	@# Tell macOS the app changed, so Finder and the Dock drop the icon they cached.
+	@/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/Farol.app
 	@echo "Installed /Applications/Farol.app"
 
 uninstall:

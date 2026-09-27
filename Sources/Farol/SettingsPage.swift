@@ -82,7 +82,7 @@ struct SettingsPage: View {
 
     @ViewBuilder private func appearance(_ p: Palette) -> some View {
         Heading(title: "App icon", detail: "Shown in the Dock while Farol runs.", palette: p)
-        HStack(spacing: 18) {
+        HStack(spacing: 10) {
             ForEach(AppIcon.allCases, id: \.self) { icon in
                 IconChoice(icon: icon, selected: appIcon == icon.rawValue, palette: p) { appIcon = icon.rawValue }
             }
@@ -395,32 +395,47 @@ private struct GroupTitle: View {
     }
 }
 
+/// One icon option: a card that lifts on hover, with an accent ring and a check when chosen.
 private struct IconChoice: View {
     let icon: AppIcon
     let selected: Bool
     let palette: Palette
     let action: () -> Void
 
+    @State private var hovering = false
+
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
-                Group {
-                    if let image = icon.image {
-                        Image(nsImage: image).resizable()
-                    } else {
-                        RoundedRectangle(cornerRadius: 12).fill(palette.raised)
+            VStack(spacing: 8) {
+                ZStack(alignment: .topTrailing) {
+                    Group {
+                        if let image = icon.image {
+                            Image(nsImage: image).resizable().interpolation(.high)
+                        } else {
+                            RoundedRectangle(cornerRadius: 14).fill(palette.raised)
+                        }
+                    }
+                    .frame(width: 76, height: 76)
+
+                    if selected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.white, palette.accent)
+                            .offset(x: 4, y: -2)
                     }
                 }
-                .frame(width: 64, height: 64)
-                .padding(3)
-                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(selected ? palette.accent : .clear, lineWidth: 2))
-                Text(icon.title)
+                Text(icon == .default ? "\(icon.title) (default)" : icon.title)
                     .font(.system(size: 11.5, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? palette.text : palette.muted)
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(RoundedRectangle(cornerRadius: 12).fill(selected || hovering ? palette.raised : .clear))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(selected ? palette.accent : .clear, lineWidth: 1.5))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(icon == .default ? "\(icon.title) (default)" : icon.title)
+        .onHover { hovering = $0 }
     }
 }
 

@@ -18,8 +18,8 @@ enum AppIcon: String, CaseIterable {
         UserDefaults.standard.string(forKey: key).flatMap(AppIcon.init) ?? .default
     }
 
-    /// The default is the bundle's own icon, so it needs no override.
+    /// Always set, even for the default: macOS caches an installed app's icon, and an older one could show instead.
     static func apply(_ icon: AppIcon = current) {
-        NSApp.applicationIconImage = icon == .default ? nil : icon.image
+        NSApp.applicationIconImage = icon.image
     }
 }
