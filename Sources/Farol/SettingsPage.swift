@@ -18,12 +18,12 @@ struct SettingsPage: View {
         var id: Self { self }
     }
 
-    @State private var section = Section.appearance
+    @State private var section = Section.terminal
     @State private var themeQuery = ""
 
     enum Section: String, CaseIterable {
-        case appearance = "Appearance"
         case terminal = "Terminal"
+        case appearance = "Appearance"
         case agents = "Agents"
         case shortcuts = "Shortcuts"
         case about = "About"
