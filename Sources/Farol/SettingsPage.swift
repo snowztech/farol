@@ -71,6 +71,9 @@ struct SettingsPage: View {
         .background(p.background)
         .foregroundStyle(p.text)
         .tint(p.accent)
+        .onAppear(perform: refreshClaude)
+        .onChange(of: section) { _, _ in refreshClaude() }
+        .alert(item: $claudeConfirm, content: claudeAlert)
     }
 
     // MARK: Sections
@@ -153,16 +156,22 @@ struct SettingsPage: View {
 
         GroupTitle(title: "Integrations", palette: p)
         Row(title: "Claude Code",
-            detail: claudeConnected
-                ? "Connected. Its hooks report working, waiting and done."
-                : "Adds five hooks to ~/.claude/settings.json.",
+            detail: claudeConnected ? "Reports working, waiting and done through hooks." : "Adds hooks to ~/.claude/settings.json.",
             palette: p) {
-            Button(claudeConnected ? "Disconnect" : "Set Up") {
-                claudeConfirm = claudeConnected ? .disconnect : .connect
+            HStack(spacing: 12) {
+                ConnectionState(connected: claudeConnected, palette: p)
+                if claudeConnected {
+                    Button("Disconnect") { claudeConfirm = .disconnect }
+                        .buttonStyle(.bordered)
+                } else {
+                    Button("Connect") { claudeConfirm = .connect }
+                        .buttonStyle(.borderedProminent)
+                }
             }
+            .controlSize(.small)
         }
         Row(title: "Other agents",
-            detail: "Any agent can report with \"$FAROL_CLI\" status working, waiting, done or clear. Agents that ring the terminal bell light the dot without setup.",
+            detail: "They can report with \"$FAROL_CLI\" status, or ring the terminal bell when they need you.",
             palette: p) { EmptyView() }
 
         GroupTitle(title: "Notifications", palette: p)
@@ -188,29 +197,28 @@ struct SettingsPage: View {
                     .frame(width: 220)
             }
         }
-        EmptyView()
-            .onAppear(perform: refreshClaude)
-            .alert(item: $claudeConfirm) { change in
-                switch change {
-                case .connect:
-                    Alert(
-                        title: Text("Connect Claude Code?"),
-                        message: Text("Farol adds hooks for five events to ~/.claude/settings.json. Your other settings stay as they are, though the file may be reformatted. The current file is kept as settings.json.farol-backup."),
-                        primaryButton: .default(Text("Connect")) { changeClaude(ClaudeHooks.install) },
-                        secondaryButton: .cancel())
-                case .disconnect:
-                    Alert(
-                        title: Text("Disconnect Claude Code?"),
-                        message: Text("Farol removes only its own hooks from ~/.claude/settings.json and keeps a backup of the file."),
-                        primaryButton: .destructive(Text("Disconnect")) { changeClaude(ClaudeHooks.remove) },
-                        secondaryButton: .cancel())
-                }
-            }
         if let claudeError {
             Text(claudeError)
                 .font(.system(size: 12))
                 .foregroundStyle(.red)
                 .padding(.top, 12)
+        }
+    }
+
+    private func claudeAlert(_ change: ClaudeChange) -> Alert {
+        switch change {
+        case .connect:
+            Alert(
+                title: Text("Connect Claude Code?"),
+                message: Text("Farol adds hooks for five events to ~/.claude/settings.json. Your other settings stay as they are, though the file may be reformatted. The current file is kept as settings.json.farol-backup."),
+                primaryButton: .default(Text("Connect")) { changeClaude(ClaudeHooks.install) },
+                secondaryButton: .cancel())
+        case .disconnect:
+            Alert(
+                title: Text("Disconnect Claude Code?"),
+                message: Text("Farol removes only its own hooks from ~/.claude/settings.json and keeps a backup of the file."),
+                primaryButton: .destructive(Text("Disconnect")) { changeClaude(ClaudeHooks.remove) },
+                secondaryButton: .cancel())
         }
     }
 
@@ -377,6 +385,23 @@ private struct GroupTitle: View {
             .foregroundStyle(palette.muted)
             .padding(.top, 22)
             .padding(.bottom, 2)
+    }
+}
+
+/// "Connected" with a green dot, or a muted "Not connected".
+private struct ConnectionState: View {
+    let connected: Bool
+    let palette: Palette
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(connected ? Color.green : palette.muted.opacity(0.5))
+                .frame(width: 6, height: 6)
+            Text(connected ? "Connected" : "Not connected")
+                .font(.system(size: 12))
+                .foregroundStyle(palette.muted)
+        }
     }
 }
 
