@@ -8,6 +8,7 @@ struct SettingsPage: View {
     @ObservedObject var agents: AgentSettings
     @ObservedObject var state: WindowState
 
+    @AppStorage(AppIcon.key) private var appIcon = AppIcon.default.rawValue
     @State private var claudeConnected = false
     @State private var claudeConfirm: ClaudeChange?
     @State private var claudeError: String?
@@ -74,11 +75,20 @@ struct SettingsPage: View {
         .onAppear(perform: refreshClaude)
         .onChange(of: section) { _, _ in refreshClaude() }
         .alert(item: $claudeConfirm, content: claudeAlert)
+        .onChange(of: appIcon) { _, name in AppIcon.apply(AppIcon(rawValue: name) ?? .default) }
     }
 
     // MARK: Sections
 
     @ViewBuilder private func appearance(_ p: Palette) -> some View {
+        Heading(title: "App icon", detail: "Shown in the Dock while Farol runs.", palette: p)
+        HStack(spacing: 18) {
+            ForEach(AppIcon.allCases, id: \.self) { icon in
+                IconChoice(icon: icon, selected: appIcon == icon.rawValue, palette: p) { appIcon = icon.rawValue }
+            }
+        }
+        .padding(.bottom, 36)
+
         Heading(title: "Theme", detail: "Applies to every session as soon as you pick it.", palette: p)
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass").foregroundStyle(p.muted)
@@ -382,6 +392,35 @@ private struct GroupTitle: View {
             .foregroundStyle(palette.muted)
             .padding(.top, 22)
             .padding(.bottom, 2)
+    }
+}
+
+private struct IconChoice: View {
+    let icon: AppIcon
+    let selected: Bool
+    let palette: Palette
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                Group {
+                    if let image = icon.image {
+                        Image(nsImage: image).resizable()
+                    } else {
+                        RoundedRectangle(cornerRadius: 12).fill(palette.raised)
+                    }
+                }
+                .frame(width: 64, height: 64)
+                .padding(3)
+                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(selected ? palette.accent : .clear, lineWidth: 2))
+                Text(icon.title)
+                    .font(.system(size: 11.5, weight: selected ? .semibold : .regular))
+                    .foregroundStyle(selected ? palette.text : palette.muted)
+            }
+        }
+        .buttonStyle(.plain)
+        .help(icon == .default ? "\(icon.title) (default)" : icon.title)
     }
 }
 

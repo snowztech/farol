@@ -107,7 +107,7 @@ Tests/               FarolCore tests, run with `make test`
 scripts/
   build-ghostty.sh   builds libghostty from a pinned commit
   bundle.sh          assembles build/Farol.app
-  make-icon.swift    turns assets/icon-source.png into the app icon
+  make-icon.swift    builds the app icons from assets/icons/source
   check-style.py     keeps comments and docs plain
 ```
 

@@ -32,6 +32,8 @@ mkdir -p "$app/Contents/Resources/bin"
 cp "$root/.build/$config/FarolCLI" "$app/Contents/Resources/bin/farol"
 cp -R "$root/vendor/ghostty-resources/." "$app/Contents/Resources/"
 cp "$root/assets/Farol.icns" "$app/Contents/Resources/"
+mkdir -p "$app/Contents/Resources/icons"
+cp "$root"/assets/icons/*.png "$app/Contents/Resources/icons/"
 
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
