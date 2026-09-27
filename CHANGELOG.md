@@ -11,8 +11,8 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Changed
 
-- Every sidebar row shows a second line with the branch or folder, so rows line up.
-- The sidebar dot only appears when an agent is working, waiting or done.
+- Every sidebar row shows a second line with the branch or where the folder is, so rows line up.
+- Agent status is clearer: a spinner while working, a pulsing dot while waiting, a checkmark when done, and nothing when idle.
 - Agent status glyphs such as Claude Code's ✳ no longer show in session names.
 - Settings name the fallback theme Default and explain where the config file lives.
 

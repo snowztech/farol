@@ -82,14 +82,18 @@ final class Session: ObservableObject, Identifiable {
     }
 
     /// The second line when there is no branch, so every row has the same height.
+    /// Under a folder name it shows where that folder is, so "docs" reads as "~/dev" and not "~/dev/docs".
     var location: String? {
         guard branch == nil else { return nil }
-        let home = NSHomeDirectory()
-        return directory.hasPrefix(home) ? "~" + directory.dropFirst(home.count) : directory
+        let path = hasProgramTitle || directory == NSHomeDirectory()
+            ? directory : (directory as NSString).deletingLastPathComponent
+        return (path as NSString).abbreviatingWithTildeInPath
     }
 
     /// Agents like Claude Code put a status glyph in front of the title. The sidebar dot already shows that.
-    private var programTitle: String {
+    private var programTitle: String { Self.withoutGlyph(title) }
+
+    static func withoutGlyph(_ title: String) -> String {
         String(title.drop { $0.isWhitespace || $0.unicodeScalars.allSatisfy { $0.properties.generalCategory == .otherSymbol } })
     }
 
@@ -211,8 +215,11 @@ final class SessionStore: ObservableObject {
         onTerminalCreated?(terminal)
         terminal.onTitleChange = { [weak session, weak terminal] in
             guard let session, terminal === session.panes.focused else { return }
+            // Agents animate a glyph in the title many times a second, and those frames are not worth a git lookup.
+            // A shell re-sends the same title at each prompt, which is how a `git checkout` gets noticed.
+            let glyphOnly = $0 != Session.withoutGlyph($0) && Session.withoutGlyph($0) == Session.withoutGlyph(session.title)
             session.title = $0
-            session.refreshGit()
+            if !glyphOnly { session.refreshGit() }
         }
         terminal.onWorkingDirectoryChange = { [weak self, weak session, weak terminal] in
             guard let session, terminal === session.panes.focused else { return }

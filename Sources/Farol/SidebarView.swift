@@ -169,33 +169,45 @@ private struct Lamp: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pulse = false
+    @State private var spin = false
 
     var body: some View {
         ZStack {
-            if activity == .waiting && !selected && !reduceMotion {
+            switch activity {
+            case .idle:
+                // Nothing to report, so nothing drawn. The frame keeps titles aligned.
+                Color.clear
+            case .working:
+                // Moving means busy, the way a spinner does.
                 Circle()
-                    .fill(palette.accent)
-                    .scaleEffect(pulse ? 2.6 : 1)
-                    .opacity(pulse ? 0 : 0.5)
+                    .trim(from: 0, to: reduceMotion ? 1 : 0.7)
+                    .stroke(palette.accent.opacity(0.8), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                    .rotationEffect(.degrees(spin ? 360 : 0))
                     .onAppear {
-                        withAnimation(.easeOut(duration: 1.8).repeatForever(autoreverses: false)) { pulse = true }
+                        guard !reduceMotion else { return }
+                        withAnimation(.linear(duration: 0.9).repeatForever(autoreverses: false)) { spin = true }
                     }
-                    .onDisappear { pulse = false }
+                    .onDisappear { spin = false }
+            case .waiting:
+                if !selected && !reduceMotion {
+                    Circle()
+                        .fill(palette.accent)
+                        .scaleEffect(pulse ? 2.6 : 1)
+                        .opacity(pulse ? 0 : 0.5)
+                        .onAppear {
+                            withAnimation(.easeOut(duration: 1.8).repeatForever(autoreverses: false)) { pulse = true }
+                        }
+                        .onDisappear { pulse = false }
+                }
+                Circle().fill(palette.accent).padding(1.5)
+            case .done:
+                Image(systemName: "checkmark")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(palette.accent)
             }
-            dot
         }
-        .frame(width: 7, height: 7)
+        .frame(width: 10, height: 10)
         .help(help)
-    }
-
-    @ViewBuilder private var dot: some View {
-        switch activity {
-        // Nothing to report, so no dot. The frame keeps titles aligned.
-        case .idle: Color.clear
-        case .working: Circle().fill(palette.accent.opacity(0.6))
-        case .waiting: Circle().fill(palette.accent)
-        case .done: Circle().strokeBorder(palette.accent, lineWidth: 1.5)
-        }
     }
 
     private var help: String {
