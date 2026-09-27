@@ -34,6 +34,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - The Farol config file now ends with a newline, so settings appended by hand stay on their own line.
 - The window's close button no longer closes the window when you cancel the quit.
+- The search bar's field no longer collapses, and its buttons are centered.
 
 ## First commits
 

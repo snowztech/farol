@@ -8,6 +8,7 @@ final class SearchBar: NSView, NSTextFieldDelegate {
     private(set) weak var terminal: TerminalView?
     private let field = NSTextField()
     private let count = NSTextField(labelWithString: "")
+    private var buttons: [NSButton] = []
     private var pending: DispatchWorkItem?
     var onClose: (() -> Void)?
 
@@ -27,22 +28,33 @@ final class SearchBar: NSView, NSTextFieldDelegate {
         count.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
         count.alignment = .right
 
-        let previous = button("chevron.up", "Previous match (⇧↩)") { [weak self] in self?.terminal?.searchPrevious() }
-        let next = button("chevron.down", "Next match (↩)") { [weak self] in self?.terminal?.searchNext() }
-        let close = button("xmark", "Close (esc)") { [weak self] in self?.onClose?() }
-        let row = NSStackView(views: [field, count, previous, next, close])
-        row.spacing = 4
-        row.edgeInsets = NSEdgeInsets(top: 0, left: 10, bottom: 0, right: 6)
-        row.setHuggingPriority(.defaultLow, for: .horizontal)
-        field.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        row.frame = bounds
-        row.autoresizingMask = [.width, .height]
-        addSubview(row)
+        buttons = [
+            button("chevron.up", "Previous match (⇧↩)") { [weak self] in self?.terminal?.searchPrevious() },
+            button("chevron.down", "Next match (↩)") { [weak self] in self?.terminal?.searchNext() },
+            button("xmark", "Close (esc)") { [weak self] in self?.onClose?() },
+        ]
+        ([field, count] + buttons).forEach(addSubview)
 
         terminal.onSearchResults = { [weak self] selected, total in self?.show(selected, total) }
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
+
+    /// Field on the left taking the spare width, then the count, then the buttons, all centered vertically.
+    override func layout() {
+        super.layout()
+        let button: CGFloat = 22
+        let countWidth: CGFloat = 64
+        var x = bounds.width - 6
+        for b in buttons.reversed() {
+            x -= button
+            b.frame = NSRect(x: x, y: (bounds.height - button) / 2, width: button, height: button)
+        }
+        x -= countWidth + 4
+        let textHeight = field.intrinsicContentSize.height
+        count.frame = NSRect(x: x, y: (bounds.height - textHeight) / 2, width: countWidth, height: textHeight)
+        field.frame = NSRect(x: 10, y: (bounds.height - textHeight) / 2, width: max(x - 14, 40), height: textHeight)
+    }
 
     func begin(with needle: String) {
         if !needle.isEmpty { field.stringValue = needle }
@@ -56,9 +68,7 @@ final class SearchBar: NSView, NSTextFieldDelegate {
         layer?.borderColor = background.mixed(with: foreground, 0.16).cgColor
         field.textColor = foreground
         count.textColor = background.mixed(with: foreground, 0.55)
-        subviews.first?.subviews.compactMap { $0 as? NSButton }.forEach {
-            $0.contentTintColor = background.mixed(with: foreground, 0.6)
-        }
+        buttons.forEach { $0.contentTintColor = background.mixed(with: foreground, 0.6) }
     }
 
     private func show(_ selected: Int?, _ total: Int?) {
@@ -104,7 +114,6 @@ final class SearchBar: NSView, NSTextFieldDelegate {
             .withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))
         button.isBordered = false
         button.toolTip = help
-        button.widthAnchor.constraint(equalToConstant: 20).isActive = true
         return button
     }
 }
