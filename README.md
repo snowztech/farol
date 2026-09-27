@@ -12,6 +12,12 @@ The terminal itself is [libghostty](https://github.com/ghostty-org/ghostty), the
 
 Farol is early. It works as a daily terminal, but expect rough edges.
 
+## Install
+
+Download **Farol.dmg** from the [latest release](https://github.com/snowztech/farol/releases/latest), open it and drag Farol to Applications. It needs a Mac with Apple Silicon and macOS 14 or later.
+
+To build it yourself instead, see [Build](#build).
+
 ## What works today
 
 - **Sessions in a sidebar.** Open as many as you like. Hidden sessions keep running but stop rendering, so twenty background agents cost no GPU time. Each row shows the session's git branch. Double-click to rename, drag to reorder.
@@ -74,27 +80,7 @@ make install                                   # builds from source into /Applic
 
 The first build compiles libghostty and takes a few minutes. After that, `make run` gives you a quick debug build and `make help` lists everything else.
 
-### Signed builds
-
-`make dist` builds a zip that opens on any Mac without warnings: signed with a Developer ID, notarized by Apple and stapled. It needs a Developer ID Application certificate in your keychain and a notarization key stored once:
-
-```sh
-xcrun notarytool store-credentials farol --key AuthKey_XXXX.p8 --key-id <Key ID> --issuer <Issuer ID>
-```
-
-The key comes from App Store Connect, under Users and Access, Integrations, App Store Connect API.
-
-### Releases
-
-Pushing a tag like `v0.1.1` runs `.github/workflows/release.yml`: it builds, tests, signs and notarizes, then publishes a DMG and a zip on GitHub Releases with that version's section of `CHANGELOG.md` as the notes. Tags with a suffix, like `v0.2.0-beta`, become pre-releases. The workflow needs these repository secrets:
-
-| Secret | Value |
-| --- | --- |
-| `DEVELOPER_ID_P12` | The Developer ID Application certificate exported from Keychain Access as .p12, base64 encoded |
-| `DEVELOPER_ID_P12_PASSWORD` | The password you gave the .p12 |
-| `NOTARY_KEY` | The App Store Connect .p8 key, base64 encoded |
-| `NOTARY_KEY_ID` | Its Key ID |
-| `NOTARY_ISSUER_ID` | Its Issuer ID |
+Maintainers: signing and publishing a release are covered in [RELEASING.md](RELEASING.md).
 
 ## Shortcuts
 
