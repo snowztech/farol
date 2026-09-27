@@ -4,6 +4,8 @@ import SwiftUI
 final class WindowState: ObservableObject {
     @Published var palette: Palette
     @Published var showingSettings = false
+    /// Mirrors the sidebar, so the top bar can match the columns below it.
+    @Published var sidebarVisible = true
     let ghosttyConfigPreview: ThemeColors
 
     init(palette: Palette, ghosttyConfigPreview: ThemeColors) {
@@ -17,6 +19,7 @@ struct Commands {
     let closeSession: (Session) -> Void
     let toggleSidebar: () -> Void
     let toggleSettings: () -> Void
+    let titleBarDoubleClick: () -> Void
 }
 
 struct TopBar: View {
@@ -51,8 +54,20 @@ struct TopBar: View {
             .padding(.trailing, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(p.surface)
-        .overlay(alignment: .bottom) { Rectangle().fill(p.line).frame(height: 1) }
+        .background { columns(p) }
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2, perform: commands.titleBarDoubleClick)
+    }
+
+    /// No rule under the bar: each part takes the color of the column below, so the terminal reaches the top edge.
+    private func columns(_ p: Palette) -> some View {
+        HStack(spacing: 0) {
+            Rectangle().fill(p.surface)
+                .frame(width: state.sidebarVisible ? SidebarView.width - 1 : 0)
+            Rectangle().fill(p.line)
+                .frame(width: state.sidebarVisible ? 1 : 0)
+            Rectangle().fill(p.background)
+        }
     }
 }
 

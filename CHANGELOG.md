@@ -7,6 +7,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Added
 
 - New sessions open in the focused pane's folder instead of the home folder.
+- Double-clicking the top bar zooms the window, or does what you chose in System Settings.
 - Rename a session by double-clicking it in the sidebar, or with right-click. An empty name goes back to the automatic one.
 - Drag sessions to reorder them. ⌘1 to ⌘9 follow the new order.
 - Session names and order are saved with the rest of the session.
@@ -51,6 +52,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The style check also reads interface text in Swift strings.
 
 ### Changed
+
+- The top bar has no rule under it, and each part takes the color of the column below, so the terminal reaches the top edge.
 
 - New app icon, Beam: the lighthouse with a lit blue lamp. Settings → Appearance offers three more (Dark, Navy, Light) for the Dock icon, in a dropdown with previews.
 

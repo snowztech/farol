@@ -46,7 +46,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             newSession: { [weak self] in self?.newSession() },
             closeSession: { [weak self] in self?.requestClose($0) },
             toggleSidebar: { [weak self] in self?.toggleSidebar() },
-            toggleSettings: { [weak self] in self?.toggleSettings() })
+            toggleSettings: { [weak self] in self?.toggleSettings() },
+            titleBarDoubleClick: { [weak self] in self?.titleBarDoubleClicked() })
 
         let root = NSView()
         let topBar = hosting(TopBar(state: state, store: store, commands: commands))
@@ -170,10 +171,20 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     func toggleSidebar() {
         let open = sidebarWidth.constant == 0
+        withAnimation(.easeOut(duration: 0.18)) { state.sidebarVisible = open }
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.18
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
             sidebarWidth.animator().constant = open ? SidebarView.width : 0
+        }
+    }
+
+    /// Does what the user chose in System Settings for a title bar double-click: zoom, minimize or nothing.
+    func titleBarDoubleClicked() {
+        switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") {
+        case "Minimize": window?.performMiniaturize(nil)
+        case "None": break
+        default: window?.performZoom(nil)
         }
     }
 
