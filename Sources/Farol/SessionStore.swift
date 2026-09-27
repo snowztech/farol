@@ -82,12 +82,9 @@ final class Session: ObservableObject, Identifiable {
     }
 
     /// The second line when there is no branch, so every row has the same height.
-    /// Under a folder name it shows where that folder is, so "docs" reads as "~/dev" and not "~/dev/docs".
     var location: String? {
         guard branch == nil else { return nil }
-        let path = hasProgramTitle || directory == NSHomeDirectory()
-            ? directory : (directory as NSString).deletingLastPathComponent
-        return (path as NSString).abbreviatingWithTildeInPath
+        return (directory as NSString).abbreviatingWithTildeInPath
     }
 
     /// Agents like Claude Code put a status glyph in front of the title. The sidebar dot already shows that.

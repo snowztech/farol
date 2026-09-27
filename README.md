@@ -35,11 +35,12 @@ Coming next: tickets from GitHub, GitLab and Jira, and a diff view. See [ROADMAP
 
 ## Agent status
 
-The icon next to each session shows what its agent is doing:
+The dot next to each session shows what its agent is doing:
 
-- **Working:** a spinner.
-- **Waiting for you:** a pulsing dot, for a permission prompt or a question.
-- **Done:** a checkmark, cleared when you open the session.
+- **Idle:** a hollow dot.
+- **Working:** the dot breathes.
+- **Waiting for you:** the dot sends out a ripple, for a permission prompt or a question.
+- **Done:** the dot fills, and goes back to hollow when you open the session.
 
 When an agent waits or finishes while Farol is in the background, you get a notification, and the Dock icon counts the sessions that are waiting.
 
