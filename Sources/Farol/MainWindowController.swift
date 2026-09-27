@@ -139,7 +139,31 @@ final class MainWindowController: NSWindowController {
     private func host(_ terminal: TerminalView) {
         terminal.frame = terminalContainer.bounds
         terminal.autoresizingMask = [.width, .height]
+        terminal.onClipboardRequest = { [weak self] request, reply in self?.confirm(request, reply: reply) }
         terminalContainer.addSubview(terminal)
+    }
+
+    private func confirm(_ request: ClipboardRequest, reply: @escaping (Bool) -> Void) {
+        guard let window else { return reply(false) }
+        let alert = NSAlert()
+        let preview = request.text.count > 400 ? request.text.prefix(400) + "…" : Substring(request.text)
+        switch request.kind {
+        case .paste:
+            let lines = request.text.split(separator: "\n", omittingEmptySubsequences: false).count
+            alert.messageText = "Paste \(lines) lines?"
+            alert.informativeText = "Text with line breaks can run commands as soon as it is pasted.\n\n\(preview)"
+            alert.addButton(withTitle: "Paste")
+        case .programRead:
+            alert.messageText = "Let this program read your clipboard?"
+            alert.informativeText = "A program in this session asked for what you last copied."
+            alert.addButton(withTitle: "Allow")
+        case .programWrite:
+            alert.messageText = "Let this program set your clipboard?"
+            alert.informativeText = String(preview)
+            alert.addButton(withTitle: "Allow")
+        }
+        alert.addButton(withTitle: "Cancel")
+        alert.beginSheetModal(for: window) { reply($0 == .alertFirstButtonReturn) }
     }
 
     /// Only the terminal on screen renders. Settings replaces it and pauses it too.

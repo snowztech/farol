@@ -3,13 +3,15 @@ import GhosttyKit
 
 /// One libghostty surface. Ghostty renders into this view, we forward size, focus and input.
 public final class TerminalView: NSView {
-    private var surface: ghostty_surface_t?
+    private(set) var surface: ghostty_surface_t?
 
     // Events from the running program. All called on the main thread.
     public var onTitleChange: ((String) -> Void)?
     public var onWorkingDirectoryChange: ((String) -> Void)?
     public var onNotification: ((_ title: String, _ body: String) -> Void)?
     public var onBell: (() -> Void)?
+    /// Asks the user to approve a clipboard access. Without it, such requests are denied.
+    public var onClipboardRequest: ((ClipboardRequest, @escaping (Bool) -> Void) -> Void)?
     public var onClose: (() -> Void)?
 
     /// `command` nil runs the user's login shell.
@@ -72,6 +74,17 @@ public final class TerminalView: NSView {
             return false
         }
         return true
+    }
+
+    // MARK: Edit menu
+
+    @objc public func copy(_ sender: Any?) { perform("copy_to_clipboard") }
+    @objc public func paste(_ sender: Any?) { perform("paste_from_clipboard") }
+    @objc public override func selectAll(_ sender: Any?) { perform("select_all") }
+
+    private func perform(_ action: String) {
+        guard let surface else { return }
+        _ = ghostty_surface_binding_action(surface, action, UInt(action.utf8.count))
     }
 
     // MARK: Size and focus

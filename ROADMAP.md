@@ -15,13 +15,13 @@ Three rules decide what gets in:
 - Attention light when a session rings the bell or sends a notification
 - Themes with live previews, chrome that follows the theme
 - In-window settings and `~/.config/farol/config`
-- App icon, `make install`, style check
+- App icon, `make install`, style check in CI
 
 ## v0.1: daily driver
 
 Farol can replace Ghostty or Warp for everyday work, and sessions start to be about branches.
 
-- [ ] Copy and paste
+- [x] Copy and paste
 - [ ] Dead keys and input methods (accents, CJK)
 - [ ] Restore sessions on relaunch, same folders and titles
 - [ ] Worktree sessions: "New session in repo" creates a branch and a git worktree, and opens the terminal there

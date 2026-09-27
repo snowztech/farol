@@ -43,10 +43,18 @@ public final class TerminalRuntime {
             let view = TerminalView.from(ud)
             DispatchQueue.main.async { view.onClose?() }
         }
-        // TODO: clipboard not wired, copy/paste do nothing yet.
-        rt.read_clipboard_cb = { _, _, _, _, _, _ in GHOSTTY_CLIPBOARD_READ_UNAVAILABLE }
-        rt.confirm_read_clipboard_cb = { _, _, _, _ in }
-        rt.write_clipboard_cb = { _, _, _, _, _ in }
+        rt.read_clipboard_cb = { ud, location, state, mimes, count, list in
+            guard let ud else { return GHOSTTY_CLIPBOARD_READ_UNSUPPORTED }
+            return Clipboard.read(TerminalView.from(ud), location: location, state: state, mimes: mimes, count: count, list: list)
+        }
+        rt.confirm_read_clipboard_cb = { ud, request, state, kind in
+            guard let ud else { return }
+            Clipboard.confirmRead(TerminalView.from(ud), request: request, state: state, kind: kind)
+        }
+        rt.write_clipboard_cb = { ud, location, content, count, confirm in
+            guard let ud else { return }
+            Clipboard.write(TerminalView.from(ud), location: location, content: content, count: count, confirm: confirm)
+        }
 
         app = ghostty_app_new(&rt, config)
     }

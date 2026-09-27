@@ -19,6 +19,7 @@ Farol is early. It works as a daily terminal, but expect rough edges.
 - **Ghostty rendering and compatibility.** Same fonts, same speed, same escape sequence support. Your existing Ghostty config is loaded.
 - **Themes.** Pick from Ghostty's 600+ themes with live previews. The window chrome follows the theme.
 - **Settings in the window.** Theme, font, size and cursor, plus a config file for everything else.
+- **Copy and paste.** Pasting text that could run commands asks first. Files copied in Finder paste as their paths.
 
 ## Planned
 
@@ -84,7 +85,7 @@ Issues and pull requests are welcome. Before you open a PR, run:
 make check
 ```
 
-It flags em dashes, semicolons in prose, comment blocks over three lines and filler words. Comments should explain why, not what. If you use Claude Code in this repo, the same check runs after every edit.
+It flags em dashes, semicolons in prose, comment blocks over three lines and filler words. Comments should explain why, not what. CI runs the same check on every pull request.
 
 ## License
 

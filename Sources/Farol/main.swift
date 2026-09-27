@@ -40,6 +40,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         app.addItem(withTitle: "Quit Farol", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         main.addItem(submenu: app, title: "Farol")
 
+        // nil target: the focused terminal or text field handles these.
+        let edit = NSMenu(title: "Edit")
+        edit.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        main.addItem(submenu: edit, title: "Edit")
+
         let sessions = NSMenu(title: "Session")
         sessions.addItem(withTitle: "New Session", action: #selector(newSession), keyEquivalent: "t")
         sessions.addItem(withTitle: "Close Session", action: #selector(closeSession), keyEquivalent: "w")
