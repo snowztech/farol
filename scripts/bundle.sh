@@ -27,6 +27,9 @@ swift build --package-path "$root" -c "$config"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$root/.build/$config/Farol" "$app/Contents/MacOS/Farol"
+# Not in Contents/MacOS: that folder already holds "Farol", and macOS file names ignore case.
+mkdir -p "$app/Contents/Resources/bin"
+cp "$root/.build/$config/FarolCLI" "$app/Contents/Resources/bin/farol"
 cp -R "$root/vendor/ghostty-resources/." "$app/Contents/Resources/"
 cp "$root/assets/Farol.icns" "$app/Contents/Resources/"
 
