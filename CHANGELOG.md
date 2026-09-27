@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-27
+
+The first signed release: download the DMG, drag Farol to Applications and open it.
+
 ### Added
 
 - New sessions open in the focused pane's folder instead of the home folder.
@@ -73,5 +77,6 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/snowztech/farol/releases/tag/v0.1.1
 [0.1.0]: https://github.com/snowztech/farol/releases/tag/v0.1.0
