@@ -4,6 +4,8 @@ name: libghostty
 # Runs when the pin changes, or by hand from the Actions tab.
 on:
   push:
+    # Listing branches keeps tag pushes out. GitHub ignores the paths filter for tags.
+    branches: ["**"]
     paths: [scripts/build-ghostty.sh]
   workflow_dispatch:
 

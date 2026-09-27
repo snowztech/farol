@@ -22,6 +22,12 @@ if [ -n "${CI:-}" ] && [ -z "${FROM_SOURCE:-}" ]; then
   exit 1
 fi
 
+# Publishing is once per Ghostty commit, so there is nothing to build if it is already out.
+if [ "${1:-}" = "--publish" ] && gh release view "ghostty-${GHOSTTY_REV:0:7}" > /dev/null 2>&1; then
+  echo "ghostty-${GHOSTTY_REV:0:7} is already published"
+  exit 0
+fi
+
 if [ ! -d "$src/.git" ]; then
   git clone https://github.com/ghostty-org/ghostty.git "$src"
 fi
@@ -49,7 +55,6 @@ echo "built vendor/GhosttyKit.xcframework @ $GHOSTTY_REV"
 # Publishes the build for everyone else, once per Ghostty commit.
 if [ "${1:-}" = "--publish" ]; then
   tag="ghostty-${GHOSTTY_REV:0:7}"
-  gh release view "$tag" > /dev/null 2>&1 && exit 0
   mkdir -p "$root/build"
   (cd "$root/vendor" && zip -qry "$root/build/GhosttyKit.zip" GhosttyKit.xcframework ghostty-resources)
   gh release create "$tag" "$root/build/GhosttyKit.zip" --prerelease --target "$(git -C "$root" rev-parse HEAD)" \
