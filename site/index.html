@@ -66,9 +66,9 @@
     @keyframes ripple { from { transform: scale(1); opacity: 0.5; } to { transform: scale(2.6); opacity: 0; } }
     @media (prefers-reduced-motion: reduce) { .dot, .dot::after { animation: none; } }
 
-    ul.features { list-style: none; padding: 0; margin: 0; display: grid; gap: 18px; }
-    .features b { display: block; font-weight: 500; }
-    .features span { color: var(--sn-fg-muted); font-size: var(--sn-text-sm); }
+    ul.features { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+    .features b { font-weight: 500; }
+    .features span { color: var(--sn-fg-muted); }
 
     footer {
       margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--sn-border-subtle);
@@ -103,10 +103,9 @@
     </div>
 
     <ul class="features">
-      <li><b>See every agent at a glance</b><span>Each session shows whether its agent is working, waiting for you or done, with a notification when one needs you.</span></li>
-      <li><b>One worktree per agent</b><span>Open a session in its own git worktree, so agents running side by side never touch each other's files.</span></li>
-      <li><b>Ghostty inside</b><span>Built on libghostty, so it is as fast as Ghostty, supports its 600+ themes and reads your Ghostty config.</span></li>
-      <li><b>Splits, search and a real Mac app</b><span>Split panes, find in scrollback, native input methods and settings you can edit in the app or in a file.</span></li>
+      <li><b>One worktree per agent.</b> <span>Parallel agents never touch each other's files.</span></li>
+      <li><b>Built on libghostty.</b> <span>Ghostty's speed, themes and config.</span></li>
+      <li><b>A real Mac app.</b> <span>Splits, search and settings in the app or in a file.</span></li>
     </ul>
 
     <footer>
