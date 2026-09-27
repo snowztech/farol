@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-27
+
+Settings and the config file now work together, you can add your own themes, and the sidebar shows agent status more clearly.
+
 ### Added
 
 - Custom themes: files in `~/.config/farol/themes` show up first in the theme gallery.
@@ -19,6 +23,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Fixed
 
 - Changing a setting in the app no longer undoes edits you made to the config file while Farol was open.
+- Sessions running Claude Code no longer start a `git` lookup several times a second while its title animates.
 
 ## [0.1.2] - 2026-09-27
 
@@ -100,7 +105,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/snowztech/farol/releases/tag/v0.2.0
 [0.1.2]: https://github.com/snowztech/farol/releases/tag/v0.1.2
 [0.1.1]: https://github.com/snowztech/farol/releases/tag/v0.1.1
 [0.1.0]: https://github.com/snowztech/farol/releases/tag/v0.1.0
