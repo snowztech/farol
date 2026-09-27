@@ -25,7 +25,7 @@ The key comes from App Store Connect, under Users and Access, Integrations, App 
 
 ## Repository secrets
 
-Pushing a tag like `v0.1.1` runs `.github/workflows/release.yml`: it builds, tests, signs and notarizes, then publishes a DMG and a zip on GitHub Releases with that version's section of `CHANGELOG.md` as the notes. Tags with a suffix, like `v0.2.0-beta`, become pre-releases. The workflow needs these repository secrets:
+The release workflow signs and notarizes with these, set under the repository's Settings, Secrets and variables, Actions:
 
 | Secret | Value |
 | --- | --- |
