@@ -10,6 +10,8 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - Files copied in Finder paste as shell-escaped paths.
 - A program asking to read or set the clipboard needs your approval.
 - CI runs the style check on every push and pull request.
+- Dead keys and input methods. Accents compose as you type, the pending accent shows at the cursor, and Japanese, Chinese and Korean input places its candidate window at the cursor.
+- The emoji picker and dictation type into the terminal.
 
 ### Fixed
 

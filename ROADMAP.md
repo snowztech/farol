@@ -22,7 +22,7 @@ Three rules decide what gets in:
 Farol can replace Ghostty or Warp for everyday work, and sessions start to be about branches.
 
 - [x] Copy and paste
-- [ ] Dead keys and input methods (accents, CJK)
+- [x] Dead keys and input methods (accents, CJK)
 - [ ] Restore sessions on relaunch, same folders and titles
 - [ ] Worktree sessions: "New session in repo" creates a branch and a git worktree, and opens the terminal there
 - [ ] Sidebar shows the repo and branch of each session

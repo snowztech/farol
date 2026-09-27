@@ -20,6 +20,7 @@ Farol is early. It works as a daily terminal, but expect rough edges.
 - **Themes.** Pick from Ghostty's 600+ themes with live previews. The window chrome follows the theme.
 - **Settings in the window.** Theme, font, size and cursor, plus a config file for everything else.
 - **Copy and paste.** Pasting text that could run commands asks first. Files copied in Finder paste as their paths.
+- **Accents and input methods.** Dead keys compose as you type, and input methods for other languages work at the cursor.
 
 ## Planned
 

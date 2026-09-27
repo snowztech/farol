@@ -117,30 +117,85 @@ public final class TerminalView: NSView {
     }
 
     // MARK: Keyboard
-    // TODO: no IME (dead keys, CJK input). Needs NSTextInputClient + ghostty_surface_preedit.
+
+    /// Text an input method is still composing, like a dead key waiting for its letter.
+    var markedText = ""
+    /// Collects text inserted while a key press is interpreted, so it goes out with that key.
+    var keyTextAccumulator: [String]?
 
     public override func keyDown(with event: NSEvent) {
-        sendKey(event, event.isARepeat ? GHOSTTY_ACTION_REPEAT : GHOSTTY_ACTION_PRESS)
+        guard let surface else { return }
+        let action = event.isARepeat ? GHOSTTY_ACTION_REPEAT : GHOSTTY_ACTION_PRESS
+        let translated = translationEvent(for: event, surface: surface)
+
+        let wasComposing = !markedText.isEmpty
+        keyTextAccumulator = []
+        defer { keyTextAccumulator = nil }
+        interpretKeyEvents([translated])
+        syncPreedit(clearIfNeeded: wasComposing)
+
+        let inserted = keyTextAccumulator ?? []
+        if wasComposing && !inserted.isEmpty {
+            // A composition just finished (´ then e gives é). Send the result, not this key.
+            inserted.forEach(sendText)
+        } else if !inserted.isEmpty {
+            inserted.forEach { sendKey(event, translated, action, text: plainText($0, translated)) }
+        } else {
+            sendKey(event, translated, action, text: keyText(translated), composing: wasComposing || !markedText.isEmpty)
+        }
     }
 
     public override func keyUp(with event: NSEvent) {
-        sendKey(event, GHOSTTY_ACTION_RELEASE)
+        sendKey(event, event, GHOSTTY_ACTION_RELEASE, text: nil)
     }
 
-    private func sendKey(_ event: NSEvent, _ action: ghostty_input_action_e) {
+    /// Without this, keys the input system doesn't handle (arrows, ctrl+key) would beep.
+    public override func doCommand(by selector: Selector) {}
+
+    /// Applies Ghostty's modifier rules, such as `macos-option-as-alt`, before macOS turns the key into text.
+    private func translationEvent(for event: NSEvent, surface: ghostty_surface_t) -> NSEvent {
+        let allowed = ghostty_surface_key_translation_mods(surface, ghosttyMods(event.modifierFlags))
+        var flags = event.modifierFlags
+        for (flag, mod) in [(NSEvent.ModifierFlags.shift, GHOSTTY_MODS_SHIFT), (.control, GHOSTTY_MODS_CTRL),
+                            (.option, GHOSTTY_MODS_ALT), (.command, GHOSTTY_MODS_SUPER)] {
+            if allowed.rawValue & mod.rawValue != 0 { flags.insert(flag) } else { flags.remove(flag) }
+        }
+        guard flags != event.modifierFlags else { return event }
+        return NSEvent.keyEvent(
+            with: event.type, location: event.locationInWindow, modifierFlags: flags,
+            timestamp: event.timestamp, windowNumber: event.windowNumber, context: nil,
+            characters: event.characters(byApplyingModifiers: flags) ?? "",
+            charactersIgnoringModifiers: event.charactersIgnoringModifiers ?? "",
+            isARepeat: event.isARepeat, keyCode: event.keyCode) ?? event
+    }
+
+    private func sendKey(
+        _ event: NSEvent, _ translated: NSEvent, _ action: ghostty_input_action_e,
+        text: String?, composing: Bool = false
+    ) {
         guard let surface else { return }
         var key = ghostty_input_key_s()
         key.action = action
         key.keycode = UInt32(event.keyCode)
         key.mods = ghosttyMods(event.modifierFlags)
         // Ctrl and Cmd never produce text on macOS, everything else might have.
-        key.consumed_mods = ghosttyMods(event.modifierFlags.subtracting([.control, .command]))
+        key.consumed_mods = ghosttyMods(translated.modifierFlags.subtracting([.control, .command]))
+        key.composing = composing
         if let scalar = event.characters(byApplyingModifiers: [])?.unicodeScalars.first {
             key.unshifted_codepoint = scalar.value
         }
-
-        let text = action == GHOSTTY_ACTION_RELEASE ? nil : keyText(event)
         text.withOptionalCString { ptr in
+            key.text = ptr
+            _ = ghostty_surface_key(surface, key)
+        }
+    }
+
+    /// Text that isn't tied to a key: a finished composition, the emoji picker, dictation.
+    func sendText(_ text: String) {
+        guard let surface, !text.isEmpty else { return }
+        var key = ghostty_input_key_s()
+        key.action = GHOSTTY_ACTION_PRESS
+        text.withCString { ptr in
             key.text = ptr
             _ = ghostty_surface_key(surface, key)
         }
@@ -149,13 +204,26 @@ public final class TerminalView: NSView {
     /// Ghostty encodes control keys itself, so send the plain character and skip function keys.
     private func keyText(_ event: NSEvent) -> String? {
         guard let chars = event.characters else { return nil }
-        if chars.count == 1, let scalar = chars.unicodeScalars.first {
-            if scalar.value < 0x20 {
-                return event.characters(byApplyingModifiers: event.modifierFlags.subtracting(.control))
-            }
-            if (0xF700...0xF8FF).contains(scalar.value) { return nil }
+        return plainText(chars, event)
+    }
+
+    private func plainText(_ chars: String, _ event: NSEvent) -> String? {
+        guard chars.count == 1, let scalar = chars.unicodeScalars.first else { return chars }
+        if scalar.value < 0x20 {
+            return event.characters(byApplyingModifiers: event.modifierFlags.subtracting(.control))
         }
+        if (0xF700...0xF8FF).contains(scalar.value) { return nil }
         return chars
+    }
+
+    /// Shows the text being composed at the cursor, or clears it.
+    func syncPreedit(clearIfNeeded: Bool = true) {
+        guard let surface else { return }
+        if !markedText.isEmpty {
+            markedText.withCString { ghostty_surface_preedit(surface, $0, UInt(markedText.utf8.count)) }
+        } else if clearIfNeeded {
+            ghostty_surface_preedit(surface, nil, 0)
+        }
     }
 
     // MARK: Mouse
