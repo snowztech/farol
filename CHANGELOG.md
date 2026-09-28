@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Sessions are grouped by repo in the sidebar once they span more than one. With a single repo the sidebar stays as it was. Worktrees sit with their repo, and ⌘1 to ⌘9 follow the order shown.
+
 ### Fixed
 
 - Session names drop the extra parts agents add after a separator, so a Codex session shows "Design codebase" instead of "Design codebase | farol", and "farol" instead of "| farol" before the conversation has a name.

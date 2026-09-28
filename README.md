@@ -35,7 +35,7 @@ It needs a Mac with Apple Silicon and macOS 14 or later. Releases are signed and
 - **New task.** ⇧⌘N asks what to do, then starts Claude Code or Codex on it in a new worktree, with the task as its first prompt.
 - **Agent status.** Each session shows whether its agent is working, waiting for you or done, with a notification when it waits in the background. See [Agent status](#agent-status).
 - **Worktree sessions.** ⇧⌘T asks for a branch and opens a session in its own git worktree, so parallel agents never touch each other's files. Closing it offers to remove the worktree and always keeps the branch.
-- **Sessions in a sidebar.** Open as many as you like. Hidden sessions keep running but stop rendering, so twenty background agents cost no GPU time. Each row shows its git branch. Double-click to rename, drag to reorder.
+- **Sessions in a sidebar.** Open as many as you like. Hidden sessions keep running but stop rendering, so twenty background agents cost no GPU time. Each row shows its git branch, and once sessions span several repos they are grouped under each repo's name. Double-click to rename, drag to reorder.
 - **Split panes.** ⌘D splits a session, and the new pane opens in the same folder. ⇧⌘R gives a pane a name, like "back" or "tunnel". Layouts and names come back after a relaunch.
 - **Find in scrollback.** ⌘F searches the focused pane and shows the match count.
 - **Ghostty inside.** Same rendering, speed and escape sequence support, and your Ghostty config is loaded.
