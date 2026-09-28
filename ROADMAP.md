@@ -40,6 +40,7 @@ Most of the time with parallel agents goes into checking what they did. That wor
 
 - [x] Files panel: the session's folder as a tree, next to the terminal
 - [x] A light editor for the files you open there, with save and a reload when an agent changes the file
+- [x] Syntax colors in the file pane and the review, from the terminal theme
 - [x] Review panel: the session's changes as one scrolling diff, per file, with the count in the title bar. Uncommitted work or everything since the branch left main
 - [ ] Push the branch and open a merge request or pull request from the session
 - [ ] Pipeline status and open review comments in the sidebar, with a notification when a pipeline fails

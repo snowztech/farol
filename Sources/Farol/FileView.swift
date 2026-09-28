@@ -11,6 +11,12 @@ final class FileView: NSView {
     /// The file's folder inside its checkout, like "internal/config/", shown muted before the name.
     private var folder = ""
     private var titleColors = (name: NSColor.labelColor, folder: NSColor.secondaryLabelColor)
+    private var language: Syntax.Language?
+    private var syntax: SyntaxColors?
+    private var plainColor = NSColor.textColor
+    private var pendingHighlight: DispatchWorkItem?
+    /// ponytail: coloring reruns on the whole file, so very large files stay plain. Per-line coloring would lift it.
+    private static let highlightLimit = 400_000
     private(set) var isDirty = false { didSet { updateTitle() } }
     var onFocus: (() -> Void)?
     var onClose: (() -> Void)?
@@ -85,6 +91,7 @@ final class FileView: NSView {
         NotificationCenter.default.addObserver(forName: NSText.didChangeNotification, object: text, queue: .main) { [weak self] _ in
             self?.isDirty = true
             self?.gutter.textChanged()
+            self?.highlightSoon()
         }
 
         scroll.documentView = text
@@ -119,6 +126,7 @@ final class FileView: NSView {
     func show(_ path: String) {
         self.path = path
         folder = ""
+        language = Syntax.language(for: path)
         title.toolTip = (path as NSString).abbreviatingWithTildeInPath
         load(keepingPosition: false)
         watch()
@@ -182,6 +190,7 @@ final class FileView: NSView {
         conflict.isHidden = true
         needsLayout = true
         gutter.textChanged()
+        highlight()
         if keepingPosition {
             let length = (text.string as NSString).length
             text.setSelectedRange(NSRange(location: min(selection.location, length), length: 0))
@@ -312,10 +321,40 @@ final class FileView: NSView {
         scroll.backgroundColor = background
         text.backgroundColor = background
         text.textColor = foreground
+        plainColor = foreground
         text.typingAttributes = [.font: Self.font, .foregroundColor: foreground]
+        highlight()
         text.insertionPointColor = foreground
         text.selectedTextAttributes = [.backgroundColor: background.mixed(with: foreground, 0.22)]
         gutter.colors = (background, background.mixed(with: foreground, 0.35))
+    }
+
+    // MARK: Syntax colors
+
+    func highlight(with colors: SyntaxColors) {
+        syntax = colors
+        highlight()
+    }
+
+    /// Typing waits for a pause, so a burst of keys colors the file once.
+    private func highlightSoon() {
+        pendingHighlight?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.highlight() }
+        pendingHighlight = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
+    }
+
+    /// Colors go straight on the text storage, so they never enter the undo history.
+    private func highlight() {
+        guard let storage = text.textStorage else { return }
+        storage.beginEditing()
+        storage.addAttribute(.foregroundColor, value: plainColor, range: NSRange(location: 0, length: storage.length))
+        if let language, let syntax, storage.length <= Self.highlightLimit {
+            for token in Syntax.tokens(in: storage.string, language) {
+                storage.addAttribute(.foregroundColor, value: syntax.color(token.kind), range: token.range)
+            }
+        }
+        storage.endEditing()
     }
 
     /// ⌘F, ⌘G and ⌘E use the text view's own find bar while the file has focus.

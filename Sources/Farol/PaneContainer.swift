@@ -51,6 +51,8 @@ final class PaneContainer: NSView {
             applyFocus()
         }
     }
+    /// Code colors for the file pane, from the same theme.
+    var syntax: SyntaxColors? { didSet { if let syntax { file?.highlight(with: syntax) } } }
     private var dividerColor: NSColor { theme.background.mixed(with: theme.foreground, 0.11) }
     private var searchBar: SearchBar?
     /// Only panes you named have one.
@@ -500,6 +502,7 @@ final class PaneContainer: NSView {
     private func adopt(_ file: FileView) {
         file.autoresizingMask = []
         file.apply(background: theme.background, foreground: theme.foreground)
+        if let syntax { file.highlight(with: syntax) }
         file.onFocus = { [weak self] in
             self?.fileFocused = true
             self?.applyFocus()

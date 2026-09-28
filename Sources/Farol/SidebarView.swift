@@ -85,7 +85,7 @@ private struct SessionRow: View {
         .onTapGesture(perform: onSelect)
         // Alongside the single tap, not instead of it, so selecting never waits for a possible second click.
         .simultaneousGesture(TapGesture(count: 2).onEnded { startEditing() })
-        .onHover { hovering = $0 }
+        .onClickableHover { hovering = $0 }
         .help(session.directory)
         .contextMenu {
             Button("Rename", action: startEditing)
@@ -172,7 +172,7 @@ private struct NewTaskRow: View {
         .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised.opacity(0.5) : .clear))
         .contentShape(Rectangle())
         .onTapGesture(perform: action)
-        .onHover { hovering = $0 }
+        .onClickableHover { hovering = $0 }
     }
 }
 

@@ -148,7 +148,7 @@ private struct ThemeCard: View {
                 .lineLimit(1)
         }
         .contentShape(Rectangle())
-        .onHover { hovering = $0 }
+        .onClickableHover { hovering = $0 }
     }
 }
 

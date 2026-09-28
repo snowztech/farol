@@ -129,7 +129,7 @@ private struct UpdateBadge: View {
                 .overlay(Capsule().strokeBorder(palette.line))
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
+        .onClickableHover { hovering = $0 }
         .help("Farol \(version) is available. Download it.")
     }
 }
@@ -156,7 +156,7 @@ private struct ReviewButton: View {
             .overlay(Capsule().strokeBorder(palette.line))
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
+        .onClickableHover { hovering = $0 }
         .help("Review changes (⌥⌘R)")
     }
 }
@@ -164,6 +164,16 @@ private struct ReviewButton: View {
 private struct SessionTitle: View {
     @ObservedObject var session: Session
     var body: some View { Text(session.displayName) }
+}
+
+extension View {
+    /// Hover for anything clickable: runs `action` and shows the pointing hand while the mouse is over it.
+    func onClickableHover(_ action: @escaping (Bool) -> Void) -> some View {
+        onHover { inside in
+            action(inside)
+            if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
+    }
 }
 
 /// The one close button, for panels, panes and rows. QuietButton draws the same in AppKit.
@@ -184,7 +194,7 @@ struct CloseButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
+        .onClickableHover { hovering = $0 }
         .help(help)
     }
 }
@@ -208,7 +218,7 @@ struct IconButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
+        .onClickableHover { hovering = $0 }
         .help(help)
     }
 }

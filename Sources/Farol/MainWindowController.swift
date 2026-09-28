@@ -310,7 +310,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         window?.backgroundColor = bg
         window?.appearance = NSAppearance(named: bg.isDark ? .darkAqua : .aqua)
         content.layer?.backgroundColor = bg.cgColor
-        store.sessions.forEach { $0.panes.theme = theme }
+        store.sessions.forEach {
+            $0.panes.theme = theme
+            $0.panes.syntax = state.palette.code
+        }
     }
 
     private var theme: (background: NSColor, foreground: NSColor) { (runtime.backgroundColor, runtime.foregroundColor) }
@@ -360,6 +363,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         session.panes.frame = terminalContainer.bounds
         session.panes.autoresizingMask = [.width, .height]
         session.panes.theme = theme
+        session.panes.syntax = state.palette.code
         terminalContainer.addSubview(session.panes)
     }
 

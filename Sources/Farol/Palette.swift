@@ -1,3 +1,4 @@
+import FarolCore
 import AppKit
 import GhosttyTerminal
 import SwiftUI
@@ -21,6 +22,7 @@ struct Palette: Equatable {
     let removed: Color
     /// Tint for macOS switches and pickers. A mid gray, since white on a switch would hide its white knob.
     let control: Color
+    let code: SyntaxColors
     let isDark: Bool
 
     init(_ runtime: TerminalRuntime) {
@@ -37,12 +39,38 @@ struct Palette: Equatable {
         muted = Color(nsColor: bg.mixed(with: fg, 0.55))
         accent = Color(nsColor: fg)
         control = Color(nsColor: bg.mixed(with: fg, 0.42))
+        code = SyntaxColors(background: bg, foreground: fg, ansi: ansi)
         let ansi = { (i: Int) in Color(nsColor: ansi.count > i ? ansi[i] : fg) }
         working = ansi(6)
         waiting = ansi(3)
         done = ansi(2)
         added = ansi(2)
         removed = ansi(1)
+    }
+}
+
+/// Colors for code, from the terminal theme's ANSI palette so they always match it.
+struct SyntaxColors: Equatable {
+    let keyword: NSColor
+    let string: NSColor
+    let number: NSColor
+    let comment: NSColor
+
+    init(background: NSColor, foreground: NSColor, ansi: [NSColor]) {
+        let color = { (i: Int) in ansi.count > i ? ansi[i] : foreground }
+        keyword = color(5)
+        string = color(2)
+        number = color(3)
+        comment = background.mixed(with: foreground, 0.45)
+    }
+
+    func color(_ kind: Syntax.Kind) -> NSColor {
+        switch kind {
+        case .keyword: keyword
+        case .string: string
+        case .number: number
+        case .comment: comment
+        }
     }
 }
 
