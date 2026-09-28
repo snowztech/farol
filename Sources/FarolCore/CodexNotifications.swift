@@ -73,13 +73,13 @@ public enum CodexNotifications {
 
     // MARK: File
 
-    public static func read() throws -> String {
-        guard FileManager.default.fileExists(atPath: file.path) else { return "" }
-        return try String(contentsOf: file, encoding: .utf8)
+    public static func read(_ url: URL = file) throws -> String {
+        guard FileManager.default.fileExists(atPath: url.path) else { return "" }
+        return try String(contentsOf: url, encoding: .utf8)
     }
 
-    public static func write(_ text: String) throws {
-        try AgentHooks.replace(file, with: Data(text.utf8))
+    public static func write(_ text: String, to url: URL = file) throws {
+        try AgentHooks.replace(url, with: Data(text.utf8))
     }
 
     // MARK: Parsing

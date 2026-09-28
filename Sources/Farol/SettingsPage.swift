@@ -13,31 +13,17 @@ struct SettingsPage: View {
     @AppStorage(AppIcon.key) private var appIcon = AppIcon.default.rawValue
     @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = true
     @State private var versionCopied = false
-    @State private var setups: [Agent: Setup] = [:]
+    /// Each agent's setup state, by name.
+    @State private var setups: [String: AgentSetup.State] = [:]
     @State private var agentChange: AgentChange?
     @State private var agentError: String?
     /// macOS refuses Farol's notifications, so turning them on here would do nothing.
     @State private var notificationsBlocked = false
 
-    /// Claude Code reports its status through hooks. Codex only through terminal notifications, see CodexNotifications.
-    private enum Agent: String, CaseIterable {
-        case claude = "Claude Code"
-        case codex = "Codex"
-
-        var file: URL { self == .claude ? AgentHooks.claude.file : CodexNotifications.file }
-    }
-
-    fileprivate enum Setup {
-        case off
-        /// Set up by an older Farol, in a way that no longer works as well.
-        case outdated
-        case on
-    }
-
     private struct AgentChange: Identifiable {
-        let agent: Agent
+        let agent: AgentSetup
         let enable: Bool
-        var id: String { agent.rawValue + (enable ? " on" : " off") }
+        var id: String { agent.name + (enable ? " on" : " off") }
     }
 
     @State private var section = Section.terminal
@@ -226,7 +212,7 @@ struct SettingsPage: View {
         Heading(title: "Agents", detail: "Set up your coding agents so Farol can tell you when they need you.", palette: p)
 
         GroupTitle(title: "Integrations", palette: p)
-        ForEach(Agent.allCases, id: \.self) { agentRow($0, p) }
+        ForEach(AgentSetup.all, id: \.name) { agentRow($0, p) }
 
         GroupTitle(title: "Notifications", palette: p)
         if notificationsBlocked {
@@ -269,12 +255,12 @@ struct SettingsPage: View {
         }
     }
 
-    private func agentRow(_ agent: Agent, _ p: Palette) -> some View {
-        let setup = setups[agent] ?? .off
-        return Row(title: agent.rawValue, detail: detail(agent, on: setup == .on), palette: p) {
+    private func agentRow(_ agent: AgentSetup, _ p: Palette) -> some View {
+        let state = setups[agent.name] ?? .off
+        return Row(title: agent.name, detail: state == .on ? agent.summaryWhenOn : agent.summaryWhenOff, palette: p) {
             HStack(spacing: 12) {
-                SetupState(setup: setup, palette: p)
-                switch setup {
+                SetupState(state: state, palette: p)
+                switch state {
                 case .outdated:
                     Button("Update") { change(agent, enable: true) }
                 case .on:
@@ -288,36 +274,18 @@ struct SettingsPage: View {
         }
     }
 
-    private func detail(_ agent: Agent, on: Bool) -> String {
-        switch (agent, on) {
-        case (.claude, false): "Show in the sidebar when Claude Code is working, waiting for you or done."
-        case (.claude, true): "The sidebar shows when Claude Code is working, waiting for you or done."
-        case (.codex, false): "Get told when Codex needs you or finishes."
-        case (.codex, true): "Farol tells you when Codex needs you or finishes. Codex doesn't report while it works, so the sidebar shows no working dot."
-        }
-    }
-
     private func agentAlert(_ change: AgentChange) -> Alert {
         let agent = change.agent
-        let path = (agent.file.path as NSString).abbreviatingWithTildeInPath
-        let backup = agent.file.lastPathComponent + ".farol-backup"
         guard change.enable else {
-            let what = agent == .claude ? "its own hooks" : "the lines it added"
             return Alert(
-                title: Text("Turn off \(agent.rawValue)?"),
-                message: Text("Farol removes only \(what) from \(path) and keeps a backup of the file."),
+                title: Text("Turn off \(agent.name)?"),
+                message: Text(agent.disableMessage),
                 primaryButton: .destructive(Text("Turn off")) { self.change(agent, enable: false) },
                 secondaryButton: .cancel())
         }
-        let message = switch agent {
-        case .claude:
-            "Farol adds hooks for \(AgentHooks.claude.events.count) events to \(path). Your other settings stay as they are, though the file may be reformatted. The current file is kept as \(backup)."
-        case .codex:
-            "Farol turns on Codex's terminal notifications in \(path), on lines marked as added by Farol. The rest of the file stays as it is, and the current one is kept as \(backup). Codex sessions that are already open need a restart."
-        }
         return Alert(
-            title: Text("Enable \(agent.rawValue)?"),
-            message: Text(message),
+            title: Text("Enable \(agent.name)?"),
+            message: Text(agent.enableMessage),
             primaryButton: .default(Text("Enable")) { self.change(agent, enable: true) },
             secondaryButton: .cancel())
     }
@@ -344,35 +312,12 @@ struct SettingsPage: View {
             let blocked = settings.authorizationStatus == .denied
             DispatchQueue.main.async { notificationsBlocked = blocked }
         }
-        let claude = AgentHooks.claude
-        let settings = try? claude.read()
-        setups[.claude] = settings.map(claude.isInstalled) == true ? .on
-            : settings.map(claude.hasAnyFarolHook) == true ? .outdated : .off
-        let notifying = (try? CodexNotifications.read()).map(CodexNotifications.isEnabled) == true
-        setups[.codex] = hasOldCodexHooks ? .outdated : notifying ? .on : .off
+        for agent in AgentSetup.all { setups[agent.name] = agent.state() }
     }
 
-    /// Farol 0.6 connected Codex through hooks that never reached it. Enabling Codex replaces them.
-    private var hasOldCodexHooks: Bool {
-        (try? AgentHooks.codex.read()).map(AgentHooks.codex.hasAnyFarolHook) == true
-    }
-
-    private func change(_ agent: Agent, enable: Bool) {
+    private func change(_ agent: AgentSetup, enable: Bool) {
         do {
-            switch agent {
-            case .claude:
-                let hooks = AgentHooks.claude
-                let settings = try hooks.read()
-                try hooks.write(enable ? hooks.install(into: settings) : hooks.remove(from: settings))
-            case .codex:
-                let text = try CodexNotifications.read()
-                let changed = enable ? try CodexNotifications.enable(in: text) : CodexNotifications.disable(in: text)
-                if changed != text { try CodexNotifications.write(changed) }
-                if enable, hasOldCodexHooks {
-                    let hooks = AgentHooks.codex
-                    try hooks.write(hooks.remove(from: try hooks.read()))
-                }
-            }
+            try enable ? agent.enable() : agent.disable()
             agentError = nil
             // Asked here, while you are looking, rather than at the first notification when you are away.
             if enable {
@@ -577,15 +522,15 @@ private struct GroupTitle: View {
 
 /// "On" with a green dot, "Needs update" with a yellow one, or a muted "Off".
 private struct SetupState: View {
-    let setup: SettingsPage.Setup
+    let state: AgentSetup.State
     let palette: Palette
 
     var body: some View {
         HStack(spacing: 6) {
             Circle()
-                .fill(setup == .on ? Color.green : setup == .outdated ? Color.yellow : palette.muted.opacity(0.5))
+                .fill(state == .on ? Color.green : state == .outdated ? Color.yellow : palette.muted.opacity(0.5))
                 .frame(width: 6, height: 6)
-            Text(setup == .on ? "On" : setup == .outdated ? "Needs update" : "Off")
+            Text(state == .on ? "On" : state == .outdated ? "Needs update" : "Off")
                 .font(.system(size: 12))
                 .foregroundStyle(palette.muted)
         }
