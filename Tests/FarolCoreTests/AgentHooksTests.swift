@@ -133,14 +133,6 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
 
 // MARK: Codex
 
-@Test func codexWaitsOnPermissionRequests() {
-    let settings = AgentHooks.codex.install(into: [:])
-    #expect(AgentHooks.codex.isInstalled(in: settings))
-    #expect(commands(settings, "PermissionRequest") == [AgentHooks.command("waiting")])
-    #expect(commands(settings, "Stop") == [AgentHooks.command("done")])
-    #expect(commands(settings, "Notification").isEmpty)
-}
-
 /// A hooks.json that already runs another tool at session start, like herdr's, keeps it through connect and disconnect.
 @Test func codexKeepsOtherHooks() throws {
     let theirs: [String: Any] = ["hooks": [

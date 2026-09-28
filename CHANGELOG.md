@@ -8,6 +8,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - Sessions are grouped by project in the sidebar once you work in more than one. A project is a git repository, worktrees included. With a single project the sidebar stays as it was, and ⌘1 to ⌘9 follow the order shown. Turn it off in Settings → Appearance → Group sessions by project.
 
+### Changed
+
+- Codex works again. Farol 0.6 connected it through hooks, but Codex 0.158 runs hooks in a background process that loses track of the terminal, so nothing reached Farol. Settings → Agents → Enable now turns on Codex's terminal notifications in `~/.codex/config.toml` instead, and removes the old hooks. You get notified when Codex needs your approval or finishes, and the session gets a yellow dot until you open it. There is no working dot for Codex, since it can't report that.
+- Settings → Agents says **Enable** and **Turn off** instead of Connect and Disconnect.
+
 ### Fixed
 
 - Session names drop the extra parts agents add after a separator, so a Codex session shows "Design codebase" instead of "Design codebase | farol", and "farol" instead of "| farol" before the conversation has a name.

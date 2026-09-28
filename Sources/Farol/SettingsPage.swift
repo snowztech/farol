@@ -13,24 +13,17 @@ struct SettingsPage: View {
     @AppStorage(AppIcon.key) private var appIcon = AppIcon.default.rawValue
     @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = true
     @State private var versionCopied = false
-    /// Each agent's hooks, by agent name.
-    @State private var connections: [String: Connection] = [:]
+    /// Each agent's setup state, by name.
+    @State private var setups: [String: AgentSetup.State] = [:]
     @State private var agentChange: AgentChange?
     @State private var agentError: String?
     /// macOS refuses Farol's notifications, so turning them on here would do nothing.
     @State private var notificationsBlocked = false
 
-    private enum Connection {
-        case disconnected
-        /// Farol's hooks are there but from an older version.
-        case outdated
-        case connected
-    }
-
     private struct AgentChange: Identifiable {
-        let hooks: AgentHooks
-        let connect: Bool
-        var id: String { hooks.name + (connect ? " connect" : " disconnect") }
+        let agent: AgentSetup
+        let enable: Bool
+        var id: String { agent.name + (enable ? " on" : " off") }
     }
 
     @State private var section = Section.terminal
@@ -216,10 +209,10 @@ struct SettingsPage: View {
     }
 
     @ViewBuilder private func agentsSection(_ p: Palette) -> some View {
-        Heading(title: "Agents", detail: "Connect your coding agents so the sidebar shows what they are doing.", palette: p)
+        Heading(title: "Agents", detail: "Set up your coding agents so Farol can tell you when they need you.", palette: p)
 
         GroupTitle(title: "Integrations", palette: p)
-        ForEach(AgentHooks.all, id: \.name) { agentRow($0, p) }
+        ForEach(AgentSetup.all, id: \.name) { agentRow($0, p) }
 
         GroupTitle(title: "Notifications", palette: p)
         if notificationsBlocked {
@@ -262,22 +255,18 @@ struct SettingsPage: View {
         }
     }
 
-    private func agentRow(_ hooks: AgentHooks, _ p: Palette) -> some View {
-        let state = connections[hooks.name] ?? .disconnected
-        return Row(title: hooks.name,
-                   detail: state == .connected
-                       ? "The sidebar shows when \(hooks.name) is working, waiting for you or done."
-                       : "Show in the sidebar when \(hooks.name) is working, waiting for you or done.",
-                   palette: p) {
+    private func agentRow(_ agent: AgentSetup, _ p: Palette) -> some View {
+        let state = setups[agent.name] ?? .off
+        return Row(title: agent.name, detail: state == .on ? agent.summaryWhenOn : agent.summaryWhenOff, palette: p) {
             HStack(spacing: 12) {
-                ConnectionState(connected: state == .connected, outdated: state == .outdated, palette: p)
+                SetupState(state: state, palette: p)
                 switch state {
                 case .outdated:
-                    Button("Update") { change(hooks, connect: true) }
-                case .connected:
-                    Button("Disconnect") { agentChange = AgentChange(hooks: hooks, connect: false) }
-                case .disconnected:
-                    Button("Connect") { agentChange = AgentChange(hooks: hooks, connect: true) }
+                    Button("Update") { change(agent, enable: true) }
+                case .on:
+                    Button("Turn off") { agentChange = AgentChange(agent: agent, enable: false) }
+                case .off:
+                    Button("Enable") { agentChange = AgentChange(agent: agent, enable: true) }
                 }
             }
             .buttonStyle(.bordered)
@@ -286,21 +275,18 @@ struct SettingsPage: View {
     }
 
     private func agentAlert(_ change: AgentChange) -> Alert {
-        let hooks = change.hooks
-        let path = (hooks.file.path as NSString).abbreviatingWithTildeInPath
-        let backup = hooks.file.lastPathComponent + ".farol-backup"
-        let approval = hooks.asksToApproveHooks ? " \(hooks.name) asks you to approve them the next time it starts." : ""
-        if change.connect {
+        let agent = change.agent
+        guard change.enable else {
             return Alert(
-                title: Text("Connect \(hooks.name)?"),
-                message: Text("Farol adds hooks for \(hooks.events.count) events to \(path). Your other settings stay as they are, though the file may be reformatted. The current file is kept as \(backup).\(approval)"),
-                primaryButton: .default(Text("Connect")) { self.change(hooks, connect: true) },
+                title: Text("Turn off \(agent.name)?"),
+                message: Text(agent.disableMessage),
+                primaryButton: .destructive(Text("Turn off")) { self.change(agent, enable: false) },
                 secondaryButton: .cancel())
         }
         return Alert(
-            title: Text("Disconnect \(hooks.name)?"),
-            message: Text("Farol removes only its own hooks from \(path) and keeps a backup of the file."),
-            primaryButton: .destructive(Text("Disconnect")) { self.change(hooks, connect: false) },
+            title: Text("Enable \(agent.name)?"),
+            message: Text(agent.enableMessage),
+            primaryButton: .default(Text("Enable")) { self.change(agent, enable: true) },
             secondaryButton: .cancel())
     }
 
@@ -326,26 +312,21 @@ struct SettingsPage: View {
             let blocked = settings.authorizationStatus == .denied
             DispatchQueue.main.async { notificationsBlocked = blocked }
         }
-        for hooks in AgentHooks.all {
-            let settings = try? hooks.read()
-            connections[hooks.name] = settings.map(hooks.isInstalled) == true ? .connected
-                : settings.map(hooks.hasAnyFarolHook) == true ? .outdated : .disconnected
-        }
+        for agent in AgentSetup.all { setups[agent.name] = agent.state() }
     }
 
-    private func change(_ hooks: AgentHooks, connect: Bool) {
+    private func change(_ agent: AgentSetup, enable: Bool) {
         do {
-            let settings = try hooks.read()
-            try hooks.write(connect ? hooks.install(into: settings) : hooks.remove(from: settings))
+            try enable ? agent.enable() : agent.disable()
             agentError = nil
             // Asked here, while you are looking, rather than at the first notification when you are away.
-            if connect {
+            if enable {
                 UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in
                     DispatchQueue.main.async { refreshAgents() }
                 }
             }
         } catch {
-            let path = (hooks.file.path as NSString).abbreviatingWithTildeInPath
+            let path = (agent.file.path as NSString).abbreviatingWithTildeInPath
             agentError = "Could not update \(path): \(error.localizedDescription)"
         }
         refreshAgents()
@@ -539,18 +520,17 @@ private struct GroupTitle: View {
     }
 }
 
-/// "Connected" with a green dot, "Needs update" with a yellow one, or a muted "Not connected".
-private struct ConnectionState: View {
-    let connected: Bool
-    var outdated = false
+/// "On" with a green dot, "Needs update" with a yellow one, or a muted "Off".
+private struct SetupState: View {
+    let state: AgentSetup.State
     let palette: Palette
 
     var body: some View {
         HStack(spacing: 6) {
             Circle()
-                .fill(connected ? Color.green : outdated ? Color.yellow : palette.muted.opacity(0.5))
+                .fill(state == .on ? Color.green : state == .outdated ? Color.yellow : palette.muted.opacity(0.5))
                 .frame(width: 6, height: 6)
-            Text(connected ? "Connected" : outdated ? "Needs update" : "Not connected")
+            Text(state == .on ? "On" : state == .outdated ? "Needs update" : "Off")
                 .font(.system(size: 12))
                 .foregroundStyle(palette.muted)
         }
