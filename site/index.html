@@ -7,7 +7,7 @@
   <meta name="description" content="A fast macOS terminal for working with coding agents. Built on libghostty.">
   <meta property="og:title" content="Farol">
   <meta property="og:description" content="A fast macOS terminal for working with coding agents.">
-  <meta property="og:image" content="https://farol.snowztech.com/screenshot-sessions.png">
+  <meta property="og:image" content="https://farol.snowztech.com/screenshot-review.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="icon.png">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.2/dist/snowztech-ui.min.css">
@@ -45,9 +45,6 @@
       background: radial-gradient(ellipse at center, var(--sn-accent-soft), transparent 70%);
       filter: blur(24px);
     }
-    .feature-title { text-align: center; margin: 96px auto 0; }
-    .feature-title h2 { font-weight: 500; margin: 0 0 8px; }
-    .feature-title p { color: var(--sn-fg-muted); margin: 0; }
     .shot {
       position: relative; z-index: 1; display: block; width: 100%; height: auto;
       border-radius: 12px; border: 1px solid var(--sn-border-strong);
@@ -83,8 +80,8 @@
     </section>
 
     <div class="showcase wide">
-      <img class="shot" src="screenshot-sessions.png" width="2400" height="1520"
-           alt="Farol running Claude Code, with other agent sessions in the sidebar, one working, one waiting for you and one done">
+      <img class="shot" src="screenshot-review.png" width="2400" height="1520"
+           alt="Farol with agent sessions in the sidebar, one working, one waiting for you and one done, Claude Code in the terminal and the review panel showing the branch's changes since main">
     </div>
 
     <ul class="features wide">
@@ -93,15 +90,6 @@
       <li><b>A task in one step</b><span>Describe it and pick an agent. Farol opens a worktree on a new branch and starts the agent on it.</span></li>
       <li><b>Built on libghostty</b><span>Ghostty's speed, themes and config, in a native Mac app.</span></li>
     </ul>
-
-    <div class="feature-title wide">
-      <h2>Review what the agent did</h2>
-      <p>Every changed file as one diff, next to the terminal. Uncommitted work or everything since main.</p>
-    </div>
-    <div class="showcase wide">
-      <img class="shot" src="screenshot-review.png" width="2400" height="1520" loading="lazy"
-           alt="The review panel next to Claude Code, showing a branch's changes since main as one scrolling diff">
-    </div>
   </main>
 
   <footer>
