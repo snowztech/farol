@@ -11,6 +11,8 @@ struct SettingsPage: View {
 
     @AppStorage(AppIcon.key) private var appIcon = AppIcon.default.rawValue
     @State private var claudeConnected = false
+    /// Farol's hooks are there but from an older version.
+    @State private var claudeOutdated = false
     @State private var versionCopied = false
     @State private var claudeConfirm: ClaudeChange?
     @State private var claudeError: String?
@@ -204,8 +206,11 @@ struct SettingsPage: View {
                 : "Show in the sidebar when Claude is working, waiting for you or done.",
             palette: p) {
             HStack(spacing: 12) {
-                ConnectionState(connected: claudeConnected, palette: p)
-                if claudeConnected {
+                ConnectionState(connected: claudeConnected, outdated: claudeOutdated, palette: p)
+                if claudeOutdated {
+                    Button("Update") { changeClaude(ClaudeHooks.install) }
+                        .buttonStyle(.bordered)
+                } else if claudeConnected {
                     Button("Disconnect") { claudeConfirm = .disconnect }
                         .buttonStyle(.bordered)
                 } else {
@@ -282,7 +287,9 @@ struct SettingsPage: View {
     }
 
     private func refreshClaude() {
-        claudeConnected = (try? ClaudeHooks.read()).map(ClaudeHooks.isInstalled) ?? false
+        let settings = try? ClaudeHooks.read()
+        claudeConnected = settings.map(ClaudeHooks.isInstalled) ?? false
+        claudeOutdated = !claudeConnected && (settings.map(ClaudeHooks.hasAnyFarolHook) ?? false)
     }
 
     private func changeClaude(_ change: ([String: Any]) -> [String: Any]) {
@@ -483,17 +490,18 @@ private struct GroupTitle: View {
     }
 }
 
-/// "Connected" with a green dot, or a muted "Not connected".
+/// "Connected" with a green dot, "Needs update" with a yellow one, or a muted "Not connected".
 private struct ConnectionState: View {
     let connected: Bool
+    var outdated = false
     let palette: Palette
 
     var body: some View {
         HStack(spacing: 6) {
             Circle()
-                .fill(connected ? Color.green : palette.muted.opacity(0.5))
+                .fill(connected ? Color.green : outdated ? Color.yellow : palette.muted.opacity(0.5))
                 .frame(width: 6, height: 6)
-            Text(connected ? "Connected" : "Not connected")
+            Text(connected ? "Connected" : outdated ? "Needs update" : "Not connected")
                 .font(.system(size: 12))
                 .foregroundStyle(palette.muted)
         }

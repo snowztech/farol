@@ -114,3 +114,19 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
     withoutFarol = try ClaudeHooks.read(url)
     #expect((withoutFarol as NSDictionary).isEqual(to: before as! [AnyHashable: Any]))
 }
+
+/// Hooks from an older Farol, without the Notification matcher, get replaced instead of doubled.
+@Test func connectUpdatesOlderHooks() {
+    let old: [String: Any] = ["hooks": [
+        "Notification": [["hooks": [["type": "command", "command": ClaudeHooks.command("waiting")]]]],
+        "Stop": [["hooks": [["type": "command", "command": "say done"]]]],
+    ]]
+    #expect(!ClaudeHooks.isInstalled(in: old))
+
+    let updated = ClaudeHooks.install(into: old)
+    let groups = (updated["hooks"] as? [String: Any])?["Notification"] as? [[String: Any]] ?? []
+    #expect(groups.count == 1)
+    #expect(groups.first?["matcher"] as? String == "permission_prompt|elicitation_dialog")
+    #expect(commands(updated, "Stop") == ["say done", ClaudeHooks.command("done")])
+    #expect(ClaudeHooks.isInstalled(in: updated))
+}
