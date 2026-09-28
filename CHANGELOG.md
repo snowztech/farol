@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Sessions are grouped by project in the sidebar once you work in more than one. A project is a git repository, worktrees included. With a single project the sidebar stays as it was, and ⌘1 to ⌘9 follow the order shown. Turn it off in Settings → Appearance → Group sessions by project.
+
 ### Fixed
 
 - Session names drop the extra parts agents add after a separator, so a Codex session shows "Design codebase" instead of "Design codebase | farol", and "farol" instead of "| farol" before the conversation has a name.

@@ -18,6 +18,10 @@ final class Session: ObservableObject, Identifiable {
     @Published var bellRang = false
     @Published private(set) var branch: String?
     @Published private(set) var repoName: String?
+    /// The main checkout's path, the same for every worktree of a repo. Sessions are grouped by it.
+    @Published private(set) var repoRoot: String?
+    /// Lets the store regroup the sidebar when a session turns out to be in another repo.
+    var onRepoChange: (() -> Void)?
     /// Set when the session runs in one of Farol's worktrees, even after `cd` into a subfolder.
     let worktree: String?
 
@@ -62,11 +66,15 @@ final class Session: ObservableObject, Identifiable {
         let directory = directory
         DispatchQueue.global(qos: .userInitiated).async {
             let branch = Git.branch(of: directory)
-            let repo = Git.repoRoot(of: directory).map { URL(fileURLWithPath: $0).lastPathComponent }
+            let root = Git.repoRoot(of: directory)
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.directory == directory else { return }
                 self.branch = branch
-                self.repoName = repo
+                self.repoName = root.map { URL(fileURLWithPath: $0).lastPathComponent }
+                if self.repoRoot != root {
+                    self.repoRoot = root
+                    self.onRepoChange?()
+                }
             }
         }
     }
@@ -163,6 +171,20 @@ final class SessionStore: ObservableObject {
 
     var selected: Session? { sessions.first { $0.id == selectedID } }
 
+    /// Settings → Appearance → Group sessions by project. On unless turned off.
+    static let groupByRepoKey = "sidebar.groupByRepo"
+
+    /// The sidebar's sections: one per repo once sessions span several, else a single unnamed one.
+    var groups: [Grouping.Group<Session>] {
+        guard UserDefaults.standard.object(forKey: Self.groupByRepoKey) as? Bool ?? true else {
+            return [Grouping.Group(key: nil, items: sessions)]
+        }
+        return Grouping.group(sessions, by: \.repoRoot)
+    }
+
+    /// Sessions in the order the sidebar shows them, which ⌘1 to ⌘9 and next or previous follow.
+    var ordered: [Session] { groups.flatMap(\.items) }
+
     /// `run` is typed into the new shell, for example "claude" to start an agent right away.
     @discardableResult
     func create(directory: String = NSHomeDirectory(), run: String? = nil) -> Session {
@@ -192,6 +214,7 @@ final class SessionStore: ObservableObject {
             self?.save()
         }
         panes.onLayoutChange = { [weak self] in self?.save() }
+        session.onRepoChange = { [weak self] in self?.objectWillChange.send() }
 
         sessions.append(session)
         onSessionCreated?(session)
@@ -284,13 +307,15 @@ final class SessionStore: ObservableObject {
     }
 
     func select(index: Int) {
-        guard sessions.indices.contains(index) else { return }
-        select(sessions[index])
+        let ordered = ordered
+        guard ordered.indices.contains(index) else { return }
+        select(ordered[index])
     }
 
     func selectNext(offset: Int) {
-        guard let current = sessions.firstIndex(where: { $0.id == selectedID }), !sessions.isEmpty else { return }
-        select(index: (current + offset + sessions.count) % sessions.count)
+        let ordered = ordered
+        guard let current = ordered.firstIndex(where: { $0.id == selectedID }), !ordered.isEmpty else { return }
+        select(ordered[(current + offset + ordered.count) % ordered.count])
     }
 
     /// Closing the last session ends the app: there is never a window without a terminal.
@@ -303,10 +328,13 @@ final class SessionStore: ObservableObject {
             onLastSessionClosed?()
             return
         }
+        // Where it sat on screen, so the session that takes its place is the one shown next to it.
+        let shown = ordered.firstIndex { $0.id == session.id } ?? 0
         session.panes.removeFromSuperview()
         sessions.remove(at: index)
         if session.id == selectedID {
-            select(sessions[min(index, sessions.count - 1)])
+            let ordered = ordered
+            select(ordered[min(shown, ordered.count - 1)])
         } else {
             save()
         }

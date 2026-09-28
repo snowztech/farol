@@ -8,28 +8,35 @@ struct SidebarView: View {
     let commands: Commands
 
     @State private var dragging: Session?
+    /// Only read so the sidebar redraws when the setting changes. The store applies it.
+    @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = true
 
     var body: some View {
         let p = state.palette
         VStack(spacing: 0) {
             ScrollView {
                 LazyVStack(spacing: 2) {
-                    ForEach(store.sessions) { session in
-                        SessionRow(
-                            session: session,
-                            selected: session.id == store.selectedID && !state.showingSettings,
-                            palette: p,
-                            // Reselecting would pull focus back into the terminal, which a rename would lose.
-                            onSelect: {
-                                if session.id != store.selectedID || state.showingSettings { store.select(session) }
-                            },
-                            onRename: { store.rename(session, to: $0) },
-                            onClose: { commands.closeSession(session) })
-                        .onDrag {
-                            dragging = session
-                            return NSItemProvider(object: session.id.uuidString as NSString)
+                    ForEach(store.groups, id: \.key) { group in
+                        if let key = group.key {
+                            RepoHeader(name: URL(fileURLWithPath: key).lastPathComponent, palette: p)
                         }
-                        .onDrop(of: [.text], delegate: Reorder(target: session, store: store, dragging: $dragging))
+                        ForEach(group.items) { session in
+                            SessionRow(
+                                session: session,
+                                selected: session.id == store.selectedID && !state.showingSettings,
+                                palette: p,
+                                // Reselecting would pull focus back into the terminal, which a rename would lose.
+                                onSelect: {
+                                    if session.id != store.selectedID || state.showingSettings { store.select(session) }
+                                },
+                                onRename: { store.rename(session, to: $0) },
+                                onClose: { commands.closeSession(session) })
+                            .onDrag {
+                                dragging = session
+                                return NSItemProvider(object: session.id.uuidString as NSString)
+                            }
+                            .onDrop(of: [.text], delegate: Reorder(target: session, store: store, dragging: $dragging))
+                        }
                     }
                 }
                 .padding(8)
@@ -177,6 +184,24 @@ private struct NewTaskRow: View {
     }
 }
 
+/// A repo's name above its sessions, only there once sessions span several repos.
+private struct RepoHeader: View {
+    let name: String
+    let palette: Palette
+
+    var body: some View {
+        Text(name.uppercased())
+            .font(.system(size: 10.5, weight: .semibold))
+            .tracking(0.6)
+            .foregroundStyle(palette.muted)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.top, 12)
+            .padding(.bottom, 4)
+    }
+}
+
 /// Moves the dragged session live as it passes over other rows.
 private struct Reorder: DropDelegate {
     let target: Session
@@ -186,6 +211,9 @@ private struct Reorder: DropDelegate {
     func dropEntered(info: DropInfo) {
         guard let dragging, dragging !== target,
               let index = store.sessions.firstIndex(where: { $0 === target }) else { return }
+        // A session's section comes from its folder, so it only moves within its own repo.
+        let grouped = store.groups.contains { $0.key != nil }
+        guard !grouped || dragging.repoRoot == target.repoRoot else { return }
         withAnimation(.easeOut(duration: 0.15)) { store.move(dragging, to: index) }
     }
 
