@@ -4,6 +4,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- Closing a worktree session no longer offers to remove the worktree when another session still uses it, or when it has uncommitted changes. Those worktrees are kept without asking.
+- When a worktree can't be removed, the message says so plainly instead of showing git's error.
+
 ## [0.4.1] - 2026-09-28
 
 ### Fixed

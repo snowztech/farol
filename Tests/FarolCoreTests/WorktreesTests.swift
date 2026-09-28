@@ -68,6 +68,14 @@ struct Sandbox {
     #expect(FileManager.default.fileExists(atPath: path + "/notes.txt"))
 }
 
+@Test func seesUncommittedChanges() throws {
+    let box = try Sandbox()
+    let path = try box.worktrees.create(branch: "clean", from: box.repo)
+    #expect(!box.worktrees.hasUncommittedChanges(path))
+    try "draft".write(toFile: path + "/notes.txt", atomically: true, encoding: .utf8)
+    #expect(box.worktrees.hasUncommittedChanges(path))
+}
+
 @Test func refusesToRemoveFoldersOutsideTheBase() throws {
     let box = try Sandbox()
     #expect(throws: GitError.self) { try box.worktrees.remove(box.repo) }

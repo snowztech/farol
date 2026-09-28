@@ -97,8 +97,15 @@ extension MainWindowController {
         }
     }
 
+    /// Offers to remove the session's worktree, but only when that is possible and safe.
     private func closeAskingAboutWorktree(_ session: Session) {
         guard let worktree = session.worktree, let window else {
+            store.close(session)
+            return
+        }
+        // Another session still works in this folder, or it holds unsaved work that git would refuse to delete.
+        let shared = store.sessions.contains { $0 !== session && $0.worktree == worktree }
+        guard !shared, !Worktrees.default.hasUncommittedChanges(worktree) else {
             store.close(session)
             return
         }
@@ -115,11 +122,11 @@ extension MainWindowController {
             case .alertFirstButtonReturn:
                 do {
                     try Worktrees.default.remove(worktree)
-                    self.store.close(session)
                 } catch {
-                    let reason = "Git would not remove it, usually because of uncommitted changes. It stays at \(worktree)."
-                    self.showError("Worktree kept", reason + "\n\n\(error)") { self.store.close(session) }
+                    // Rare now that unsaved work is checked first, so a plain note is enough.
+                    self.showError("Worktree kept", "It couldn't be removed and stays at \(worktree). Nothing was deleted.")
                 }
+                self.store.close(session)
             case .alertSecondButtonReturn:
                 self.store.close(session)
             default:
