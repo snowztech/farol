@@ -59,6 +59,8 @@ When an agent waits or finishes while Farol is in the background, you get a noti
 
 **Claude Code:** open Settings → Agents and click **Connect**. Farol adds its hooks to `~/.claude/settings.json`, leaves everything else in the file alone and keeps a backup. **Disconnect** removes only Farol's hooks.
 
+**Codex:** same place, click **Connect**. Farol adds its hooks to `~/.codex/hooks.json`, and Codex asks you to approve them the next time it starts. Codex has no event for quitting, so a session keeps its last status until you open it.
+
 **Other agents** can report with `"$FAROL_CLI" status working|waiting|done|clear`, which Farol makes available in every session. Agents that ring the terminal bell show as waiting without any setup.
 
 <details>
@@ -77,6 +79,25 @@ When an agent waits or finishes while Farol is in the background, you get a noti
 ```
 
 Outside Farol `$FAROL_CLI` is unset, so the hooks do nothing. The Notification matcher leaves out Claude's idle reminder, which would otherwise mark a finished session as waiting.
+
+</details>
+
+<details>
+<summary>The Codex hooks, if you prefer to add them by hand</summary>
+
+In `~/.codex/hooks.json`:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status clear" }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status working" }] }],
+    "PostToolUse": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status working" }] }],
+    "PermissionRequest": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status waiting" }] }],
+    "Stop": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status done" }] }]
+  }
+}
+```
 
 </details>
 

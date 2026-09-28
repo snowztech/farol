@@ -10,16 +10,23 @@ struct SettingsPage: View {
     @ObservedObject var updates: UpdateChecker
 
     @AppStorage(AppIcon.key) private var appIcon = AppIcon.default.rawValue
-    @State private var claudeConnected = false
-    /// Farol's hooks are there but from an older version.
-    @State private var claudeOutdated = false
     @State private var versionCopied = false
-    @State private var claudeConfirm: ClaudeChange?
-    @State private var claudeError: String?
+    /// Each agent's hooks, by agent name.
+    @State private var connections: [String: Connection] = [:]
+    @State private var agentChange: AgentChange?
+    @State private var agentError: String?
 
-    private enum ClaudeChange: Identifiable {
-        case connect, disconnect
-        var id: Self { self }
+    private enum Connection {
+        case disconnected
+        /// Farol's hooks are there but from an older version.
+        case outdated
+        case connected
+    }
+
+    private struct AgentChange: Identifiable {
+        let hooks: AgentHooks
+        let connect: Bool
+        var id: String { hooks.name + (connect ? " connect" : " disconnect") }
     }
 
     @State private var section = Section.terminal
@@ -83,9 +90,9 @@ struct SettingsPage: View {
         .background(p.background)
         .foregroundStyle(p.text)
         .tint(p.control)
-        .onAppear(perform: refreshClaude)
-        .onChange(of: section) { _, _ in refreshClaude() }
-        .alert(item: $claudeConfirm, content: claudeAlert)
+        .onAppear(perform: refreshAgents)
+        .onChange(of: section) { _, _ in refreshAgents() }
+        .alert(item: $agentChange, content: agentAlert)
         .onChange(of: appIcon) { _, name in AppIcon.apply(AppIcon(rawValue: name) ?? .default) }
     }
 
@@ -200,26 +207,7 @@ struct SettingsPage: View {
         Heading(title: "Agents", detail: "Connect your coding agents so the sidebar shows what they are doing.", palette: p)
 
         GroupTitle(title: "Integrations", palette: p)
-        Row(title: "Claude Code",
-            detail: claudeConnected
-                ? "The sidebar shows when Claude is working, waiting for you or done."
-                : "Show in the sidebar when Claude is working, waiting for you or done.",
-            palette: p) {
-            HStack(spacing: 12) {
-                ConnectionState(connected: claudeConnected, outdated: claudeOutdated, palette: p)
-                if claudeOutdated {
-                    Button("Update") { changeClaude(ClaudeHooks.install) }
-                        .buttonStyle(.bordered)
-                } else if claudeConnected {
-                    Button("Disconnect") { claudeConfirm = .disconnect }
-                        .buttonStyle(.bordered)
-                } else {
-                    Button("Connect") { claudeConfirm = .connect }
-                        .buttonStyle(.bordered)
-                }
-            }
-            .controlSize(.small)
-        }
+        ForEach(AgentHooks.all, id: \.name) { agentRow($0, p) }
 
         GroupTitle(title: "Notifications", palette: p)
         Row(title: "When an agent is waiting for you", palette: p) { toggle($agents.notifyWaiting) }
@@ -244,29 +232,54 @@ struct SettingsPage: View {
                     .frame(width: 220)
             }
         }
-        if let claudeError {
-            Text(claudeError)
+        if let agentError {
+            Text(agentError)
                 .font(.system(size: 12))
                 .foregroundStyle(.red)
                 .padding(.top, 12)
         }
     }
 
-    private func claudeAlert(_ change: ClaudeChange) -> Alert {
-        switch change {
-        case .connect:
-            Alert(
-                title: Text("Connect Claude Code?"),
-                message: Text("Farol adds hooks for five events to ~/.claude/settings.json. Your other settings stay as they are, though the file may be reformatted. The current file is kept as settings.json.farol-backup."),
-                primaryButton: .default(Text("Connect")) { changeClaude(ClaudeHooks.install) },
-                secondaryButton: .cancel())
-        case .disconnect:
-            Alert(
-                title: Text("Disconnect Claude Code?"),
-                message: Text("Farol removes only its own hooks from ~/.claude/settings.json and keeps a backup of the file."),
-                primaryButton: .destructive(Text("Disconnect")) { changeClaude(ClaudeHooks.remove) },
+    private func agentRow(_ hooks: AgentHooks, _ p: Palette) -> some View {
+        let state = connections[hooks.name] ?? .disconnected
+        return Row(title: hooks.name,
+                   detail: state == .connected
+                       ? "The sidebar shows when \(hooks.name) is working, waiting for you or done."
+                       : "Show in the sidebar when \(hooks.name) is working, waiting for you or done.",
+                   palette: p) {
+            HStack(spacing: 12) {
+                ConnectionState(connected: state == .connected, outdated: state == .outdated, palette: p)
+                switch state {
+                case .outdated:
+                    Button("Update") { change(hooks, connect: true) }
+                case .connected:
+                    Button("Disconnect") { agentChange = AgentChange(hooks: hooks, connect: false) }
+                case .disconnected:
+                    Button("Connect") { agentChange = AgentChange(hooks: hooks, connect: true) }
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+    }
+
+    private func agentAlert(_ change: AgentChange) -> Alert {
+        let hooks = change.hooks
+        let path = (hooks.file.path as NSString).abbreviatingWithTildeInPath
+        let backup = hooks.file.lastPathComponent + ".farol-backup"
+        let approval = hooks.asksToApproveHooks ? " \(hooks.name) asks you to approve them the next time it starts." : ""
+        if change.connect {
+            return Alert(
+                title: Text("Connect \(hooks.name)?"),
+                message: Text("Farol adds hooks for \(hooks.events.count) events to \(path). Your other settings stay as they are, though the file may be reformatted. The current file is kept as \(backup).\(approval)"),
+                primaryButton: .default(Text("Connect")) { self.change(hooks, connect: true) },
                 secondaryButton: .cancel())
         }
+        return Alert(
+            title: Text("Disconnect \(hooks.name)?"),
+            message: Text("Farol removes only its own hooks from \(path) and keeps a backup of the file."),
+            primaryButton: .destructive(Text("Disconnect")) { self.change(hooks, connect: false) },
+            secondaryButton: .cancel())
     }
 
     private static let custom = "custom"
@@ -286,20 +299,24 @@ struct SettingsPage: View {
         Toggle("", isOn: value).labelsHidden().toggleStyle(.switch).controlSize(.small)
     }
 
-    private func refreshClaude() {
-        let settings = try? ClaudeHooks.read()
-        claudeConnected = settings.map(ClaudeHooks.isInstalled) ?? false
-        claudeOutdated = !claudeConnected && (settings.map(ClaudeHooks.hasAnyFarolHook) ?? false)
+    private func refreshAgents() {
+        for hooks in AgentHooks.all {
+            let settings = try? hooks.read()
+            connections[hooks.name] = settings.map(hooks.isInstalled) == true ? .connected
+                : settings.map(hooks.hasAnyFarolHook) == true ? .outdated : .disconnected
+        }
     }
 
-    private func changeClaude(_ change: ([String: Any]) -> [String: Any]) {
+    private func change(_ hooks: AgentHooks, connect: Bool) {
         do {
-            try ClaudeHooks.write(change(try ClaudeHooks.read()))
-            claudeError = nil
+            let settings = try hooks.read()
+            try hooks.write(connect ? hooks.install(into: settings) : hooks.remove(from: settings))
+            agentError = nil
         } catch {
-            claudeError = "Could not update ~/.claude/settings.json: \(error.localizedDescription)"
+            let path = (hooks.file.path as NSString).abbreviatingWithTildeInPath
+            agentError = "Could not update \(path): \(error.localizedDescription)"
         }
-        refreshClaude()
+        refreshAgents()
     }
 
     @ViewBuilder private func shortcuts(_ p: Palette) -> some View {

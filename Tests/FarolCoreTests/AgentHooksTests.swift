@@ -9,9 +9,9 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
 }
 
 @Test func installsIntoEmptySettings() {
-    let settings = ClaudeHooks.install(into: [:])
-    #expect(ClaudeHooks.isInstalled(in: settings))
-    #expect(commands(settings, "Notification") == [ClaudeHooks.command("waiting")])
+    let settings = AgentHooks.claude.install(into: [:])
+    #expect(AgentHooks.claude.isInstalled(in: settings))
+    #expect(commands(settings, "Notification") == [AgentHooks.command("waiting")])
 }
 
 @Test func keepsEverythingElse() {
@@ -20,36 +20,36 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
         "hooks": ["PreToolUse": [["matcher": "Bash", "hooks": [["type": "command", "command": "my-guard.sh"]]]],
                   "Stop": [["hooks": [["type": "command", "command": "say done"]]]]],
     ]
-    let settings = ClaudeHooks.install(into: mine)
+    let settings = AgentHooks.claude.install(into: mine)
     #expect(settings["model"] as? String == "opus")
     #expect(commands(settings, "PreToolUse") == ["my-guard.sh"])
-    #expect(commands(settings, "Stop") == ["say done", ClaudeHooks.command("done")])
+    #expect(commands(settings, "Stop") == ["say done", AgentHooks.command("done")])
 }
 
 @Test func installingTwiceChangesNothing() {
-    let once = ClaudeHooks.install(into: [:])
-    let twice = ClaudeHooks.install(into: once)
+    let once = AgentHooks.claude.install(into: [:])
+    let twice = AgentHooks.claude.install(into: once)
     #expect(NSDictionary(dictionary: once).isEqual(to: twice))
 }
 
 @Test func notInstalledWhenOneHookIsMissing() {
-    var settings = ClaudeHooks.install(into: [:])
+    var settings = AgentHooks.claude.install(into: [:])
     var hooks = settings["hooks"] as! [String: Any]
     hooks["Stop"] = nil
     settings["hooks"] = hooks
-    #expect(!ClaudeHooks.isInstalled(in: settings))
+    #expect(!AgentHooks.claude.isInstalled(in: settings))
 }
 
 @Test func removingLeavesOtherHooks() {
     let mine: [String: Any] = ["hooks": ["Stop": [["hooks": [["type": "command", "command": "say done"]]]]]]
-    let settings = ClaudeHooks.remove(from: ClaudeHooks.install(into: mine))
-    #expect(!ClaudeHooks.isInstalled(in: settings))
+    let settings = AgentHooks.claude.remove(from: AgentHooks.claude.install(into: mine))
+    #expect(!AgentHooks.claude.isInstalled(in: settings))
     #expect(commands(settings, "Stop") == ["say done"])
     #expect((settings["hooks"] as? [String: Any])?["Notification"] == nil)
 }
 
 @Test func removingEverythingDropsTheHooksKey() {
-    let settings = ClaudeHooks.remove(from: ClaudeHooks.install(into: ["model": "opus"]))
+    let settings = AgentHooks.claude.remove(from: AgentHooks.claude.install(into: ["model": "opus"]))
     #expect(settings["hooks"] == nil)
     #expect(settings["model"] as? String == "opus")
 }
@@ -60,10 +60,10 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     try Data(#"{"model":"opus"}"#.utf8).write(to: url)
 
-    try ClaudeHooks.write(ClaudeHooks.install(into: try ClaudeHooks.read(url)), to: url)
+    try AgentHooks.write(AgentHooks.claude.install(into: try AgentHooks.read(url)), to: url)
 
-    #expect(ClaudeHooks.isInstalled(in: try ClaudeHooks.read(url)))
-    #expect(try ClaudeHooks.read(url)["model"] as? String == "opus")
+    #expect(AgentHooks.claude.isInstalled(in: try AgentHooks.read(url)))
+    #expect(try AgentHooks.read(url)["model"] as? String == "opus")
     let backup = try String(contentsOf: url.appendingPathExtension("farol-backup"), encoding: .utf8)
     #expect(backup == #"{"model":"opus"}"#)
 }
@@ -71,7 +71,7 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
 @Test func refusesAFileThatIsNotAnObject() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent("farol-hooks-\(UUID().uuidString).json")
     try Data("[1,2]".utf8).write(to: url)
-    #expect(throws: (any Error).self) { try ClaudeHooks.read(url) }
+    #expect(throws: (any Error).self) { try AgentHooks.read(url) }
 }
 
 /// A busy settings file survives Connect then Disconnect with nothing lost or changed.
@@ -99,34 +99,60 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
     let url = dir.appendingPathComponent("settings.json")
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     try Data(original.utf8).write(to: url)
-    let before = try ClaudeHooks.read(url) as NSDictionary
+    let before = try AgentHooks.read(url) as NSDictionary
 
-    try ClaudeHooks.write(ClaudeHooks.install(into: try ClaudeHooks.read(url)), to: url)
-    let connected = try ClaudeHooks.read(url)
-    #expect(ClaudeHooks.isInstalled(in: connected))
+    try AgentHooks.write(AgentHooks.claude.install(into: try AgentHooks.read(url)), to: url)
+    let connected = try AgentHooks.read(url)
+    #expect(AgentHooks.claude.isInstalled(in: connected))
     // Farol's hook comes after the user's own, never in place of them.
-    #expect(commands(connected, "Stop") == ["say done", "afplay ~/ding.aiff", ClaudeHooks.command("done")])
+    #expect(commands(connected, "Stop") == ["say done", "afplay ~/ding.aiff", AgentHooks.command("done")])
     #expect(commands(connected, "PreToolUse") == ["~/guard.sh"])
-    var withoutFarol = ClaudeHooks.remove(from: connected)
+    var withoutFarol = AgentHooks.claude.remove(from: connected)
     #expect((withoutFarol as NSDictionary).isEqual(to: before as! [AnyHashable: Any]))
 
-    try ClaudeHooks.write(ClaudeHooks.remove(from: connected), to: url)
-    withoutFarol = try ClaudeHooks.read(url)
+    try AgentHooks.write(AgentHooks.claude.remove(from: connected), to: url)
+    withoutFarol = try AgentHooks.read(url)
     #expect((withoutFarol as NSDictionary).isEqual(to: before as! [AnyHashable: Any]))
 }
 
 /// Hooks from an older Farol, without the Notification matcher, get replaced instead of doubled.
 @Test func connectUpdatesOlderHooks() {
     let old: [String: Any] = ["hooks": [
-        "Notification": [["hooks": [["type": "command", "command": ClaudeHooks.command("waiting")]]]],
+        "Notification": [["hooks": [["type": "command", "command": AgentHooks.command("waiting")]]]],
         "Stop": [["hooks": [["type": "command", "command": "say done"]]]],
     ]]
-    #expect(!ClaudeHooks.isInstalled(in: old))
+    #expect(!AgentHooks.claude.isInstalled(in: old))
 
-    let updated = ClaudeHooks.install(into: old)
+    let updated = AgentHooks.claude.install(into: old)
     let groups = (updated["hooks"] as? [String: Any])?["Notification"] as? [[String: Any]] ?? []
     #expect(groups.count == 1)
     #expect(groups.first?["matcher"] as? String == "permission_prompt|elicitation_dialog")
-    #expect(commands(updated, "Stop") == ["say done", ClaudeHooks.command("done")])
-    #expect(ClaudeHooks.isInstalled(in: updated))
+    #expect(commands(updated, "Stop") == ["say done", AgentHooks.command("done")])
+    #expect(AgentHooks.claude.isInstalled(in: updated))
+}
+
+// MARK: Codex
+
+@Test func codexWaitsOnPermissionRequests() {
+    let settings = AgentHooks.codex.install(into: [:])
+    #expect(AgentHooks.codex.isInstalled(in: settings))
+    #expect(commands(settings, "PermissionRequest") == [AgentHooks.command("waiting")])
+    #expect(commands(settings, "Stop") == [AgentHooks.command("done")])
+    #expect(commands(settings, "Notification").isEmpty)
+}
+
+/// A hooks.json that already runs another tool at session start, like herdr's, keeps it through connect and disconnect.
+@Test func codexKeepsOtherHooks() throws {
+    let theirs: [String: Any] = ["hooks": [
+        "SessionStart": [["hooks": [["type": "command", "command": "bash ~/.codex/herdr-agent-state.sh session", "timeout": 10]]]],
+    ]]
+    let connected = AgentHooks.codex.install(into: theirs)
+    #expect(commands(connected, "SessionStart") == ["bash ~/.codex/herdr-agent-state.sh session", AgentHooks.command("clear")])
+    let disconnected = AgentHooks.codex.remove(from: connected) as NSDictionary
+    #expect(disconnected.isEqual(to: theirs))
+}
+
+@Test func agentsUseTheirOwnFiles() {
+    #expect(AgentHooks.claude.file.path.hasSuffix(".claude/settings.json"))
+    #expect(AgentHooks.codex.file.path.hasSuffix(".codex/hooks.json"))
 }
