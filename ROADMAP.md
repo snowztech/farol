@@ -29,7 +29,7 @@ Someone who downloads Farol understands what it is for in the first minute.
 - [x] **New task**: one flow that picks the repo, takes a task description, creates the worktree and starts the agent with the task as its first prompt
 - [x] Codex notifications through its terminal notifications, since its hooks lose track of the terminal
 - [ ] A working dot for Codex, once its hooks know which terminal they belong to
-- [x] Sessions grouped by project in the sidebar, with a setting to turn it off
+- [x] Sessions grouped by project in the sidebar, as a setting
 - [x] Update check: a quiet Update button when a new version is out
 - [ ] Install updates in place (Sparkle), behind the same button
 - [ ] Homebrew cask

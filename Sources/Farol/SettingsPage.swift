@@ -11,7 +11,7 @@ struct SettingsPage: View {
     @ObservedObject var updates: UpdateChecker
 
     @AppStorage(AppIcon.key) private var appIcon = AppIcon.default.rawValue
-    @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = true
+    @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = false
     @State private var versionCopied = false
     /// Each agent's setup state, by name.
     @State private var setups: [String: AgentSetup.State] = [:]

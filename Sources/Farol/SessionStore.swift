@@ -171,12 +171,12 @@ final class SessionStore: ObservableObject {
 
     var selected: Session? { sessions.first { $0.id == selectedID } }
 
-    /// Settings → Appearance → Group sessions by project. On unless turned off.
+    /// Settings → Appearance → Group sessions by project. Off unless turned on.
     static let groupByRepoKey = "sidebar.groupByRepo"
 
     /// The sidebar's sections: one per repo once sessions span several, else a single unnamed one.
     var groups: [Grouping.Group<Session>] {
-        guard UserDefaults.standard.object(forKey: Self.groupByRepoKey) as? Bool ?? true else {
+        guard UserDefaults.standard.bool(forKey: Self.groupByRepoKey) else {
             return [Grouping.Group(key: nil, items: sessions)]
         }
         return Grouping.group(sessions, by: \.repoRoot)
