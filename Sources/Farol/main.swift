@@ -1,7 +1,7 @@
 import AppKit
 import GhosttyTerminal
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var store: SessionStore!
     private var windowController: MainWindowController!
     private var settings: Settings!
@@ -61,6 +61,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func findNext(_ sender: Any?) { windowController.findNext() }
     @objc func findPrevious(_ sender: Any?) { windowController.findPrevious() }
     @objc func findSelection(_ sender: Any?) { windowController.findSelection() }
+    @objc func saveFile(_ sender: Any?) { windowController.saveFile() }
+
+    /// ⌘S only means something while a file has focus, and stays free for the terminal otherwise.
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        item.action == #selector(saveFile) ? windowController.canSaveFile : true
+    }
 
     private func makeMenu() -> NSMenu {
         let main = NSMenu()
@@ -74,6 +80,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // nil target: the focused terminal or text field handles these.
         let edit = NSMenu(title: "Edit")
+        edit.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        edit.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")
+        edit.addItem(.separator())
+        edit.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
         edit.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
         edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
@@ -93,6 +103,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sessions.addItem(withTitle: "New Session", action: #selector(newSession), keyEquivalent: "t")
         sessions.addItem(withTitle: "New Worktree Session…", action: #selector(newWorktreeSession), keyEquivalent: "T")
         sessions.addItem(withTitle: "Close Session", action: #selector(closeSession), keyEquivalent: "w")
+        sessions.addItem(withTitle: "Save File", action: #selector(saveFile), keyEquivalent: "s")
         sessions.addItem(withTitle: "Name Pane…", action: #selector(namePane), keyEquivalent: "R")
         sessions.addItem(.separator())
         sessions.addItem(withTitle: "Next Session", action: #selector(nextSession), keyEquivalent: "]")
