@@ -152,7 +152,8 @@ struct ReviewPanel: View {
 
     @ObservedObject var review: ReviewModel
     @ObservedObject var state: WindowState
-    let open: (String) -> Void
+    /// Opens a file in the file pane, at a line.
+    let open: (String, Int) -> Void
     let close: () -> Void
     let resize: (CGFloat) -> Void
 
@@ -208,7 +209,7 @@ struct ReviewPanel: View {
         case .header(let file, let collapsed):
             FileHeader(file: file, collapsed: collapsed, palette: p,
                        toggle: { review.toggle(file.path) },
-                       open: { review.root.map { open(($0 as NSString).appendingPathComponent(file.path)) } })
+                       open: { review.root.map { open(($0 as NSString).appendingPathComponent(file.path), file.firstChange) } })
         case .gap(_, _, let lines):
             Text("\(lines) unmodified \(lines == 1 ? "line" : "lines")")
                 .font(.system(size: 11))
@@ -247,7 +248,8 @@ struct ReviewPanel: View {
     }
 }
 
-/// "⇄ Uncommitted changes", a quiet menu to pick what the panel compares with, like Warp's.
+/// "⇄ Uncommitted changes ⌃⌄", a quiet select for what the panel compares with, like Warp's.
+/// A plain button that opens a native menu, because SwiftUI's menu button drops the ⌃⌄ that says "this is a select".
 private struct ScopeMenu: View {
     @ObservedObject var review: ReviewModel
     let palette: Palette
@@ -255,32 +257,25 @@ private struct ScopeMenu: View {
     @State private var hovering = false
 
     var body: some View {
-        Menu {
-            Button { review.choose(.uncommitted) } label: { item("Uncommitted changes", .uncommitted) }
-            if !review.branches.isEmpty {
-                Section("Changes since") {
-                    ForEach(review.branches, id: \.self) { branch in
-                        Button { review.choose(.branch(base: branch)) } label: { item(Self.name(branch), .branch(base: branch)) }
-                    }
-                }
-            }
-        } label: {
+        Button(action: showMenu) {
             HStack(spacing: 6) {
-                Image(systemName: "arrow.left.arrow.right").font(.system(size: 10.5, weight: .semibold))
-                Text(title)
-                Image(systemName: "chevron.down").font(.system(size: 8.5, weight: .bold)).foregroundStyle(palette.muted)
+                Image(systemName: "arrow.left.arrow.right")
+                    .font(.system(size: 9.5, weight: .semibold))
+                    .foregroundStyle(palette.muted)
+                Text(title).font(.system(size: 12, weight: .medium))
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(palette.muted)
             }
-            .font(.system(size: 12, weight: .medium))
             .foregroundStyle(palette.text)
             .padding(.horizontal, 8)
             .frame(height: 24)
             .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised : .clear))
             .contentShape(Rectangle())
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
+        .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .help("Choose what to compare with")
     }
 
     private var title: String {
@@ -290,14 +285,42 @@ private struct ScopeMenu: View {
         }
     }
 
-    @ViewBuilder private func item(_ title: String, _ scope: Diff.Scope) -> some View {
-        if review.scope == scope { Label(title, systemImage: "checkmark") } else { Text(title) }
+    private func showMenu() {
+        let menu = NSMenu()
+        menu.addItem(item("Uncommitted changes", .uncommitted))
+        if !review.branches.isEmpty {
+            menu.addItem(.separator())
+            menu.addItem(.sectionHeader(title: "Changes since"))
+            for branch in review.branches { menu.addItem(item(Self.name(branch), .branch(base: branch))) }
+        }
+        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+    }
+
+    private func item(_ title: String, _ scope: Diff.Scope) -> NSMenuItem {
+        let item = ActionMenuItem(title: title) { [review] in review.choose(scope) }
+        item.state = review.scope == scope ? .on : .off
+        return item
     }
 
     /// origin/main reads as main. The remote is an implementation detail here.
     static func name(_ branch: String) -> String {
         branch.hasPrefix("origin/") ? String(branch.dropFirst("origin/".count)) : branch
     }
+}
+
+/// An NSMenuItem that runs a closure, for menus built on the spot.
+private final class ActionMenuItem: NSMenuItem {
+    private let handler: () -> Void
+
+    init(title: String, handler: @escaping () -> Void) {
+        self.handler = handler
+        super.init(title: title, action: #selector(run), keyEquivalent: "")
+        target = self
+    }
+
+    required init(coder: NSCoder) { fatalError("not used") }
+
+    @objc private func run() { handler() }
 }
 
 /// "+18 −3" in the diff colors.

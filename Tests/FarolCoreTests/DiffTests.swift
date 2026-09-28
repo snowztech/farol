@@ -39,6 +39,9 @@ private let sample = """
     #expect(app.hunks[0].lines.map(\.number) == [10, nil, 11, 12, 13])
     #expect(app.hunks[0].lines.map(\.text) == ["let a = 1", "let b = 2", "let b = 3", "let c = 4", "let d = 5"])
 
+    // The first change removes line 11, so the file opens there.
+    #expect(app.firstChange == 11)
+
     #expect(files[1].status == .renamed)
     #expect(files[1].oldPath == "old name.txt")
     #expect(files[2].status == .deleted)

@@ -31,6 +31,17 @@ public enum Diff {
         public var isBinary = false
         public var hunks: [Hunk] = []
 
+        /// Where the first change is in the new file, to open it there. A removal points at the line that follows it.
+        public var firstChange: Int {
+            guard let hunk = hunks.first else { return 1 }
+            var number = hunk.newStart
+            for line in hunk.lines {
+                if line.kind != .context { return line.number ?? number }
+                number = (line.number ?? number) + 1
+            }
+            return hunk.newStart
+        }
+
         public var added: Int { hunks.reduce(0) { $0 + $1.lines.filter { $0.kind == .added }.count } }
         public var removed: Int { hunks.reduce(0) { $0 + $1.lines.filter { $0.kind == .removed }.count } }
     }

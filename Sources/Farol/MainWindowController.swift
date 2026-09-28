@@ -73,7 +73,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         filesPanel.clipsToBounds = true
         let reviewPanel = hosting(ReviewPanel(
             review: review, state: state,
-            open: { [weak self] in self?.store.selected?.panes.open($0) },
+            open: { [weak self] in self?.store.selected?.panes.open($0, line: $1) },
             close: { [weak self] in self?.toggleReview() },
             resize: { [weak self] in self?.setReviewWidth($0) }))
         reviewPanel.clipsToBounds = true
