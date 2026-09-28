@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- Update in Settings → Agents now also removes Farol hooks from events it no longer uses. A leftover SessionStart hook from an early build made Claude report a hook error at every start.
+
 ## [0.9.0] - 2026-09-28
 
 Review what your agents changed without leaving Farol.
