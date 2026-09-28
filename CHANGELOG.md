@@ -4,6 +4,16 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Codex support: Settings → Agents → Connect adds Farol's hooks to `~/.codex/hooks.json`, so the sidebar shows when Codex is working, waiting for your approval or done. Codex asks you to approve the hooks the first time.
+
+### Changed
+
+- Clearer notifications. "Done" now says it's your turn to check the result or send the next prompt, and "waiting" says the agent needs your approval or an answer.
+- Farol asks for permission to notify when you connect an agent, instead of at the first notification, which was easy to miss.
+- Settings → Agents says when macOS blocks Farol's notifications, with a button to open System Settings.
+
 ## [0.5.0] - 2026-09-28
 
 Start an agent on a task in one step, and know when a new Farol is out.
