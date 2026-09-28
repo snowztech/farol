@@ -7,6 +7,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Fixed
 
 - Update in Settings → Agents now also removes Farol hooks from events it no longer uses. A leftover SessionStart hook from an early build made Claude report a hook error at every start.
+- Long lines in the review panel stop at the edge of their file instead of running past it.
+
+### Changed
+
+- New screenshots in the README and on the landing page, which now shows the review panel.
 
 ## [0.9.0] - 2026-09-28
 
