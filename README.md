@@ -196,4 +196,4 @@ make lint
 
 ## License
 
-MIT. Farol includes libghostty, which is also MIT licensed. See `THIRD_PARTY_NOTICES`.
+[MIT](LICENSE). Farol includes libghostty, which is also MIT licensed. See [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
