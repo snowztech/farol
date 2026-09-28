@@ -191,10 +191,19 @@ public final class TerminalView: NSView {
         ghostty_surface_set_size(surface, UInt32(px.width), UInt32(px.height))
     }
 
+    /// Runs when the window moves to a screen with another pixel density, like Retina to an external monitor.
     public override func viewDidChangeBackingProperties() {
         super.viewDidChangeBackingProperties()
-        guard let surface, let window else { return }
+        guard let window else { return }
         let scale = window.backingScaleFactor
+        // Ghostty renders at the new scale itself, so the layer must not be scaled again when composited.
+        // Without this, text shrinks or grows by the ratio between the two screens.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer?.contentsScale = scale
+        CATransaction.commit()
+
+        guard let surface else { return }
         ghostty_surface_set_content_scale(surface, scale, scale)
         setFrameSize(frame.size)
     }
