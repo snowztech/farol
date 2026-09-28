@@ -223,9 +223,9 @@ private struct Lamp: View {
     private var help: String {
         switch activity {
         case .idle: ""
-        case .working: "Agent working"
-        case .waiting: "Waiting for you"
-        case .done: "Agent finished"
+        case .working: "Working"
+        case .waiting: "Waiting for your approval or an answer"
+        case .done: "Done. Your turn"
         }
     }
 }

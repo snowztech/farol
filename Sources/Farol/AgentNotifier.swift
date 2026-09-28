@@ -19,9 +19,9 @@ final class AgentNotifier: NSObject, UNUserNotificationCenterDelegate {
         guard !NSApp.isActive else { return }
         switch after {
         case .waiting where settings.notifyWaiting:
-            post(session, title: "\(session.displayName) is waiting for you", body: "An agent needs your input to continue.")
+            post(session, title: "\(session.displayName) is waiting for you", body: "It needs your approval or an answer to continue.")
         case .done where before == .working && settings.notifyDone:
-            post(session, title: "\(session.displayName) is done", body: "The agent finished its turn.")
+            post(session, title: "\(session.displayName) is done", body: "Your turn: check the result or send the next prompt.")
         default:
             break
         }
