@@ -30,6 +30,8 @@ struct SidebarView: View {
                     }
                     .onDrop(of: [.text], delegate: Reorder(target: session, store: store, dragging: $dragging))
                 }
+                NewTaskRow(palette: p, action: commands.newTask)
+                    .padding(.top, 4)
             }
             .padding(8)
         }
@@ -137,6 +139,39 @@ private struct SessionRow: View {
     private var background: some View {
         RoundedRectangle(cornerRadius: 6)
             .fill(selected ? palette.raised : hovering ? palette.raised.opacity(0.5) : .clear)
+    }
+}
+
+/// Right below the sessions, so the way to start one is where they live. Quiet until hovered.
+private struct NewTaskRow: View {
+    let palette: Palette
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            // Same width as the status dots, so the label lines up with session names.
+            Image(systemName: "plus")
+                .font(.system(size: 9, weight: .semibold))
+                .frame(width: 7)
+            Text("New task")
+                .font(.system(size: 12.5))
+            Spacer(minLength: 0)
+            if hovering {
+                Text("⇧⌘N")
+                    .font(.system(size: 11))
+                    .foregroundStyle(palette.muted)
+            }
+        }
+        .foregroundStyle(hovering ? palette.text : palette.muted)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised.opacity(0.5) : .clear))
+        .contentShape(Rectangle())
+        .onTapGesture(perform: action)
+        .onHover { hovering = $0 }
+        .help("New task (⇧⌘N)")
     }
 }
 
