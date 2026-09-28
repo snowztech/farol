@@ -4,10 +4,14 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-28
+
+Start an agent on a task in one step, and know when a new Farol is out.
+
 ### Added
 
+- New Task (⇧⌘N, or New task at the bottom of the sidebar): describe a task, pick Claude Code or Codex, and Farol creates a worktree and starts the agent on it. The branch name comes from the task and can be edited.
 - A small Update button appears in the top bar when a newer Farol is out, with the same note in Settings → About. Clicking it downloads the new version.
-- New Task (⇧⌘N): describe a task, pick Claude Code or Codex, and Farol creates a worktree and starts the agent on it. The branch name comes from the task and can be edited.
 
 ### Fixed
 
@@ -144,7 +148,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/snowztech/farol/releases/tag/v0.5.0
 [0.4.1]: https://github.com/snowztech/farol/releases/tag/v0.4.1
 [0.4.0]: https://github.com/snowztech/farol/releases/tag/v0.4.0
 [0.3.0]: https://github.com/snowztech/farol/releases/tag/v0.3.0
