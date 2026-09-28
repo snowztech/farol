@@ -11,11 +11,14 @@ Outside Farol it does nothing, so hooks that call it are safe in any terminal.
 """
 
 let arguments = Array(CommandLine.arguments.dropFirst())
-let named = arguments.count == 4 && arguments[2] == "--agent"
-guard arguments.count == 2 || named, arguments[0] == "status" else {
+guard arguments.count >= 2, arguments[0] == "status" else {
     print(usage)
     exit(arguments.first == "help" || arguments.first == "--help" ? 0 : 64)
 }
+
+// Options this version doesn't know are skipped, so hooks written by a newer Farol never fail in an older one.
+let agentFlag = arguments.firstIndex(of: "--agent")
+let agent = agentFlag.flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil }
 
 let status: AgentStatus?
 // Quit is a clear that also forgets the agent, so it never carries a name.
@@ -34,7 +37,7 @@ let environment = ProcessInfo.processInfo.environment
 guard let pane = environment["FAROL_PANE"], let socket = environment["FAROL_SOCKET"] else { exit(0) }
 
 do {
-    try StatusClient.send(StatusMessage(pane: pane, status: status, agent: named && !quitting ? arguments[3] : nil), to: socket)
+    try StatusClient.send(StatusMessage(pane: pane, status: status, agent: quitting ? nil : agent), to: socket)
 } catch {
     // Farol may have quit while the agent kept running. A hook must never fail the agent over that.
     exit(0)
