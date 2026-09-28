@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- The file pane's header takes the pane's own background, so it lines up with the terminal and the files panel instead of sitting on top as a separate bar.
+
 ## [0.9.1] - 2026-09-28
 
 Clearer agent settings and a few fixes.

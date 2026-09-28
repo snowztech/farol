@@ -301,12 +301,13 @@ final class FileView: NSView {
 
     func apply(background: NSColor, foreground: NSColor) {
         layer?.backgroundColor = background.cgColor
-        header.layer?.backgroundColor = background.mixed(with: foreground, 0.035).cgColor
+        // Same color as the text below, so the header reads as a row of the pane, not a bar on top of it.
+        header.layer?.backgroundColor = background.cgColor
         conflict.layer?.backgroundColor = background.mixed(with: foreground, 0.07).cgColor
         conflictText.textColor = foreground
         titleColors = (background.mixed(with: foreground, 0.75), background.mixed(with: foreground, 0.45))
         updateTitle()
-        closeButton.apply(background: background.mixed(with: foreground, 0.035), foreground: foreground)
+        closeButton.apply(background: background, foreground: foreground)
         message.textColor = background.mixed(with: foreground, 0.55)
         scroll.backgroundColor = background
         text.backgroundColor = background
