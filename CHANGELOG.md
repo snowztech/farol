@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- New Task (⇧⌘N): describe a task, pick Claude Code or Codex, and Farol creates a worktree and starts the agent on it. The branch name comes from the task and can be edited.
+
 ## [0.4.1] - 2026-09-28
 
 ### Fixed

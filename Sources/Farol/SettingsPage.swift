@@ -378,6 +378,7 @@ struct SettingsPage: View {
 
     private static let shortcutGroups = [
         ShortcutGroup(title: "Sessions", items: [
+            ("New task", ["⇧⌘N"]),
             ("New session", ["⌘T", "⌘N"]),
             ("New worktree session", ["⇧⌘T"]),
             ("Close pane or session", ["⌘W"]),

@@ -32,6 +32,7 @@ It needs a Mac with Apple Silicon and macOS 14 or later. Releases are signed and
 
 ## Features
 
+- **New task.** ⇧⌘N asks what to do, then starts Claude Code or Codex on it in a new worktree, with the task as its first prompt.
 - **Agent status.** Each session shows whether its agent is working, waiting for you or done, with a notification when it waits in the background. See [Agent status](#agent-status).
 - **Worktree sessions.** ⇧⌘T asks for a branch and opens a session in its own git worktree, so parallel agents never touch each other's files. Closing it offers to remove the worktree and always keeps the branch.
 - **Sessions in a sidebar.** Open as many as you like. Hidden sessions keep running but stop rendering, so twenty background agents cost no GPU time. Each row shows its git branch. Double-click to rename, drag to reorder.
@@ -83,6 +84,7 @@ Outside Farol `$FAROL_CLI` is unset, so the hooks do nothing.
 
 | Action | Keys |
 | --- | --- |
+| New task | ⇧⌘N |
 | New session | ⌘T or ⌘N |
 | New worktree session | ⇧⌘T |
 | Close pane or session | ⌘W |
