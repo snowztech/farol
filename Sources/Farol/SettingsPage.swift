@@ -121,8 +121,8 @@ struct SettingsPage: View {
         .padding(.bottom, 8)
 
         GroupTitle(title: "Sidebar", palette: p)
-        Row(title: "Group sessions by repo",
-            detail: "Once sessions span more than one repo, each repo gets a header above its sessions.",
+        Row(title: "Group sessions by project",
+            detail: "Sessions in the same git repository, worktrees included, go under one header once you work in more than one.",
             palette: p) {
             toggle($groupByRepo)
         }

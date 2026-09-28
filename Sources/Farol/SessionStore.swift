@@ -171,7 +171,7 @@ final class SessionStore: ObservableObject {
 
     var selected: Session? { sessions.first { $0.id == selectedID } }
 
-    /// Settings → Appearance → Group sessions by repo. On unless turned off.
+    /// Settings → Appearance → Group sessions by project. On unless turned off.
     static let groupByRepoKey = "sidebar.groupByRepo"
 
     /// The sidebar's sections: one per repo once sessions span several, else a single unnamed one.
