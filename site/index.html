@@ -7,7 +7,7 @@
   <meta name="description" content="A fast macOS terminal for working with coding agents. Built on libghostty.">
   <meta property="og:title" content="Farol">
   <meta property="og:description" content="A fast macOS terminal for working with coding agents.">
-  <meta property="og:image" content="https://farol.snowztech.com/screenshot.png">
+  <meta property="og:image" content="https://farol.snowztech.com/screenshot-review.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="icon.png">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.2/dist/snowztech-ui.min.css">
@@ -52,7 +52,7 @@
     }
 
     .features { list-style: none; margin: 0 auto; display: grid; gap: 28px; }
-    @media (min-width: 760px) { .features { grid-template-columns: repeat(3, 1fr); } }
+    @media (min-width: 760px) { .features { grid-template-columns: repeat(2, 1fr); } }
     .features b { display: block; font-weight: 500; margin-bottom: 6px; }
     .features span { color: var(--sn-fg-muted); font-size: var(--sn-text-sm); }
 
@@ -80,12 +80,13 @@
     </section>
 
     <div class="showcase wide">
-      <img class="shot" src="screenshot.png" width="2400" height="1520"
-           alt="Farol running Claude Code, with other agent sessions in the sidebar, one working, one waiting for you and one done, and New task at the bottom">
+      <img class="shot" src="screenshot-review.png" width="2400" height="1520"
+           alt="Farol with agent sessions in the sidebar, one working, one waiting for you and one done, and the review panel showing a branch's changes since main">
     </div>
 
     <ul class="features wide">
       <li><b>Every agent at a glance</b><span>The sidebar shows which agent is working, which one needs you and which one is done.</span></li>
+      <li><b>Review what changed</b><span>The title bar counts what the agent changed. One click shows every file as a diff, uncommitted or since main.</span></li>
       <li><b>A task in one step</b><span>Describe it and pick an agent. Farol opens a worktree on a new branch and starts the agent on it.</span></li>
       <li><b>Built on libghostty</b><span>Ghostty's speed, themes and config, in a native Mac app.</span></li>
     </ul>
