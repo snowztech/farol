@@ -39,7 +39,7 @@ Someone who downloads Farol understands what it is for in the first minute.
 Most of the time with parallel agents goes into checking what they did. That work belongs in Farol.
 
 - [x] Files panel: the session's folder as a tree, next to the terminal
-- [ ] A light editor for the files you open there, with save and a reload when an agent changes the file
+- [x] A light editor for the files you open there, with save and a reload when an agent changes the file
 - [ ] Changes tab in the same panel: the diff of a session against its base branch
 - [ ] Push the branch and open a merge request or pull request from the session
 - [ ] Pipeline status and open review comments in the sidebar, with a notification when a pipeline fails

@@ -6,6 +6,14 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
+- Edit the file you opened from the files panel, and save with ⌘S. A dot next to the name marks unsaved edits, and Farol asks before closing the file, the session or the app with unsaved edits. Saving keeps the file's permissions.
+- When an agent changes the open file, the pane reloads and keeps your place. With unsaved edits, it asks whether to reload or keep yours.
+- A new line starts at the same indent as the one above.
+- Undo, Redo and Cut in the Edit menu.
+- ⌘[ and ⌘] move to the file pane too, like any other pane.
+
+### Added
+
 - Files panel (⇧⌘E, or the folder button in the title bar): the session's project as a tree, next to the sidebar. Folders load when you open them, hidden and git-ignored files are dimmed, and new files show up as agents create them. Nothing is watched while the panel is closed.
 - Click a file to open it in a pane beside the terminal, with line numbers and ⌘F. Opening another file reuses the pane, ⌘W closes it, and it comes back after a relaunch. Editing comes next.
 
