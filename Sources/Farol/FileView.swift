@@ -94,7 +94,6 @@ final class FileView: NSView {
         switch content {
         case .success(.text(let string)):
             text.string = string
-            text.scroll(.zero)
             display(message: nil)
         case .success(.binary):
             display(message: "This file isn't text.")
@@ -104,6 +103,7 @@ final class FileView: NSView {
             display(message: error.localizedDescription)
         }
         gutter.textChanged()
+        text.scroll(.zero)
     }
 
     private func display(message text: String?) {
@@ -142,6 +142,8 @@ final class FileView: NSView {
         closeButton.frame = NSRect(x: bounds.width - 28, y: 3, width: 20, height: 20)
         title.frame = NSRect(x: 12, y: 5, width: max(0, bounds.width - 48), height: 16)
         scroll.frame = NSRect(x: 0, y: h, width: bounds.width, height: max(0, bounds.height - h))
+        // At least as big as the visible area, so short files still fill it and clicks land in the text.
+        text.minSize = scroll.contentSize
         message.frame = NSRect(x: 12, y: bounds.midY - 10, width: max(0, bounds.width - 24), height: 20)
     }
 }
@@ -184,6 +186,8 @@ private final class LineNumbers: NSRulerView {
         lineStarts = starts
         let digits = String(repeating: "8", count: max(3, String(starts.count).count)) as NSString
         ruleThickness = digits.size(withAttributes: [.font: Self.font]).width + 20
+        // The scroll view doesn't make room for a wider gutter on its own, and the text would slide under it.
+        scrollView?.tile()
         needsDisplay = true
     }
 

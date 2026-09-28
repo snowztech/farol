@@ -50,9 +50,9 @@ struct TopBar: View {
                 // Room for the traffic lights.
                 Spacer().frame(width: 72)
                 IconButton(symbol: "sidebar.left", help: "Toggle sidebar (⌘B)", palette: p, action: commands.toggleSidebar)
-                IconButton(symbol: "plus", help: "New session (⌘T)", palette: p, action: commands.newSession)
                 IconButton(symbol: "folder", help: "Files (⇧⌘E)", active: state.filesVisible,
                            palette: p, action: commands.toggleFiles)
+                if !state.sidebarVisible { newSessionButton(p) }
                 Spacer()
                 if let version = updates.available {
                     UpdateBadge(version: version, palette: p, action: updates.install)
@@ -63,10 +63,21 @@ struct TopBar: View {
             }
             .padding(.trailing, 8)
         }
+        // Above the sessions it creates, at the sidebar's right edge.
+        .overlay(alignment: .leading) {
+            if state.sidebarVisible {
+                newSessionButton(p)
+                    .frame(width: SidebarView.width - 8, alignment: .trailing)
+            }
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background { columns(p) }
         .contentShape(Rectangle())
         .onTapGesture(count: 2, perform: commands.titleBarDoubleClick)
+    }
+
+    private func newSessionButton(_ p: Palette) -> some View {
+        IconButton(symbol: "plus", help: "New session (⌘T)", palette: p, action: commands.newSession)
     }
 
     /// No rule under the bar: each part takes the color of the column below, so the terminal reaches the top edge.
