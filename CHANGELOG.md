@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-09-28
+
+Clearer agent settings and a few fixes.
+
 ### Fixed
 
 - Update in Settings → Agents now also removes Farol hooks from events it no longer uses. A leftover SessionStart hook from an early build made Claude report a hook error at every start.
@@ -225,7 +229,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/snowztech/farol/releases/tag/v0.9.1
 [0.9.0]: https://github.com/snowztech/farol/releases/tag/v0.9.0
 [0.8.0]: https://github.com/snowztech/farol/releases/tag/v0.8.0
 [0.7.0]: https://github.com/snowztech/farol/releases/tag/v0.7.0
