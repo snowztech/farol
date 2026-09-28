@@ -6,7 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
-- Sessions are grouped by project in the sidebar once you work in more than one. A project is a git repository, worktrees included. With a single project the sidebar stays as it was, and ⌘1 to ⌘9 follow the order shown. Turn it off in Settings → Appearance → Group sessions by project.
+- Settings → Appearance → Group sessions by project sorts the sidebar into one section per project once you work in more than one. A project is a git repository, worktrees included. It is off by default, and ⌘1 to ⌘9 follow the order shown.
 
 ### Changed
 

@@ -9,7 +9,7 @@ struct SidebarView: View {
 
     @State private var dragging: Session?
     /// Only read so the sidebar redraws when the setting changes. The store applies it.
-    @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = true
+    @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = false
 
     var body: some View {
         let p = state.palette
