@@ -10,6 +10,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Changed
 
+- Images, PDFs, video and audio open in their Mac app when you click them in the files panel or the review. Other files Farol can't show as text are revealed in Finder instead of opening a pane that only says so.
 - The pointer turns into a hand over everything you can click: buttons, the file tree, sessions, review files and the settings sections.
 
 ## [0.9.2] - 2026-09-28
