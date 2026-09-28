@@ -14,11 +14,13 @@ public enum Syntax {
 
     public struct Language {
         let lineComments: [String]
-        let blockComment: (open: String, close: String)?
+        let blockComments: [(open: String, close: String)]
         let quotes: Set<Character>
         /// Quotes whose strings can span lines, like JavaScript's backtick.
         var multilineQuotes: Set<Character> = []
         let keywords: Set<String>
+        /// Markup: the name right after `<` or `</` is colored like a keyword.
+        var tagNames = false
     }
 
     /// The language for a file name, or nil when Farol doesn't color it.
@@ -37,6 +39,7 @@ public enum Syntax {
         case "json", "jsonc": return json
         case "yml", "yaml", "toml", "ini", "conf": return config
         case "css", "scss": return css
+        case "html", "htm", "xml", "svg", "plist", "vue", "svelte": return html
         default: return nil
         }
     }
@@ -58,7 +61,7 @@ public enum Syntax {
 
         while i < chars.count {
             let c = chars[i]
-            if let block = language.blockComment, starts(with: block.open, at: i) {
+            if let block = language.blockComments.first(where: { starts(with: $0.open, at: i) }) {
                 var end = i + block.open.utf16.count
                 while end < chars.count, !starts(with: block.close, at: end) { end += 1 }
                 end = min(end + block.close.utf16.count, chars.count)
@@ -92,7 +95,9 @@ public enum Syntax {
                 let word = String(utf16CodeUnits: Array(chars[i..<end]), count: end - i)
                 // A dotted name like `.default` or `obj.type` is a member, not the keyword.
                 let afterDot = i > 0 && chars[i - 1] == code(".")
-                if !afterDot, language.keywords.contains(word) { add(i, end, .keyword) }
+                let isTag = language.tagNames && i > 0
+                    && (chars[i - 1] == code("<") || (i > 1 && chars[i - 1] == code("/") && chars[i - 2] == code("<")))
+                if isTag || (!afterDot && language.keywords.contains(word)) { add(i, end, .keyword) }
                 i = end
             } else {
                 i += 1
@@ -113,33 +118,38 @@ public enum Syntax {
 
     private static func words(_ list: String) -> Set<String> { Set(list.split(separator: " ").map(String.init)) }
 
-    static let swift = Language(lineComments: ["//"], blockComment: ("/*", "*/"), quotes: ["\""], keywords: words(
+    static let swift = Language(lineComments: ["//"], blockComments: [("/*", "*/")], quotes: ["\""], keywords: words(
         "let var func if else guard return for in while repeat switch case default break continue fallthrough struct class enum protocol extension import init deinit self Self nil true false throw throws rethrows try catch do async await private public internal fileprivate open static final override mutating nonmutating where as is some any lazy weak unowned defer typealias inout operator subscript get set willSet didSet associatedtype convenience required indirect"))
 
-    static let go = Language(lineComments: ["//"], blockComment: ("/*", "*/"), quotes: ["\"", "'", "`"], multilineQuotes: ["`"], keywords: words(
+    static let go = Language(lineComments: ["//"], blockComments: [("/*", "*/")], quotes: ["\"", "'", "`"], multilineQuotes: ["`"], keywords: words(
         "package import func var const type struct interface map chan if else for range return go defer select switch case default break continue fallthrough goto nil true false iota"))
 
-    static let javascript = Language(lineComments: ["//"], blockComment: ("/*", "*/"), quotes: ["\"", "'", "`"], multilineQuotes: ["`"], keywords: words(
+    static let javascript = Language(lineComments: ["//"], blockComments: [("/*", "*/")], quotes: ["\"", "'", "`"], multilineQuotes: ["`"], keywords: words(
         "const let var function return if else for while do switch case default break continue new this class extends super import export from as async await try catch finally throw typeof instanceof in of null undefined true false void delete yield static get set interface type enum implements private public protected readonly declare namespace abstract keyof"))
 
-    static let python = Language(lineComments: ["#"], blockComment: nil, quotes: ["\"", "'"], keywords: words(
+    static let python = Language(lineComments: ["#"], blockComments: [], quotes: ["\"", "'"], keywords: words(
         "def class return if elif else for while in not and or is import from as with try except finally raise pass break continue lambda yield None True False self async await global nonlocal assert del match case"))
 
-    static let rust = Language(lineComments: ["//"], blockComment: ("/*", "*/"), quotes: ["\""], keywords: words(
+    static let rust = Language(lineComments: ["//"], blockComments: [("/*", "*/")], quotes: ["\""], keywords: words(
         "fn let mut const static struct enum impl trait pub use mod crate self Self super match if else loop while for in return break continue as ref move where type unsafe async await dyn true false Some None Ok Err"))
 
-    static let ruby = Language(lineComments: ["#"], blockComment: nil, quotes: ["\"", "'"], keywords: words(
+    static let ruby = Language(lineComments: ["#"], blockComments: [], quotes: ["\"", "'"], keywords: words(
         "def end class module if elsif else unless while until for in do return yield begin rescue ensure raise self nil true false and or not then case when require require_relative attr_reader attr_accessor private"))
 
-    static let shell = Language(lineComments: ["#"], blockComment: nil, quotes: ["\"", "'"], keywords: words(
+    static let shell = Language(lineComments: ["#"], blockComments: [], quotes: ["\"", "'"], keywords: words(
         "if then else elif fi for while until do done case esac in function return local export readonly set unset exit true false source"))
 
-    static let cFamily = Language(lineComments: ["//"], blockComment: ("/*", "*/"), quotes: ["\"", "'"], keywords: words(
+    static let cFamily = Language(lineComments: ["//"], blockComments: [("/*", "*/")], quotes: ["\"", "'"], keywords: words(
         "if else for while do switch case default break continue return struct class enum union typedef static const void int char float double long short unsigned signed bool boolean true false null nullptr NULL new delete this public private protected virtual override final import package namespace using template typename try catch throw throws fun val var when object interface extends implements sealed data suspend"))
 
-    static let json = Language(lineComments: [], blockComment: nil, quotes: ["\""], keywords: words("true false null"))
+    static let json = Language(lineComments: [], blockComments: [], quotes: ["\""], keywords: words("true false null"))
 
-    static let config = Language(lineComments: ["#"], blockComment: nil, quotes: ["\"", "'"], keywords: words("true false null yes no on off"))
+    static let config = Language(lineComments: ["#"], blockComments: [], quotes: ["\"", "'"], keywords: words("true false null yes no on off"))
 
-    static let css = Language(lineComments: [], blockComment: ("/*", "*/"), quotes: ["\"", "'"], keywords: words("important"))
+    /// Only double quotes, since an apostrophe in page text would otherwise color the rest of its line.
+    /// No `//` comments either, or every `https://` would start one.
+    static let html = Language(lineComments: [], blockComments: [("<!--", "-->"), ("/*", "*/")], quotes: ["\""],
+                               keywords: words("DOCTYPE doctype"), tagNames: true)
+
+    static let css = Language(lineComments: [], blockComments: [("/*", "*/")], quotes: ["\"", "'"], keywords: words("important"))
 }

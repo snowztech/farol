@@ -32,3 +32,8 @@ private func tokens(_ text: String, _ path: String) -> [String] {
     #expect(Syntax.language(for: "README.md") == nil)
     #expect(Syntax.language(for: "Makefile") != nil)
 }
+
+@Test func htmlColorsTagsAttributesAndComments() {
+    let code = "<!-- hi --><p class=\"a\">Farol's</p>"
+    #expect(tokens(code, "index.html") == ["<!-- hi -->:comment", "p:keyword", "\"a\":string", "p:keyword"])
+}
