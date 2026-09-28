@@ -21,6 +21,8 @@ public enum Syntax {
         let keywords: Set<String>
         /// Markup: the name right after `<` or `</` is colored like a keyword.
         var tagNames = false
+        /// Markdown is colored by lines instead, see markdownTokens.
+        var isMarkdown = false
     }
 
     /// The language for a file name, or nil when Farol doesn't color it.
@@ -40,11 +42,13 @@ public enum Syntax {
         case "yml", "yaml", "toml", "ini", "conf": return config
         case "css", "scss": return css
         case "html", "htm", "xml", "svg", "plist", "vue", "svelte": return html
+        case "md", "markdown", "mdx": return markdown
         default: return nil
         }
     }
 
     public static func tokens(in text: String, _ language: Language) -> [Token] {
+        if language.isMarkdown { return markdownTokens(in: text) }
         let chars = Array(text.utf16)
         var tokens: [Token] = []
         var i = 0
@@ -106,6 +110,54 @@ public enum Syntax {
         return tokens
     }
 
+    /// Headings and list markers like keywords, code like strings, quotes and link targets muted like comments.
+    private static func markdownTokens(in text: String) -> [Token] {
+        let string = text as NSString
+        var tokens: [Token] = []
+        var inFence = false
+        string.enumerateSubstrings(in: NSRange(location: 0, length: string.length), options: .byLines) { line, range, _, _ in
+            guard let line else { return }
+            let trimmed = line.drop { $0 == " " }
+            let indent = line.count - trimmed.count
+            func add(_ location: Int, _ length: Int, _ kind: Kind) {
+                tokens.append(Token(range: NSRange(location: range.location + location, length: length), kind: kind))
+            }
+            if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
+                inFence.toggle()
+                return add(0, range.length, .string)
+            }
+            if inFence { return add(0, range.length, .string) }
+            let hashes = trimmed.prefix { $0 == "#" }.count
+            if (1...6).contains(hashes), trimmed.dropFirst(hashes).first == " " { return add(0, range.length, .keyword) }
+            if trimmed.hasPrefix(">") { return add(0, range.length, .comment) }
+            let utf16 = Array(line.utf16)
+            var marker = 0
+            if let first = trimmed.first, "-*+".contains(first), trimmed.dropFirst().first == " " {
+                marker = 1
+            } else {
+                let digits = trimmed.prefix { $0.isNumber }.count
+                if digits > 0, trimmed.dropFirst(digits).hasPrefix(". ") { marker = digits + 1 }
+            }
+            if marker > 0 { add(indent, marker, .keyword) }
+            // Inline code, then link targets after `](`, found on the line's UTF-16 so offsets match the text.
+            var i = 0
+            let tick = UInt16(UInt8(ascii: "`"))
+            while i < utf16.count {
+                if utf16[i] == tick, let end = utf16[(i + 1)...].firstIndex(of: tick) {
+                    add(i, end - i + 1, .string)
+                    i = end + 1
+                } else if utf16[i] == UInt16(UInt8(ascii: "]")), i + 1 < utf16.count, utf16[i + 1] == UInt16(UInt8(ascii: "(")),
+                          let end = utf16[(i + 1)...].firstIndex(of: UInt16(UInt8(ascii: ")"))) {
+                    add(i + 1, end - i, .comment)
+                    i = end + 1
+                } else {
+                    i += 1
+                }
+            }
+        }
+        return tokens
+    }
+
     private static func code(_ c: Unicode.Scalar) -> UInt16 { UInt16(c.value) }
 
     private static func isDigit(_ c: UInt16) -> Bool { c >= 48 && c <= 57 }
@@ -150,6 +202,8 @@ public enum Syntax {
     /// No `//` comments either, or every `https://` would start one.
     static let html = Language(lineComments: [], blockComments: [("<!--", "-->"), ("/*", "*/")], quotes: ["\""],
                                keywords: words("DOCTYPE doctype"), tagNames: true)
+
+    static let markdown = Language(lineComments: [], blockComments: [], quotes: [], keywords: [], isMarkdown: true)
 
     static let css = Language(lineComments: [], blockComments: [("/*", "*/")], quotes: ["\"", "'"], keywords: words("important"))
 }

@@ -29,11 +29,19 @@ private func tokens(_ text: String, _ path: String) -> [String] {
 }
 
 @Test func unknownFilesAreNotColored() {
-    #expect(Syntax.language(for: "README.md") == nil)
+    #expect(Syntax.language(for: "notes.txt") == nil)
     #expect(Syntax.language(for: "Makefile") != nil)
 }
 
 @Test func htmlColorsTagsAttributesAndComments() {
     let code = "<!-- hi --><p class=\"a\">Farol's</p>"
     #expect(tokens(code, "index.html") == ["<!-- hi -->:comment", "p:keyword", "\"a\":string", "p:keyword"])
+}
+
+@Test func markdownColorsHeadingsListsCodeAndLinks() {
+    let text = "# Title\n- see `make lint` and [docs](https://x.dev)\n```\nlet a = 1\n```"
+    #expect(tokens(text, "README.md") == [
+        "# Title:keyword", "-:keyword", "`make lint`:string", "(https://x.dev):comment",
+        "```:string", "let a = 1:string", "```:string",
+    ])
 }
