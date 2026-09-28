@@ -7,6 +7,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Added
 
 - Right-click a terminal for Copy, Paste, Split Right, Split Down, Name Pane and Close. Programs that use the mouse, like vim or htop, still get the click.
+- Copying with ⌘C or the Copy menu item shows a short "Copied" at the bottom of the pane. Copy on select stays silent.
 
 ## [0.3.0] - 2026-09-28
 

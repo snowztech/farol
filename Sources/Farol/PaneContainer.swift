@@ -308,6 +308,22 @@ final class PaneContainer: NSView {
         }
     }
 
+    // MARK: Toast
+
+    private var toast: PaneToast?
+
+    /// Bottom center of the pane. A new one replaces the last, so quick repeats don't stack.
+    private func showToast(_ text: String, in terminal: TerminalView) {
+        toast?.removeFromSuperview()
+        let toast = PaneToast(text, background: theme.background, foreground: theme.foreground)
+        let size = toast.size
+        toast.frame = NSRect(x: terminal.frame.midX - size.width / 2, y: terminal.frame.maxY - size.height - 12,
+                             width: size.width, height: size.height)
+        addSubview(toast, positioned: .above, relativeTo: nil)
+        self.toast = toast
+        toast.dismissLater()
+    }
+
     // MARK: Dividers
 
     /// Each visible divider and the split it belongs to.
@@ -386,6 +402,9 @@ final class PaneContainer: NSView {
             // Same path as ⌘W, so a running program still asks before it closes.
             menu.addItem(withTitle: self.terminals.count > 1 ? "Close Pane" : "Close Session",
                          action: #selector(AppDelegate.closeSession(_:)), keyEquivalent: "")
+        }
+        terminal.onCopy = { [weak self, weak terminal] in
+            if let self, let terminal { self.showToast("Copied", in: terminal) }
         }
         terminal.onSearchEnd = { [weak self, weak terminal] in
             if self?.searchBar?.terminal === terminal { self?.hideSearch() }

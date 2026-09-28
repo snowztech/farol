@@ -164,7 +164,14 @@ public final class TerminalView: NSView {
 
     // MARK: Edit menu
 
-    @objc public func copy(_ sender: Any?) { perform("copy_to_clipboard") }
+    /// Called after ⌘C or the Copy menu item copied a selection. Copy on select does not call it.
+    public var onCopy: (() -> Void)?
+
+    @objc public func copy(_ sender: Any?) {
+        guard let surface, ghostty_surface_has_selection(surface) else { return }
+        perform("copy_to_clipboard")
+        onCopy?()
+    }
     @objc public func paste(_ sender: Any?) { perform("paste_from_clipboard") }
     @objc public override func selectAll(_ sender: Any?) { perform("select_all") }
 
