@@ -6,6 +6,14 @@
 
 <p align="center">A fast macOS terminal for working with coding agents.</p>
 
+<p align="center">
+    <a href="https://github.com/snowztech/farol/releases/latest"><img src="https://img.shields.io/github/v/release/snowztech/farol?style=flat&logo=github&label=release" alt="Latest release"></a>
+    <a href="https://github.com/snowztech/farol/stargazers"><img src="https://img.shields.io/github/stars/snowztech/farol?style=flat&logo=github" alt="Stars"></a>
+    <a href="https://github.com/snowztech/farol/network/members"><img src="https://img.shields.io/github/forks/snowztech/farol?style=flat&logo=github" alt="Forks"></a>
+    <a href="https://github.com/snowztech/farol/issues"><img src="https://img.shields.io/github/issues/snowztech/farol?style=flat&logo=github" alt="Issues"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License"></a>
+</p>
+
 <p align="center"><img src="site/screenshot.png" width="800" alt="Farol running Claude Code, with other agent sessions in the sidebar"></p>
 
 Run several coding agents side by side, each in its own session, and Farol shows you which one is working, which one is done and which one needs you. Farol is Portuguese for lighthouse.
