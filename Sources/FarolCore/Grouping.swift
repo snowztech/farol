@@ -4,6 +4,11 @@ public enum Grouping {
         /// The section's key, like the repo's path. Nil for the unnamed section at the top.
         public let key: String?
         public let items: [Item]
+
+        public init(key: String?, items: [Item]) {
+            self.key = key
+            self.items = items
+        }
     }
 
     /// Items without a key come first, in one unnamed group. The others follow, one group per key, in order of first appearance.

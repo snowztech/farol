@@ -6,7 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
-- Sessions are grouped by repo in the sidebar once they span more than one. With a single repo the sidebar stays as it was. Worktrees sit with their repo, and ⌘1 to ⌘9 follow the order shown.
+- Sessions are grouped by repo in the sidebar once they span more than one. With a single repo the sidebar stays as it was. Worktrees sit with their repo, and ⌘1 to ⌘9 follow the order shown. Turn it off in Settings → Appearance → Group sessions by repo.
 
 ### Fixed
 

@@ -11,6 +11,7 @@ struct SettingsPage: View {
     @ObservedObject var updates: UpdateChecker
 
     @AppStorage(AppIcon.key) private var appIcon = AppIcon.default.rawValue
+    @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = true
     @State private var versionCopied = false
     /// Each agent's hooks, by agent name.
     @State private var connections: [String: Connection] = [:]
@@ -116,6 +117,14 @@ struct SettingsPage: View {
             }
             .labelsHidden()
             .fixedSize()
+        }
+        .padding(.bottom, 8)
+
+        GroupTitle(title: "Sidebar", palette: p)
+        Row(title: "Group sessions by repo",
+            detail: "Once sessions span more than one repo, each repo gets a header above its sessions.",
+            palette: p) {
+            toggle($groupByRepo)
         }
         .padding(.bottom, 32)
 
