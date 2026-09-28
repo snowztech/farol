@@ -17,7 +17,7 @@ Milestones are themes, not version numbers. Releases ship whatever is ready.
 - Split panes with names, find in scrollback, copy and paste, dead keys and input methods
 - Right-click menu: copy, paste, split, name and close a pane
 - Worktree sessions, and closing one offers to remove the worktree when that is safe
-- Agent status: `farol status`, one-click Claude Code setup, colored dots, notifications and a Dock badge
+- Agent status: `farol status`, one-click Claude Code and Codex setup, colored dots, notifications and a Dock badge
 - New sessions can start Claude Code, Codex or any command
 - Settings page and `~/.config/farol/config` kept in sync, custom themes
 - Signed and notarized DMG on GitHub Releases, landing page, CI and a prebuilt libghostty
@@ -27,7 +27,8 @@ Milestones are themes, not version numbers. Releases ship whatever is ready.
 Someone who downloads Farol understands what it is for in the first minute.
 
 - [x] **New task**: one flow that picks the repo, takes a task description, creates the worktree and starts the agent with the task as its first prompt
-- [ ] Codex status. Connect works, but Codex 0.158 runs hooks in a shared background process that loses the terminal they came from, so Farol can't tell which session they belong to. On hold until Codex passes that context along.
+- [x] Codex notifications through its terminal notifications, since its hooks lose track of the terminal
+- [ ] A working dot for Codex, once its hooks know which terminal they belong to
 - [x] Sessions grouped by project in the sidebar, with a setting to turn it off
 - [x] Update check: a quiet Update button when a new version is out
 - [ ] Install updates in place (Sparkle), behind the same button

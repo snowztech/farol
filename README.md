@@ -42,7 +42,7 @@ It needs a Mac with Apple Silicon and macOS 14 or later. Releases are signed and
 - **Themes and settings.** Ghostty's 600+ themes with live previews, and settings inside the window.
 - **Copy and paste, accents and input methods.** Pasting text that could run commands asks first, dead keys compose as you type, and input methods for other languages work at the cursor.
 
-Coming next: Codex status, a review view for what an agent did, and GitLab, GitHub and Jira integrations. See [ROADMAP.md](ROADMAP.md).
+Coming next: a review view for what an agent did, and GitLab, GitHub and Jira integrations. See [ROADMAP.md](ROADMAP.md).
 
 ## Agent status
 
@@ -57,9 +57,9 @@ The colors come from your theme's own cyan, yellow and green, so they always mat
 
 When an agent waits or finishes while Farol is in the background, you get a notification, and the Dock icon counts the sessions that are waiting.
 
-**Claude Code:** open Settings → Agents and click **Connect**. Farol adds its hooks to `~/.claude/settings.json`, leaves everything else in the file alone and keeps a backup. **Disconnect** removes only Farol's hooks.
+**Claude Code:** open Settings → Agents and click **Enable**. Farol adds its hooks to `~/.claude/settings.json`, leaves everything else in the file alone and keeps a backup. **Turn off** removes only Farol's hooks.
 
-**Codex:** same place, click **Connect**. Farol adds its hooks to `~/.codex/hooks.json`, and Codex asks you to approve them the next time it starts. Codex has no event for quitting, so a session keeps its last status until you open it.
+**Codex:** same place, click **Enable**. Farol turns on Codex's terminal notifications in `~/.codex/config.toml`, so you hear from Codex when it needs your approval or finishes a turn. The sidebar shows a yellow dot until you open the session. Codex can't report while it works, so there is no working dot. Farol marks the lines it adds and **Turn off** removes only those.
 
 **Other agents** can report with `"$FAROL_CLI" status working|waiting|done|clear`, which Farol makes available in every session. Agents that ring the terminal bell show as waiting without any setup.
 
@@ -83,21 +83,18 @@ Outside Farol `$FAROL_CLI` is unset, so the hooks do nothing. The Notification m
 </details>
 
 <details>
-<summary>The Codex hooks, if you prefer to add them by hand</summary>
+<summary>The Codex settings, if you prefer to add them by hand</summary>
 
-In `~/.codex/hooks.json`:
+In `~/.codex/config.toml`:
 
-```json
-{
-  "hooks": {
-    "SessionStart": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status clear" }] }],
-    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status working" }] }],
-    "PostToolUse": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status working" }] }],
-    "PermissionRequest": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status waiting" }] }],
-    "Stop": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status done" }] }]
-  }
-}
+```toml
+[tui]
+notifications = true
+notification_method = "osc9"
+notification_condition = "always"
 ```
+
+Farol ignores notifications from the session you are looking at, so "always" doesn't make it noisy.
 
 </details>
 
