@@ -21,6 +21,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// Follows the selected session's folder while the files panel is open.
     private var filesRoot: AnyCancellable?
     private static let filesVisibleKey = "files.visible"
+    private var reviewWidth: NSLayoutConstraint!
+    private let review = ReviewModel()
+    /// Follows the selected session's checkout and branch, so the count in the title bar stays current.
+    private var reviewFollow: AnyCancellable?
+    private static let reviewWidthKey = "review.width"
     private var settingsView: NSView!
 
     let agents: AgentSettings
@@ -54,30 +59,38 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             closeSession: { [weak self] in self?.requestClose($0) },
             toggleSidebar: { [weak self] in self?.toggleSidebar() },
             toggleFiles: { [weak self] in self?.toggleFiles() },
+            toggleReview: { [weak self] in self?.toggleReview() },
             toggleSettings: { [weak self] in self?.toggleSettings() },
             titleBarDoubleClick: { [weak self] in self?.titleBarDoubleClicked() })
 
         let root = NSView()
-        let topBar = hosting(TopBar(state: state, store: store, updates: updates, commands: commands))
+        let topBar = hosting(TopBar(state: state, store: store, updates: updates, review: review, commands: commands))
         let sidebar = hosting(SidebarView(store: store, state: state, commands: commands))
         sidebar.clipsToBounds = true
         let filesPanel = hosting(FilesPanel(tree: files, state: state) { [weak self] path in
             self?.store.selected?.panes.open(path)
         })
         filesPanel.clipsToBounds = true
+        let reviewPanel = hosting(ReviewPanel(
+            review: review, state: state,
+            open: { [weak self] in self?.store.selected?.panes.open($0, line: $1) },
+            close: { [weak self] in self?.toggleReview() },
+            resize: { [weak self] in self?.setReviewWidth($0) }))
+        reviewPanel.clipsToBounds = true
         state.filesVisible = UserDefaults.standard.bool(forKey: Self.filesVisibleKey)
         settingsView = hosting(SettingsPage(settings: settings, agents: agents, state: state, updates: updates))
         settingsView.isHidden = true
 
         content.wantsLayer = true
-        for v in [topBar, sidebar, filesPanel, content] { root.addSubview(v) }
+        for v in [topBar, sidebar, filesPanel, content, reviewPanel] { root.addSubview(v) }
         for v in [terminalContainer, settingsView!] { content.addSubview(v) }
-        for v in [topBar, sidebar, filesPanel, content, terminalContainer, settingsView!] {
+        for v in [topBar, sidebar, filesPanel, content, reviewPanel, terminalContainer, settingsView!] {
             v.translatesAutoresizingMaskIntoConstraints = false
         }
 
         sidebarWidth = sidebar.widthAnchor.constraint(equalToConstant: SidebarView.width)
         filesWidth = filesPanel.widthAnchor.constraint(equalToConstant: state.filesVisible ? FilesPanel.width : 0)
+        reviewWidth = reviewPanel.widthAnchor.constraint(equalToConstant: 0)
         NSLayoutConstraint.activate([
             topBar.topAnchor.constraint(equalTo: root.topAnchor),
             topBar.leadingAnchor.constraint(equalTo: root.leadingAnchor),
@@ -96,8 +109,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
             content.topAnchor.constraint(equalTo: topBar.bottomAnchor),
             content.leadingAnchor.constraint(equalTo: filesPanel.trailingAnchor),
-            content.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            content.trailingAnchor.constraint(equalTo: reviewPanel.leadingAnchor),
             content.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+
+            reviewPanel.topAnchor.constraint(equalTo: topBar.bottomAnchor),
+            reviewPanel.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            reviewPanel.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            reviewWidth,
 
             // Breathing room around the text. It shares the terminal background, so it reads as terminal.
             terminalContainer.topAnchor.constraint(equalTo: content.topAnchor, constant: 8),
@@ -214,6 +232,41 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             filesWidth.animator().constant = open ? FilesPanel.width : 0
         }
         followFiles(store.selected)
+    }
+
+    /// Opens or closes the review panel at the width you last gave it.
+    func toggleReview() {
+        review.isOpen.toggle()
+        let saved = UserDefaults.standard.double(forKey: Self.reviewWidthKey)
+        let width = review.isOpen ? clampedReviewWidth(saved > 0 ? saved : ReviewPanel.defaultWidth) : 0
+        withAnimation(.easeOut(duration: 0.18)) { state.reviewWidth = width }
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.18
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            reviewWidth.animator().constant = width
+        }
+    }
+
+    private func setReviewWidth(_ width: CGFloat) {
+        let width = clampedReviewWidth(width)
+        reviewWidth.constant = width
+        state.reviewWidth = width
+        UserDefaults.standard.set(width, forKey: Self.reviewWidthKey)
+    }
+
+    /// Room for the terminal stays, however wide the panel is dragged.
+    private func clampedReviewWidth(_ width: CGFloat) -> CGFloat {
+        let available = (window?.frame.width ?? 1200) - sidebarWidth.constant - filesWidth.constant - 360
+        return min(max(width, 320), max(available, 320))
+    }
+
+    private func followReview(_ session: Session?) {
+        guard let session else {
+            reviewFollow = nil
+            return review.follow(nil, branch: nil)
+        }
+        reviewFollow = session.$topLevel.combineLatest(session.$branch)
+            .sink { [weak self] topLevel, branch in self?.review.follow(topLevel, branch: branch) }
     }
 
     private func followFiles(_ session: Session?) {
@@ -348,5 +401,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
         if !settings, let session { window?.makeFirstResponder(session.panes.focusTarget) }
         followFiles(session)
+        followReview(session)
     }
 }

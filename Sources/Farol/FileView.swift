@@ -8,6 +8,9 @@ final class FileView: NSView {
     private static let barHeight: CGFloat = 30
 
     private(set) var path = ""
+    /// The file's folder inside its checkout, like "internal/config/", shown muted before the name.
+    private var folder = ""
+    private var titleColors = (name: NSColor.labelColor, folder: NSColor.secondaryLabelColor)
     private(set) var isDirty = false { didSet { updateTitle() } }
     var onFocus: (() -> Void)?
     var onClose: (() -> Void)?
@@ -18,7 +21,7 @@ final class FileView: NSView {
 
     private let header = NSView()
     private let title = NSTextField(labelWithString: "")
-    private let closeButton = NSButton()
+    private lazy var closeButton = QuietButton(symbol: "xmark", help: "Close file (⌘W)") { [weak self] in self?.onClose?() }
     /// Shown when the file changed on disk while you had unsaved edits.
     private let conflict = NSView()
     private let conflictText = NSTextField(labelWithString: "Changed on disk while you were editing.")
@@ -42,14 +45,8 @@ final class FileView: NSView {
         wantsLayer = true
 
         title.font = .systemFont(ofSize: 12, weight: .medium)
-        title.lineBreakMode = .byTruncatingMiddle
-        closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Close file")
-        closeButton.isBordered = false
-        closeButton.imagePosition = .imageOnly
-        closeButton.symbolConfiguration = .init(pointSize: 10, weight: .semibold)
-        closeButton.target = self
-        closeButton.action = #selector(close)
-        closeButton.toolTip = "Close file (⌘W)"
+        // A narrow pane drops the start of the folder first, so the name stays readable.
+        title.lineBreakMode = .byTruncatingHead
         header.wantsLayer = true
         header.addSubview(title)
         header.addSubview(closeButton)
@@ -121,9 +118,45 @@ final class FileView: NSView {
     /// Loads another file into the same pane. Callers check `isDirty` first, see confirmClose.
     func show(_ path: String) {
         self.path = path
+        folder = ""
         title.toolTip = (path as NSString).abbreviatingWithTildeInPath
         load(keepingPosition: false)
         watch()
+        findFolder()
+    }
+
+    /// Asks git where the checkout starts, off the main thread. Outside a checkout the header shows only the name.
+    private func findFolder() {
+        let path = path
+        let directory = (path as NSString).deletingLastPathComponent
+        DispatchQueue.global(qos: .userInitiated).async {
+            let top = Git.topLevel(of: directory)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.path == path, let top, directory.hasPrefix(top + "/") else { return }
+                self.folder = String(directory.dropFirst(top.count + 1)) + "/"
+                self.updateTitle()
+            }
+        }
+    }
+
+    /// Puts the cursor on a line and scrolls it near the top, for opening a file at its first change.
+    func reveal(line: Int) {
+        let string = text.string as NSString
+        var location = 0
+        for _ in 1..<max(line, 1) where location < string.length {
+            location = NSMaxRange(string.lineRange(for: NSRange(location: location, length: 0)))
+        }
+        text.setSelectedRange(NSRange(location: min(location, string.length), length: 0))
+        // A pane that was just added has no size yet, so this waits for its first layout.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let layout = text.layoutManager, let container = text.textContainer else { return }
+            let glyphs = layout.glyphRange(forCharacterRange: NSRange(location: min(location, string.length), length: 0),
+                                           actualCharacterRange: nil)
+            let rect = layout.boundingRect(forGlyphRange: glyphs, in: container)
+            scroll.contentView.scroll(to: NSPoint(x: 0, y: max(0, rect.minY - 80)))
+            scroll.reflectScrolledClipView(scroll.contentView)
+            gutter.needsDisplay = true
+        }
     }
 
     /// Reads the file again. Keeping the position means an agent's edit doesn't throw you back to the top.
@@ -171,8 +204,11 @@ final class FileView: NSView {
     }
 
     private func updateTitle() {
-        let name = (path as NSString).lastPathComponent
-        title.stringValue = isDirty ? "\(name)  ●" : name
+        let font = title.font ?? .systemFont(ofSize: 12)
+        let name = (path as NSString).lastPathComponent + (isDirty ? "  ●" : "")
+        let result = NSMutableAttributedString(string: folder, attributes: [.font: font, .foregroundColor: titleColors.folder])
+        result.append(NSAttributedString(string: name, attributes: [.font: font, .foregroundColor: titleColors.name]))
+        title.attributedStringValue = result
     }
 
     // MARK: Saving
@@ -268,8 +304,9 @@ final class FileView: NSView {
         header.layer?.backgroundColor = background.mixed(with: foreground, 0.035).cgColor
         conflict.layer?.backgroundColor = background.mixed(with: foreground, 0.07).cgColor
         conflictText.textColor = foreground
-        title.textColor = background.mixed(with: foreground, 0.75)
-        closeButton.contentTintColor = background.mixed(with: foreground, 0.55)
+        titleColors = (background.mixed(with: foreground, 0.75), background.mixed(with: foreground, 0.45))
+        updateTitle()
+        closeButton.apply(background: background.mixed(with: foreground, 0.035), foreground: foreground)
         message.textColor = background.mixed(with: foreground, 0.55)
         scroll.backgroundColor = background
         text.backgroundColor = background
@@ -286,8 +323,6 @@ final class FileView: NSView {
         item.tag = action.rawValue
         text.performTextFinderAction(item)
     }
-
-    @objc private func close() { onClose?() }
 
     override func layout() {
         super.layout()

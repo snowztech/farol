@@ -1,4 +1,3 @@
-import CoreServices
 import FarolCore
 import SwiftUI
 
@@ -22,20 +21,20 @@ final class FileTree: ObservableObject {
     private var expanded: [String: Set<String>] = [:]
     private var listings: [String: [Files.Entry]] = [:]
     private var ignored: Set<String> = []
-    private var stream: FSEventStreamRef?
+    private var watcher: FolderWatcher?
 
     /// Shows another folder, or stops watching when `root` is nil.
     func show(_ root: String?) {
         let root = root.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path }
-        guard root != self.root || (root != nil && stream == nil) else { return }
-        stop()
+        guard root != self.root || (root != nil && watcher == nil) else { return }
+        watcher = nil
         self.root = root
         selected = nil
         listings = [:]
         ignored = []
         rows = []
         guard let root else { return }
-        watch(root)
+        watcher = FolderWatcher(root) { [weak self] in self?.changed($0) }
         reload()
     }
 
@@ -80,27 +79,6 @@ final class FileTree: ObservableObject {
         self.rows = rows
     }
 
-    // MARK: Watching
-
-    /// FSEvents batches changes, so an agent writing many files costs one refresh.
-    private func watch(_ root: String) {
-        var context = FSEventStreamContext(
-            version: 0, info: Unmanaged.passUnretained(self).toOpaque(), retain: nil, release: nil, copyDescription: nil)
-        let callback: FSEventStreamCallback = { _, info, count, paths, _, _ in
-            guard let info else { return }
-            let tree = Unmanaged<FileTree>.fromOpaque(info).takeUnretainedValue()
-            tree.changed(unsafeBitCast(paths, to: NSArray.self) as? [String] ?? [])
-        }
-        guard let stream = FSEventStreamCreate(
-            nil, callback, &context, [root] as CFArray, FSEventStreamEventId(kFSEventStreamEventIdSinceNow), 0.3,
-            FSEventStreamCreateFlags(
-                kFSEventStreamCreateFlagUseCFTypes | kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer))
-        else { return }
-        FSEventStreamSetDispatchQueue(stream, .main)
-        FSEventStreamStart(stream)
-        self.stream = stream
-    }
-
     /// Git touches .git at every shell prompt, so only a .gitignore edit asks git again.
     private func changed(_ paths: [String]) {
         let outsideGit = paths.filter { !$0.contains("/.git/") }
@@ -108,16 +86,6 @@ final class FileTree: ObservableObject {
         let shown = folders.filter { listings[$0] != nil }
         if !shown.isEmpty || outsideGit.contains(where: { $0.hasSuffix("/.gitignore") }) { reload(Array(shown)) }
     }
-
-    func stop() {
-        guard let stream else { return }
-        FSEventStreamStop(stream)
-        FSEventStreamInvalidate(stream)
-        FSEventStreamRelease(stream)
-        self.stream = nil
-    }
-
-    deinit { stop() }
 }
 
 struct FilesPanel: View {

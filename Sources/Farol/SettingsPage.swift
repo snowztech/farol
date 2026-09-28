@@ -461,6 +461,7 @@ struct SettingsPage: View {
         ShortcutGroup(title: "Window", items: [
             ("Toggle sidebar", ["⌘B"]),
             ("Toggle files", ["⇧⌘E"]),
+            ("Review changes", ["⌥⌘R"]),
             ("Save the open file", ["⌘S"]),
             ("Full screen", ["⌃⌘F", "⌘↩"]),
             ("Settings", ["⌘,"]),

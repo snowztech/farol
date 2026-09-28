@@ -132,11 +132,16 @@ final class PaneContainer: NSView {
     }
 
     /// Shows the file in the file pane, opening one right of the focused terminal if there is none yet.
-    func open(_ path: String) {
+    /// `line` scrolls to it, for opening a file at a change.
+    func open(_ path: String, line: Int? = nil) {
         if let file {
-            guard file.path != path else { return focusFile() }
+            guard file.path != path else {
+                if let line { file.reveal(line: line) }
+                return focusFile()
+            }
             return file.confirmClose { [weak self, weak file] in
                 file?.show(path)
+                if let line { file?.reveal(line: line) }
                 self?.focusFile()
                 self?.onLayoutChange?()
             }
@@ -145,6 +150,7 @@ final class PaneContainer: NSView {
             self.file = file
             insert(Node(file: file), beside: focused, .right)
             adopt(file)
+            if let line { file.reveal(line: line) }
         }
         focusFile()
         onLayoutChange?()

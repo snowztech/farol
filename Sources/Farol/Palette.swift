@@ -17,6 +17,8 @@ struct Palette: Equatable {
     let working: Color
     let waiting: Color
     let done: Color
+    let added: Color
+    let removed: Color
     /// Tint for macOS switches and pickers. A mid gray, since white on a switch would hide its white knob.
     let control: Color
     let isDark: Bool
@@ -39,6 +41,8 @@ struct Palette: Equatable {
         working = ansi(6)
         waiting = ansi(3)
         done = ansi(2)
+        added = ansi(2)
+        removed = ansi(1)
     }
 }
 
