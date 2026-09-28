@@ -54,6 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings.reload()
         windowController.handle(.reloadConfig)
     }
+    @objc func namePane(_ sender: Any?) { windowController.namePane() }
     @objc func find(_ sender: Any?) { windowController.find() }
     @objc func findNext(_ sender: Any?) { windowController.findNext() }
     @objc func findPrevious(_ sender: Any?) { windowController.findPrevious() }
@@ -89,6 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sessions.addItem(withTitle: "New Session", action: #selector(newSession), keyEquivalent: "t")
         sessions.addItem(withTitle: "New Worktree Session…", action: #selector(newWorktreeSession), keyEquivalent: "T")
         sessions.addItem(withTitle: "Close Session", action: #selector(closeSession), keyEquivalent: "w")
+        sessions.addItem(withTitle: "Name Pane…", action: #selector(namePane), keyEquivalent: "R")
         sessions.addItem(.separator())
         sessions.addItem(withTitle: "Next Session", action: #selector(nextSession), keyEquivalent: "]")
             .keyEquivalentModifierMask = [.command, .shift]

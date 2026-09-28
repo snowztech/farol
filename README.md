@@ -25,7 +25,7 @@ It needs a Mac with Apple Silicon and macOS 14 or later. Releases are signed and
 - **Agent status.** Each session shows whether its agent is working, waiting for you or done, with a notification when it waits in the background. See [Agent status](#agent-status).
 - **Worktree sessions.** ⇧⌘T asks for a branch and opens a session in its own git worktree, so parallel agents never touch each other's files. Closing it offers to remove the worktree and always keeps the branch.
 - **Sessions in a sidebar.** Open as many as you like. Hidden sessions keep running but stop rendering, so twenty background agents cost no GPU time. Each row shows its git branch. Double-click to rename, drag to reorder.
-- **Split panes.** ⌘D splits a session, and the new pane opens in the same folder. Layouts come back after a relaunch.
+- **Split panes.** ⌘D splits a session, and the new pane opens in the same folder. ⇧⌘R gives a pane a name, like "back" or "tunnel". Layouts and names come back after a relaunch.
 - **Find in scrollback.** ⌘F searches the focused pane and shows the match count.
 - **Ghostty inside.** Same rendering, speed and escape sequence support, and your Ghostty config is loaded.
 - **Themes and settings.** Ghostty's 600+ themes with live previews, and settings inside the window.
@@ -83,6 +83,7 @@ Outside Farol `$FAROL_CLI` is unset, so the hooks do nothing.
 | Resize the focused pane | ⌘⌃ with arrows |
 | Equal pane sizes | ⌘⌃= |
 | Zoom the focused pane | ⇧⌘↩ |
+| Name the focused pane | ⇧⌘R |
 | Find, next, previous | ⌘F, ⌘G, ⇧⌘G |
 | Find the selected text | ⌘E |
 | Toggle sidebar | ⌘B |
