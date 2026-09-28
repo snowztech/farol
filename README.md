@@ -61,9 +61,9 @@ The colors come from your theme's own cyan, yellow and green, so they always mat
 
 When an agent waits or finishes while Farol is in the background, you get a notification, and the Dock icon counts the sessions that are waiting.
 
-**Claude Code:** open Settings → Agents and click **Enable**. Farol adds its hooks to `~/.claude/settings.json`, leaves everything else in the file alone and keeps a backup. **Turn off** removes only Farol's hooks.
+**Claude Code:** open Settings → Agents and click **Connect**. Farol adds its hooks to `~/.claude/settings.json`, leaves everything else in the file alone and keeps a backup. **Disconnect** removes only Farol's hooks, and Claude Code keeps working as before.
 
-**Codex:** same place, click **Enable**. Farol turns on Codex's terminal notifications in `~/.codex/config.toml`, so you hear from Codex when it needs your approval or finishes a turn. The sidebar shows a yellow dot until you open the session. Codex can't report while it works, so there is no working dot. Farol marks the lines it adds and **Turn off** removes only those.
+**Codex:** same place, click **Connect**. Farol turns on Codex's terminal notifications in `~/.codex/config.toml`, so you hear from Codex when it needs your approval or finishes a turn. The sidebar shows a yellow dot until you open the session. Codex can't report while it works, so there is no working dot. Farol marks the lines it adds and **Disconnect** removes only those.
 
 **Other agents** can report with `"$FAROL_CLI" status working|waiting|done|clear`, which Farol makes available in every session. Agents that ring the terminal bell show as waiting without any setup.
 

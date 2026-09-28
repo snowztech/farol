@@ -11,6 +11,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Changed
 
+- Settings → Agents says **Connect** and **Disconnect** again, with Connected and Not connected. "Turn off Claude Code" read as if it stopped Claude Code itself. Disconnecting now says first what you lose, and that the agent keeps working as before.
 - New screenshots in the README and on the landing page, which now shows the review panel.
 
 ## [0.9.0] - 2026-09-28
