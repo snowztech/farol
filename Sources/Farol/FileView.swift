@@ -40,8 +40,6 @@ final class FileView: NSView {
         gutter = LineNumbers(textView: text)
         super.init(frame: .zero)
         wantsLayer = true
-        // Since macOS 14 views draw past their bounds by default, and the gutter's edge line reached the title bar.
-        clipsToBounds = true
 
         title.font = .systemFont(ofSize: 12, weight: .medium)
         title.lineBreakMode = .byTruncatingMiddle
@@ -97,9 +95,6 @@ final class FileView: NSView {
         scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
         scroll.drawsBackground = true
-        scroll.verticalRulerView = gutter
-        scroll.hasVerticalRuler = true
-        scroll.rulersVisible = true
         scroll.contentView.postsBoundsChangedNotifications = true
         NotificationCenter.default.addObserver(
             forName: NSView.boundsDidChangeNotification, object: scroll.contentView, queue: .main
@@ -108,7 +103,8 @@ final class FileView: NSView {
         message.alignment = .center
         message.isHidden = true
 
-        for view in [header, conflict, scroll, message] { addSubview(view) }
+        gutter.onResize = { [weak self] in self?.needsLayout = true }
+        for view in [header, conflict, gutter, scroll, message] { addSubview(view) }
         show(path)
     }
 
@@ -171,6 +167,7 @@ final class FileView: NSView {
         message.stringValue = text ?? ""
         message.isHidden = text == nil
         scroll.isHidden = text != nil
+        gutter.isHidden = text != nil
     }
 
     private func updateTitle() {
@@ -305,7 +302,9 @@ final class FileView: NSView {
         keepButton.frame.origin = NSPoint(x: bounds.width - keepButton.frame.width - 10, y: (bar - keepButton.frame.height) / 2)
         reloadButton.frame.origin = NSPoint(x: keepButton.frame.minX - reloadButton.frame.width - 6, y: keepButton.frame.minY)
         conflictText.frame = NSRect(x: 12, y: (bar - 16) / 2, width: max(0, reloadButton.frame.minX - 20), height: 16)
-        scroll.frame = NSRect(x: 0, y: h + bar, width: bounds.width, height: max(0, bounds.height - h - bar))
+        let body = max(0, bounds.height - h - bar)
+        gutter.frame = NSRect(x: 0, y: h + bar, width: gutter.width, height: body)
+        scroll.frame = NSRect(x: gutter.width, y: h + bar, width: max(0, bounds.width - gutter.width), height: body)
         // At least as big as the visible area, so short files still fill it and clicks land in the text.
         text.minSize = scroll.contentSize
         message.frame = NSRect(x: 12, y: bounds.midY - 10, width: max(0, bounds.width - 24), height: 20)
@@ -331,21 +330,25 @@ private final class CodeTextView: NSTextView {
     }
 }
 
-/// The gutter left of the text. Only the lines on screen are drawn, so long files stay cheap.
-private final class LineNumbers: NSRulerView {
+/// The gutter left of the text, a plain view beside the scroll view so the text can never slide under it.
+/// Only the lines on screen are drawn, so long files stay cheap.
+private final class LineNumbers: NSView {
     private static let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
     private weak var textView: NSTextView?
     /// Where each line starts, as UTF-16 offsets, so the first visible line is a binary search away.
     private var lineStarts: [Int] = [0]
+    private(set) var width: CGFloat = 0
+    var onResize: (() -> Void)?
     var colors = (background: NSColor.black, text: NSColor.gray) { didSet { needsDisplay = true } }
 
     init(textView: NSTextView) {
         self.textView = textView
-        super.init(scrollView: nil, orientation: .verticalRuler)
-        clientView = textView
+        super.init(frame: .zero)
     }
 
-    required init(coder: NSCoder) { fatalError("not used") }
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    override var isFlipped: Bool { true }
 
     func textChanged() {
         let string = (textView?.string ?? "") as NSString
@@ -358,13 +361,15 @@ private final class LineNumbers: NSRulerView {
         }
         lineStarts = starts
         let digits = String(repeating: "8", count: max(3, String(starts.count).count)) as NSString
-        ruleThickness = digits.size(withAttributes: [.font: Self.font]).width + 20
-        // The scroll view doesn't make room for a wider gutter on its own, and the text would slide under it.
-        scrollView?.tile()
+        let width = (digits.size(withAttributes: [.font: Self.font]).width + 20).rounded()
+        if width != self.width {
+            self.width = width
+            onResize?()
+        }
         needsDisplay = true
     }
 
-    override func drawHashMarksAndLabels(in rect: NSRect) {
+    override func draw(_ dirtyRect: NSRect) {
         colors.background.setFill()
         bounds.fill()
         guard let textView, let layout = textView.layoutManager, let container = textView.textContainer,
@@ -377,10 +382,11 @@ private final class LineNumbers: NSRulerView {
         while line < lineStarts.count, lineStarts[line] <= NSMaxRange(characters) {
             let glyph = layout.glyphIndexForCharacter(at: lineStarts[line])
             let fragment = layout.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
-            let y = convert(NSPoint(x: 0, y: fragment.minY + textView.textContainerOrigin.y), from: textView).y
+            // Text view coordinates, shifted by how far it is scrolled. Both views start at the same height.
+            let y = fragment.minY + textView.textContainerOrigin.y - visible.minY
             let label = "\(line + 1)" as NSString
             let size = label.size(withAttributes: attributes)
-            label.draw(at: NSPoint(x: ruleThickness - size.width - 10, y: y + (fragment.height - size.height) / 2),
+            label.draw(at: NSPoint(x: width - size.width - 10, y: y + (fragment.height - size.height) / 2),
                        withAttributes: attributes)
             line += 1
         }
