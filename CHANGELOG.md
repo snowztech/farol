@@ -4,14 +4,20 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-28
+
+Codex notifications that actually reach you, and an option to group sessions by project.
+
 ### Added
 
 - Settings → Appearance → Group sessions by project sorts the sidebar into one section per project once you work in more than one. A project is a git repository, worktrees included. It is off by default, and ⌘1 to ⌘9 follow the order shown.
 
 ### Changed
 
-- Codex works again. Farol 0.6 connected it through hooks, but Codex 0.158 runs hooks in a background process that loses track of the terminal, so nothing reached Farol. Settings → Agents → Enable now turns on Codex's terminal notifications in `~/.codex/config.toml` instead, and removes the old hooks. You get notified when Codex needs your approval or finishes, and the session gets a yellow dot until you open it. There is no working dot for Codex, since it can't report that.
+- Codex works again. The hooks from 0.6 never reached Farol, because Codex 0.158 runs them in a background process that loses track of the terminal. Settings → Agents → Enable now turns on Codex's terminal notifications in `~/.codex/config.toml` and removes the old hooks. You get notified when Codex needs your approval or finishes, and the session keeps a yellow dot until you open it. Codex can't report while it works, so there is no working dot. If you connected Codex in 0.6, Settings shows **Needs update**.
+- Farol changes only the lines it marks in `config.toml`, never a value you set yourself, and **Turn off** removes just those lines.
 - Settings → Agents says **Enable** and **Turn off** instead of Connect and Disconnect.
+- A notification from an agent without hooks no longer claims it needs your approval, since it may just have finished.
 
 ### Fixed
 
@@ -175,7 +181,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/snowztech/farol/releases/tag/v0.7.0
 [0.6.0]: https://github.com/snowztech/farol/releases/tag/v0.6.0
 [0.5.0]: https://github.com/snowztech/farol/releases/tag/v0.5.0
 [0.4.1]: https://github.com/snowztech/farol/releases/tag/v0.4.1
