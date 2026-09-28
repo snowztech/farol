@@ -11,6 +11,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Fixed
 
+- A finished Claude Code session no longer turns into "waiting" and notifies again a minute later. Farol now only counts permission prompts and questions as waiting, not Claude's idle reminder. If you connected Claude Code before, Settings → Agents shows Needs update: click Update.
 - Closing a worktree session no longer offers to remove the worktree when another session still uses it, or when it has uncommitted changes. Those worktrees are kept without asking.
 - When a worktree can't be removed, the message says so plainly instead of showing git's error.
 

@@ -3,13 +3,14 @@ import Foundation
 /// Connects Claude Code to Farol by adding hooks that call `farol status` to its settings file.
 /// Only hooks whose command mentions $FAROL_CLI are Farol's. Everything else in the file is left alone.
 public enum ClaudeHooks {
-    /// Claude Code event, and the status it maps to.
-    public static let events: [(event: String, status: String)] = [
-        ("UserPromptSubmit", "working"),
-        ("PostToolUse", "working"),
-        ("Notification", "waiting"),
-        ("Stop", "done"),
-        ("SessionEnd", "clear"),
+    /// Claude Code event, the status it maps to, and which occurrences count.
+    /// Notification also fires as an idle reminder after a finished turn. Only permission prompts and questions mean waiting.
+    public static let events: [(event: String, status: String, matcher: String?)] = [
+        ("UserPromptSubmit", "working", nil),
+        ("PostToolUse", "working", nil),
+        ("Notification", "waiting", "permission_prompt|elicitation_dialog"),
+        ("Stop", "done", nil),
+        ("SessionEnd", "clear", nil),
     ]
 
     public static let defaultSettings = FileManager.default.homeDirectoryForCurrentUser
@@ -20,18 +21,29 @@ public enum ClaudeHooks {
         "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status \(status)"
     }
 
+    /// True when every Farol hook is there in its current form. Older ones count as missing, so Connect updates them.
     public static func isInstalled(in settings: [String: Any]) -> Bool {
-        events.allSatisfy { has(command($0.status), for: $0.event, in: settings) }
+        events.allSatisfy { has(command($0.status), matcher: $0.matcher, for: $0.event, in: settings) }
     }
 
-    /// Adds the missing hooks. Running it again changes nothing.
+    /// Some Farol hook is there, current or not. With isInstalled false, that means they need an update.
+    public static func hasAnyFarolHook(in settings: [String: Any]) -> Bool {
+        let hooks = settings["hooks"] as? [String: Any] ?? [:]
+        return hooks.values.contains { value in
+            (value as? [[String: Any]] ?? []).contains { group in
+                (group["hooks"] as? [[String: Any]] ?? []).contains(where: isFarol)
+            }
+        }
+    }
+
+    /// Replaces Farol's hooks with the current ones and leaves the rest alone. Running it again changes nothing.
     public static func install(into settings: [String: Any]) -> [String: Any] {
-        var settings = settings
+        var settings = remove(from: settings)
         var hooks = settings["hooks"] as? [String: Any] ?? [:]
-        for (event, status) in events where !has(command(status), for: event, in: settings) {
-            var groups = hooks[event] as? [[String: Any]] ?? []
-            groups.append(["hooks": [["type": "command", "command": command(status)]]])
-            hooks[event] = groups
+        for (event, status, matcher) in events {
+            var group: [String: Any] = ["hooks": [["type": "command", "command": command(status)]]]
+            if let matcher { group["matcher"] = matcher }
+            hooks[event] = (hooks[event] as? [[String: Any]] ?? []) + [group]
         }
         settings["hooks"] = hooks
         return settings
@@ -41,7 +53,7 @@ public enum ClaudeHooks {
     public static func remove(from settings: [String: Any]) -> [String: Any] {
         var settings = settings
         guard var hooks = settings["hooks"] as? [String: Any] else { return settings }
-        for (event, _) in events {
+        for (event, _, _) in events {
             guard let groups = hooks[event] as? [[String: Any]] else { continue }
             let kept: [[String: Any]] = groups.compactMap { group in
                 guard let entries = group["hooks"] as? [[String: Any]] else { return group }
@@ -85,10 +97,11 @@ public enum ClaudeHooks {
 
     // MARK: Helpers
 
-    private static func has(_ command: String, for event: String, in settings: [String: Any]) -> Bool {
+    private static func has(_ command: String, matcher: String?, for event: String, in settings: [String: Any]) -> Bool {
         let groups = (settings["hooks"] as? [String: Any])?[event] as? [[String: Any]] ?? []
         return groups.contains { group in
-            (group["hooks"] as? [[String: Any]] ?? []).contains { ($0["command"] as? String) == command }
+            group["matcher"] as? String == matcher
+                && (group["hooks"] as? [[String: Any]] ?? []).contains { ($0["command"] as? String) == command }
         }
     }
 
