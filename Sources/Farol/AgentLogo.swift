@@ -1,6 +1,6 @@
 import AppKit
 
-/// Claude Code and Codex logos, shown small before a session's name when that agent runs in it.
+/// Claude Code and Codex logos, shown small at the end of a session's name when that agent runs in it.
 /// From Simple Icons (simpleicons.org, CC0). The marks belong to Anthropic and OpenAI and only identify the tool.
 enum AgentLogo {
     private static let svg = [

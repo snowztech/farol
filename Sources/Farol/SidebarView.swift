@@ -65,8 +65,7 @@ private struct SessionRow: View {
             Lamp(activity: session.activity, selected: selected, palette: palette)
 
             labels.lineLimit(1)
-
-            Spacer(minLength: 0)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             if hovering && !editing {
                 Button(action: onClose) {
@@ -107,17 +106,19 @@ private struct SessionRow: View {
                     .onExitCommand { editing = false }
                     .onChange(of: fieldFocused) { _, focused in if !focused { commit() } }
             } else {
-                HStack(spacing: 5) {
-                    if let agent = session.agent, let logo = AgentLogo.image(for: agent) {
-                        Image(nsImage: logo)
-                            .resizable()
-                            .frame(width: 11, height: 11)
-                            .foregroundStyle(palette.muted)
-                            .help(AgentHooks.all.first { $0.id == agent }?.name ?? agent)
-                    }
+                HStack(spacing: 6) {
                     Text(session.displayName)
                         .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
                         .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
+                    // At the end of the title line, like a tag. The close button takes that corner on hover.
+                    if !hovering, let agent = session.agent, let logo = AgentLogo.image(for: agent) {
+                        Spacer(minLength: 0)
+                        Image(nsImage: logo)
+                            .resizable()
+                            .frame(width: 12, height: 12)
+                            .foregroundStyle(palette.muted)
+                            .accessibilityLabel(AgentHooks.all.first { $0.id == agent }?.name ?? agent)
+                    }
                 }
             }
             if let branch = session.branch {

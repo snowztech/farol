@@ -6,7 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
-- The sidebar shows which agent runs in a session, with a small Claude Code or Codex logo before its name. Hover it for the name. If you connected an agent before, Settings → Agents shows Needs update: click Update.
+- The sidebar shows which agent runs in a session, with a small Claude Code or Codex logo at the end of its name. If you connected an agent before, Settings → Agents shows Needs update: click Update.
 - `farol status` takes `--agent <name>`.
 
 ### Fixed
