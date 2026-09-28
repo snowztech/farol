@@ -11,7 +11,18 @@ final class FileView: NSView {
     /// The file's folder inside its checkout, like "internal/config/", shown muted before the name.
     private var folder = ""
     private var titleColors = (name: NSColor.labelColor, folder: NSColor.secondaryLabelColor)
-    private(set) var isDirty = false { didSet { updateTitle() } }
+    private var language: Syntax.Language?
+    private var syntax: SyntaxColors?
+    private var plainColor = NSColor.textColor
+    private var pendingHighlight: DispatchWorkItem?
+    /// ponytail: coloring reruns on the whole file, so very large files stay plain. Per-line coloring would lift it.
+    private static let highlightLimit = 400_000
+    private(set) var isDirty = false {
+        didSet {
+            unsavedDot.isHidden = !isDirty
+            needsLayout = true
+        }
+    }
     var onFocus: (() -> Void)?
     var onClose: (() -> Void)?
 
@@ -21,6 +32,9 @@ final class FileView: NSView {
 
     private let header = NSView()
     private let title = NSTextField(labelWithString: "")
+    /// Same size as the sidebar's status dots, but muted, since colored dots mean agent states.
+    private let unsavedDot = NSView()
+    private static let dotSize: CGFloat = 7
     private lazy var closeButton = QuietButton(symbol: "xmark", help: "Close file (⌘W)") { [weak self] in self?.onClose?() }
     /// Shown when the file changed on disk while you had unsaved edits.
     private let conflict = NSView()
@@ -49,6 +63,11 @@ final class FileView: NSView {
         title.lineBreakMode = .byTruncatingHead
         header.wantsLayer = true
         header.addSubview(title)
+        unsavedDot.wantsLayer = true
+        unsavedDot.layer?.cornerRadius = Self.dotSize / 2
+        unsavedDot.isHidden = true
+        unsavedDot.toolTip = "Unsaved changes (⌘S to save)"
+        header.addSubview(unsavedDot)
         header.addSubview(closeButton)
 
         conflict.wantsLayer = true
@@ -85,6 +104,7 @@ final class FileView: NSView {
         NotificationCenter.default.addObserver(forName: NSText.didChangeNotification, object: text, queue: .main) { [weak self] _ in
             self?.isDirty = true
             self?.gutter.textChanged()
+            self?.highlightSoon()
         }
 
         scroll.documentView = text
@@ -119,6 +139,8 @@ final class FileView: NSView {
     func show(_ path: String) {
         self.path = path
         folder = ""
+        language = Syntax.language(for: path)
+        updateTitle()
         title.toolTip = (path as NSString).abbreviatingWithTildeInPath
         load(keepingPosition: false)
         watch()
@@ -182,6 +204,7 @@ final class FileView: NSView {
         conflict.isHidden = true
         needsLayout = true
         gutter.textChanged()
+        highlight()
         if keepingPosition {
             let length = (text.string as NSString).length
             text.setSelectedRange(NSRange(location: min(selection.location, length), length: 0))
@@ -205,10 +228,11 @@ final class FileView: NSView {
 
     private func updateTitle() {
         let font = title.font ?? .systemFont(ofSize: 12)
-        let name = (path as NSString).lastPathComponent + (isDirty ? "  ●" : "")
+        let name = (path as NSString).lastPathComponent
         let result = NSMutableAttributedString(string: folder, attributes: [.font: font, .foregroundColor: titleColors.folder])
         result.append(NSAttributedString(string: name, attributes: [.font: font, .foregroundColor: titleColors.name]))
         title.attributedStringValue = result
+        needsLayout = true
     }
 
     // MARK: Saving
@@ -306,16 +330,47 @@ final class FileView: NSView {
         conflict.layer?.backgroundColor = background.mixed(with: foreground, 0.07).cgColor
         conflictText.textColor = foreground
         titleColors = (background.mixed(with: foreground, 0.75), background.mixed(with: foreground, 0.45))
+        unsavedDot.layer?.backgroundColor = background.mixed(with: foreground, 0.55).cgColor
         updateTitle()
         closeButton.apply(background: background, foreground: foreground)
         message.textColor = background.mixed(with: foreground, 0.55)
         scroll.backgroundColor = background
         text.backgroundColor = background
         text.textColor = foreground
+        plainColor = foreground
         text.typingAttributes = [.font: Self.font, .foregroundColor: foreground]
+        highlight()
         text.insertionPointColor = foreground
         text.selectedTextAttributes = [.backgroundColor: background.mixed(with: foreground, 0.22)]
         gutter.colors = (background, background.mixed(with: foreground, 0.35))
+    }
+
+    // MARK: Syntax colors
+
+    func highlight(with colors: SyntaxColors) {
+        syntax = colors
+        highlight()
+    }
+
+    /// Typing waits for a pause, so a burst of keys colors the file once.
+    private func highlightSoon() {
+        pendingHighlight?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.highlight() }
+        pendingHighlight = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
+    }
+
+    /// Colors go straight on the text storage, so they never enter the undo history.
+    private func highlight() {
+        guard let storage = text.textStorage else { return }
+        storage.beginEditing()
+        storage.addAttribute(.foregroundColor, value: plainColor, range: NSRange(location: 0, length: storage.length))
+        if let language, let syntax, storage.length <= Self.highlightLimit {
+            for token in Syntax.tokens(in: storage.string, language) {
+                storage.addAttribute(.foregroundColor, value: syntax.color(token.kind), range: token.range)
+            }
+        }
+        storage.endEditing()
     }
 
     /// ⌘F, ⌘G and ⌘E use the text view's own find bar while the file has focus.
@@ -330,7 +385,11 @@ final class FileView: NSView {
         let h = Self.headerHeight
         header.frame = NSRect(x: 0, y: 0, width: bounds.width, height: h)
         closeButton.frame = NSRect(x: bounds.width - 28, y: 3, width: 20, height: 20)
-        title.frame = NSRect(x: 12, y: 5, width: max(0, bounds.width - 48), height: 16)
+        // The dot follows the name, and the name gives up room first when the pane is narrow.
+        let room = max(0, bounds.width - 48 - Self.dotSize - 8)
+        let titleWidth = min(ceil(title.attributedStringValue.size().width) + 4, room)
+        title.frame = NSRect(x: 12, y: 5, width: titleWidth, height: 16)
+        unsavedDot.frame = NSRect(x: title.frame.maxX + 4, y: (h - Self.dotSize) / 2, width: Self.dotSize, height: Self.dotSize)
         let bar = conflict.isHidden ? 0 : Self.barHeight
         conflict.frame = NSRect(x: 0, y: h, width: bounds.width, height: bar)
         keepButton.sizeToFit()

@@ -4,6 +4,15 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Syntax colors in the file pane and the review panel: comments, strings, numbers and keywords for Swift, Go, JavaScript and TypeScript, Python, Rust, Ruby, shell, the C family, JSON, YAML, TOML, CSS, HTML, XML, SVG and Markdown. The colors come from your terminal theme, so they always match it.
+
+### Changed
+
+- Images, PDFs, video and audio open in their Mac app when you click them in the files panel or the review. Other files Farol can't show as text are revealed in Finder instead of opening a pane that only says so.
+- The pointer turns into a hand over everything you can click: buttons, the file tree, sessions, review files and the settings sections.
+
 ## [0.9.2] - 2026-09-28
 
 A quieter file pane.

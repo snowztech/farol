@@ -159,7 +159,7 @@ private struct FileRow: View {
         .frame(height: 24)
         .background(RoundedRectangle(cornerRadius: 5).fill(selected ? palette.raised : hovering ? palette.raised.opacity(0.5) : .clear))
         .contentShape(Rectangle())
-        .onHover { hovering = $0 }
+        .onClickableHover { hovering = $0 }
         .onTapGesture(perform: action)
         .help((row.entry.path as NSString).abbreviatingWithTildeInPath)
     }

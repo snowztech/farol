@@ -129,7 +129,7 @@ private struct UpdateBadge: View {
                 .overlay(Capsule().strokeBorder(palette.line))
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
+        .onClickableHover { hovering = $0 }
         .help("Farol \(version) is available. Download it.")
     }
 }
@@ -156,7 +156,7 @@ private struct ReviewButton: View {
             .overlay(Capsule().strokeBorder(palette.line))
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
+        .onClickableHover { hovering = $0 }
         .help("Review changes (⌥⌘R)")
     }
 }
@@ -164,6 +164,34 @@ private struct ReviewButton: View {
 private struct SessionTitle: View {
     @ObservedObject var session: Session
     var body: some View { Text(session.displayName) }
+}
+
+extension View {
+    /// Hover for anything clickable: runs `action` and shows the pointing hand while the mouse is over it.
+    func onClickableHover(_ action: @escaping (Bool) -> Void) -> some View {
+        modifier(ClickableHover(action: action))
+    }
+}
+
+/// Scroll views reset the cursor on every mouse move, so a hand pushed once on hover doesn't last in the sidebar or the tree.
+/// macOS 15 has a pointer style for this. macOS 14 sets the hand again on each move.
+private struct ClickableHover: ViewModifier {
+    let action: (Bool) -> Void
+
+    func body(content: Content) -> some View {
+        if #available(macOS 15, *) {
+            content.onHover(perform: action).pointerStyle(.link)
+        } else {
+            content
+                .onHover { inside in
+                    action(inside)
+                    if !inside { NSCursor.arrow.set() }
+                }
+                .onContinuousHover { phase in
+                    if case .active = phase { NSCursor.pointingHand.set() }
+                }
+        }
+    }
 }
 
 /// The one close button, for panels, panes and rows. QuietButton draws the same in AppKit.
@@ -184,7 +212,7 @@ struct CloseButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
+        .onClickableHover { hovering = $0 }
         .help(help)
     }
 }
@@ -208,7 +236,7 @@ struct IconButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
+        .onClickableHover { hovering = $0 }
         .help(help)
     }
 }

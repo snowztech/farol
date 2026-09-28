@@ -579,6 +579,6 @@ private struct NavItem: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
+        .onClickableHover { hovering = $0 }
     }
 }

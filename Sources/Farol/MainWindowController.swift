@@ -1,4 +1,6 @@
 import AppKit
+import UniformTypeIdentifiers
+import FarolCore
 import Combine
 import SwiftUI
 import GhosttyTerminal
@@ -68,12 +70,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let sidebar = hosting(SidebarView(store: store, state: state, commands: commands))
         sidebar.clipsToBounds = true
         let filesPanel = hosting(FilesPanel(tree: files, state: state) { [weak self] path in
-            self?.store.selected?.panes.open(path)
+            self?.open(path)
         })
         filesPanel.clipsToBounds = true
         let reviewPanel = hosting(ReviewPanel(
             review: review, state: state,
-            open: { [weak self] in self?.store.selected?.panes.open($0, line: $1) },
+            open: { [weak self] in self?.open($0, line: $1) },
             close: { [weak self] in self?.toggleReview() },
             resize: { [weak self] in self?.setReviewWidth($0) }))
         reviewPanel.clipsToBounds = true
@@ -234,6 +236,21 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         followFiles(store.selected)
     }
 
+    /// Text opens in the file pane. Images, PDFs and media open in their Mac app.
+    /// Anything else is shown in Finder rather than opened, since opening an unknown binary could run it.
+    private func open(_ path: String, line: Int? = nil) {
+        let url = URL(fileURLWithPath: path)
+        // SVG is an image to macOS, but here it is code you might want to read.
+        if let type = UTType(filenameExtension: url.pathExtension), !type.conforms(to: .svg),
+           [UTType.image, .pdf, .audiovisualContent].contains(where: type.conforms) {
+            NSWorkspace.shared.open(url)
+        } else if case .text? = try? Files.read(path) {
+            store.selected?.panes.open(path, line: line)
+        } else {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        }
+    }
+
     /// Opens or closes the review panel at the width you last gave it.
     func toggleReview() {
         review.isOpen.toggle()
@@ -310,7 +327,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         window?.backgroundColor = bg
         window?.appearance = NSAppearance(named: bg.isDark ? .darkAqua : .aqua)
         content.layer?.backgroundColor = bg.cgColor
-        store.sessions.forEach { $0.panes.theme = theme }
+        store.sessions.forEach {
+            $0.panes.theme = theme
+            $0.panes.syntax = state.palette.code
+        }
     }
 
     private var theme: (background: NSColor, foreground: NSColor) { (runtime.backgroundColor, runtime.foregroundColor) }
@@ -360,6 +380,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         session.panes.frame = terminalContainer.bounds
         session.panes.autoresizingMask = [.width, .height]
         session.panes.theme = theme
+        session.panes.syntax = state.palette.code
         terminalContainer.addSubview(session.panes)
     }
 

@@ -218,8 +218,8 @@ struct ReviewPanel: View {
                 .frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
                 .background(p.surface)
                 .padding(.horizontal, 8)
-        case .line(_, _, let line):
-            DiffLine(line: line, palette: p).padding(.horizontal, 8)
+        case .line(let file, _, let line):
+            DiffLine(line: line, language: Syntax.language(for: file), palette: p).padding(.horizontal, 8)
         case .note(_, let text):
             Text(text).font(.system(size: 12)).foregroundStyle(p.muted).padding(.leading, 58).frame(height: 24)
         }
@@ -275,7 +275,7 @@ private struct ScopeMenu: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
+        .onClickableHover { hovering = $0 }
         .help("Choose what to compare with")
     }
 
@@ -384,7 +384,7 @@ private struct FileHeader: View {
         .padding(.top, 10)
         .padding(.bottom, 4)
         .contentShape(Rectangle())
-        .onHover { hovering = $0 }
+        .onClickableHover { hovering = $0 }
         .onTapGesture(perform: toggle)
     }
 
@@ -407,6 +407,7 @@ private struct FileHeader: View {
 
 private struct DiffLine: View {
     let line: Diff.Line
+    let language: Syntax.Language?
     let palette: Palette
 
     var body: some View {
@@ -418,8 +419,7 @@ private struct DiffLine: View {
                 .padding(.trailing, 11)
             // An overlay never sizes its parent, so a long line is cut at the card's edge instead of widening the list.
             Color.clear.overlay(alignment: .leading) {
-                // Tabs would line up differently from the file, so they show as four spaces.
-                Text(line.text.replacingOccurrences(of: "\t", with: "    "))
+                Text(colored)
                     .foregroundStyle(palette.text)
                     .lineLimit(1)
                     .fixedSize()
@@ -432,4 +432,17 @@ private struct DiffLine: View {
     }
 
     private var tint: Color { line.kind == .removed ? palette.removed : palette.added }
+
+    /// ponytail: each line is colored on its own, so a comment or string spanning lines shows plain after its first line.
+    private var colored: AttributedString {
+        // Tabs would line up differently from the file, so they show as four spaces.
+        let text = line.text.replacingOccurrences(of: "\t", with: "    ")
+        var result = AttributedString(text)
+        guard let language else { return result }
+        for token in Syntax.tokens(in: text, language) {
+            guard let range = Range(token.range, in: result) else { continue }
+            result[range].foregroundColor = Color(nsColor: palette.code.color(token.kind))
+        }
+        return result
+    }
 }
