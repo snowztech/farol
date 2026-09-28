@@ -4,6 +4,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- The sidebar shows which agent runs in a session, with the symbol the tool shows itself: ✳ for Claude Code, >_ for Codex. Hover it for the name. If you connected an agent before, Settings → Agents shows Needs update: click Update.
+- `farol status` takes `--agent <name>`.
+
 ### Fixed
 
 - Session names drop the extra parts agents add after a separator, so a Codex session shows "Design codebase" instead of "Design codebase | farol", and "farol" instead of "| farol" before the conversation has a name.

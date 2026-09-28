@@ -11,7 +11,7 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
 @Test func installsIntoEmptySettings() {
     let settings = AgentHooks.claude.install(into: [:])
     #expect(AgentHooks.claude.isInstalled(in: settings))
-    #expect(commands(settings, "Notification") == [AgentHooks.command("waiting")])
+    #expect(commands(settings, "Notification") == [AgentHooks.claude.command("waiting")])
 }
 
 @Test func keepsEverythingElse() {
@@ -23,7 +23,7 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
     let settings = AgentHooks.claude.install(into: mine)
     #expect(settings["model"] as? String == "opus")
     #expect(commands(settings, "PreToolUse") == ["my-guard.sh"])
-    #expect(commands(settings, "Stop") == ["say done", AgentHooks.command("done")])
+    #expect(commands(settings, "Stop") == ["say done", AgentHooks.claude.command("done")])
 }
 
 @Test func installingTwiceChangesNothing() {
@@ -105,7 +105,7 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
     let connected = try AgentHooks.read(url)
     #expect(AgentHooks.claude.isInstalled(in: connected))
     // Farol's hook comes after the user's own, never in place of them.
-    #expect(commands(connected, "Stop") == ["say done", "afplay ~/ding.aiff", AgentHooks.command("done")])
+    #expect(commands(connected, "Stop") == ["say done", "afplay ~/ding.aiff", AgentHooks.claude.command("done")])
     #expect(commands(connected, "PreToolUse") == ["~/guard.sh"])
     var withoutFarol = AgentHooks.claude.remove(from: connected)
     #expect((withoutFarol as NSDictionary).isEqual(to: before as! [AnyHashable: Any]))
@@ -118,7 +118,7 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
 /// Hooks from an older Farol, without the Notification matcher, get replaced instead of doubled.
 @Test func connectUpdatesOlderHooks() {
     let old: [String: Any] = ["hooks": [
-        "Notification": [["hooks": [["type": "command", "command": AgentHooks.command("waiting")]]]],
+        "Notification": [["hooks": [["type": "command", "command": AgentHooks.claude.command("waiting")]]]],
         "Stop": [["hooks": [["type": "command", "command": "say done"]]]],
     ]]
     #expect(!AgentHooks.claude.isInstalled(in: old))
@@ -127,7 +127,7 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
     let groups = (updated["hooks"] as? [String: Any])?["Notification"] as? [[String: Any]] ?? []
     #expect(groups.count == 1)
     #expect(groups.first?["matcher"] as? String == "permission_prompt|elicitation_dialog")
-    #expect(commands(updated, "Stop") == ["say done", AgentHooks.command("done")])
+    #expect(commands(updated, "Stop") == ["say done", AgentHooks.claude.command("done")])
     #expect(AgentHooks.claude.isInstalled(in: updated))
 }
 
@@ -136,8 +136,8 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
 @Test func codexWaitsOnPermissionRequests() {
     let settings = AgentHooks.codex.install(into: [:])
     #expect(AgentHooks.codex.isInstalled(in: settings))
-    #expect(commands(settings, "PermissionRequest") == [AgentHooks.command("waiting")])
-    #expect(commands(settings, "Stop") == [AgentHooks.command("done")])
+    #expect(commands(settings, "PermissionRequest") == [AgentHooks.codex.command("waiting")])
+    #expect(commands(settings, "Stop") == [AgentHooks.codex.command("done")])
     #expect(commands(settings, "Notification").isEmpty)
 }
 
@@ -147,7 +147,7 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
         "SessionStart": [["hooks": [["type": "command", "command": "bash ~/.codex/herdr-agent-state.sh session", "timeout": 10]]]],
     ]]
     let connected = AgentHooks.codex.install(into: theirs)
-    #expect(commands(connected, "SessionStart") == ["bash ~/.codex/herdr-agent-state.sh session", AgentHooks.command("clear")])
+    #expect(commands(connected, "SessionStart") == ["bash ~/.codex/herdr-agent-state.sh session", AgentHooks.codex.command("clear")])
     let disconnected = AgentHooks.codex.remove(from: connected) as NSDictionary
     #expect(disconnected.isEqual(to: theirs))
 }
@@ -155,4 +155,19 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
 @Test func agentsUseTheirOwnFiles() {
     #expect(AgentHooks.claude.file.path.hasSuffix(".claude/settings.json"))
     #expect(AgentHooks.codex.file.path.hasSuffix(".codex/hooks.json"))
+}
+
+/// Hooks name their agent, so the sidebar can show which one is in a session.
+@Test func hooksNameTheirAgent() {
+    #expect(AgentHooks.claude.command("done").hasSuffix("status done --agent claude"))
+    #expect(AgentHooks.codex.command("waiting").hasSuffix("status waiting --agent codex"))
+}
+
+/// Hooks from before the agent name count as outdated, so Settings offers Update.
+@Test func hooksWithoutTheAgentNameNeedAnUpdate() {
+    let old: [String: Any] = ["hooks": [
+        "Stop": [["hooks": [["type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status done"]]]],
+    ]]
+    #expect(!AgentHooks.claude.isInstalled(in: old))
+    #expect(AgentHooks.claude.hasAnyFarolHook(in: old))
 }

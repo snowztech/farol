@@ -13,10 +13,13 @@ public enum AgentStatus: String, Codable, CaseIterable, Sendable {
 public struct StatusMessage: Codable, Equatable, Sendable {
     public var pane: String
     public var status: AgentStatus?
+    /// Which agent reported it, like "claude" or "codex". Older hooks leave it out.
+    public var agent: String?
 
-    public init(pane: String, status: AgentStatus?) {
+    public init(pane: String, status: AgentStatus?, agent: String? = nil) {
         self.pane = pane
         self.status = status
+        self.agent = agent
     }
 }
 

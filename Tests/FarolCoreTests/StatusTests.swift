@@ -78,3 +78,9 @@ final class Listening {
         try StatusClient.send(StatusMessage(pane: "x", status: .working), to: "/tmp/farol-nobody-\(UUID().uuidString.prefix(8)).sock")
     }
 }
+
+@Test func deliversTheAgentName() throws {
+    let box = try Listening()
+    try StatusClient.send(StatusMessage(pane: "pane-1", status: .waiting, agent: "codex"), to: box.server.path)
+    #expect(box.messages(count: 1) == [StatusMessage(pane: "pane-1", status: .waiting, agent: "codex")])
+}

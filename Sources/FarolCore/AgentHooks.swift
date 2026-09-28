@@ -12,6 +12,8 @@ public struct AgentHooks {
     }
 
     public let name: String
+    /// Passed as `farol status --agent`, so the sidebar knows which agent is in a session.
+    public let id: String
     /// The file the agent reads its hooks from.
     public let file: URL
     public let events: [Event]
@@ -19,7 +21,7 @@ public struct AgentHooks {
     public var asksToApproveHooks = false
 
     /// Notification also fires as an idle reminder after a finished turn. Only permission prompts and questions mean waiting.
-    public static let claude = AgentHooks(name: "Claude Code", file: home(".claude/settings.json"), events: [
+    public static let claude = AgentHooks(name: "Claude Code", id: "claude", file: home(".claude/settings.json"), events: [
         Event(name: "UserPromptSubmit", status: "working", matcher: nil),
         Event(name: "PostToolUse", status: "working", matcher: nil),
         Event(name: "Notification", status: "waiting", matcher: "permission_prompt|elicitation_dialog"),
@@ -28,7 +30,7 @@ public struct AgentHooks {
     ])
 
     /// Codex has no session end event, so the last status stays until the session is opened.
-    public static let codex = AgentHooks(name: "Codex", file: home(".codex/hooks.json"), events: [
+    public static let codex = AgentHooks(name: "Codex", id: "codex", file: home(".codex/hooks.json"), events: [
         Event(name: "SessionStart", status: "clear", matcher: nil),
         Event(name: "UserPromptSubmit", status: "working", matcher: nil),
         Event(name: "PostToolUse", status: "working", matcher: nil),
@@ -43,13 +45,13 @@ public struct AgentHooks {
     }
 
     /// Does nothing outside Farol, where $FAROL_CLI is unset.
-    public static func command(_ status: String) -> String {
-        "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status \(status)"
+    public func command(_ status: String) -> String {
+        "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status \(status) --agent \(id)"
     }
 
     /// True when every Farol hook is there in its current form. Older ones count as missing, so Connect updates them.
     public func isInstalled(in settings: [String: Any]) -> Bool {
-        events.allSatisfy { Self.has(Self.command($0.status), matcher: $0.matcher, for: $0.name, in: settings) }
+        events.allSatisfy { Self.has(command($0.status), matcher: $0.matcher, for: $0.name, in: settings) }
     }
 
     /// Some Farol hook is there, current or not. With isInstalled false, that means they need an update.
@@ -67,7 +69,7 @@ public struct AgentHooks {
         var settings = remove(from: settings)
         var hooks = settings["hooks"] as? [String: Any] ?? [:]
         for event in events {
-            var group: [String: Any] = ["hooks": [["type": "command", "command": Self.command(event.status)]]]
+            var group: [String: Any] = ["hooks": [["type": "command", "command": command(event.status)]]]
             if let matcher = event.matcher { group["matcher"] = matcher }
             hooks[event.name] = (hooks[event.name] as? [[String: Any]] ?? []) + [group]
         }

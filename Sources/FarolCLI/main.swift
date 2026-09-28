@@ -2,14 +2,16 @@ import FarolCore
 import Foundation
 
 let usage = """
-usage: farol status working|waiting|done|clear
+usage: farol status working|waiting|done|clear [--agent name]
 
 Reports what the agent in this pane is doing, so Farol's sidebar can show it.
+--agent names the agent, like claude or codex, so the sidebar can show which one it is.
 Outside Farol it does nothing, so hooks that call it are safe in any terminal.
 """
 
 let arguments = Array(CommandLine.arguments.dropFirst())
-guard arguments.count == 2, arguments[0] == "status" else {
+let named = arguments.count == 4 && arguments[2] == "--agent"
+guard arguments.count == 2 || named, arguments[0] == "status" else {
     print(usage)
     exit(arguments.first == "help" || arguments.first == "--help" ? 0 : 64)
 }
@@ -29,7 +31,7 @@ let environment = ProcessInfo.processInfo.environment
 guard let pane = environment["FAROL_PANE"], let socket = environment["FAROL_SOCKET"] else { exit(0) }
 
 do {
-    try StatusClient.send(StatusMessage(pane: pane, status: status), to: socket)
+    try StatusClient.send(StatusMessage(pane: pane, status: status, agent: named ? arguments[3] : nil), to: socket)
 } catch {
     // Farol may have quit while the agent kept running. A hook must never fail the agent over that.
     exit(0)

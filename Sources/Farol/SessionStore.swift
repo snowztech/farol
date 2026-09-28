@@ -14,6 +14,8 @@ final class Session: ObservableObject, Identifiable {
     @Published var directory: String
     /// Reported per pane by agent hooks through `farol status`.
     @Published private(set) var agentStatus: [UUID: AgentStatus] = [:]
+    /// Which agent runs in each pane, like "claude", from hooks that name themselves.
+    @Published private(set) var agentName: [UUID: String] = [:]
     /// The program rang the bell or sent a notification while you were elsewhere. Covers agents without hooks.
     @Published var bellRang = false
     @Published private(set) var branch: String?
@@ -49,6 +51,17 @@ final class Session: ObservableObject, Identifiable {
 
     func setAgentStatus(_ status: AgentStatus?, pane: UUID) {
         agentStatus[pane] = status
+    }
+
+    /// Nil once the agent quits.
+    func setAgent(_ agent: String?, pane: UUID) {
+        agentName[pane] = agent
+    }
+
+    /// The focused pane's agent, or any other pane's when the focused one has none.
+    var agent: String? {
+        let live = panes.terminals.map(\.id)
+        return agentName[panes.focused.id] ?? live.lazy.compactMap { self.agentName[$0] }.first
     }
 
     /// Looking at the session is the acknowledgement, so the bell and "done" clear.
@@ -153,6 +166,12 @@ final class SessionStore: ObservableObject {
         // A "done" you are already looking at needs no light.
         let looking = session.id == selectedID && NSApp.isActive
         session.setAgentStatus(message.status == .done && looking ? nil : message.status, pane: pane)
+        // Clear means the agent quit. A done you are looking at only hides the dot, the agent is still there.
+        if message.status == nil {
+            session.setAgent(nil, pane: pane)
+        } else if let agent = message.agent {
+            session.setAgent(agent, pane: pane)
+        }
         report(session, from: before)
     }
 
