@@ -7,6 +7,7 @@ struct SettingsPage: View {
     @ObservedObject var settings: Settings
     @ObservedObject var agents: AgentSettings
     @ObservedObject var state: WindowState
+    @ObservedObject var updates: UpdateChecker
 
     @AppStorage(AppIcon.key) private var appIcon = AppIcon.default.rawValue
     @State private var claudeConnected = false
@@ -343,6 +344,14 @@ struct SettingsPage: View {
             .buttonStyle(.plain)
             .help("Copy the version")
             .padding(.top, 20)
+
+            if let version = updates.available {
+                Button("Farol \(version) is available. Download it.", action: updates.install)
+                    .buttonStyle(.link)
+                    .font(.system(size: 12))
+                    .tint(p.text)
+                    .padding(.top, 10)
+            }
 
             HStack(spacing: 18) {
                 link("GitHub", Self.repo)

@@ -26,6 +26,7 @@ struct Commands {
 struct TopBar: View {
     @ObservedObject var state: WindowState
     @ObservedObject var store: SessionStore
+    @ObservedObject var updates: UpdateChecker
     let commands: Commands
 
     var body: some View {
@@ -49,6 +50,10 @@ struct TopBar: View {
                 IconButton(symbol: "sidebar.left", help: "Toggle sidebar (⌘B)", palette: p, action: commands.toggleSidebar)
                 IconButton(symbol: "plus", help: "New session (⌘T)", palette: p, action: commands.newSession)
                 Spacer()
+                if let version = updates.available {
+                    UpdateBadge(version: version, palette: p, action: updates.install)
+                        .padding(.trailing, 6)
+                }
                 IconButton(symbol: "gearshape", help: "Settings (⌘,)", active: state.showingSettings,
                            palette: p, action: commands.toggleSettings)
             }
@@ -69,6 +74,30 @@ struct TopBar: View {
                 .frame(width: state.sidebarVisible ? 1 : 0)
             Rectangle().fill(p.background)
         }
+    }
+}
+
+/// Only there when a newer release exists, so it never takes room otherwise.
+private struct UpdateBadge: View {
+    let version: String
+    let palette: Palette
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Text("Update")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(hovering ? palette.text : palette.muted)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(palette.raised.opacity(hovering ? 1 : 0.6), in: Capsule())
+                .overlay(Capsule().strokeBorder(palette.line))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help("Farol \(version) is available. Download it.")
     }
 }
 
