@@ -27,7 +27,9 @@ public struct AgentHooks {
         Event(name: "SessionEnd", status: "clear", matcher: nil),
     ])
 
-    /// Codex has no session end event, so the last status stays until the session is opened.
+    /// Farol 0.6 connected Codex through these hooks, which never reached Farol.
+    /// Codex runs them in a background process that doesn't know their terminal.
+    /// Kept so enabling Codex in Settings can remove them.
     public static let codex = AgentHooks(name: "Codex", file: home(".codex/hooks.json"), events: [
         Event(name: "SessionStart", status: "clear", matcher: nil),
         Event(name: "UserPromptSubmit", status: "working", matcher: nil),
@@ -35,8 +37,6 @@ public struct AgentHooks {
         Event(name: "PermissionRequest", status: "waiting", matcher: nil),
         Event(name: "Stop", status: "done", matcher: nil),
     ], asksToApproveHooks: true)
-
-    public static let all = [claude, codex]
 
     private static func home(_ path: String) -> URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(path)
@@ -115,6 +115,11 @@ public struct AgentHooks {
     public static func write(_ settings: [String: Any], to url: URL) throws {
         let data = try JSONSerialization.data(
             withJSONObject: settings, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+        try replace(url, with: data + Data("\n".utf8))
+    }
+
+    /// Writes the file atomically, keeping the previous one next to it as a backup.
+    static func replace(_ url: URL, with data: Data) throws {
         let manager = FileManager.default
         try manager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         if manager.fileExists(atPath: url.path) {
@@ -122,7 +127,7 @@ public struct AgentHooks {
             try? manager.removeItem(at: backup)
             try manager.copyItem(at: url, to: backup)
         }
-        try (data + Data("\n".utf8)).write(to: url, options: .atomic)
+        try data.write(to: url, options: .atomic)
     }
 
     // MARK: Helpers
