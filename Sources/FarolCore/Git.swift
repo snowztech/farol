@@ -38,6 +38,11 @@ public enum Git {
     }
 
     /// The checked out branch, or nil outside a repo or on a detached HEAD.
+    /// The top of the checkout the folder is in. For a worktree, the worktree itself.
+    public static func topLevel(of directory: String) -> String? {
+        try? run(["rev-parse", "--show-toplevel"], in: directory)
+    }
+
     public static func branch(of directory: String) -> String? {
         guard let name = try? run(["symbolic-ref", "--quiet", "--short", "HEAD"], in: directory) else { return nil }
         return name.isEmpty ? nil : name
