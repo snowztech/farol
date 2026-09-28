@@ -42,7 +42,7 @@ It needs a Mac with Apple Silicon and macOS 14 or later. Releases are signed and
 - **Themes and settings.** Ghostty's 600+ themes with live previews, and settings inside the window.
 - **Copy and paste, accents and input methods.** Pasting text that could run commands asks first, dead keys compose as you type, and input methods for other languages work at the cursor.
 
-Coming next: tickets from GitHub, GitLab and Jira, and a diff view. See [ROADMAP.md](ROADMAP.md).
+Coming next: Codex status, a review view for what an agent did, and GitLab, GitHub and Jira integrations. See [ROADMAP.md](ROADMAP.md).
 
 ## Agent status
 

@@ -1,75 +1,75 @@
 # Roadmap
 
-The goal: a terminal where you run several coding agents side by side, each on its own branch, started from a ticket and reviewed without leaving the window.
+The goal: an agentic terminal that is easy to use. You start a task, an agent works on it in its own branch, and you review and ship the result without leaving the window.
 
 Three rules decide what gets in:
 
 - **Speed first.** No feature may add input latency or slow down startup. Hidden sessions never render.
 - **Terminal first.** Agents are command line tools. Farol hosts them and gives them context. It does not wrap them in a chat UI or become an agent itself.
-- **Quiet UI.** Every control earns its place. When in doubt, it goes behind a shortcut.
+- **Quiet UI.** Every control earns its place. A feature you have not set up stays out of sight.
+
+Milestones are themes, not version numbers. Releases ship whatever is ready.
 
 ## Done
 
 - Terminal engine: libghostty embedded through `GhosttyTerminal`
-- Session sidebar, shortcuts, closing the last session quits
-- Split panes with Ghostty's shortcuts, restored after a relaunch
-- Find in scrollback with a match count
-- Attention light when a session rings the bell or sends a notification
-- Themes with live previews, chrome that follows the theme
-- In-window settings and `~/.config/farol/config`
-- App icon, `make install`, style check in CI
+- Session sidebar with branches, rename and drag to reorder, restored after a relaunch
+- Split panes with names, find in scrollback, copy and paste, dead keys and input methods
+- Right-click menu: copy, paste, split, name and close a pane
+- Worktree sessions, and closing one offers to remove the worktree when that is safe
+- Agent status: `farol status`, one-click Claude Code setup, colored dots, notifications and a Dock badge
+- New sessions can start Claude Code, Codex or any command
+- Settings page and `~/.config/farol/config` kept in sync, custom themes
+- Signed and notarized DMG on GitHub Releases, landing page, CI and a prebuilt libghostty
 
-## v0.1: daily driver
+## Now: easy to start
 
-Farol can replace Ghostty or Warp for everyday work, and sessions start to be about branches.
+Someone who downloads Farol understands what it is for in the first minute.
 
-- [x] Copy and paste
-- [x] Dead keys and input methods (accents, CJK)
-- [x] Restore sessions on relaunch, same folders in the same order
-- [x] Worktree sessions: "New session in repo" creates a branch and a git worktree, and opens the terminal there
-- [x] Sidebar shows the repo and branch of each session
-- [x] Closing a worktree session offers to remove the worktree
-- [ ] Release: signed and notarized build on GitHub Releases, Homebrew cask
-
-Worktree logic lives in the `FarolCore` module with tests, since it is the first code that can lose work if it is wrong.
-
-## v0.2: agents
-
-Farol knows what each agent is doing, not just that it rang the bell.
-
-- [x] `farol` command line tool that talks to the app over a local socket, for example `farol status waiting`
-- [x] Ready-made hooks for Claude Code that report working, waiting and done
-- [ ] The same for Codex, and a one-click setup instead of pasting hooks
-- [ ] Default agent in settings, so a new session can start `claude` or `codex` directly
-- [x] macOS notification and Dock badge when an agent waits while Farol is in the background
+- [x] **New task**: one flow that picks the repo, takes a task description, creates the worktree and starts the agent with the task as its first prompt
+- [ ] Codex: status from its terminal notifications, then from its hooks
 - [ ] Sessions grouped by repo in the sidebar
+- [x] Update check: a quiet Update button when a new version is out
+- [ ] Install updates in place (Sparkle), behind the same button
+- [ ] Homebrew cask
 
-## v0.3: tickets
+## Next: review
 
-Start work from the ticket instead of copying it into a prompt.
+Most of the time with parallel agents goes into checking what they did. That work belongs in Farol.
 
-- [ ] Ticket picker for GitHub issues, GitLab issues and Jira
-- [ ] Branch named from the ticket, ticket text sent as the first prompt
-- [ ] Tokens stored in the macOS Keychain
-- [ ] MCP config written into the worktree, so the agent can read comments and update the ticket
-- [ ] Session shows its ticket and links to it
+- [ ] Diff of a session against its base branch
+- [ ] Push the branch and open a merge request or pull request from the session
+- [ ] Pipeline status and open review comments in the sidebar, with a notification when a pipeline fails
+- [ ] Send review comments or a failed job's log back to the agent in one action
 
-## v0.4: review
+## Then: integrations
 
-Check what an agent did and ship it from the same window.
+Work comes from a ticket and goes out as a merge request, on the services teams already use, hosted or self-hosted.
 
-- [ ] Diff view of a session against its base branch
-- [ ] Light editor for small fixes: open a file, syntax highlighting with tree-sitter, save
-- [ ] Push the branch and open a pull or merge request from the session
+- [ ] Settings → Integrations for GitLab, GitHub and Jira, with a server field for self-hosted instances
+- [ ] Reuse `glab` and `gh` logins when they exist, otherwise a token stored in the macOS Keychain
+- [ ] Jira Cloud and Jira Data Center, detected from the URL
+- [ ] Start a New task from a Jira ticket: branch named after the ticket, ticket text as the first prompt, ticket moved to In Progress
+- [ ] The session shows its ticket and links to it
+- [ ] MCP config written into the worktree, so the agent can read and update the ticket and the merge request
+
+Everything talks to your servers directly. Nothing goes through a Farol service.
+
+## Hardening
+
+- [ ] Checksum for the prebuilt libghostty, checked before every release
+- [ ] Signing secrets in a GitHub environment that only release tags can use
+- [ ] A checksum published next to the DMG
 
 ## Later
 
+- Linear and GitHub Issues as ticket sources
 - Command palette
-- Language server support in the editor
+- A light editor for small fixes in the diff view
 
 ## Not planned
 
-- A full IDE. The editor stays small, and big changes belong in your own editor.
+- A full IDE. Big changes belong in your own editor.
 - A chat interface or an agent built into Farol.
 - Plugins, until the core is stable.
 - Linux and Windows. Farol is a native macOS app.
