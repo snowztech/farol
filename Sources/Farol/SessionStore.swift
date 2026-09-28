@@ -94,8 +94,11 @@ final class Session: ObservableObject, Identifiable {
         String(title.drop { $0.isWhitespace || $0.unicodeScalars.allSatisfy { $0.properties.generalCategory == .otherSymbol } })
     }
 
+    /// Shells title the window with the folder, sometimes shortened to "…/dev/project" or "dev/project".
+    /// A path has a slash and no spaces, while a program title like "vim src/main.swift" has spaces.
     private var hasProgramTitle: Bool {
-        !(title.isEmpty || title.contains("@") || title.hasPrefix("~") || title.hasPrefix("/"))
+        let looksLikePath = title.contains("/") && !title.contains(" ")
+        return !(title.isEmpty || title.contains("@") || title.hasPrefix("~") || looksLikePath)
     }
 
     private var folderName: String {

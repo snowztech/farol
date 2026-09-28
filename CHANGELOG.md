@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- A session whose shell titles it with a shortened path, like "dev/oss/farol", shows the folder name instead.
+
 ## [0.4.0] - 2026-09-28
 
 ### Added
