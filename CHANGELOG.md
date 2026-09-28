@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Name a pane with ⇧⌘R or Session → Name Pane. The name shows in the pane's corner, double-click it to rename, and it comes back after a relaunch.
+
 ### Fixed
 
 - Text keeps its size when you move the window between a Retina screen and an external monitor.

@@ -392,6 +392,7 @@ struct SettingsPage: View {
             ("Resize the focused pane", ["⌃⌘ arrows"]),
             ("Make panes equal", ["⌃⌘="]),
             ("Zoom the focused pane", ["⇧⌘↩"]),
+            ("Name the focused pane", ["⇧⌘R"]),
         ]),
         ShortcutGroup(title: "Find", items: [
             ("Find", ["⌘F"]),

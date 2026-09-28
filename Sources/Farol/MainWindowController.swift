@@ -221,6 +221,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: Find
 
+    func namePane() { store.selected?.panes.nameFocusedPane() }
     func find() { store.selected?.panes.focused.startSearch() }
     func findNext() { store.selected?.panes.searchTarget.searchNext() }
     func findPrevious() { store.selected?.panes.searchTarget.searchPrevious() }

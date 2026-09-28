@@ -35,10 +35,13 @@ final class PaneContainer: NSView {
         didSet {
             needsDisplay = true
             searchBar?.apply(background: theme.background, foreground: theme.foreground)
+            applyFocus()
         }
     }
     private var dividerColor: NSColor { theme.background.mixed(with: theme.foreground, 0.11) }
     private var searchBar: SearchBar?
+    /// Only panes you named have one.
+    private var labels: [UUID: PaneLabel] = [:]
     var onFocusChange: ((TerminalView) -> Void)?
     /// Panes were added, removed or resized, so the saved layout is out of date.
     var onLayoutChange: (() -> Void)?
@@ -54,10 +57,13 @@ final class PaneContainer: NSView {
 
     /// Rebuilds saved panes. `make` creates a terminal in a folder.
     init(_ layout: PaneLayout, make: (String) -> TerminalView) {
+        var names: [(TerminalView, String)] = []
         func build(_ layout: PaneLayout) -> Node {
             switch layout {
-            case .terminal(let directory):
-                return Node(make(directory))
+            case .terminal(let directory, let name):
+                let terminal = make(directory)
+                if let name { names.append((terminal, name)) }
+                return Node(terminal)
             case .split(let horizontal, let ratio, let first, let second):
                 let node = Node(nil)
                 node.axis = horizontal ? .horizontal : .vertical
@@ -71,11 +77,14 @@ final class PaneContainer: NSView {
         focused = root.leaves[0]
         super.init(frame: .zero)
         root.leaves.forEach(adopt)
+        for (terminal, name) in names { labels[terminal.id] = makeLabel(for: terminal, name: name) }
     }
 
     var layoutSnapshot: PaneLayout {
         func snapshot(_ node: Node) -> PaneLayout {
-            if let terminal = node.terminal { return .terminal(directory: terminal.workingDirectory ?? NSHomeDirectory()) }
+            if let terminal = node.terminal {
+                return .terminal(directory: terminal.workingDirectory ?? NSHomeDirectory(), name: labels[terminal.id]?.name)
+            }
             return .split(horizontal: node.axis == .horizontal, ratio: Double(node.ratio),
                           first: snapshot(node.children[0]), second: snapshot(node.children[1]))
         }
@@ -114,6 +123,7 @@ final class PaneContainer: NSView {
         parent.ratio = sibling.ratio
         parent.children.forEach { $0.parent = parent }
         if searchBar?.terminal === terminal { hideSearch() }
+        labels.removeValue(forKey: terminal.id)?.removeFromSuperview()
         terminal.removeFromSuperview()
         zoomed = false
         if terminal === focused { focus(parent.leaves[0]) }
@@ -192,6 +202,7 @@ final class PaneContainer: NSView {
             place(root, in: bounds)
         }
         applyFocus()
+        placeLabels()
         placeSearchBar()
         window?.invalidateCursorRects(for: self)
         needsDisplay = true
@@ -258,6 +269,41 @@ final class PaneContainer: NSView {
         bar.frame = NSRect(x: terminal.frame.maxX - size.width - 10, y: terminal.frame.minY + 8,
                            width: min(size.width, terminal.frame.width - 20), height: size.height)
         if subviews.last !== bar { addSubview(bar, positioned: .above, relativeTo: nil) }
+    }
+
+    // MARK: Names
+
+    /// Shows the focused pane's label ready for typing, adding one if the pane has no name yet.
+    func nameFocusedPane() {
+        let label = labels[focused.id] ?? makeLabel(for: focused, name: "")
+        labels[focused.id] = label
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+        label.beginEditing()
+    }
+
+    private func makeLabel(for terminal: TerminalView, name: String) -> PaneLabel {
+        let label = PaneLabel()
+        label.name = name
+        label.onCommit = { [weak self, weak terminal] name in
+            guard let self, let terminal else { return }
+            if name == nil { self.labels.removeValue(forKey: terminal.id)?.removeFromSuperview() }
+            self.needsLayout = true
+            self.focus(terminal)
+            self.onLayoutChange?()
+        }
+        return label
+    }
+
+    /// Top right of each named pane. The search bar takes that corner while it is open.
+    private func placeLabels() {
+        for terminal in terminals {
+            guard let label = labels[terminal.id] else { continue }
+            label.isHidden = terminal.isHidden || searchBar?.terminal === terminal
+            let width = min(label.fittingWidth, terminal.frame.width - 20)
+            label.frame = NSRect(x: terminal.frame.maxX - width - 10, y: terminal.frame.minY + 8, width: width, height: 20)
+            if label.superview == nil { addSubview(label, positioned: .above, relativeTo: terminal) }
+        }
     }
 
     // MARK: Dividers
@@ -342,6 +388,7 @@ final class PaneContainer: NSView {
         let single = terminals.count == 1 || zoomed
         for terminal in terminals {
             terminal.alphaValue = single || terminal === focused ? 1 : Self.unfocusedAlpha
+            labels[terminal.id]?.apply(background: theme.background, foreground: theme.foreground, focused: terminal === focused)
         }
     }
 
@@ -373,14 +420,15 @@ final class PaneContainer: NSView {
     }
 }
 
-/// A session's panes as saved between launches: each terminal's folder, and each split's direction and share.
+/// A session's panes as saved between launches: each terminal's folder and name, and each split's direction and share.
 indirect enum PaneLayout: Codable {
-    case terminal(directory: String)
+    /// `name` is optional, so layouts saved before panes had names still load.
+    case terminal(directory: String, name: String? = nil)
     case split(horizontal: Bool, ratio: Double, first: PaneLayout, second: PaneLayout)
 
     var directories: [String] {
         switch self {
-        case .terminal(let directory): [directory]
+        case .terminal(let directory, _): [directory]
         case .split(_, _, let first, let second): first.directories + second.directories
         }
     }
