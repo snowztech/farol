@@ -4,18 +4,19 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
-### Added
+## [0.8.0] - 2026-09-28
 
-- Edit the file you opened from the files panel, and save with ⌘S. A dot next to the name marks unsaved edits, and Farol asks before closing the file, the session or the app with unsaved edits. Saving keeps the file's permissions.
-- When an agent changes the open file, the pane reloads and keeps your place. With unsaved edits, it asks whether to reload or keep yours.
-- A new line starts at the same indent as the one above.
-- Undo, Redo and Cut in the Edit menu.
-- ⌘[ and ⌘] move to the file pane too, like any other pane.
+Your project's files next to the terminal, with a light editor for quick fixes while agents work.
 
 ### Added
 
 - Files panel (⇧⌘E, or the folder button in the title bar): the session's project as a tree, next to the sidebar. Folders load when you open them, hidden and git-ignored files are dimmed, and new files show up as agents create them. Nothing is watched while the panel is closed.
-- Click a file to open it in a pane beside the terminal, with line numbers and ⌘F. Opening another file reuses the pane, ⌘W closes it, and it comes back after a relaunch. Editing comes next.
+- Click a file to open it in a pane beside the terminal, with line numbers and ⌘F. Opening another file reuses the pane, ⌘W closes it, and it comes back after a relaunch.
+- Edit the open file and save with ⌘S. A dot next to the name marks unsaved edits, and Farol asks before closing the file, the session or the app with unsaved edits. Saving keeps the file's permissions.
+- When an agent changes the open file, the pane reloads and keeps your place. With unsaved edits, it asks whether to reload or keep yours.
+- A new line starts at the same indent as the one above.
+- Undo, Redo and Cut in the Edit menu.
+- ⌘[ and ⌘] move to the file pane too, like any other pane.
 
 ### Changed
 
@@ -198,7 +199,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/snowztech/farol/releases/tag/v0.8.0
 [0.7.0]: https://github.com/snowztech/farol/releases/tag/v0.7.0
 [0.6.0]: https://github.com/snowztech/farol/releases/tag/v0.6.0
 [0.5.0]: https://github.com/snowztech/farol/releases/tag/v0.5.0
