@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- Session names drop the extra parts agents add after a separator, so a Codex session shows "Design codebase" instead of "Design codebase | farol", and "farol" instead of "| farol" before the conversation has a name.
+
 ## [0.6.0] - 2026-09-28
 
 Codex joins Claude Code in the sidebar, and notifications say plainly what the agent needs from you.
