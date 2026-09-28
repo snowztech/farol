@@ -170,16 +170,9 @@ final class FileView: NSView {
         gutter.isHidden = text != nil
     }
 
-    /// The name, then a small dot for unsaved edits, centered on the text rather than sitting on its baseline.
     private func updateTitle() {
-        let color = title.textColor ?? .labelColor
-        let result = NSMutableAttributedString(
-            string: (path as NSString).lastPathComponent, attributes: [.font: title.font!, .foregroundColor: color])
-        if isDirty {
-            result.append(NSAttributedString(
-                string: "  ●", attributes: [.font: NSFont.systemFont(ofSize: 7), .foregroundColor: color, .baselineOffset: 2]))
-        }
-        title.attributedStringValue = result
+        let name = (path as NSString).lastPathComponent
+        title.stringValue = isDirty ? "\(name)  ●" : name
     }
 
     // MARK: Saving
@@ -276,7 +269,6 @@ final class FileView: NSView {
         conflict.layer?.backgroundColor = background.mixed(with: foreground, 0.07).cgColor
         conflictText.textColor = foreground
         title.textColor = background.mixed(with: foreground, 0.75)
-        updateTitle()
         closeButton.contentTintColor = background.mixed(with: foreground, 0.55)
         message.textColor = background.mixed(with: foreground, 0.55)
         scroll.backgroundColor = background
