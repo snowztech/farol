@@ -22,3 +22,13 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+------------------------------------------------------------------------------
+
+Claude and OpenAI logos (Sources/Farol/AgentLogo.swift)
+https://simpleicons.org
+
+The icon shapes come from Simple Icons and are released under CC0 1.0
+(public domain). The Claude mark is a trademark of Anthropic and the OpenAI
+mark is a trademark of OpenAI. Farol uses them only to show which tool runs
+in a session. Farol is not affiliated with or endorsed by either company.

@@ -61,7 +61,7 @@ When an agent waits or finishes while Farol is in the background, you get a noti
 
 **Codex:** same place, click **Connect**. Farol adds its hooks to `~/.codex/hooks.json`, and Codex asks you to approve them the next time it starts. Codex has no event for quitting, so a session keeps its last status until you open it.
 
-The session row also shows which agent it is: ✳ for Claude Code, >_ for Codex.
+The session row also shows which agent it is, with a small Claude Code or Codex logo before its name.
 
 **Other agents** can report with `"$FAROL_CLI" status working|waiting|done|clear`, which Farol makes available in every session. Agents that ring the terminal bell show as waiting without any setup.
 
