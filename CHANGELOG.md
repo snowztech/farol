@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- A Codex session no longer shows as "| farol" before its conversation has a name. It shows the project name until Codex titles the conversation.
+
 ## [0.6.0] - 2026-09-28
 
 Codex joins Claude Code in the sidebar, and notifications say plainly what the agent needs from you.

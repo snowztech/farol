@@ -87,12 +87,8 @@ final class Session: ObservableObject, Identifiable {
         return (directory as NSString).abbreviatingWithTildeInPath
     }
 
-    /// Agents like Claude Code put a status glyph in front of the title. The sidebar dot already shows that.
-    private var programTitle: String { Self.withoutGlyph(title) }
-
-    static func withoutGlyph(_ title: String) -> String {
-        String(title.drop { $0.isWhitespace || $0.unicodeScalars.allSatisfy { $0.properties.generalCategory == .otherSymbol } })
-    }
+    /// Agents put their status in the title, like Claude Code's ✳. The sidebar dot already shows it.
+    private var programTitle: String { AgentTitle.withoutStatus(title) }
 
     /// Shells title the window with the folder, sometimes shortened to "…/dev/project" or "dev/project".
     /// A path has a slash and no spaces, while a program title like "vim src/main.swift" has spaces.
@@ -217,7 +213,7 @@ final class SessionStore: ObservableObject {
             guard let session, terminal === session.panes.focused else { return }
             // Agents animate a glyph in the title many times a second, and those frames are not worth a git lookup.
             // A shell re-sends the same title at each prompt, which is how a `git checkout` gets noticed.
-            let glyphOnly = $0 != Session.withoutGlyph($0) && Session.withoutGlyph($0) == Session.withoutGlyph(session.title)
+            let glyphOnly = $0 != AgentTitle.withoutStatus($0) && AgentTitle.withoutStatus($0) == AgentTitle.withoutStatus(session.title)
             session.title = $0
             if !glyphOnly { session.refreshGit() }
         }
