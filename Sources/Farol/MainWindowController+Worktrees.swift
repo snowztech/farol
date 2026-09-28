@@ -79,6 +79,7 @@ extension MainWindowController {
 
     /// ⌘W: closes the focused pane, or the whole session when it is the last one.
     func requestClosePane(_ session: Session) {
+        if session.panes.fileFocused { return session.panes.closeFile() }
         let terminal = session.panes.focused
         guard session.panes.terminals.count > 1 else { return requestClose(session) }
         guard terminal.hasRunningProcess, let window else {

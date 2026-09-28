@@ -16,6 +16,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private let content = NSView()
     private let terminalContainer = NSView()
     private var sidebarWidth: NSLayoutConstraint!
+    private var filesWidth: NSLayoutConstraint!
+    private let files = FileTree()
+    /// Follows the selected session's folder while the files panel is open.
+    private var filesRoot: AnyCancellable?
+    private static let filesVisibleKey = "files.visible"
     private var settingsView: NSView!
 
     let agents: AgentSettings
@@ -48,6 +53,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             newTask: { [weak self] in self?.newTask() },
             closeSession: { [weak self] in self?.requestClose($0) },
             toggleSidebar: { [weak self] in self?.toggleSidebar() },
+            toggleFiles: { [weak self] in self?.toggleFiles() },
             toggleSettings: { [weak self] in self?.toggleSettings() },
             titleBarDoubleClick: { [weak self] in self?.titleBarDoubleClicked() })
 
@@ -55,17 +61,23 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let topBar = hosting(TopBar(state: state, store: store, updates: updates, commands: commands))
         let sidebar = hosting(SidebarView(store: store, state: state, commands: commands))
         sidebar.clipsToBounds = true
+        let filesPanel = hosting(FilesPanel(tree: files, state: state) { [weak self] path in
+            self?.store.selected?.panes.open(path)
+        })
+        filesPanel.clipsToBounds = true
+        state.filesVisible = UserDefaults.standard.bool(forKey: Self.filesVisibleKey)
         settingsView = hosting(SettingsPage(settings: settings, agents: agents, state: state, updates: updates))
         settingsView.isHidden = true
 
         content.wantsLayer = true
-        for v in [topBar, sidebar, content] { root.addSubview(v) }
+        for v in [topBar, sidebar, filesPanel, content] { root.addSubview(v) }
         for v in [terminalContainer, settingsView!] { content.addSubview(v) }
-        for v in [topBar, sidebar, content, terminalContainer, settingsView!] {
+        for v in [topBar, sidebar, filesPanel, content, terminalContainer, settingsView!] {
             v.translatesAutoresizingMaskIntoConstraints = false
         }
 
         sidebarWidth = sidebar.widthAnchor.constraint(equalToConstant: SidebarView.width)
+        filesWidth = filesPanel.widthAnchor.constraint(equalToConstant: state.filesVisible ? FilesPanel.width : 0)
         NSLayoutConstraint.activate([
             topBar.topAnchor.constraint(equalTo: root.topAnchor),
             topBar.leadingAnchor.constraint(equalTo: root.leadingAnchor),
@@ -77,8 +89,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             sidebar.bottomAnchor.constraint(equalTo: root.bottomAnchor),
             sidebarWidth,
 
+            filesPanel.topAnchor.constraint(equalTo: topBar.bottomAnchor),
+            filesPanel.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
+            filesPanel.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            filesWidth,
+
             content.topAnchor.constraint(equalTo: topBar.bottomAnchor),
-            content.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
+            content.leadingAnchor.constraint(equalTo: filesPanel.trailingAnchor),
             content.trailingAnchor.constraint(equalTo: root.trailingAnchor),
             content.bottomAnchor.constraint(equalTo: root.bottomAnchor),
 
@@ -181,6 +198,29 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    /// Opens or closes the files panel. It remembers the choice, and only watches the disk while open.
+    func toggleFiles() {
+        let open = !state.filesVisible
+        UserDefaults.standard.set(open, forKey: Self.filesVisibleKey)
+        withAnimation(.easeOut(duration: 0.18)) { state.filesVisible = open }
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.18
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            filesWidth.animator().constant = open ? FilesPanel.width : 0
+        }
+        followFiles(store.selected)
+    }
+
+    private func followFiles(_ session: Session?) {
+        guard state.filesVisible, let session else {
+            filesRoot = nil
+            files.show(nil)
+            return
+        }
+        filesRoot = session.$topLevel.combineLatest(session.$directory)
+            .sink { [weak self] topLevel, directory in self?.files.show(topLevel ?? directory) }
+    }
+
     /// Does what the user chose in System Settings for a title bar double-click: zoom, minimize or nothing.
     func titleBarDoubleClicked() {
         switch UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick") {
@@ -224,10 +264,28 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     // MARK: Find
 
     func namePane() { store.selected?.panes.nameFocusedPane() }
-    func find() { store.selected?.panes.focused.startSearch() }
-    func findNext() { store.selected?.panes.searchTarget.searchNext() }
-    func findPrevious() { store.selected?.panes.searchTarget.searchPrevious() }
-    func findSelection() { store.selected?.panes.focused.searchSelection() }
+    /// The open file when it has focus, else the terminal search.
+    private var focusedFile: FileView? {
+        guard let panes = store.selected?.panes, panes.fileFocused else { return nil }
+        return panes.file
+    }
+
+    func find() {
+        if let file = focusedFile { return file.find(.showFindInterface) }
+        store.selected?.panes.focused.startSearch()
+    }
+    func findNext() {
+        if let file = focusedFile { return file.find(.nextMatch) }
+        store.selected?.panes.searchTarget.searchNext()
+    }
+    func findPrevious() {
+        if let file = focusedFile { return file.find(.previousMatch) }
+        store.selected?.panes.searchTarget.searchPrevious()
+    }
+    func findSelection() {
+        if let file = focusedFile { return file.find(.setSearchString) }
+        store.selected?.panes.focused.searchSelection()
+    }
 
     private func host(_ session: Session) {
         session.panes.frame = terminalContainer.bounds
@@ -272,6 +330,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         for s in store.sessions {
             s.panes.setVisible(!settings && s.id == session?.id)
         }
-        if !settings, let session { window?.makeFirstResponder(session.panes.focused) }
+        if !settings, let session { window?.makeFirstResponder(session.panes.focusTarget) }
+        followFiles(session)
     }
 }

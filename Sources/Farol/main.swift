@@ -50,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func toggleSettings(_ sender: Any?) { windowController.toggleSettings() }
     @objc func toggleSidebar(_ sender: Any?) { windowController.toggleSidebar() }
+    @objc func toggleFiles(_ sender: Any?) { windowController.toggleFiles() }
     @objc func reloadConfig(_ sender: Any?) {
         settings.reload()
         windowController.handle(.reloadConfig)
@@ -107,6 +108,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let view = NSMenu(title: "View")
         view.addItem(withTitle: "Toggle Sidebar", action: #selector(toggleSidebar), keyEquivalent: "b")
+        view.addItem(withTitle: "Toggle Files", action: #selector(toggleFiles), keyEquivalent: "E")
         main.addItem(submenu: view, title: "View")
 
         for menu in [app, sessions, view] {
