@@ -14,7 +14,7 @@
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License"></a>
 </p>
 
-<p align="center"><img src="site/screenshot-review.png" width="800" alt="Farol with agent sessions in the sidebar and the review panel showing a branch's changes since main"></p>
+<p align="center"><img src="site/screenshot-sessions.png" width="800" alt="Farol running Claude Code, with other agent sessions in the sidebar, one working, one waiting for you and one done"></p>
 
 Run several coding agents side by side, each in its own session, and Farol shows you which one is working, which one is done and which one needs you. Farol is Portuguese for lighthouse.
 
@@ -45,6 +45,8 @@ It needs a Mac with Apple Silicon and macOS 14 or later. Releases are signed and
 - **Copy and paste, accents and input methods.** Pasting text that could run commands asks first, dead keys compose as you type, and input methods for other languages work at the cursor.
 
 Coming next: a review view for what an agent did, and GitLab, GitHub and Jira integrations. See [ROADMAP.md](ROADMAP.md).
+
+<p align="center"><img src="site/screenshot-review.png" width="800" alt="The review panel next to Claude Code, showing a branch's changes since main as one scrolling diff"></p>
 
 ## Agent status
 
