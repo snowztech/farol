@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Right-click a terminal for Copy, Paste, Split Right, Split Down, Name Pane and Close. Programs that use the mouse, like vim or htop, still get the click.
+
 ## [0.3.0] - 2026-09-28
 
 ### Added
