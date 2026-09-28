@@ -59,6 +59,14 @@ public enum Diff {
         return ["main", "master"].first { (try? Git.run(["rev-parse", "--verify", "--quiet", $0], in: directory)) != nil }
     }
 
+    /// Local branches to compare with, most recently committed first, leaving out the one checked out.
+    public static func branches(in directory: String, limit: Int = 15) -> [String] {
+        let output = (try? Git.run(["for-each-ref", "--sort=-committerdate", "--format=%(refname:short)", "refs/heads"],
+                                   in: directory)) ?? ""
+        let current = Git.branch(of: directory)
+        return Array(output.split(separator: "\n").map(String.init).filter { $0 != current }.prefix(limit))
+    }
+
     /// Uncommitted when HEAD is the base branch itself, where "since the branch left" means nothing.
     public static func defaultScope(in directory: String) -> Scope {
         guard let base = baseBranch(in: directory), let branch = Git.branch(of: directory),

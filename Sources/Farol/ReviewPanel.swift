@@ -24,8 +24,8 @@ final class ReviewModel: ObservableObject {
     @Published private(set) var root: String?
     @Published private(set) var branch: String?
     @Published private(set) var scope = Diff.Scope.uncommitted
-    /// The branch "since" compares against. Nil when the repo has none, which hides the choice.
-    @Published private(set) var base: String?
+    /// Branches to compare with, the base one first.
+    @Published private(set) var branches: [String] = []
     @Published private(set) var stat = Diff.Stat()
     @Published private(set) var rows: [Row] = []
     @Published private(set) var error: String?
@@ -61,11 +61,13 @@ final class ReviewModel: ObservableObject {
         if rootChanged { watcher = FolderWatcher(root) { [weak self] in self?.changed($0) } }
         DispatchQueue.global(qos: .userInitiated).async {
             let base = Diff.baseBranch(in: root)
+            let local = Diff.branches(in: root)
+            let branches = (base.map { [$0] } ?? []) + local.filter { base != $0 && base != "origin/\($0)" }
             let scope = Diff.defaultScope(in: root)
             let ignored = Files.ignored(in: root).map { $0 + "/" }
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root else { return }
-                self.base = base
+                self.branches = branches
                 self.ignored = ignored
                 self.scope = self.chosenScope[root] ?? scope
                 self.refresh()
@@ -160,17 +162,9 @@ struct ReviewPanel: View {
         let p = state.palette
         VStack(alignment: .leading, spacing: 0) {
             header(p)
-            if let base = review.base {
-                Picker("", selection: Binding(get: { review.scope }, set: { review.choose($0) })) {
-                    Text("Uncommitted").tag(Diff.Scope.uncommitted)
-                    Text("Since \(base.replacingOccurrences(of: "origin/", with: ""))").tag(Diff.Scope.branch(base: base))
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
-                .padding(.horizontal, 14)
+            ScopeMenu(review: review, palette: p)
+                .padding(.horizontal, 10)
                 .padding(.bottom, 8)
-            }
             Rectangle().fill(p.line).frame(height: 1)
             if let error = review.error {
                 message(error, p)
@@ -222,8 +216,9 @@ struct ReviewPanel: View {
                 .padding(.leading, 58)
                 .frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
                 .background(p.surface)
+                .padding(.horizontal, 8)
         case .line(_, _, let line):
-            DiffLine(line: line, palette: p)
+            DiffLine(line: line, palette: p).padding(.horizontal, 8)
         case .note(_, let text):
             Text(text).font(.system(size: 12)).foregroundStyle(p.muted).padding(.leading, 58).frame(height: 24)
         }
@@ -249,6 +244,59 @@ struct ReviewPanel: View {
                     resize(start - drag.translation.width)
                 }
                 .onEnded { _ in dragStart = nil })
+    }
+}
+
+/// "⇄ Uncommitted changes", a quiet menu to pick what the panel compares with, like Warp's.
+private struct ScopeMenu: View {
+    @ObservedObject var review: ReviewModel
+    let palette: Palette
+
+    @State private var hovering = false
+
+    var body: some View {
+        Menu {
+            Button { review.choose(.uncommitted) } label: { item("Uncommitted changes", .uncommitted) }
+            if !review.branches.isEmpty {
+                Section("Changes since") {
+                    ForEach(review.branches, id: \.self) { branch in
+                        Button { review.choose(.branch(base: branch)) } label: { item(Self.name(branch), .branch(base: branch)) }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.left.arrow.right").font(.system(size: 10.5, weight: .semibold))
+                Text(title)
+                Image(systemName: "chevron.down").font(.system(size: 8.5, weight: .bold)).foregroundStyle(palette.muted)
+            }
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(palette.text)
+            .padding(.horizontal, 8)
+            .frame(height: 24)
+            .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised : .clear))
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .onHover { hovering = $0 }
+    }
+
+    private var title: String {
+        switch review.scope {
+        case .uncommitted: "Uncommitted changes"
+        case .branch(let base): "Changes since \(Self.name(base))"
+        }
+    }
+
+    @ViewBuilder private func item(_ title: String, _ scope: Diff.Scope) -> some View {
+        if review.scope == scope { Label(title, systemImage: "checkmark") } else { Text(title) }
+    }
+
+    /// origin/main reads as main. The remote is an implementation detail here.
+    static func name(_ branch: String) -> String {
+        branch.hasPrefix("origin/") ? String(branch.dropFirst("origin/".count)) : branch
     }
 }
 
@@ -288,21 +336,29 @@ private struct FileHeader: View {
                 .lineLimit(1)
                 .truncationMode(.head)
             if let status { Text(status).font(.system(size: 11)).foregroundStyle(palette.muted) }
-            Counts(added: file.added, removed: file.removed, palette: palette).font(.system(size: 11.5))
+            Counts(added: file.added, removed: file.removed, palette: palette)
+                .font(.system(size: 11))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(palette.line))
             Spacer(minLength: 8)
-            IconButton(symbol: "doc.on.doc", help: "Copy path", palette: palette) {
+            IconButton(symbol: "square.on.square", help: "Copy path", palette: palette) {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(file.path, forType: .string)
             }
             if file.status != .deleted {
-                IconButton(symbol: "arrow.up.forward.square", help: "Open file", palette: palette, action: open)
+                IconButton(symbol: "arrow.up.right.square", help: "Open in the file pane", palette: palette, action: open)
             }
         }
         .padding(.leading, 10)
         .padding(.trailing, 6)
-        .frame(height: 32)
-        .background(hovering ? palette.raised : palette.surface)
-        .overlay(alignment: .top) { Rectangle().fill(palette.line).frame(height: 1) }
+        .frame(height: 34)
+        .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised : palette.surface))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(palette.line))
+        // Room between files, so each one reads as its own block.
+        .padding(.horizontal, 8)
+        .padding(.top, 10)
+        .padding(.bottom, 4)
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture(perform: toggle)
