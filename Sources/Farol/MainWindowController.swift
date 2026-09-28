@@ -113,8 +113,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         // @Published reports the new value before the property changes, so pass it along.
         badgeSwitch = agents.$dockBadge.dropFirst().sink { [weak self] in self?.refreshBadge(enabled: $0) }
         notifier.onOpen = { [weak self] id in
-            guard let self, let session = store.sessions.first(where: { $0.id == id }) else { return }
-            store.select(session)
+            guard let self, let session = self.store.sessions.first(where: { $0.id == id }) else { return }
+            self.store.select(session)
         }
         store.onSelectionChange = { [weak self] in
             self?.state.showingSettings = false
