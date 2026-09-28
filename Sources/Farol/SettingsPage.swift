@@ -1,5 +1,6 @@
 import FarolCore
 import SwiftUI
+import UserNotifications
 import GhosttyTerminal
 
 /// Settings live in the window, in place of the terminal, like any other page.
@@ -15,6 +16,8 @@ struct SettingsPage: View {
     @State private var connections: [String: Connection] = [:]
     @State private var agentChange: AgentChange?
     @State private var agentError: String?
+    /// macOS refuses Farol's notifications, so turning them on here would do nothing.
+    @State private var notificationsBlocked = false
 
     private enum Connection {
         case disconnected
@@ -210,6 +213,16 @@ struct SettingsPage: View {
         ForEach(AgentHooks.all, id: \.name) { agentRow($0, p) }
 
         GroupTitle(title: "Notifications", palette: p)
+        if notificationsBlocked {
+            Row(title: "macOS is blocking Farol's notifications",
+                detail: "Turn them on for Farol in System Settings, under Notifications.", palette: p) {
+                Button("Open System Settings") {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")!)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+        }
         Row(title: "When an agent is waiting for you", palette: p) { toggle($agents.notifyWaiting) }
         Row(title: "When an agent finishes", palette: p) { toggle($agents.notifyDone) }
         Row(title: "Waiting count on the Dock icon", palette: p) { toggle($agents.dockBadge) }
@@ -300,6 +313,10 @@ struct SettingsPage: View {
     }
 
     private func refreshAgents() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            let blocked = settings.authorizationStatus == .denied
+            DispatchQueue.main.async { notificationsBlocked = blocked }
+        }
         for hooks in AgentHooks.all {
             let settings = try? hooks.read()
             connections[hooks.name] = settings.map(hooks.isInstalled) == true ? .connected
@@ -312,6 +329,12 @@ struct SettingsPage: View {
             let settings = try hooks.read()
             try hooks.write(connect ? hooks.install(into: settings) : hooks.remove(from: settings))
             agentError = nil
+            // Asked here, while you are looking, rather than at the first notification when you are away.
+            if connect {
+                UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in
+                    DispatchQueue.main.async { refreshAgents() }
+                }
+            }
         } catch {
             let path = (hooks.file.path as NSString).abbreviatingWithTildeInPath
             agentError = "Could not update \(path): \(error.localizedDescription)"

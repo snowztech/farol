@@ -158,7 +158,7 @@ You need macOS 14 or later and Xcode 26.
 make install   # builds Farol into /Applications
 ```
 
-The first build downloads a prebuilt libghostty for the pinned Ghostty commit. After that, `make run` gives you a quick debug build and `make help` lists everything else.
+The first build downloads a prebuilt libghostty for the pinned Ghostty commit. After that, `make run` gives you a quick debug build and `make help` lists everything else. Farol Dev, the `make run` build, is signed only locally, so macOS doesn't show its notifications. Status dots and the Dock badge still work.
 
 To compile libghostty yourself, install Zig 0.16 and the Metal toolchain (`xcodebuild -downloadComponent MetalToolchain`), then run `FROM_SOURCE=1 ./scripts/build-ghostty.sh`.
 
