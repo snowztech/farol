@@ -14,7 +14,7 @@
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License"></a>
 </p>
 
-<p align="center"><img src="site/screenshot.png" width="800" alt="Farol running Claude Code, with other agent sessions in the sidebar"></p>
+<p align="center"><img src="site/screenshot.png" width="800" alt="Farol running Claude Code, with other agent sessions in the sidebar and New task at the bottom"></p>
 
 Run several coding agents side by side, each in its own session, and Farol shows you which one is working, which one is done and which one needs you. Farol is Portuguese for lighthouse.
 
