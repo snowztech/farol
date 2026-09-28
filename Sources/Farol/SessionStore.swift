@@ -20,6 +20,8 @@ final class Session: ObservableObject, Identifiable {
     @Published private(set) var repoName: String?
     /// The main checkout's path, the same for every worktree of a repo. Sessions are grouped by it.
     @Published private(set) var repoRoot: String?
+    /// The top of the checkout the session is in, a worktree's own folder for worktrees. The files panel starts there.
+    @Published private(set) var topLevel: String?
     /// Lets the store regroup the sidebar when a session turns out to be in another repo.
     var onRepoChange: (() -> Void)?
     /// Set when the session runs in one of Farol's worktrees, even after `cd` into a subfolder.
@@ -67,9 +69,11 @@ final class Session: ObservableObject, Identifiable {
         DispatchQueue.global(qos: .userInitiated).async {
             let branch = Git.branch(of: directory)
             let root = Git.repoRoot(of: directory)
+            let topLevel = Git.topLevel(of: directory)
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.directory == directory else { return }
                 self.branch = branch
+                if self.topLevel != topLevel { self.topLevel = topLevel }
                 self.repoName = root.map { URL(fileURLWithPath: $0).lastPathComponent }
                 if self.repoRoot != root {
                     self.repoRoot = root

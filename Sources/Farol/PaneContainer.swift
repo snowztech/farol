@@ -1,13 +1,14 @@
 import AppKit
 import GhosttyTerminal
 
-/// A session's terminals, split into panes. Each split holds two children and the share the first one gets.
+/// A session's terminals and at most one open file, split into panes. Each split holds two children and the share the first one gets.
 /// Layout is plain arithmetic on that tree, which maps directly onto Ghostty's resize and equalize requests.
 final class PaneContainer: NSView {
     final class Node {
         enum Axis { case horizontal, vertical }
 
         var terminal: TerminalView?
+        var file: FileView?
         var axis = Axis.horizontal
         var children: [Node] = []
         var ratio: CGFloat = 0.5
@@ -19,6 +20,13 @@ final class PaneContainer: NSView {
             self.terminal = terminal
         }
 
+        init(file: FileView) {
+            self.file = file
+        }
+
+        /// What a leaf shows. Nil for a split.
+        var view: NSView? { terminal ?? file }
+
         var leaves: [TerminalView] { terminal.map { [$0] } ?? children.flatMap(\.leaves) }
     }
 
@@ -26,7 +34,11 @@ final class PaneContainer: NSView {
     private static let unfocusedAlpha: CGFloat = 0.7
 
     private(set) var root: Node
+    /// The terminal with focus, or the last one that had it while the file pane has focus.
     private(set) var focused: TerminalView
+    /// Opening another file replaces what it shows, so a session never fills up with file panes.
+    private(set) var file: FileView?
+    private(set) var fileFocused = false
     private var zoomed = false
     private var dragging: Node?
 
@@ -35,6 +47,7 @@ final class PaneContainer: NSView {
         didSet {
             needsDisplay = true
             searchBar?.apply(background: theme.background, foreground: theme.foreground)
+            file?.apply(background: theme.background, foreground: theme.foreground)
             applyFocus()
         }
     }
@@ -55,28 +68,40 @@ final class PaneContainer: NSView {
         adopt(terminal)
     }
 
-    /// Rebuilds saved panes. `make` creates a terminal in a folder.
+    /// Rebuilds saved panes. `make` creates a terminal in a folder. A file that is gone leaves its space to its neighbor.
     init(_ layout: PaneLayout, make: (String) -> TerminalView) {
         var names: [(TerminalView, String)] = []
-        func build(_ layout: PaneLayout) -> Node {
+        var file: FileView?
+        func build(_ layout: PaneLayout) -> Node? {
             switch layout {
             case .terminal(let directory, let name):
                 let terminal = make(directory)
                 if let name { names.append((terminal, name)) }
                 return Node(terminal)
+            case .file(let path):
+                guard file == nil, FileManager.default.fileExists(atPath: path) else { return nil }
+                file = FileView(path: path)
+                return Node(file: file!)
             case .split(let horizontal, let ratio, let first, let second):
+                guard let a = build(first) else { return build(second) }
+                guard let b = build(second) else { return a }
                 let node = Node(nil)
                 node.axis = horizontal ? .horizontal : .vertical
                 node.ratio = CGFloat(ratio)
-                node.children = [build(first), build(second)]
+                node.children = [a, b]
                 node.children.forEach { $0.parent = node }
                 return node
             }
         }
-        root = build(layout)
+        // A layout always has a terminal, since closing the last one closes the session.
+        root = build(layout) ?? Node(make(NSHomeDirectory()))
         focused = root.leaves[0]
         super.init(frame: .zero)
         root.leaves.forEach(adopt)
+        if let file {
+            self.file = file
+            adopt(file)
+        }
         for (terminal, name) in names { labels[terminal.id] = makeLabel(for: terminal, name: name) }
     }
 
@@ -85,6 +110,7 @@ final class PaneContainer: NSView {
             if let terminal = node.terminal {
                 return .terminal(directory: terminal.workingDirectory ?? NSHomeDirectory(), name: labels[terminal.id]?.name)
             }
+            if let file = node.file { return .file(path: file.path) }
             return .split(horizontal: node.axis == .horizontal, ratio: Double(node.ratio),
                           first: snapshot(node.children[0]), second: snapshot(node.children[1]))
         }
@@ -99,37 +125,76 @@ final class PaneContainer: NSView {
 
     /// Puts `terminal` next to the focused pane, on the side `direction` points to.
     func split(_ direction: TerminalRequest.Direction, with terminal: TerminalView) {
-        guard let leaf = node(of: focused) else { return }
-        let old = Node(focused)
-        let new = Node(terminal)
-        leaf.terminal = nil
-        leaf.axis = direction == .left || direction == .right ? .horizontal : .vertical
-        leaf.children = direction == .left || direction == .up ? [new, old] : [old, new]
-        leaf.ratio = 0.5
-        leaf.children.forEach { $0.parent = leaf }
-        zoomed = false
+        insert(Node(terminal), beside: fileFocused ? file! : focused, direction)
         adopt(terminal)
         focus(terminal)
         onLayoutChange?()
     }
 
-    /// Removes a pane and lets its sibling take the space. Returns false for the last pane.
+    /// Shows the file in the file pane, opening one right of the focused terminal if there is none yet.
+    func open(_ path: String) {
+        if let file {
+            file.show(path)
+        } else {
+            let file = FileView(path: path)
+            self.file = file
+            insert(Node(file: file), beside: focused, .right)
+            adopt(file)
+        }
+        window?.makeFirstResponder(file!.textView)
+        onLayoutChange?()
+    }
+
+    func closeFile() {
+        guard let file, let leaf = node(of: file) else { return }
+        self.file = nil
+        detach(leaf)
+        file.removeFromSuperview()
+        if fileFocused { focus(focused) }
+        fileFocused = false
+        onLayoutChange?()
+    }
+
+    /// Removes a terminal pane and lets its sibling take the space. Returns false for the last terminal.
     func remove(_ terminal: TerminalView) -> Bool {
-        guard let leaf = node(of: terminal), let parent = leaf.parent else { return false }
+        guard terminals.count > 1, let leaf = node(of: terminal) else { return false }
+        let parent = detach(leaf)
+        if searchBar?.terminal === terminal { hideSearch() }
+        labels.removeValue(forKey: terminal.id)?.removeFromSuperview()
+        terminal.removeFromSuperview()
+        if terminal === focused { focus(parent.leaves[0]) }
+        onLayoutChange?()
+        return true
+    }
+
+    /// Turns the leaf showing `view` into a split of it and `new`.
+    private func insert(_ new: Node, beside view: NSView, _ direction: TerminalRequest.Direction) {
+        guard let leaf = node(of: view) else { return }
+        let old = leaf.terminal.map { Node($0) } ?? Node(file: leaf.file!)
+        leaf.terminal = nil
+        leaf.file = nil
+        leaf.axis = direction == .left || direction == .right ? .horizontal : .vertical
+        leaf.children = direction == .left || direction == .up ? [new, old] : [old, new]
+        leaf.ratio = 0.5
+        leaf.children.forEach { $0.parent = leaf }
+        zoomed = false
+        needsLayout = true
+    }
+
+    /// Takes a leaf out and moves its sibling into the parent's place. Returns that parent.
+    @discardableResult
+    private func detach(_ leaf: Node) -> Node {
+        let parent = leaf.parent!
         let sibling = parent.children.first { $0 !== leaf }!
         parent.terminal = sibling.terminal
+        parent.file = sibling.file
         parent.axis = sibling.axis
         parent.children = sibling.children
         parent.ratio = sibling.ratio
         parent.children.forEach { $0.parent = parent }
-        if searchBar?.terminal === terminal { hideSearch() }
-        labels.removeValue(forKey: terminal.id)?.removeFromSuperview()
-        terminal.removeFromSuperview()
         zoomed = false
-        if terminal === focused { focus(parent.leaves[0]) }
         needsLayout = true
-        onLayoutChange?()
-        return true
+        return parent
     }
 
     /// Moves keyboard focus. The terminal reports back through onFocus, which records it.
@@ -137,8 +202,12 @@ final class PaneContainer: NSView {
         if window?.makeFirstResponder(target) != true { noteFocused(target) }
     }
 
+    /// Where keyboard focus goes when the session is shown again.
+    var focusTarget: NSView { fileFocused ? file!.textView : focused }
+
     private func noteFocused(_ target: TerminalView) {
         focused = target
+        fileFocused = false
         applyFocus()
         onFocusChange?(target)
     }
@@ -196,9 +265,11 @@ final class PaneContainer: NSView {
         super.layout()
         if zoomed, let leaf = node(of: focused) {
             terminals.forEach { $0.isHidden = $0 !== focused }
+            file?.isHidden = true
             place(leaf, in: bounds)
         } else {
             terminals.forEach { $0.isHidden = false }
+            file?.isHidden = false
             place(root, in: bounds)
         }
         applyFocus()
@@ -210,8 +281,8 @@ final class PaneContainer: NSView {
 
     private func place(_ node: Node, in rect: CGRect) {
         node.frame = rect
-        if let terminal = node.terminal {
-            terminal.frame = rect.integral
+        if let view = node.view {
+            view.frame = rect.integral
             return
         }
         let (first, second) = split(rect, node.axis, node.ratio)
@@ -315,7 +386,7 @@ final class PaneContainer: NSView {
         guard !zoomed else { return [] }
         var result: [(Node, CGRect)] = []
         func collect(_ node: Node) {
-            guard node.terminal == nil else { return }
+            guard node.view == nil else { return }
             let first = node.children[0].frame
             let rect = node.axis == .horizontal
                 ? CGRect(x: first.maxX, y: node.frame.minY, width: Self.divider, height: node.frame.height)
@@ -394,17 +465,31 @@ final class PaneContainer: NSView {
         needsLayout = true
     }
 
-    private func applyFocus() {
-        let single = terminals.count == 1 || zoomed
-        for terminal in terminals {
-            terminal.alphaValue = single || terminal === focused ? 1 : Self.unfocusedAlpha
-            labels[terminal.id]?.apply(background: theme.background, foreground: theme.foreground, focused: terminal === focused)
+    private func adopt(_ file: FileView) {
+        file.autoresizingMask = []
+        file.apply(background: theme.background, foreground: theme.foreground)
+        file.onFocus = { [weak self] in
+            self?.fileFocused = true
+            self?.applyFocus()
         }
+        file.onClose = { [weak self] in self?.closeFile() }
+        addSubview(file)
+        needsLayout = true
     }
 
-    private func node(of terminal: TerminalView) -> Node? {
+    private func applyFocus() {
+        let single = (terminals.count == 1 && file == nil) || zoomed
+        for terminal in terminals {
+            let active = terminal === focused && !fileFocused
+            terminal.alphaValue = single || active ? 1 : Self.unfocusedAlpha
+            labels[terminal.id]?.apply(background: theme.background, foreground: theme.foreground, focused: active)
+        }
+        file?.alphaValue = single || fileFocused ? 1 : Self.unfocusedAlpha
+    }
+
+    private func node(of view: NSView) -> Node? {
         func find(_ node: Node) -> Node? {
-            if node.terminal === terminal { return node }
+            if node.view === view { return node }
             return node.children.lazy.compactMap(find).first
         }
         return find(root)
@@ -430,15 +515,17 @@ final class PaneContainer: NSView {
     }
 }
 
-/// A session's panes as saved between launches: each terminal's folder and name, and each split's direction and share.
+/// A session's panes as saved between launches: each terminal's folder and name, the open file, and each split's direction and share.
 indirect enum PaneLayout: Codable {
     /// `name` is optional, so layouts saved before panes had names still load.
     case terminal(directory: String, name: String? = nil)
+    case file(path: String)
     case split(horizontal: Bool, ratio: Double, first: PaneLayout, second: PaneLayout)
 
     var directories: [String] {
         switch self {
         case .terminal(let directory, _): [directory]
+        case .file: []
         case .split(_, _, let first, let second): first.directories + second.directories
         }
     }
