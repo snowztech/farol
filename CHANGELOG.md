@@ -4,6 +4,8 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-28
+
 ### Added
 
 - Name a pane with ⇧⌘R or Session → Name Pane. The name shows in the pane's corner, double-click it to rename, and it comes back after a relaunch.
@@ -119,7 +121,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/snowztech/farol/releases/tag/v0.3.0
 [0.2.1]: https://github.com/snowztech/farol/releases/tag/v0.2.1
 [0.2.0]: https://github.com/snowztech/farol/releases/tag/v0.2.0
 [0.1.2]: https://github.com/snowztech/farol/releases/tag/v0.1.2
