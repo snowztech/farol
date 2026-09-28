@@ -11,27 +11,32 @@ struct SidebarView: View {
 
     var body: some View {
         let p = state.palette
-        ScrollView {
-            LazyVStack(spacing: 2) {
-                ForEach(store.sessions) { session in
-                    SessionRow(
-                        session: session,
-                        selected: session.id == store.selectedID && !state.showingSettings,
-                        palette: p,
-                        // Reselecting would pull focus back into the terminal, which a rename would lose.
-                        onSelect: {
-                            if session.id != store.selectedID || state.showingSettings { store.select(session) }
-                        },
-                        onRename: { store.rename(session, to: $0) },
-                        onClose: { commands.closeSession(session) })
-                    .onDrag {
-                        dragging = session
-                        return NSItemProvider(object: session.id.uuidString as NSString)
+        VStack(spacing: 0) {
+            ScrollView {
+                LazyVStack(spacing: 2) {
+                    ForEach(store.sessions) { session in
+                        SessionRow(
+                            session: session,
+                            selected: session.id == store.selectedID && !state.showingSettings,
+                            palette: p,
+                            // Reselecting would pull focus back into the terminal, which a rename would lose.
+                            onSelect: {
+                                if session.id != store.selectedID || state.showingSettings { store.select(session) }
+                            },
+                            onRename: { store.rename(session, to: $0) },
+                            onClose: { commands.closeSession(session) })
+                        .onDrag {
+                            dragging = session
+                            return NSItemProvider(object: session.id.uuidString as NSString)
+                        }
+                        .onDrop(of: [.text], delegate: Reorder(target: session, store: store, dragging: $dragging))
                     }
-                    .onDrop(of: [.text], delegate: Reorder(target: session, store: store, dragging: $dragging))
                 }
+                .padding(8)
             }
-            .padding(8)
+            // Pinned below the list, so it stays in the same place however many sessions there are.
+            NewTaskRow(palette: p, action: commands.newTask)
+                .padding(8)
         }
         // Fixed width, so collapsing the sidebar clips it instead of reflowing every row.
         .frame(width: Self.width)
@@ -137,6 +142,38 @@ private struct SessionRow: View {
     private var background: some View {
         RoundedRectangle(cornerRadius: 6)
             .fill(selected ? palette.raised : hovering ? palette.raised.opacity(0.5) : .clear)
+    }
+}
+
+/// The way to start a task, at the foot of the sidebar where the tasks live. Quiet until hovered.
+private struct NewTaskRow: View {
+    let palette: Palette
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            // Same width as the status dots, so the label lines up with session names.
+            Image(systemName: "plus")
+                .font(.system(size: 9, weight: .semibold))
+                .frame(width: 7)
+            Text("New task")
+                .font(.system(size: 12.5))
+            Spacer(minLength: 0)
+            if hovering {
+                Text("⇧⌘N")
+                    .font(.system(size: 11))
+                    .foregroundStyle(palette.muted)
+            }
+        }
+        .foregroundStyle(hovering ? palette.text : palette.muted)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised.opacity(0.5) : .clear))
+        .contentShape(Rectangle())
+        .onTapGesture(perform: action)
+        .onHover { hovering = $0 }
     }
 }
 
