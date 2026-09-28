@@ -5,15 +5,29 @@ import GhosttyTerminal
 extension MainWindowController {
     /// Asks for a branch and opens a session in a new worktree of the current session's repo.
     func newWorktreeSession() {
+        withRepo(purpose: "the new worktree session") { [weak self] in self?.askForBranch(from: $0) }
+    }
+
+    /// ⇧⌘N: a task, a branch and an agent in one sheet. The agent starts in a new worktree with the task as its prompt.
+    func newTask() {
+        withRepo(purpose: "the new task") { [weak self] directory in
+            guard let self, let window = self.window else { return }
+            NewTaskSheet.present(in: window, directory: directory) { branch, command in
+                self.startWorktreeSession(branch: branch, from: directory, run: command)
+            }
+        }
+    }
+
+    /// The current session's repo, or one the user picks when the current session isn't in a repo.
+    private func withRepo(purpose: String, then: @escaping (String) -> Void) {
         guard let window else { return }
         if let directory = store.selected?.directory, Git.repoRoot(of: directory) != nil {
-            askForBranch(from: directory)
-            return
+            return then(directory)
         }
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
-        panel.message = "Choose a git repository for the new worktree session."
+        panel.message = "Choose a git repository for \(purpose)."
         panel.prompt = "Choose"
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let path = panel.url?.path else { return }
@@ -21,7 +35,7 @@ extension MainWindowController {
                 self?.showError("Not a git repository", "Choose a folder inside a git repository.")
                 return
             }
-            self?.askForBranch(from: path)
+            then(path)
         }
     }
 
@@ -46,14 +60,18 @@ extension MainWindowController {
                 self?.showError("No branch name", "Use letters, numbers, dashes or slashes.")
                 return
             }
-            // Checking out a big repo can take a moment, so keep it off the main thread.
-            DispatchQueue.global(qos: .userInitiated).async {
-                let result = Result { try Worktrees.default.create(branch: branch, from: directory) }
-                DispatchQueue.main.async {
-                    switch result {
-                    case .success(let path): self?.store.create(directory: path, run: self?.agents.startCommand)
-                    case .failure(let error): self?.showError("Couldn't create the worktree", "\(error)")
-                    }
+            self?.startWorktreeSession(branch: branch, from: directory, run: self?.agents.startCommand)
+        }
+    }
+
+    private func startWorktreeSession(branch: String, from directory: String, run command: String?) {
+        // Checking out a big repo can take a moment, so keep it off the main thread.
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = Result { try Worktrees.default.create(branch: branch, from: directory) }
+            DispatchQueue.main.async { [weak self] in
+                switch result {
+                case .success(let path): self?.store.create(directory: path, run: command)
+                case .failure(let error): self?.showError("Couldn't create the worktree", "\(error)")
                 }
             }
         }

@@ -54,6 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings.reload()
         windowController.handle(.reloadConfig)
     }
+    @objc func newTask(_ sender: Any?) { windowController.newTask() }
     @objc func namePane(_ sender: Any?) { windowController.namePane() }
     @objc func find(_ sender: Any?) { windowController.find() }
     @objc func findNext(_ sender: Any?) { windowController.findNext() }
@@ -87,6 +88,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         main.addItem(submenu: edit, title: "Edit")
 
         let sessions = NSMenu(title: "Session")
+        sessions.addItem(withTitle: "New Task…", action: #selector(newTask), keyEquivalent: "N")
         sessions.addItem(withTitle: "New Session", action: #selector(newSession), keyEquivalent: "t")
         sessions.addItem(withTitle: "New Worktree Session…", action: #selector(newWorktreeSession), keyEquivalent: "T")
         sessions.addItem(withTitle: "Close Session", action: #selector(closeSession), keyEquivalent: "w")
