@@ -7,7 +7,7 @@ public struct GitError: Error, CustomStringConvertible {
 /// Runs the git command line tool. Shelling out keeps Farol's behavior identical to the user's own git.
 public enum Git {
     @discardableResult
-    static func run(_ arguments: [String], in directory: String) throws -> String {
+    static func run(_ arguments: [String], in directory: String, trimming: Bool = true) throws -> String {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
         process.arguments = arguments
@@ -26,7 +26,9 @@ public enum Git {
             let message = String(decoding: err, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
             throw GitError(description: message.isEmpty ? "git \(arguments.joined(separator: " ")) failed" : message)
         }
-        return String(decoding: out, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = String(decoding: out, as: UTF8.self)
+        // A diff's leading spaces are context lines, so it can't be trimmed.
+        return trimming ? text.trimmingCharacters(in: .whitespacesAndNewlines) : text
     }
 
     /// The main checkout of the repo that contains `directory`, even when called from inside a worktree.
