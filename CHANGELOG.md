@@ -6,7 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Fixed
 
-- A Codex session no longer shows as "| farol" before its conversation has a name. It shows the project name until Codex titles the conversation.
+- Session names drop the extra parts agents add after a separator, so a Codex session shows "Design codebase" instead of "Design codebase | farol", and "farol" instead of "| farol" before the conversation has a name.
 
 ## [0.6.0] - 2026-09-28
 
