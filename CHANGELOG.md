@@ -4,6 +4,18 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Review panel (⌥⌘R, or the change count in the title bar): every file the session changed as one scrolling diff, with added and removed lines, folded unchanged runs and the counts per file. Untracked files show as new, and big diffs like lockfiles start folded. It updates as the agent works.
+- Compare with uncommitted changes, or with everything since the branch left main or any other local branch. Branches start on "since main", and the choice is kept per project.
+- The title bar shows the session's change count, like `± +821 −61`, only while there are changes.
+- Open a file from the review to land on its first change, ready to edit.
+- The file pane's header shows the file's folder, muted, before its name.
+
+### Changed
+
+- One quiet close button across panes, panels, sidebar rows and the find bar.
+
 ## [0.8.0] - 2026-09-28
 
 Your project's files next to the terminal, with a light editor for quick fixes while agents work.
