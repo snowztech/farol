@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- Text keeps its size when you move the window between a Retina screen and an external monitor.
+
 ## [0.2.1] - 2026-09-27
 
 ### Changed
