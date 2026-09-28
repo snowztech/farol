@@ -6,6 +6,8 @@
 
 <p align="center">A fast macOS terminal for working with coding agents.</p>
 
+<p align="center"><img src="site/screenshot.png" width="800" alt="Farol with several agent sessions and split panes"></p>
+
 Run several coding agents side by side, each in its own session, and Farol shows you which one is working, which one is done and which one needs you. Farol is Portuguese for lighthouse.
 
 Underneath is [libghostty](https://github.com/ghostty-org/ghostty), the engine behind Ghostty, so it is as fast as Ghostty and reads your Ghostty config.

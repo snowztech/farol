@@ -36,35 +36,12 @@
     .actions a.sn-btn--secondary:hover { color: var(--sn-fg); }
     .fine { color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); margin-top: 14px; }
 
-    /* A sketch of the sidebar, so the page shows what Farol does before any screenshot. */
-    .window {
-      margin: 56px 0 48px;
-      border: 1px solid var(--sn-border);
-      border-radius: var(--sn-r-lg);
-      background: var(--sn-bg-inset);
-      overflow: hidden;
+    .shot {
+      display: block; width: 100%; height: auto; margin: 56px 0 48px;
+      border-radius: 10px; border: 1px solid var(--sn-border);
     }
-    .bar { display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--sn-border-subtle); }
-    .bar i { width: 10px; height: 10px; border-radius: 50%; background: var(--sn-border-strong); }
-    .rows { padding: 8px; }
-    .row { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: var(--sn-r-md); }
-    .row.selected { background: var(--sn-border-subtle); }
-    .row b { display: block; font-weight: 500; font-size: var(--sn-text-sm); }
-    .row small { color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); }
-    .row .state { margin-left: auto; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); }
-
-    .dot { position: relative; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .dot.idle { box-shadow: inset 0 0 0 1.2px var(--sn-fg-faint); }
-    .dot.working { background: var(--sn-accent); animation: breathe 1.6s ease-in-out infinite; }
-    .dot.waiting { background: var(--sn-warning); }
-    .dot.waiting::after {
-      content: ""; position: absolute; inset: 0; border-radius: 50%;
-      background: var(--sn-warning); animation: ripple 1.8s ease-out infinite;
-    }
-    .dot.done { background: var(--sn-success); }
-    @keyframes breathe { 50% { opacity: 0.25; } }
-    @keyframes ripple { from { transform: scale(1); opacity: 0.5; } to { transform: scale(2.6); opacity: 0; } }
-    @media (prefers-reduced-motion: reduce) { .dot, .dot::after { animation: none; } }
+    /* The page is wider than the text column, so the screenshot gets more room. */
+    @media (min-width: 900px) { .shot { width: 860px; margin-left: -110px; } }
 
     ul.features { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
     .features b { font-weight: 500; }
@@ -92,15 +69,8 @@
       <p class="fine">Apple Silicon, macOS 14 or later. Signed and notarized. Free and open source.</p>
     </section>
 
-    <div class="window" aria-hidden="true">
-      <div class="bar"><i></i><i></i><i></i></div>
-      <div class="rows">
-        <div class="row"><span class="dot working"></span><div><b>Refactor the parser</b><small>feat/parser</small></div><span class="state">working</span></div>
-        <div class="row"><span class="dot waiting"></span><div><b>Fix flaky tests</b><small>fix/ci</small></div><span class="state">needs you</span></div>
-        <div class="row"><span class="dot done"></span><div><b>Write the docs</b><small>docs/api</small></div><span class="state">done</span></div>
-        <div class="row selected"><span class="dot idle"></span><div><b>farol</b><small>~/dev/farol</small></div></div>
-      </div>
-    </div>
+    <img class="shot" src="screenshot.png" width="1600" height="1013"
+         alt="Farol with four sessions in the sidebar, one agent working, one waiting and one done, and a split pane showing git log and tests">
 
     <ul class="features">
       <li><b>One worktree per agent.</b> <span>Parallel agents never touch each other's files.</span></li>
