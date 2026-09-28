@@ -11,29 +11,32 @@ struct SidebarView: View {
 
     var body: some View {
         let p = state.palette
-        ScrollView {
-            LazyVStack(spacing: 2) {
-                ForEach(store.sessions) { session in
-                    SessionRow(
-                        session: session,
-                        selected: session.id == store.selectedID && !state.showingSettings,
-                        palette: p,
-                        // Reselecting would pull focus back into the terminal, which a rename would lose.
-                        onSelect: {
-                            if session.id != store.selectedID || state.showingSettings { store.select(session) }
-                        },
-                        onRename: { store.rename(session, to: $0) },
-                        onClose: { commands.closeSession(session) })
-                    .onDrag {
-                        dragging = session
-                        return NSItemProvider(object: session.id.uuidString as NSString)
+        VStack(spacing: 0) {
+            ScrollView {
+                LazyVStack(spacing: 2) {
+                    ForEach(store.sessions) { session in
+                        SessionRow(
+                            session: session,
+                            selected: session.id == store.selectedID && !state.showingSettings,
+                            palette: p,
+                            // Reselecting would pull focus back into the terminal, which a rename would lose.
+                            onSelect: {
+                                if session.id != store.selectedID || state.showingSettings { store.select(session) }
+                            },
+                            onRename: { store.rename(session, to: $0) },
+                            onClose: { commands.closeSession(session) })
+                        .onDrag {
+                            dragging = session
+                            return NSItemProvider(object: session.id.uuidString as NSString)
+                        }
+                        .onDrop(of: [.text], delegate: Reorder(target: session, store: store, dragging: $dragging))
                     }
-                    .onDrop(of: [.text], delegate: Reorder(target: session, store: store, dragging: $dragging))
                 }
-                NewTaskRow(palette: p, action: commands.newTask)
-                    .padding(.top, 4)
+                .padding(8)
             }
-            .padding(8)
+            // Pinned below the list, so it stays in the same place however many sessions there are.
+            NewTaskRow(palette: p, action: commands.newTask)
+                .padding(8)
         }
         // Fixed width, so collapsing the sidebar clips it instead of reflowing every row.
         .frame(width: Self.width)
@@ -142,7 +145,7 @@ private struct SessionRow: View {
     }
 }
 
-/// Right below the sessions, so the way to start one is where they live. Quiet until hovered.
+/// The way to start a task, at the foot of the sidebar where the tasks live. Quiet until hovered.
 private struct NewTaskRow: View {
     let palette: Palette
     let action: () -> Void
@@ -171,7 +174,6 @@ private struct NewTaskRow: View {
         .contentShape(Rectangle())
         .onTapGesture(perform: action)
         .onHover { hovering = $0 }
-        .help("New task (⇧⌘N)")
     }
 }
 
