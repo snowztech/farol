@@ -19,6 +19,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var settingsView: NSView!
 
     let agents: AgentSettings
+    private let updates = UpdateChecker()
     private var badgeSwitch: AnyCancellable?
 
     init(store: SessionStore, runtime: TerminalRuntime, settings: Settings, agents: AgentSettings) {
@@ -51,10 +52,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             titleBarDoubleClick: { [weak self] in self?.titleBarDoubleClicked() })
 
         let root = NSView()
-        let topBar = hosting(TopBar(state: state, store: store, commands: commands))
+        let topBar = hosting(TopBar(state: state, store: store, updates: updates, commands: commands))
         let sidebar = hosting(SidebarView(store: store, state: state, commands: commands))
         sidebar.clipsToBounds = true
-        settingsView = hosting(SettingsPage(settings: settings, agents: agents, state: state))
+        settingsView = hosting(SettingsPage(settings: settings, agents: agents, state: state, updates: updates))
         settingsView.isHidden = true
 
         content.wantsLayer = true
