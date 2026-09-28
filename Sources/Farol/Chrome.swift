@@ -169,9 +169,27 @@ private struct SessionTitle: View {
 extension View {
     /// Hover for anything clickable: runs `action` and shows the pointing hand while the mouse is over it.
     func onClickableHover(_ action: @escaping (Bool) -> Void) -> some View {
-        onHover { inside in
-            action(inside)
-            if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        modifier(ClickableHover(action: action))
+    }
+}
+
+/// Scroll views reset the cursor on every mouse move, so a hand pushed once on hover doesn't last in the sidebar or the tree.
+/// macOS 15 has a pointer style for this. macOS 14 sets the hand again on each move.
+private struct ClickableHover: ViewModifier {
+    let action: (Bool) -> Void
+
+    func body(content: Content) -> some View {
+        if #available(macOS 15, *) {
+            content.onHover(perform: action).pointerStyle(.link)
+        } else {
+            content
+                .onHover { inside in
+                    action(inside)
+                    if !inside { NSCursor.arrow.set() }
+                }
+                .onContinuousHover { phase in
+                    if case .active = phase { NSCursor.pointingHand.set() }
+                }
         }
     }
 }
