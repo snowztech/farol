@@ -189,10 +189,10 @@ Issues and pull requests are welcome. Before you open a PR, run the tests and th
 
 ```sh
 make test
-make check
+make lint
 ```
 
-`make check` flags em dashes, semicolons in prose, comment blocks over three lines and filler words. Comments should explain why, not what. CI runs the same check on every pull request.
+`make lint` flags em dashes, semicolons in prose, comment blocks over three lines and filler words. Comments should explain why, not what. CI runs the same check on every pull request.
 
 ## License
 
