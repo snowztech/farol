@@ -1,3 +1,4 @@
+import FarolCore
 import SwiftUI
 
 /// UI state shared by the SwiftUI pieces of the window.
@@ -7,6 +8,8 @@ final class WindowState: ObservableObject {
     /// Mirrors the sidebar and the files panel, so the top bar can match the columns below it.
     @Published var sidebarVisible = true
     @Published var filesVisible = false
+    /// Zero while the review panel is closed.
+    @Published var reviewWidth: CGFloat = 0
     let ghosttyConfigPreview: ThemeColors
 
     init(palette: Palette, ghosttyConfigPreview: ThemeColors) {
@@ -21,6 +24,7 @@ struct Commands {
     let closeSession: (Session) -> Void
     let toggleSidebar: () -> Void
     let toggleFiles: () -> Void
+    let toggleReview: () -> Void
     let toggleSettings: () -> Void
     let titleBarDoubleClick: () -> Void
 }
@@ -29,6 +33,7 @@ struct TopBar: View {
     @ObservedObject var state: WindowState
     @ObservedObject var store: SessionStore
     @ObservedObject var updates: UpdateChecker
+    @ObservedObject var review: ReviewModel
     let commands: Commands
 
     var body: some View {
@@ -54,6 +59,11 @@ struct TopBar: View {
                            palette: p, action: commands.toggleFiles)
                 if !state.sidebarVisible { newSessionButton(p) }
                 Spacer()
+                // Only there when the session has changes, like the Update button.
+                if !review.stat.isEmpty || review.isOpen {
+                    ReviewButton(stat: review.stat, active: review.isOpen, palette: p, action: commands.toggleReview)
+                        .padding(.trailing, 6)
+                }
                 if let version = updates.available {
                     UpdateBadge(version: version, palette: p, action: updates.install)
                         .padding(.trailing, 6)
@@ -92,6 +102,10 @@ struct TopBar: View {
             Rectangle().fill(p.line)
                 .frame(width: state.filesVisible ? 1 : 0)
             Rectangle().fill(p.background)
+            Rectangle().fill(p.line)
+                .frame(width: state.reviewWidth > 0 ? 1 : 0)
+            Rectangle().fill(p.background)
+                .frame(width: max(state.reviewWidth - 1, 0))
         }
     }
 }
@@ -117,6 +131,33 @@ private struct UpdateBadge: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .help("Farol \(version) is available. Download it.")
+    }
+}
+
+/// "± +821 −61": what the session changed, and the way into the review panel.
+private struct ReviewButton: View {
+    let stat: Diff.Stat
+    let active: Bool
+    let palette: Palette
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: "plusminus").foregroundStyle(palette.muted)
+                Counts(added: stat.added, removed: stat.removed, palette: palette)
+            }
+            .font(.system(size: 11, weight: .medium))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(palette.raised.opacity(hovering || active ? 1 : 0.6), in: Capsule())
+            .overlay(Capsule().strokeBorder(palette.line))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help("Review changes (⌥⌘R)")
     }
 }
 

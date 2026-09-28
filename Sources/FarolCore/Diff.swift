@@ -2,7 +2,7 @@ import Foundation
 
 /// What changed in a checkout: uncommitted work, or everything since the branch left its base.
 public enum Diff {
-    public enum Scope: Equatable {
+    public enum Scope: Hashable {
         /// Working tree and index against HEAD, plus untracked files.
         case uncommitted
         /// Working tree against the commit where HEAD left `base`, so committed and uncommitted work together.
@@ -39,6 +39,12 @@ public enum Diff {
         public var files = 0
         public var added = 0
         public var removed = 0
+
+        public init(files: Int = 0, added: Int = 0, removed: Int = 0) {
+            self.files = files
+            self.added = added
+            self.removed = removed
+        }
 
         public var isEmpty: Bool { files == 0 }
     }
