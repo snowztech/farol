@@ -27,7 +27,7 @@ Milestones are themes, not version numbers. Releases ship whatever is ready.
 Someone who downloads Farol understands what it is for in the first minute.
 
 - [x] **New task**: one flow that picks the repo, takes a task description, creates the worktree and starts the agent with the task as its first prompt
-- [ ] Codex: status from its terminal notifications, then from its hooks
+- [x] Codex: status from its hooks, connected from Settings like Claude Code
 - [ ] Sessions grouped by repo in the sidebar
 - [x] Update check: a quiet Update button when a new version is out
 - [ ] Install updates in place (Sparkle), behind the same button

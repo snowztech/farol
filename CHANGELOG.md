@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-28
+
+Codex joins Claude Code in the sidebar, and notifications say plainly what the agent needs from you.
+
 ### Added
 
 - Codex support: Settings → Agents → Connect adds Farol's hooks to `~/.codex/hooks.json`, so the sidebar shows when Codex is working, waiting for your approval or done. Codex asks you to approve the hooks the first time.
@@ -158,7 +162,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/snowztech/farol/releases/tag/v0.6.0
 [0.5.0]: https://github.com/snowztech/farol/releases/tag/v0.5.0
 [0.4.1]: https://github.com/snowztech/farol/releases/tag/v0.4.1
 [0.4.0]: https://github.com/snowztech/farol/releases/tag/v0.4.0
