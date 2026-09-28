@@ -16,6 +16,8 @@ struct SettingsPage: View {
     @State private var connections: [String: Connection] = [:]
     @State private var agentChange: AgentChange?
     @State private var agentError: String?
+    /// What to do next in the agent itself, like approving changed hooks in Codex.
+    @State private var agentNote: String?
     /// macOS refuses Farol's notifications, so turning them on here would do nothing.
     @State private var notificationsBlocked = false
 
@@ -245,6 +247,12 @@ struct SettingsPage: View {
                     .frame(width: 220)
             }
         }
+        if let agentNote {
+            Text(agentNote)
+                .font(.system(size: 12))
+                .foregroundStyle(p.muted)
+                .padding(.top, 12)
+        }
         if let agentError {
             Text(agentError)
                 .font(.system(size: 12))
@@ -329,6 +337,10 @@ struct SettingsPage: View {
             let settings = try hooks.read()
             try hooks.write(connect ? hooks.install(into: settings) : hooks.remove(from: settings))
             agentError = nil
+            // Codex runs a changed hook only after you approve it, and says so only once it starts.
+            agentNote = connect && hooks.asksToApproveHooks
+                ? "Next time \(hooks.name) starts, it says its hooks need review. Approve them there to see its status in Farol."
+                : nil
             // Asked here, while you are looking, rather than at the first notification when you are away.
             if connect {
                 UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in
