@@ -22,14 +22,15 @@ public struct AgentHooks {
 
     /// Notification also fires as an idle reminder after a finished turn. Only permission prompts and questions mean waiting.
     public static let claude = AgentHooks(name: "Claude Code", id: "claude", file: home(".claude/settings.json"), events: [
+        Event(name: "SessionStart", status: "clear", matcher: nil),
         Event(name: "UserPromptSubmit", status: "working", matcher: nil),
         Event(name: "PostToolUse", status: "working", matcher: nil),
         Event(name: "Notification", status: "waiting", matcher: "permission_prompt|elicitation_dialog"),
         Event(name: "Stop", status: "done", matcher: nil),
-        Event(name: "SessionEnd", status: "clear", matcher: nil),
+        Event(name: "SessionEnd", status: "quit", matcher: nil),
     ])
 
-    /// Codex has no session end event, so the last status stays until the session is opened.
+    /// Codex has no session end event, so its logo and last status stay until the pane closes or another agent starts.
     public static let codex = AgentHooks(name: "Codex", id: "codex", file: home(".codex/hooks.json"), events: [
         Event(name: "SessionStart", status: "clear", matcher: nil),
         Event(name: "UserPromptSubmit", status: "working", matcher: nil),

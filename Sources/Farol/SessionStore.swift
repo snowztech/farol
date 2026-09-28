@@ -103,11 +103,13 @@ final class Session: ObservableObject, Identifiable {
     /// Agents put their status in the title, like Claude Code's ✳. The sidebar dot already shows it.
     private var programTitle: String { AgentTitle.withoutStatus(title) }
 
-    /// Shells title the window with the folder, sometimes shortened to "…/dev/project" or "dev/project".
+    private var hasProgramTitle: Bool { !Self.isShellTitle(title) }
+
+    /// Shells title the window at each prompt with the folder, sometimes shortened to "…/dev/project", or user@host.
     /// A path has a slash and no spaces, while a program title like "vim src/main.swift" has spaces.
-    private var hasProgramTitle: Bool {
+    static func isShellTitle(_ title: String) -> Bool {
         let looksLikePath = title.contains("/") && !title.contains(" ")
-        return !(title.isEmpty || title.contains("@") || title.hasPrefix("~") || looksLikePath)
+        return title.isEmpty || title.contains("@") || title.hasPrefix("~") || looksLikePath
     }
 
     private var folderName: String {
@@ -166,11 +168,12 @@ final class SessionStore: ObservableObject {
         // A "done" you are already looking at needs no light.
         let looking = session.id == selectedID && NSApp.isActive
         session.setAgentStatus(message.status == .done && looking ? nil : message.status, pane: pane)
-        // Clear means the agent quit. A done you are looking at only hides the dot, the agent is still there.
-        if message.status == nil {
-            session.setAgent(nil, pane: pane)
-        } else if let agent = message.agent {
+        // A named message means that agent is here, even a clear sent when it starts.
+        // A clear without a name is `farol status quit`, or a hook from before names: the agent is gone.
+        if let agent = message.agent {
             session.setAgent(agent, pane: pane)
+        } else if message.status == nil {
+            session.setAgent(nil, pane: pane)
         }
         report(session, from: before)
     }
@@ -229,6 +232,8 @@ final class SessionStore: ObservableObject {
     private func wire(_ terminal: TerminalView, to session: Session) {
         onTerminalCreated?(terminal)
         terminal.onTitleChange = { [weak session, weak terminal] in
+            // Back at the prompt, so whatever agent ran here has exited, even one without a quit hook like Codex.
+            if let session, let terminal, Session.isShellTitle($0) { session.setAgent(nil, pane: terminal.id) }
             guard let session, terminal === session.panes.focused else { return }
             // Agents animate a glyph in the title many times a second, and those frames are not worth a git lookup.
             // A shell re-sends the same title at each prompt, which is how a `git checkout` gets noticed.
