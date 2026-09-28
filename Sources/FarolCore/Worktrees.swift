@@ -62,6 +62,12 @@ public struct Worktrees {
         return path
     }
 
+    /// Modified or new files that removing the worktree would lose. Git refuses to remove it while there are any.
+    public func hasUncommittedChanges(_ path: String) -> Bool {
+        let status = (try? Git.run(["status", "--porcelain"], in: path)) ?? ""
+        return !status.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     /// Removes the worktree folder but never the branch, so no commit is lost.
     /// Git refuses when there are uncommitted changes, and that error is passed on.
     public func remove(_ path: String) throws {
