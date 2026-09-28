@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-28
+
+Review what your agents changed without leaving Farol.
+
 ### Added
 
 - Review panel (⌥⌘R, or the change count in the title bar): every file the session changed as one scrolling diff, with added and removed lines, folded unchanged runs and the counts per file. Untracked files show as new, and big diffs like lockfiles start folded. It updates as the agent works.
@@ -211,7 +215,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/snowztech/farol/releases/tag/v0.9.0
 [0.8.0]: https://github.com/snowztech/farol/releases/tag/v0.8.0
 [0.7.0]: https://github.com/snowztech/farol/releases/tag/v0.7.0
 [0.6.0]: https://github.com/snowztech/farol/releases/tag/v0.6.0
