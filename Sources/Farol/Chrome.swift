@@ -166,6 +166,29 @@ private struct SessionTitle: View {
     var body: some View { Text(session.displayName) }
 }
 
+/// The one close button, for panels, panes and rows. QuietButton draws the same in AppKit.
+struct CloseButton: View {
+    let help: String
+    let palette: Palette
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(hovering ? palette.text : palette.muted)
+                .frame(width: 20, height: 20)
+                .background(RoundedRectangle(cornerRadius: 5).fill(hovering ? palette.raised : .clear))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(help)
+    }
+}
+
 struct IconButton: View {
     let symbol: String
     let help: String

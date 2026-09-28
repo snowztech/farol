@@ -21,7 +21,7 @@ final class FileView: NSView {
 
     private let header = NSView()
     private let title = NSTextField(labelWithString: "")
-    private let closeButton = NSButton()
+    private lazy var closeButton = QuietButton(symbol: "xmark", help: "Close file (⌘W)") { [weak self] in self?.onClose?() }
     /// Shown when the file changed on disk while you had unsaved edits.
     private let conflict = NSView()
     private let conflictText = NSTextField(labelWithString: "Changed on disk while you were editing.")
@@ -47,13 +47,6 @@ final class FileView: NSView {
         title.font = .systemFont(ofSize: 12, weight: .medium)
         // A narrow pane drops the start of the folder first, so the name stays readable.
         title.lineBreakMode = .byTruncatingHead
-        closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Close file")
-        closeButton.isBordered = false
-        closeButton.imagePosition = .imageOnly
-        closeButton.symbolConfiguration = .init(pointSize: 10, weight: .semibold)
-        closeButton.target = self
-        closeButton.action = #selector(close)
-        closeButton.toolTip = "Close file (⌘W)"
         header.wantsLayer = true
         header.addSubview(title)
         header.addSubview(closeButton)
@@ -313,7 +306,7 @@ final class FileView: NSView {
         conflictText.textColor = foreground
         titleColors = (background.mixed(with: foreground, 0.75), background.mixed(with: foreground, 0.45))
         updateTitle()
-        closeButton.contentTintColor = background.mixed(with: foreground, 0.55)
+        closeButton.apply(background: background.mixed(with: foreground, 0.035), foreground: foreground)
         message.textColor = background.mixed(with: foreground, 0.55)
         scroll.backgroundColor = background
         text.backgroundColor = background
@@ -330,8 +323,6 @@ final class FileView: NSView {
         item.tag = action.rawValue
         text.performTextFinderAction(item)
     }
-
-    @objc private func close() { onClose?() }
 
     override func layout() {
         super.layout()

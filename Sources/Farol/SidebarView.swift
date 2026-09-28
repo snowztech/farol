@@ -75,15 +75,7 @@ private struct SessionRow: View {
             Spacer(minLength: 0)
 
             if hovering && !editing {
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(palette.muted)
-                        .frame(width: 16, height: 16)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help("Close session (⌘W)")
+                CloseButton(help: "Close session (⌘W)", palette: palette, action: onClose)
             }
         }
         .padding(.horizontal, 10)

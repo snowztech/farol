@@ -8,7 +8,7 @@ final class SearchBar: NSView, NSTextFieldDelegate {
     private(set) weak var terminal: TerminalView?
     private let field = NSTextField()
     private let count = NSTextField(labelWithString: "")
-    private var buttons: [NSButton] = []
+    private var buttons: [QuietButton] = []
     private var pending: DispatchWorkItem?
     var onClose: (() -> Void)?
 
@@ -68,7 +68,7 @@ final class SearchBar: NSView, NSTextFieldDelegate {
         layer?.borderColor = background.mixed(with: foreground, 0.16).cgColor
         field.textColor = foreground
         count.textColor = background.mixed(with: foreground, 0.55)
-        buttons.forEach { $0.contentTintColor = background.mixed(with: foreground, 0.6) }
+        buttons.forEach { $0.apply(background: background.mixed(with: foreground, 0.06), foreground: foreground) }
     }
 
     private func show(_ selected: Int?, _ total: Int?) {
@@ -108,28 +108,7 @@ final class SearchBar: NSView, NSTextFieldDelegate {
         }
     }
 
-    private func button(_ symbol: String, _ help: String, action: @escaping () -> Void) -> NSButton {
-        let button = ActionButton(action: action)
-        button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: help)?
-            .withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))
-        button.isBordered = false
-        button.toolTip = help
-        return button
+    private func button(_ symbol: String, _ help: String, action: @escaping () -> Void) -> QuietButton {
+        QuietButton(symbol: symbol, help: help, action: action)
     }
-}
-
-/// An NSButton that runs a closure, so the bar needs no @objc methods.
-private final class ActionButton: NSButton {
-    private let run: () -> Void
-
-    init(action: @escaping () -> Void) {
-        run = action
-        super.init(frame: .zero)
-        target = self
-        self.action = #selector(fire)
-    }
-
-    required init?(coder: NSCoder) { fatalError("not used") }
-
-    @objc private func fire() { run() }
 }

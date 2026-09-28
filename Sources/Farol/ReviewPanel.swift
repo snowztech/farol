@@ -195,7 +195,7 @@ struct ReviewPanel: View {
                 Counts(added: review.stat.added, removed: review.stat.removed, palette: p)
             }
             Spacer()
-            IconButton(symbol: "xmark", help: "Close review (⌥⌘R)", palette: p, action: close)
+            CloseButton(help: "Close review (⌥⌘R)", palette: p, action: close)
         }
         .font(.system(size: 12))
         .foregroundStyle(p.text)
