@@ -282,6 +282,8 @@ final class PaneContainer: NSView {
         label.beginEditing()
     }
 
+    @objc private func nameFromMenu() { nameFocusedPane() }
+
     private func makeLabel(for terminal: TerminalView, name: String) -> PaneLabel {
         let label = PaneLabel()
         label.name = name
@@ -376,6 +378,14 @@ final class PaneContainer: NSView {
         }
         terminal.onSearchStart = { [weak self, weak terminal] needle in
             if let self, let terminal { self.showSearch(in: terminal, needle: needle) }
+        }
+        terminal.onContextMenu = { [weak self] menu in
+            guard let self else { return }
+            menu.addItem(.separator())
+            menu.addItem(withTitle: "Name Pane…", action: #selector(self.nameFromMenu), keyEquivalent: "").target = self
+            // Same path as ⌘W, so a running program still asks before it closes.
+            menu.addItem(withTitle: self.terminals.count > 1 ? "Close Pane" : "Close Session",
+                         action: #selector(AppDelegate.closeSession(_:)), keyEquivalent: "")
         }
         terminal.onSearchEnd = { [weak self, weak terminal] in
             if self?.searchBar?.terminal === terminal { self?.hideSearch() }

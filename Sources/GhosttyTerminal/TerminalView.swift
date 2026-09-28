@@ -335,7 +335,10 @@ public final class TerminalView: NSView {
 
     public override func mouseDown(with event: NSEvent) { mouseButton(event, GHOSTTY_MOUSE_PRESS, GHOSTTY_MOUSE_LEFT) }
     public override func mouseUp(with event: NSEvent) { mouseButton(event, GHOSTTY_MOUSE_RELEASE, GHOSTTY_MOUSE_LEFT) }
-    public override func rightMouseDown(with event: NSEvent) { mouseButton(event, GHOSTTY_MOUSE_PRESS, GHOSTTY_MOUSE_RIGHT) }
+    /// A program that uses the mouse gets the click. Otherwise AppKit asks menu(for:) for the context menu.
+    public override func rightMouseDown(with event: NSEvent) {
+        if !mouseButton(event, GHOSTTY_MOUSE_PRESS, GHOSTTY_MOUSE_RIGHT) { super.rightMouseDown(with: event) }
+    }
     public override func rightMouseUp(with event: NSEvent) { mouseButton(event, GHOSTTY_MOUSE_RELEASE, GHOSTTY_MOUSE_RIGHT) }
     public override func mouseMoved(with event: NSEvent) { mousePos(event) }
     public override func mouseDragged(with event: NSEvent) { mousePos(event) }
@@ -354,12 +357,36 @@ public final class TerminalView: NSView {
         ghostty_surface_mouse_scroll(surface, x, y, mods)
     }
 
-    private func mouseButton(_ event: NSEvent, _ state: ghostty_input_mouse_state_e, _ button: ghostty_input_mouse_button_e) {
-        guard let surface else { return }
+    /// True when the program in the terminal took the click.
+    @discardableResult
+    private func mouseButton(_ event: NSEvent, _ state: ghostty_input_mouse_state_e, _ button: ghostty_input_mouse_button_e) -> Bool {
+        guard let surface else { return false }
         if state == GHOSTTY_MOUSE_PRESS { window?.makeFirstResponder(self) }
         mousePos(event)
-        _ = ghostty_surface_mouse_button(surface, state, button, ghosttyMods(event.modifierFlags))
+        return ghostty_surface_mouse_button(surface, state, button, ghosttyMods(event.modifierFlags))
     }
+
+    /// Adds the app's own items, like naming or closing the pane, below the terminal's.
+    public var onContextMenu: ((NSMenu) -> Void)?
+
+    public override func menu(for event: NSEvent) -> NSMenu? {
+        guard event.type == .rightMouseDown, let surface, !ghostty_surface_mouse_captured(surface) else { return nil }
+        let menu = NSMenu()
+        let copy = menu.addItem(withTitle: "Copy", action: #selector(copy(_:)), keyEquivalent: "")
+        copy.target = self
+        copy.isEnabled = ghostty_surface_has_selection(surface)
+        menu.addItem(withTitle: "Paste", action: #selector(paste(_:)), keyEquivalent: "").target = self
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Split Right", action: #selector(splitRight), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Split Down", action: #selector(splitDown), keyEquivalent: "").target = self
+        onContextMenu?(menu)
+        // Items above set isEnabled themselves.
+        menu.autoenablesItems = false
+        return menu
+    }
+
+    @objc private func splitRight() { perform("new_split:right") }
+    @objc private func splitDown() { perform("new_split:down") }
 
     private func mousePos(_ event: NSEvent) {
         guard let surface else { return }
