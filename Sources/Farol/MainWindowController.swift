@@ -174,6 +174,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// Asks before quitting kills running programs.
     func confirmQuit(_ reply: @escaping (Bool) -> Void) {
+        // Unsaved files first, one at a time, each shown in its session.
+        if let session = store.sessions.first(where: { $0.panes.file?.isDirty == true }), let file = session.panes.file {
+            store.select(session)
+            return file.confirmClose({ [weak self] in self?.confirmQuit(reply) }, cancelled: { reply(false) })
+        }
         guard runtime.hasRunningProcesses, let window else { return reply(true) }
         let alert = NSAlert()
         alert.messageText = "Quit Farol?"
@@ -268,6 +273,17 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var focusedFile: FileView? {
         guard let panes = store.selected?.panes, panes.fileFocused else { return nil }
         return panes.file
+    }
+
+    var canSaveFile: Bool { focusedFile != nil }
+
+    func saveFile() {
+        guard let file = focusedFile, let window else { return }
+        do {
+            try file.save()
+        } catch {
+            NSAlert(error: error).beginSheetModal(for: window)
+        }
     }
 
     func find() {

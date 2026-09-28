@@ -134,18 +134,32 @@ final class PaneContainer: NSView {
     /// Shows the file in the file pane, opening one right of the focused terminal if there is none yet.
     func open(_ path: String) {
         if let file {
-            file.show(path)
+            guard file.path != path else { return focusFile() }
+            return file.confirmClose { [weak self, weak file] in
+                file?.show(path)
+                self?.focusFile()
+                self?.onLayoutChange?()
+            }
         } else {
             let file = FileView(path: path)
             self.file = file
             insert(Node(file: file), beside: focused, .right)
             adopt(file)
         }
-        window?.makeFirstResponder(file!.textView)
+        focusFile()
         onLayoutChange?()
     }
 
+    private func focusFile() {
+        if let file { window?.makeFirstResponder(file.textView) }
+    }
+
+    /// Asks first when the file has unsaved edits.
     func closeFile() {
+        file?.confirmClose { [weak self] in self?.removeFile() }
+    }
+
+    private func removeFile() {
         guard let file, let leaf = node(of: file) else { return }
         self.file = nil
         detach(leaf)
@@ -212,14 +226,26 @@ final class PaneContainer: NSView {
         onFocusChange?(target)
     }
 
+    /// Every pane in screen order, the file pane included.
+    private var panes: [NSView] {
+        func collect(_ node: Node) -> [NSView] { node.view.map { [$0] } ?? node.children.flatMap(collect) }
+        return collect(root)
+    }
+
+    private var focusedPane: NSView { fileFocused ? file! : focused }
+
     func goto(_ target: TerminalRequest.SplitTarget) {
-        let all = terminals
-        guard all.count > 1, let index = all.firstIndex(where: { $0 === focused }) else { return }
+        let all = panes
+        guard all.count > 1, let index = all.firstIndex(where: { $0 === focusedPane }) else { return }
         switch target {
-        case .previous: focus(all[(index - 1 + all.count) % all.count])
-        case .next: focus(all[(index + 1) % all.count])
-        case .direction(let direction): neighbor(direction).map(focus)
+        case .previous: focus(pane: all[(index - 1 + all.count) % all.count])
+        case .next: focus(pane: all[(index + 1) % all.count])
+        case .direction(let direction): neighbor(direction).map { focus(pane: $0) }
         }
+    }
+
+    private func focus(pane: NSView) {
+        if let terminal = pane as? TerminalView { focus(terminal) } else { focusFile() }
     }
 
     func resize(_ direction: TerminalRequest.Direction, by amount: CGFloat) {
@@ -496,9 +522,9 @@ final class PaneContainer: NSView {
     }
 
     /// The closest pane on that side of the focused one, preferring the one most in line with it.
-    private func neighbor(_ direction: TerminalRequest.Direction) -> TerminalView? {
-        let from = focused.frame
-        let candidates = terminals.filter { $0 !== focused }.filter { other in
+    private func neighbor(_ direction: TerminalRequest.Direction) -> NSView? {
+        let from = focusedPane.frame
+        let candidates = panes.filter { $0 !== focusedPane }.filter { other in
             let f = other.frame
             switch direction {
             case .left: return f.maxX <= from.minX + 1 && f.maxY > from.minY && f.minY < from.maxY
