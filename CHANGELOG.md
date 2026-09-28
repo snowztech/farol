@@ -4,6 +4,15 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Files panel (⇧⌘E, or the folder button in the title bar): the session's project as a tree, next to the sidebar. Folders load when you open them, hidden and git-ignored files are dimmed, and new files show up as agents create them. Nothing is watched while the panel is closed.
+- Click a file to open it in a pane beside the terminal, with line numbers and ⌘F. Opening another file reuses the pane, ⌘W closes it, and it comes back after a relaunch. Editing comes next.
+
+### Changed
+
+- The new session button sits at the right edge of the sidebar, above the sessions it creates.
+
 ## [0.7.0] - 2026-09-28
 
 Codex notifications that actually reach you, and an option to group sessions by project.
