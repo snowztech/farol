@@ -4,23 +4,24 @@ import Foundation
 /// Adding an agent is one more value in `all`.
 public struct AgentSetup {
     public enum State {
-        case off
+        case disconnected
         /// Set up by an older Farol, in a way that no longer works as well.
         case outdated
-        case on
+        case connected
     }
 
     public let name: String
-    /// The file Enable and Turn off change.
+    /// The file Connect and Disconnect change.
     public let file: URL
-    public let summaryWhenOff: String
-    public let summaryWhenOn: String
-    /// What Enable changes, shown before it does.
-    public let enableMessage: String
-    public let disableMessage: String
+    public let summaryWhenDisconnected: String
+    public let summaryWhenConnected: String
+    /// What connecting changes, shown before it does.
+    public let connectMessage: String
+    /// What disconnecting takes away, first, then what changes on disk.
+    public let disconnectMessage: String
     public let state: () -> State
-    public let enable: () throws -> Void
-    public let disable: () throws -> Void
+    public let connect: () throws -> Void
+    public let disconnect: () throws -> Void
 
     public static let all = [claude(), codex()]
 
@@ -29,19 +30,20 @@ public struct AgentSetup {
         AgentSetup(
             name: hooks.name,
             file: hooks.file,
-            summaryWhenOff: "Show in the sidebar when Claude Code is working, waiting for you or done.",
-            summaryWhenOn: "The sidebar shows when Claude Code is working, waiting for you or done.",
-            enableMessage: "Farol adds hooks for \(hooks.events.count) events to \(tilde(hooks.file)). Your other settings stay as they are, though the file may be reformatted. The current file is kept as \(backup(hooks.file)).",
-            disableMessage: "Farol removes only its own hooks from \(tilde(hooks.file)) and keeps a backup of the file.",
+            summaryWhenDisconnected: "Show in the sidebar when Claude Code is working, waiting for you or done.",
+            summaryWhenConnected: "The sidebar shows when Claude Code is working, waiting for you or done.",
+            connectMessage: "Farol adds hooks for \(hooks.events.count) events to \(tilde(hooks.file)). Your other settings stay as they are, though the file may be reformatted. The current file is kept as \(backup(hooks.file)).",
+            disconnectMessage: "The sidebar stops showing when Claude Code is working, waiting or done, and Farol stops notifying you. Claude Code keeps working as before. Farol removes only its own hooks from \(tilde(hooks.file)) and keeps a backup.",
             state: {
-                guard let settings = try? hooks.read() else { return .off }
-                return hooks.isInstalled(in: settings) ? .on : hooks.hasAnyFarolHook(in: settings) ? .outdated : .off
+                guard let settings = try? hooks.read() else { return .disconnected }
+                if hooks.isInstalled(in: settings) { return .connected }
+                return hooks.hasAnyFarolHook(in: settings) ? .outdated : .disconnected
             },
-            enable: { try hooks.write(hooks.install(into: hooks.read())) },
-            disable: { try hooks.write(hooks.remove(from: hooks.read())) })
+            connect: { try hooks.write(hooks.install(into: hooks.read())) },
+            disconnect: { try hooks.write(hooks.remove(from: hooks.read())) })
     }
 
-    /// Terminal notifications only, see CodexNotifications. Enable also clears the hooks Farol 0.6 added.
+    /// Terminal notifications only, see CodexNotifications. Connecting also clears the hooks Farol 0.6 added.
     static func codex(config: URL = CodexNotifications.file, oldHooks: AgentHooks = .codex) -> AgentSetup {
         let hasOldHooks = { (try? oldHooks.read()).map(oldHooks.hasAnyFarolHook) == true }
         let edit = { (change: (String) throws -> String) in
@@ -52,19 +54,19 @@ public struct AgentSetup {
         return AgentSetup(
             name: "Codex",
             file: config,
-            summaryWhenOff: "Get told when Codex needs you or finishes.",
-            summaryWhenOn: "Farol tells you when Codex needs you or finishes. Codex doesn't report while it works, so the sidebar shows no working dot.",
-            enableMessage: "Farol turns on Codex's terminal notifications in \(tilde(config)), on lines marked as added by Farol. The rest of the file stays as it is, and the current one is kept as \(backup(config)). Codex sessions that are already open need a restart.",
-            disableMessage: "Farol removes only the lines it added to \(tilde(config)) and keeps a backup of the file.",
+            summaryWhenDisconnected: "Get told when Codex needs you or finishes.",
+            summaryWhenConnected: "Farol tells you when Codex needs you or finishes. Codex doesn't report while it works, so the sidebar shows no working dot.",
+            connectMessage: "Farol turns on Codex's terminal notifications in \(tilde(config)), on lines marked as added by Farol. The rest of the file stays as it is, and the current one is kept as \(backup(config)). Codex sessions that are already open need a restart.",
+            disconnectMessage: "Farol stops notifying you when Codex needs you or finishes. Codex keeps working as before. Farol removes only the lines it added to \(tilde(config)) and keeps a backup.",
             state: {
                 if hasOldHooks() { return .outdated }
-                return (try? CodexNotifications.read(config)).map(CodexNotifications.isEnabled) == true ? .on : .off
+                return (try? CodexNotifications.read(config)).map(CodexNotifications.isEnabled) == true ? .connected : .disconnected
             },
-            enable: {
+            connect: {
                 try edit(CodexNotifications.enable)
                 if hasOldHooks() { try oldHooks.write(oldHooks.remove(from: oldHooks.read())) }
             },
-            disable: { try edit(CodexNotifications.disable) })
+            disconnect: { try edit(CodexNotifications.disable) })
     }
 
     private static func tilde(_ url: URL) -> String {

@@ -22,8 +22,8 @@ struct SettingsPage: View {
 
     private struct AgentChange: Identifiable {
         let agent: AgentSetup
-        let enable: Bool
-        var id: String { agent.name + (enable ? " on" : " off") }
+        let connect: Bool
+        var id: String { agent.name + (connect ? " connect" : " disconnect") }
     }
 
     @State private var section = Section.terminal
@@ -256,17 +256,18 @@ struct SettingsPage: View {
     }
 
     private func agentRow(_ agent: AgentSetup, _ p: Palette) -> some View {
-        let state = setups[agent.name] ?? .off
-        return Row(title: agent.name, detail: state == .on ? agent.summaryWhenOn : agent.summaryWhenOff, palette: p) {
+        let state = setups[agent.name] ?? .disconnected
+        let summary = state == .connected ? agent.summaryWhenConnected : agent.summaryWhenDisconnected
+        return Row(title: agent.name, detail: summary, palette: p) {
             HStack(spacing: 12) {
                 SetupState(state: state, palette: p)
                 switch state {
                 case .outdated:
-                    Button("Update") { change(agent, enable: true) }
-                case .on:
-                    Button("Turn off") { agentChange = AgentChange(agent: agent, enable: false) }
-                case .off:
-                    Button("Enable") { agentChange = AgentChange(agent: agent, enable: true) }
+                    Button("Update") { change(agent, connect: true) }
+                case .connected:
+                    Button("Disconnect") { agentChange = AgentChange(agent: agent, connect: false) }
+                case .disconnected:
+                    Button("Connect") { agentChange = AgentChange(agent: agent, connect: true) }
                 }
             }
             .buttonStyle(.bordered)
@@ -276,17 +277,17 @@ struct SettingsPage: View {
 
     private func agentAlert(_ change: AgentChange) -> Alert {
         let agent = change.agent
-        guard change.enable else {
+        guard change.connect else {
             return Alert(
-                title: Text("Turn off \(agent.name)?"),
-                message: Text(agent.disableMessage),
-                primaryButton: .destructive(Text("Turn off")) { self.change(agent, enable: false) },
+                title: Text("Disconnect \(agent.name)?"),
+                message: Text(agent.disconnectMessage),
+                primaryButton: .destructive(Text("Disconnect")) { self.change(agent, connect: false) },
                 secondaryButton: .cancel())
         }
         return Alert(
-            title: Text("Enable \(agent.name)?"),
-            message: Text(agent.enableMessage),
-            primaryButton: .default(Text("Enable")) { self.change(agent, enable: true) },
+            title: Text("Connect \(agent.name)?"),
+            message: Text(agent.connectMessage),
+            primaryButton: .default(Text("Connect")) { self.change(agent, connect: true) },
             secondaryButton: .cancel())
     }
 
@@ -315,12 +316,12 @@ struct SettingsPage: View {
         for agent in AgentSetup.all { setups[agent.name] = agent.state() }
     }
 
-    private func change(_ agent: AgentSetup, enable: Bool) {
+    private func change(_ agent: AgentSetup, connect: Bool) {
         do {
-            try enable ? agent.enable() : agent.disable()
+            try connect ? agent.connect() : agent.disconnect()
             agentError = nil
             // Asked here, while you are looking, rather than at the first notification when you are away.
-            if enable {
+            if connect {
                 UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in
                     DispatchQueue.main.async { refreshAgents() }
                 }
@@ -523,7 +524,7 @@ private struct GroupTitle: View {
     }
 }
 
-/// "On" with a green dot, "Needs update" with a yellow one, or a muted "Off".
+/// "Connected" with a green dot, "Needs update" with a yellow one, or a muted "Not connected".
 private struct SetupState: View {
     let state: AgentSetup.State
     let palette: Palette
@@ -531,9 +532,9 @@ private struct SetupState: View {
     var body: some View {
         HStack(spacing: 6) {
             Circle()
-                .fill(state == .on ? Color.green : state == .outdated ? Color.yellow : palette.muted.opacity(0.5))
+                .fill(state == .connected ? Color.green : state == .outdated ? Color.yellow : palette.muted.opacity(0.5))
                 .frame(width: 6, height: 6)
-            Text(state == .on ? "On" : state == .outdated ? "Needs update" : "Off")
+            Text(state == .connected ? "Connected" : state == .outdated ? "Needs update" : "Not connected")
                 .font(.system(size: 12))
                 .foregroundStyle(palette.muted)
         }
