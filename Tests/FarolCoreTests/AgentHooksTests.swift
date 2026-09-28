@@ -148,3 +148,14 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
     #expect(AgentHooks.claude.file.path.hasSuffix(".claude/settings.json"))
     #expect(AgentHooks.codex.file.path.hasSuffix(".codex/hooks.json"))
 }
+
+/// An older Farol hooked SessionStart, which the current one doesn't use. Updating must clear it anyway.
+@Test func updateRemovesHooksOnEventsFarolNoLongerUses() {
+    let old: [String: Any] = ["hooks": [
+        "SessionStart": [["hooks": [["type": "command", "command": "bash herdr.sh"]]],
+                         ["hooks": [["type": "command", "command": "\"$FAROL_CLI\" status clear --agent claude"]]]],
+    ]]
+    let updated = AgentHooks.claude.install(into: old)
+    #expect(commands(updated, "SessionStart") == ["bash herdr.sh"])
+    #expect(AgentHooks.claude.isInstalled(in: updated))
+}

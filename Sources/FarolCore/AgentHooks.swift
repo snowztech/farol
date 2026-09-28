@@ -76,10 +76,11 @@ public struct AgentHooks {
     }
 
     /// Removes Farol's hooks, and any group or event they leave empty.
+    /// Every event, not only the current ones, so hooks an older Farol put on other events go too.
     public func remove(from settings: [String: Any]) -> [String: Any] {
         var settings = settings
         guard var hooks = settings["hooks"] as? [String: Any] else { return settings }
-        for event in events.map(\.name) {
+        for event in hooks.keys {
             guard let groups = hooks[event] as? [[String: Any]] else { continue }
             let kept: [[String: Any]] = groups.compactMap { group in
                 guard let entries = group["hooks"] as? [[String: Any]] else { return group }
