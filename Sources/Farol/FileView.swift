@@ -40,6 +40,8 @@ final class FileView: NSView {
         gutter = LineNumbers(textView: text)
         super.init(frame: .zero)
         wantsLayer = true
+        // Since macOS 14 views draw past their bounds by default, and the gutter's edge line reached the title bar.
+        clipsToBounds = true
 
         title.font = .systemFont(ofSize: 12, weight: .medium)
         title.lineBreakMode = .byTruncatingMiddle
