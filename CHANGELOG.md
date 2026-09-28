@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-29
+
+Syntax colors, and a calmer file pane.
+
 ### Added
 
 - Syntax colors in the file pane and the review panel: comments, strings, numbers and keywords for Swift, Go, JavaScript and TypeScript, Python, Rust, Ruby, shell, the C family, JSON, YAML, TOML, CSS, HTML, XML, SVG and Markdown. The colors come from your terminal theme, so they always match it.
@@ -11,15 +15,9 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Changed
 
 - Images, PDFs, video and audio open in their Mac app when you click them in the files panel or the review. Other files Farol can't show as text are revealed in Finder instead of opening a pane that only says so.
-- The pointer turns into a hand over everything you can click: buttons, the file tree, sessions, review files and the settings sections.
-
-## [0.9.2] - 2026-09-28
-
-A quieter file pane.
-
-### Changed
-
 - The file pane's header takes the pane's own background, so it lines up with the terminal and the files panel instead of sitting on top as a separate bar.
+- Unsaved edits show as a small muted dot after the file name, the same size as the sidebar's status dots.
+- The pointer turns into a hand over everything you can click: buttons, the file tree, sessions, review files and the settings sections.
 - For contributors: the style check is now `make lint`, and the workflow is called CI.
 
 ## [0.9.1] - 2026-09-28
@@ -247,8 +245,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.9.2...HEAD
-[0.9.2]: https://github.com/snowztech/farol/releases/tag/v0.9.2
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/snowztech/farol/releases/tag/v0.10.0
 [0.9.1]: https://github.com/snowztech/farol/releases/tag/v0.9.1
 [0.9.0]: https://github.com/snowztech/farol/releases/tag/v0.9.0
 [0.8.0]: https://github.com/snowztech/farol/releases/tag/v0.8.0
