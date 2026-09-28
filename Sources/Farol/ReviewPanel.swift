@@ -416,17 +416,19 @@ private struct DiffLine: View {
                 .foregroundStyle(palette.muted)
                 .frame(width: 44, alignment: .trailing)
                 .padding(.trailing, 11)
-            // Tabs would line up differently from the file, so they show as four spaces.
-            Text(line.text.replacingOccurrences(of: "\t", with: "    "))
-                .foregroundStyle(palette.text)
-                .lineLimit(1)
-                .fixedSize()
-            Spacer(minLength: 0)
+            // An overlay never sizes its parent, so a long line is cut at the card's edge instead of widening the list.
+            Color.clear.overlay(alignment: .leading) {
+                // Tabs would line up differently from the file, so they show as four spaces.
+                Text(line.text.replacingOccurrences(of: "\t", with: "    "))
+                    .foregroundStyle(palette.text)
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+            .clipped()
         }
         .font(.system(size: 12, design: .monospaced))
         .frame(height: 20)
         .background(tint.opacity(line.kind == .context ? 0 : 0.14))
-        .clipped()
     }
 
     private var tint: Color { line.kind == .removed ? palette.removed : palette.added }
