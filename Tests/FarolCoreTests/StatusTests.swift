@@ -38,14 +38,14 @@ final class Listening {
 
 @Test func deliversAStatus() throws {
     let box = try Listening()
-    try StatusClient.send(StatusMessage(pane: "pane-1", status: .waiting), to: box.server.path)
-    #expect(box.messages(count: 1) == [StatusMessage(pane: "pane-1", status: .waiting)])
+    try StatusClient.send(StatusMessage(pane: "pane-1", event: .waiting), to: box.server.path)
+    #expect(box.messages(count: 1) == [StatusMessage(pane: "pane-1", event: .waiting)])
 }
 
 @Test func deliversAClear() throws {
     let box = try Listening()
-    try StatusClient.send(StatusMessage(pane: "pane-2", status: nil), to: box.server.path)
-    #expect(box.messages(count: 1) == [StatusMessage(pane: "pane-2", status: nil)])
+    try StatusClient.send(StatusMessage(pane: "pane-2", event: .clear), to: box.server.path)
+    #expect(box.messages(count: 1) == [StatusMessage(pane: "pane-2", event: .clear)])
 }
 
 @Test func skipsJunkAndKeepsValidLines() throws {
@@ -61,10 +61,10 @@ final class Listening {
     _ = withUnsafePointer(to: &address) {
         $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
     }
-    let payload = "not json\n{\"pane\":\"p3\",\"status\":\"done\"}\n"
+    let payload = "not json\n{\"pane\":\"p3\",\"event\":\"done\"}\n"
     _ = payload.withCString { write(fd, $0, strlen($0)) }
     close(fd)
-    #expect(box.messages(count: 1) == [StatusMessage(pane: "p3", status: .done)])
+    #expect(box.messages(count: 1) == [StatusMessage(pane: "p3", event: .done)])
 }
 
 @Test func socketIsPrivate() throws {
@@ -75,6 +75,6 @@ final class Listening {
 
 @Test func sendingWithoutAServerFails() {
     #expect(throws: (any Error).self) {
-        try StatusClient.send(StatusMessage(pane: "x", status: .working), to: "/tmp/farol-nobody-\(UUID().uuidString.prefix(8)).sock")
+        try StatusClient.send(StatusMessage(pane: "x", event: .working), to: "/tmp/farol-nobody-\(UUID().uuidString.prefix(8)).sock")
     }
 }

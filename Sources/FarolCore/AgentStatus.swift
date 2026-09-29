@@ -12,11 +12,11 @@ public enum AgentStatus: String, Codable, CaseIterable, Sendable {
 /// One report from `farol status`. A nil status clears the pane.
 public struct StatusMessage: Codable, Equatable, Sendable {
     public var pane: String
-    public var status: AgentStatus?
+    public var event: AgentEvent
 
-    public init(pane: String, status: AgentStatus?) {
+    public init(pane: String, event: AgentEvent) {
         self.pane = pane
-        self.status = status
+        self.event = event
     }
 }
 

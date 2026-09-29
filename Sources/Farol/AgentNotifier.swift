@@ -20,11 +20,11 @@ final class AgentNotifier: NSObject, UNUserNotificationCenterDelegate {
         switch after {
         case .waiting where settings.notifyWaiting:
             // A bell or terminal notification can mean a question or a finished turn. Only hooks tell them apart.
-            let body = session.agentStatus.values.contains(.waiting)
+            let body = session.agentIsWaiting
                 ? "It needs your approval or an answer to continue." : "Open it to see what it needs."
             post(session, title: "\(session.displayName) is waiting for you", body: body)
         case .done where before == .working && settings.notifyDone:
-            post(session, title: "\(session.displayName) is done", body: "Your turn: check the result or send the next prompt.")
+            post(session, title: "\(session.displayName) is done", body: "Check the result or send the next prompt.")
         default:
             break
         }
