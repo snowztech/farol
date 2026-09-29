@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-09-29
+
+Tooltips that show, and small fixes.
+
 ### Fixed
 
 - Tooltips show again. Farol draws its own under each button, in the theme's colors, with the shortcut muted after the name: the title bar buttons, the change count, close buttons, the find bar and the review's compare menu.
@@ -11,7 +15,8 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Changed
 
 - The links and buttons in Settings → About, and Open config file, show the pointing hand like the rest of the app. Open config file also gets the same hover as New task.
-- Reload Configuration is ⇧⌘, on every keyboard layout. On some layouts the menu showed ⌘< instead.
+- Reload Configuration is set up as ⇧⌘, in the menu, the same as in Settings → Shortcuts and the README.
+- For contributors: a short CONTRIBUTING.md, issue and pull request templates, and notes that AI coding tools read.
 
 ## [0.11.0] - 2026-09-29
 
@@ -268,7 +273,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.11.1...HEAD
+[0.11.1]: https://github.com/snowztech/farol/releases/tag/v0.11.1
 [0.11.0]: https://github.com/snowztech/farol/releases/tag/v0.11.0
 [0.10.0]: https://github.com/snowztech/farol/releases/tag/v0.10.0
 [0.9.1]: https://github.com/snowztech/farol/releases/tag/v0.9.1
