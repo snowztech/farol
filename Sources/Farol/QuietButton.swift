@@ -9,12 +9,12 @@ final class QuietButton: NSButton {
 
     init(symbol: String, help: String, action: @escaping () -> Void) {
         run = action
+        tip = help
         super.init(frame: .zero)
         image = NSImage(systemSymbolName: symbol, accessibilityDescription: help)?
             .withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))
         imagePosition = .imageOnly
         isBordered = false
-        toolTip = help
         target = self
         self.action = #selector(fire)
         wantsLayer = true
@@ -34,18 +34,31 @@ final class QuietButton: NSButton {
         layer?.backgroundColor = hovering ? colors.background.cgColor : nil
     }
 
+    private var hoverArea: NSTrackingArea?
+    private let tip: String
+
+    /// Replaces only our own area. Removing every area also dropped the ones AppKit adds for itself.
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        trackingAreas.forEach(removeTrackingArea)
-        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways], owner: self))
+        if let hoverArea { removeTrackingArea(hoverArea) }
+        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways], owner: self)
+        addTrackingArea(area)
+        hoverArea = area
     }
 
     override func resetCursorRects() {
         addCursorRect(bounds, cursor: .pointingHand)
     }
 
-    override func mouseEntered(with event: NSEvent) { hovering = true }
-    override func mouseExited(with event: NSEvent) { hovering = false }
+    override func mouseEntered(with event: NSEvent) {
+        hovering = true
+        if let window { HoverTip.shared.show(tip, below: window.convertToScreen(convert(bounds, to: nil)), in: window) }
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        hovering = false
+        HoverTip.shared.hide()
+    }
 
     @objc private func fire() { run() }
 }

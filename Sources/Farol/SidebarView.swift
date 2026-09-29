@@ -236,7 +236,7 @@ private struct Lamp: View {
             }
         }
         .frame(width: 7, height: 7)
-        .help(help)
+        .hoverTip(help)
     }
 
     private var help: String {

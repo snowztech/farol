@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- Tooltips show again. Farol draws its own under each button, in the theme's colors, with the shortcut muted after the name: the title bar buttons, the change count, close buttons, the find bar and the review's compare menu.
+
 ### Changed
 
 - The links and buttons in Settings → About, and Open config file, show the pointing hand like the rest of the app. Open config file also gets the same hover as New task.

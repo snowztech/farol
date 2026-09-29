@@ -161,6 +161,5 @@ private struct FileRow: View {
         .contentShape(Rectangle())
         .onClickableHover { hovering = $0 }
         .onTapGesture(perform: action)
-        .help((row.entry.path as NSString).abbreviatingWithTildeInPath)
     }
 }

@@ -375,7 +375,7 @@ struct SettingsPage: View {
             }
             .buttonStyle(.plain)
             .onClickableHover { _ in }
-            .help("Copy the version")
+            .hoverTip("Copy the version")
             .padding(.top, 20)
 
             if let version = updates.available {
