@@ -116,7 +116,7 @@ public enum Diff {
         }
     }
 
-    /// ponytail: capped so a folder full of untracked build output can't stall the panel. The rest still show in git status.
+    /// Capped so a folder full of untracked build output can't stall the panel. The rest still show in git status.
     static let untrackedLimit = 200
 
     private static func untracked(in directory: String) -> [String] {

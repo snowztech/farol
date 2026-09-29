@@ -15,7 +15,7 @@ final class FileView: NSView {
     private var syntax: SyntaxColors?
     private var plainColor = NSColor.textColor
     private var pendingHighlight: DispatchWorkItem?
-    /// ponytail: coloring reruns on the whole file, so very large files stay plain. Per-line coloring would lift it.
+    /// Coloring reruns on the whole file, so very large files stay plain. Coloring only the edited lines would lift the limit.
     private static let highlightLimit = 400_000
     private(set) var isDirty = false {
         didSet {

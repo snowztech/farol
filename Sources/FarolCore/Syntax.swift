@@ -2,7 +2,7 @@ import Foundation
 
 /// Just enough highlighting to make code easy to read: comments, strings, numbers and keywords.
 /// One pass and no grammar, so it stays fast and needs no dependency.
-/// ponytail: nested template strings and the like come out wrong, a real parser would fix them if it ever matters.
+/// Nested template strings and the like come out wrong. A real parser would fix that if it ever matters.
 public enum Syntax {
     public enum Kind: Equatable { case keyword, string, number, comment }
 

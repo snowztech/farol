@@ -85,7 +85,7 @@ public enum CodexNotifications {
     // MARK: Parsing
 
     /// The keys set directly in [tui], with their values as written, minus any trailing comment.
-    /// ponytail: a line in a multiline array that starts with "[" reads as a table header. Codex's config has none.
+    /// A line in a multiline array that starts with "[" would read as a table header. Codex's config has none.
     private static func tuiValues(in lines: [String]) -> [String: String] {
         guard let header = lines.firstIndex(where: { isHeader($0, "tui") }) else { return [:] }
         var values: [String: String] = [:]
