@@ -185,7 +185,7 @@ Farol embeds Ghostty through its internal API (`ghostty.h`). Ghostty makes no st
 
 ## Contributing
 
-Issues and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) has how to run Farol locally and what a good PR looks like.
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
 
 ## License
 
