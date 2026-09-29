@@ -256,7 +256,7 @@ private struct ScopeMenu: View {
         }
         .buttonStyle(.plain)
         .onClickableHover { hovering = $0 }
-        .help("Choose what to compare with")
+        .hoverTip("Choose what to compare with")
     }
 
     private var title: String {

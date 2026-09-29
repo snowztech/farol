@@ -324,6 +324,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private func applyTheme() {
         let bg = runtime.backgroundColor
         state.palette = Palette(runtime)
+        HoverTip.shared.colors = (bg, runtime.foregroundColor)
         window?.backgroundColor = bg
         window?.appearance = NSAppearance(named: bg.isDark ? .darkAqua : .aqua)
         content.layer?.backgroundColor = bg.cgColor

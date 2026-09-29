@@ -58,7 +58,7 @@ struct TopBar: View {
             HStack(spacing: 2) {
                 // Room for the traffic lights.
                 Spacer().frame(width: 72)
-                IconButton(symbol: "sidebar.left", help: "Toggle sidebar (⌘B)", active: state.sidebarVisible,
+                IconButton(symbol: "sidebar.left", help: "Sidebar (⌘B)", active: state.sidebarVisible,
                            palette: p, action: commands.toggleSidebar)
                 IconButton(symbol: "folder", help: "Files (⇧⌘E)", active: state.filesVisible,
                            palette: p, action: commands.toggleFiles)
@@ -128,7 +128,7 @@ private struct UpdateBadge: View {
         }
         .buttonStyle(.plain)
         .onClickableHover { hovering = $0 }
-        .help("Farol \(version) is available. Download it.")
+        .hoverTip("Farol \(version) is available. Download it.")
     }
 }
 
@@ -155,7 +155,7 @@ private struct ReviewButton: View {
         }
         .buttonStyle(.plain)
         .onClickableHover { hovering = $0 }
-        .help("Review changes (⌥⌘R)")
+        .hoverTip("Review changes (⌥⌘R)")
     }
 }
 
@@ -211,7 +211,7 @@ struct CloseButton: View {
         }
         .buttonStyle(.plain)
         .onClickableHover { hovering = $0 }
-        .help(help)
+        .hoverTip(help)
     }
 }
 
@@ -235,6 +235,6 @@ struct IconButton: View {
         }
         .buttonStyle(.plain)
         .onClickableHover { hovering = $0 }
-        .help(help)
+        .hoverTip(help)
     }
 }
