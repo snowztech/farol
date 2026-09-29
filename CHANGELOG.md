@@ -6,8 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Changed
 
-- The settings button in the title bar shows sliders instead of a gear.
-- The links and buttons in Settings → About show the pointing hand, like the rest of the app.
+- The links and buttons in Settings → About, and Open config file, show the pointing hand like the rest of the app. Open config file also gets the same hover as New task.
 
 ## [0.11.0] - 2026-09-29
 

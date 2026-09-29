@@ -46,14 +46,8 @@ struct SettingsPage: View {
                     NavItem(title: s.rawValue, selected: s == section, palette: p) { section = s }
                 }
                 Spacer()
-                Button(action: settings.openFile) {
-                    Label("Open config file", systemImage: "doc.text")
-                        .font(.system(size: 12))
-                        .foregroundStyle(p.muted)
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 16)
+                OpenConfigRow(palette: p, action: settings.openFile)
+                    .padding(.bottom, 12)
             }
             .padding(.top, 28)
             .padding(.horizontal, 10)
@@ -542,6 +536,29 @@ private struct SetupState: View {
                 .font(.system(size: 12))
                 .foregroundStyle(palette.muted)
         }
+    }
+}
+
+/// Pinned under the settings sections, and styled like New task under the sessions.
+private struct OpenConfigRow: View {
+    let palette: Palette
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "doc.text").font(.system(size: 11.5))
+            Text("Open config file").font(.system(size: 12.5))
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(hovering ? palette.text : palette.muted)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised.opacity(0.35) : .clear))
+        .contentShape(Rectangle())
+        .onTapGesture(perform: action)
+        .onClickableHover { hovering = $0 }
     }
 }
 
