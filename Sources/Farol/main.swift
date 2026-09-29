@@ -74,7 +74,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
         let app = NSMenu()
         app.addItem(withTitle: "Settings…", action: #selector(toggleSettings), keyEquivalent: ",")
-        app.addItem(withTitle: "Reload Configuration", action: #selector(reloadConfig), keyEquivalent: "<")
+        // "," with Shift rather than "<", which is only Shift-comma on some layouts, so every keyboard shows ⇧⌘,.
+        app.addItem(withTitle: "Reload Configuration", action: #selector(reloadConfig), keyEquivalent: ",")
+            .keyEquivalentModifierMask = [.command, .shift]
         app.addItem(.separator())
         app.addItem(withTitle: "Quit Farol", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         main.addItem(submenu: app, title: "Farol")

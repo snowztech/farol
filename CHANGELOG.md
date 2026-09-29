@@ -7,6 +7,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Changed
 
 - The links and buttons in Settings → About, and Open config file, show the pointing hand like the rest of the app. Open config file also gets the same hover as New task.
+- Reload Configuration is ⇧⌘, on every keyboard layout. On some layouts the menu showed ⌘< instead.
 
 ## [0.11.0] - 2026-09-29
 
