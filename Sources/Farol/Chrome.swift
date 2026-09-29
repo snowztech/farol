@@ -57,7 +57,7 @@ struct TopBar: View {
                 IconButton(symbol: "sidebar.left", help: "Toggle sidebar (⌘B)", palette: p, action: commands.toggleSidebar)
                 IconButton(symbol: "folder", help: "Files (⇧⌘E)", active: state.filesVisible,
                            palette: p, action: commands.toggleFiles)
-                if !state.sidebarVisible { newSessionButton(p) }
+                newSessionButton(p)
                 Spacer()
                 // Only there when the session has changes, like the Update button.
                 if !review.stat.isEmpty || review.isOpen {
@@ -73,17 +73,9 @@ struct TopBar: View {
             }
             .padding(.trailing, 8)
         }
-        // Above the sessions it creates, at the sidebar's right edge.
-        .overlay(alignment: .leading) {
-            if state.sidebarVisible {
-                newSessionButton(p)
-                    .frame(width: SidebarView.width - 8, alignment: .trailing)
-            }
-        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // One bar across the window with a hairline under it, so the columns below start at the line.
+        // One bar in the terminal's color, so the terminal flows into it and the side panels start below it.
         .background(p.background)
-        .overlay(alignment: .bottom) { Rectangle().fill(p.line).frame(height: 1) }
         .contentShape(Rectangle())
         .onTapGesture(count: 2, perform: commands.titleBarDoubleClick)
     }
