@@ -47,13 +47,14 @@ private extension NSAttributedString.Key {
 }
 
 /// One text view per file, so a selection can run across lines and uses the theme's color, like the file pane.
-/// Each line carries its kind and number as attributes, and DiffLayoutManager paints the tints and numbers under the text.
+/// Each line carries its kind and number as attributes, and drawBackground paints the tints and numbers under the text.
 final class DiffTextView: NSTextView {
     static let rowHeight: CGFloat = 20
     static let gutter: CGFloat = 58
 
     private var shown: (file: Diff.File, colors: DiffColors, syntax: SyntaxColors)?
-    private let diffLayout = DiffLayoutManager()
+    private let diffLayout = NSLayoutManager()
+    fileprivate var diffColors: DiffColors?
 
     init() {
         let storage = NSTextStorage()
@@ -103,7 +104,7 @@ final class DiffTextView: NSTextView {
     func show(_ file: Diff.File, colors: DiffColors, syntax: SyntaxColors) {
         if let shown, shown.file == file, shown.colors == colors, shown.syntax == syntax { return }
         shown = (file, colors, syntax)
-        diffLayout.colors = colors
+        diffColors = colors
         CodeText.apply(to: self, background: colors.background, foreground: colors.foreground)
 
         let paragraph = NSMutableParagraphStyle()
@@ -138,44 +139,45 @@ final class DiffTextView: NSTextView {
     }
 }
 
-/// Paints each row's full-width tint, colored bar, line number and gap label. AppKit then draws the selection on top.
-private final class DiffLayoutManager: NSLayoutManager {
-    var colors: DiffColors?
+extension DiffTextView {
+    /// Paints each row's full-width tint, colored bar, line number and gap label. AppKit then draws the selection and text on top.
+    /// This runs in the view's own background pass, because the layout manager can't draw left of the text.
+    override func drawBackground(in rect: NSRect) {
+        super.drawBackground(in: rect)
+        guard let colors = diffColors, let layout = layoutManager, let container = textContainer, let storage = textStorage else { return }
+        let origin = textContainerOrigin
+        let visible = NSRect(x: 0, y: rect.minY - origin.y, width: 100_000, height: rect.height)
+        let glyphs = layout.glyphRange(forBoundingRect: visible, in: container)
+        let numberFont = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        layout.enumerateLineFragments(forGlyphRange: glyphs) { fragment, _, _, glyphRange, _ in
+            let index = layout.characterIndexForGlyph(at: glyphRange.location)
+            guard index < storage.length else { return }
+            let attributes = storage.attributes(at: index, effectiveRange: nil)
+            let row = NSRect(x: 0, y: fragment.minY + origin.y, width: self.bounds.width, height: fragment.height)
 
-    override func drawBackground(forGlyphRange glyphsToShow: NSRange, at origin: NSPoint) {
-        if let colors, let storage = textStorage, let view = textContainers.first?.textView {
-            let numberFont = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
-            enumerateLineFragments(forGlyphRange: glyphsToShow) { rect, _, _, glyphs, _ in
-                let index = self.characterIndexForGlyph(at: glyphs.location)
-                guard index < storage.length else { return }
-                let attributes = storage.attributes(at: index, effectiveRange: nil)
-                let row = NSRect(x: 0, y: rect.minY + origin.y, width: view.bounds.width, height: rect.height)
-
-                if let gap = attributes[.diffGap] as? Int {
-                    colors.band.setFill()
-                    row.fill()
-                    let label = "\(gap) unmodified \(gap == 1 ? "line" : "lines")" as NSString
-                    let style: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: colors.muted]
-                    let size = label.size(withAttributes: style)
-                    label.draw(at: NSPoint(x: DiffTextView.gutter, y: row.midY - size.height / 2), withAttributes: style)
-                    return
-                }
-                let kind = attributes[.diffKind] as? Int ?? 0
-                if kind != 0 {
-                    let tint = kind > 0 ? colors.added : colors.removed
-                    tint.withAlphaComponent(0.14).setFill()
-                    row.fill()
-                    tint.withAlphaComponent(0.9).setFill()
-                    NSRect(x: 0, y: row.minY, width: 3, height: row.height).fill()
-                }
-                if let number = attributes[.diffNumber] as? Int {
-                    let label = "\(number)" as NSString
-                    let style: [NSAttributedString.Key: Any] = [.font: numberFont, .foregroundColor: colors.muted]
-                    let size = label.size(withAttributes: style)
-                    label.draw(at: NSPoint(x: DiffTextView.gutter - 11 - size.width, y: row.midY - size.height / 2), withAttributes: style)
-                }
+            if let gap = attributes[.diffGap] as? Int {
+                colors.band.setFill()
+                row.fill()
+                let label = "\(gap) unmodified \(gap == 1 ? "line" : "lines")" as NSString
+                let style: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: colors.muted]
+                let size = label.size(withAttributes: style)
+                label.draw(at: NSPoint(x: Self.gutter, y: row.midY - size.height / 2), withAttributes: style)
+                return
+            }
+            let kind = attributes[.diffKind] as? Int ?? 0
+            if kind != 0 {
+                let tint = kind > 0 ? colors.added : colors.removed
+                tint.withAlphaComponent(0.14).setFill()
+                row.fill()
+                tint.withAlphaComponent(0.9).setFill()
+                NSRect(x: 0, y: row.minY, width: 3, height: row.height).fill()
+            }
+            if let number = attributes[.diffNumber] as? Int {
+                let label = "\(number)" as NSString
+                let style: [NSAttributedString.Key: Any] = [.font: numberFont, .foregroundColor: colors.muted]
+                let size = label.size(withAttributes: style)
+                label.draw(at: NSPoint(x: Self.gutter - 11 - size.width, y: row.midY - size.height / 2), withAttributes: style)
             }
         }
-        super.drawBackground(forGlyphRange: glyphsToShow, at: origin)
     }
 }
