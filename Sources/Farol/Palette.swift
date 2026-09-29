@@ -23,6 +23,7 @@ struct Palette: Equatable {
     /// Tint for macOS switches and pickers. A mid gray, since white on a switch would hide its white knob.
     let control: Color
     let code: SyntaxColors
+    let diff: DiffColors
     let isDark: Bool
 
     init(_ runtime: TerminalRuntime) {
@@ -40,6 +41,7 @@ struct Palette: Equatable {
         accent = Color(nsColor: fg)
         control = Color(nsColor: bg.mixed(with: fg, 0.42))
         code = SyntaxColors(background: bg, foreground: fg, ansi: ansi)
+        diff = DiffColors(background: bg, foreground: fg, added: ansi.count > 2 ? ansi[2] : fg, removed: ansi.count > 1 ? ansi[1] : fg)
         let ansi = { (i: Int) in Color(nsColor: ansi.count > i ? ansi[i] : fg) }
         working = ansi(6)
         waiting = ansi(3)
