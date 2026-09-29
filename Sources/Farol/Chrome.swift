@@ -49,7 +49,10 @@ struct TopBar: View {
             .font(.system(size: 12, weight: .medium))
             .foregroundStyle(p.muted)
             .lineLimit(1)
-            .padding(.horizontal, 160)
+            // Centered over the content, right of the sidebar, so it never sits on the sidebar's edge.
+            .padding(.horizontal, 120)
+            .frame(maxWidth: .infinity)
+            .padding(.leading, state.sidebarVisible ? SidebarView.width : 0)
 
             HStack(spacing: 2) {
                 // Room for the traffic lights.
@@ -74,8 +77,14 @@ struct TopBar: View {
             .padding(.trailing, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // One bar in the terminal's color, so the terminal flows into it and the side panels start below it.
-        .background(p.background)
+        // The sidebar runs up into the bar, like Mac apps with a sidebar, so the traffic lights sit on its color.
+        // The rest is one strip in the terminal's color, so no divider crosses the bar.
+        .background {
+            HStack(spacing: 0) {
+                Rectangle().fill(p.surface).frame(width: state.sidebarVisible ? SidebarView.width : 0)
+                Rectangle().fill(p.background)
+            }
+        }
         .contentShape(Rectangle())
         .onTapGesture(count: 2, perform: commands.titleBarDoubleClick)
     }

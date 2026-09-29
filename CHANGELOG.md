@@ -7,7 +7,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Changed
 
 - Select text across lines in the review panel and copy it, with the same selection color as the file pane. Each file's diff is now one text view that shares its setup with the file pane, so both show code the same way.
-- The title bar is one quiet strip in the terminal's color. The side panels start below it, and the window title no longer sits on a column divider. The new session button stays next to the sidebar and files buttons instead of moving with the sidebar.
+- The title bar is one quiet strip in the terminal's color, and the sidebar runs up into it like other Mac apps with a sidebar. The window title is centered over the content, so it no longer sits on a column divider. The new session button stays next to the sidebar and files buttons instead of moving with the sidebar.
 - Hovering a session or a file is lighter than selecting it, so the two don't look alike, and session rows no longer pop up their path.
 
 ## [0.10.0] - 2026-09-29
