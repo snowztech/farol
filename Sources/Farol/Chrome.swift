@@ -49,15 +49,20 @@ struct TopBar: View {
             .font(.system(size: 12, weight: .medium))
             .foregroundStyle(p.muted)
             .lineLimit(1)
-            .padding(.horizontal, 160)
+            // Centered over the content, between the open panels, so it never sits on a panel's edge.
+            .padding(.horizontal, 120)
+            .frame(maxWidth: .infinity)
+            .padding(.leading, leftPanels)
+            .padding(.trailing, state.reviewWidth)
 
             HStack(spacing: 2) {
                 // Room for the traffic lights.
                 Spacer().frame(width: 72)
-                IconButton(symbol: "sidebar.left", help: "Toggle sidebar (⌘B)", palette: p, action: commands.toggleSidebar)
+                IconButton(symbol: "sidebar.left", help: "Toggle sidebar (⌘B)", active: state.sidebarVisible,
+                           palette: p, action: commands.toggleSidebar)
                 IconButton(symbol: "folder", help: "Files (⇧⌘E)", active: state.filesVisible,
                            palette: p, action: commands.toggleFiles)
-                if !state.sidebarVisible { newSessionButton(p) }
+                newSessionButton(p)
                 Spacer()
                 // Only there when the session has changes, like the Update button.
                 if !review.stat.isEmpty || review.isOpen {
@@ -73,41 +78,34 @@ struct TopBar: View {
             }
             .padding(.trailing, 8)
         }
-        // Above the sessions it creates, at the sidebar's right edge.
-        .overlay(alignment: .leading) {
-            if state.sidebarVisible {
-                newSessionButton(p)
-                    .frame(width: SidebarView.width - 8, alignment: .trailing)
-            }
-        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background { columns(p) }
         .contentShape(Rectangle())
         .onTapGesture(count: 2, perform: commands.titleBarDoubleClick)
     }
 
+    /// Width of the side panels open on the left, which the title stays clear of.
+    private var leftPanels: CGFloat {
+        (state.sidebarVisible ? SidebarView.width : 0) + (state.filesVisible ? FilesPanel.width : 0)
+    }
+
+    /// Every panel runs up into the bar in its own color, like Mac apps with a sidebar, and the terminal's part matches the terminal.
+    private func columns(_ p: Palette) -> some View {
+        HStack(spacing: 0) {
+            Rectangle().fill(p.surface).frame(width: state.sidebarVisible ? SidebarView.width - 1 : 0)
+            Rectangle().fill(p.line).frame(width: state.sidebarVisible ? 1 : 0)
+            Rectangle().fill(p.surface).frame(width: state.filesVisible ? FilesPanel.width - 1 : 0)
+            Rectangle().fill(p.line).frame(width: state.filesVisible ? 1 : 0)
+            Rectangle().fill(p.background)
+            Rectangle().fill(p.line).frame(width: state.reviewWidth > 0 ? 1 : 0)
+            Rectangle().fill(p.background).frame(width: max(state.reviewWidth - 1, 0))
+        }
+    }
+
     private func newSessionButton(_ p: Palette) -> some View {
         IconButton(symbol: "plus", help: "New session (⌘T)", palette: p, action: commands.newSession)
     }
 
-    /// No rule under the bar: each part takes the color of the column below, so the terminal reaches the top edge.
-    private func columns(_ p: Palette) -> some View {
-        HStack(spacing: 0) {
-            Rectangle().fill(p.surface)
-                .frame(width: state.sidebarVisible ? SidebarView.width - 1 : 0)
-            Rectangle().fill(p.line)
-                .frame(width: state.sidebarVisible ? 1 : 0)
-            Rectangle().fill(p.surface)
-                .frame(width: state.filesVisible ? FilesPanel.width - 1 : 0)
-            Rectangle().fill(p.line)
-                .frame(width: state.filesVisible ? 1 : 0)
-            Rectangle().fill(p.background)
-            Rectangle().fill(p.line)
-                .frame(width: state.reviewWidth > 0 ? 1 : 0)
-            Rectangle().fill(p.background)
-                .frame(width: max(state.reviewWidth - 1, 0))
-        }
-    }
 }
 
 /// Only there when a newer release exists, so it never takes room otherwise.

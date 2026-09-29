@@ -86,7 +86,6 @@ private struct SessionRow: View {
         // Alongside the single tap, not instead of it, so selecting never waits for a possible second click.
         .simultaneousGesture(TapGesture(count: 2).onEnded { startEditing() })
         .onClickableHover { hovering = $0 }
-        .help(session.directory)
         .contextMenu {
             Button("Rename", action: startEditing)
             Button("Close Session", action: onClose)
@@ -140,7 +139,7 @@ private struct SessionRow: View {
     /// Selection stays neutral, so color only ever means agent status.
     private var background: some View {
         RoundedRectangle(cornerRadius: 6)
-            .fill(selected ? palette.raised : hovering ? palette.raised.opacity(0.5) : .clear)
+            .fill(selected ? palette.raised : hovering ? palette.raised.opacity(0.35) : .clear)
     }
 }
 
