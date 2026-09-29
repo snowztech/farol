@@ -82,24 +82,15 @@ final class FileView: NSView {
         }
         conflict.addSubview(conflictText)
 
-        // Code keeps its lines: no wrapping, scroll sideways instead. No smart quotes or other prose helpers.
-        text.isRichText = false
+        CodeText.configure(text)
         text.allowsUndo = true
-        text.usesFindBar = true
-        text.isIncrementalSearchingEnabled = true
-        text.isAutomaticQuoteSubstitutionEnabled = false
-        text.isAutomaticDashSubstitutionEnabled = false
-        text.isAutomaticTextReplacementEnabled = false
-        text.isAutomaticSpellingCorrectionEnabled = false
-        text.isContinuousSpellCheckingEnabled = false
-        text.isAutomaticLinkDetectionEnabled = false
+        // Code keeps its lines: no wrapping, scroll sideways instead.
         text.isHorizontallyResizable = true
         text.isVerticallyResizable = true
         text.autoresizingMask = []
         text.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: .greatestFiniteMagnitude)
         container.widthTracksTextView = false
         text.textContainerInset = NSSize(width: 8, height: 6)
-        text.font = Self.font
         text.onFocus = { [weak self] in self?.onFocus?() }
         NotificationCenter.default.addObserver(forName: NSText.didChangeNotification, object: text, queue: .main) { [weak self] _ in
             self?.isDirty = true
@@ -130,8 +121,6 @@ final class FileView: NSView {
     deinit { watcher?.cancel() }
 
     override var isFlipped: Bool { true }
-
-    static let font = NSFont.monospacedSystemFont(ofSize: 12.5, weight: .regular)
 
     var textView: NSTextView { text }
 
@@ -335,13 +324,9 @@ final class FileView: NSView {
         closeButton.apply(background: background, foreground: foreground)
         message.textColor = background.mixed(with: foreground, 0.55)
         scroll.backgroundColor = background
-        text.backgroundColor = background
-        text.textColor = foreground
+        CodeText.apply(to: text, background: background, foreground: foreground)
         plainColor = foreground
-        text.typingAttributes = [.font: Self.font, .foregroundColor: foreground]
         highlight()
-        text.insertionPointColor = foreground
-        text.selectedTextAttributes = [.backgroundColor: background.mixed(with: foreground, 0.22)]
         gutter.colors = (background, background.mixed(with: foreground, 0.35))
     }
 
@@ -363,14 +348,8 @@ final class FileView: NSView {
     /// Colors go straight on the text storage, so they never enter the undo history.
     private func highlight() {
         guard let storage = text.textStorage else { return }
-        storage.beginEditing()
-        storage.addAttribute(.foregroundColor, value: plainColor, range: NSRange(location: 0, length: storage.length))
-        if let language, let syntax, storage.length <= Self.highlightLimit {
-            for token in Syntax.tokens(in: storage.string, language) {
-                storage.addAttribute(.foregroundColor, value: syntax.color(token.kind), range: token.range)
-            }
-        }
-        storage.endEditing()
+        let small = storage.length <= Self.highlightLimit
+        CodeText.highlight(storage, small ? language : nil, syntax, plain: plainColor)
     }
 
     /// ⌘F, ⌘G and ⌘E use the text view's own find bar while the file has focus.
