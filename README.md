@@ -185,14 +185,7 @@ Farol embeds Ghostty through its internal API (`ghostty.h`). Ghostty makes no st
 
 ## Contributing
 
-Issues and pull requests are welcome. Before you open a PR, run the tests and the style check:
-
-```sh
-make test
-make lint
-```
-
-`make lint` flags em dashes, semicolons in prose, comment blocks over three lines and filler words. Comments should explain why, not what. CI runs the same check on every pull request.
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
 
 ## License
 
