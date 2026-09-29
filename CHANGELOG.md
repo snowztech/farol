@@ -4,11 +4,19 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
-### Changed
+## [0.11.0] - 2026-09-29
+
+Select and copy code in the review, and a calmer title bar.
+
+### Added
 
 - Select text across lines in the review panel and copy it, with the same selection color as the file pane. Each file's diff is now one text view that shares its setup with the file pane, so both show code the same way.
+
+### Changed
+
 - The sidebar and the files panel run up into the title bar in their own color, like other Mac apps with a sidebar. The window title is centered over the content between the open panels, so it no longer sits on a divider. The new session button stays next to the sidebar and files buttons instead of moving with the sidebar.
 - Hovering a session or a file is lighter than selecting it, so the two don't look alike, and session rows no longer pop up their path.
+- The sidebar button looks switched on while the sidebar is open, like the files and settings buttons.
 
 ## [0.10.0] - 2026-09-29
 
@@ -251,7 +259,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/snowztech/farol/releases/tag/v0.11.0
 [0.10.0]: https://github.com/snowztech/farol/releases/tag/v0.10.0
 [0.9.1]: https://github.com/snowztech/farol/releases/tag/v0.9.1
 [0.9.0]: https://github.com/snowztech/farol/releases/tag/v0.9.0
