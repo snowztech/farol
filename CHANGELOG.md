@@ -4,6 +4,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- The settings button in the title bar shows sliders instead of a gear.
+- The links and buttons in Settings → About show the pointing hand, like the rest of the app.
+
 ## [0.11.0] - 2026-09-29
 
 Select and copy code in the review, and a calmer title bar.

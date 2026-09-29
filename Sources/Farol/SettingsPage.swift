@@ -380,6 +380,7 @@ struct SettingsPage: View {
                 .background(p.raised, in: RoundedRectangle(cornerRadius: 6))
             }
             .buttonStyle(.plain)
+            .onClickableHover { _ in }
             .help("Copy the version")
             .padding(.top, 20)
 
@@ -388,6 +389,7 @@ struct SettingsPage: View {
                     .buttonStyle(.link)
                     .font(.system(size: 12))
                     .tint(p.text)
+                    .onClickableHover { _ in }
                     .padding(.top, 10)
             }
 
@@ -410,7 +412,9 @@ struct SettingsPage: View {
     }
 
     private func link(_ title: String, _ url: String) -> some View {
-        Link(title, destination: URL(string: url)!).foregroundStyle(state.palette.text)
+        Link(title, destination: URL(string: url)!)
+            .foregroundStyle(state.palette.text)
+            .onClickableHover { _ in }
     }
 
     private static let repo = "https://github.com/snowztech/farol"

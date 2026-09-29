@@ -73,7 +73,7 @@ struct TopBar: View {
                     UpdateBadge(version: version, palette: p, action: updates.install)
                         .padding(.trailing, 6)
                 }
-                IconButton(symbol: "gearshape", help: "Settings (⌘,)", active: state.showingSettings,
+                IconButton(symbol: "slider.horizontal.3", help: "Settings (⌘,)", active: state.showingSettings,
                            palette: p, action: commands.toggleSettings)
             }
             .padding(.trailing, 8)
