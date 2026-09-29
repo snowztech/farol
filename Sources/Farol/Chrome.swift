@@ -58,7 +58,8 @@ struct TopBar: View {
             HStack(spacing: 2) {
                 // Room for the traffic lights.
                 Spacer().frame(width: 72)
-                IconButton(symbol: "sidebar.left", help: "Toggle sidebar (⌘B)", palette: p, action: commands.toggleSidebar)
+                IconButton(symbol: "sidebar.left", help: "Toggle sidebar (⌘B)", active: state.sidebarVisible,
+                           palette: p, action: commands.toggleSidebar)
                 IconButton(symbol: "folder", help: "Files (⇧⌘E)", active: state.filesVisible,
                            palette: p, action: commands.toggleFiles)
                 newSessionButton(p)
