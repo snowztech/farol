@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- Text in the review panel can be selected and copied, within a line.
+
 ## [0.10.0] - 2026-09-29
 
 Syntax colors, and a calmer file pane.

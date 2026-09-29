@@ -419,10 +419,13 @@ private struct DiffLine: View {
                 .padding(.trailing, 11)
             // An overlay never sizes its parent, so a long line is cut at the card's edge instead of widening the list.
             Color.clear.overlay(alignment: .leading) {
+                // Select within a line and copy it, like any text on the Mac.
+                // ponytail: a selection can't cross lines, that needs one text view per file.
                 Text(colored)
                     .foregroundStyle(palette.text)
                     .lineLimit(1)
                     .fixedSize()
+                    .textSelection(.enabled)
             }
             .clipped()
         }
