@@ -81,7 +81,9 @@ struct TopBar: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background { columns(p) }
+        // One bar across the window with a hairline under it, so the columns below start at the line.
+        .background(p.background)
+        .overlay(alignment: .bottom) { Rectangle().fill(p.line).frame(height: 1) }
         .contentShape(Rectangle())
         .onTapGesture(count: 2, perform: commands.titleBarDoubleClick)
     }
@@ -90,24 +92,6 @@ struct TopBar: View {
         IconButton(symbol: "plus", help: "New session (⌘T)", palette: p, action: commands.newSession)
     }
 
-    /// No rule under the bar: each part takes the color of the column below, so the terminal reaches the top edge.
-    private func columns(_ p: Palette) -> some View {
-        HStack(spacing: 0) {
-            Rectangle().fill(p.surface)
-                .frame(width: state.sidebarVisible ? SidebarView.width - 1 : 0)
-            Rectangle().fill(p.line)
-                .frame(width: state.sidebarVisible ? 1 : 0)
-            Rectangle().fill(p.surface)
-                .frame(width: state.filesVisible ? FilesPanel.width - 1 : 0)
-            Rectangle().fill(p.line)
-                .frame(width: state.filesVisible ? 1 : 0)
-            Rectangle().fill(p.background)
-            Rectangle().fill(p.line)
-                .frame(width: state.reviewWidth > 0 ? 1 : 0)
-            Rectangle().fill(p.background)
-                .frame(width: max(state.reviewWidth - 1, 0))
-        }
-    }
 }
 
 /// Only there when a newer release exists, so it never takes room otherwise.
