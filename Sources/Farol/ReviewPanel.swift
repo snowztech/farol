@@ -6,16 +6,14 @@ import SwiftUI
 final class ReviewModel: ObservableObject {
     enum Row: Identifiable {
         case header(Diff.File, collapsed: Bool)
-        /// Unchanged lines git left out between two hunks.
-        case gap(file: String, index: Int, lines: Int)
-        case line(file: String, index: Int, Diff.Line)
+        /// The file's lines, drawn by one text view so a selection can cross them.
+        case body(Diff.File)
         case note(file: String, String)
 
         var id: String {
             switch self {
             case .header(let file, _): file.path
-            case .gap(let file, let index, _): "\(file)#gap\(index)"
-            case .line(let file, let index, _): "\(file)#\(index)"
+            case .body(let file): "\(file.path)#body"
             case .note(let file, _): "\(file)#note"
             }
         }
@@ -131,17 +129,7 @@ final class ReviewModel: ObservableObject {
             rows.append(.header(file, collapsed: folded))
             if folded { continue }
             if file.isBinary { rows.append(.note(file: file.path, "Binary file")) }
-            var index = 0
-            var next = 1
-            for (h, hunk) in file.hunks.enumerated() {
-                let skipped = hunk.newStart - next
-                if skipped > 0 { rows.append(.gap(file: file.path, index: h, lines: skipped)) }
-                for line in hunk.lines {
-                    rows.append(.line(file: file.path, index: index, line))
-                    index += 1
-                }
-                next = hunk.newStart + hunk.lines.filter { $0.kind != .removed }.count
-            }
+            if !file.hunks.isEmpty { rows.append(.body(file)) }
         }
         self.rows = rows
     }
@@ -210,16 +198,8 @@ struct ReviewPanel: View {
             FileHeader(file: file, collapsed: collapsed, palette: p,
                        toggle: { review.toggle(file.path) },
                        open: { review.root.map { open(($0 as NSString).appendingPathComponent(file.path), file.firstChange) } })
-        case .gap(_, _, let lines):
-            Text("\(lines) unmodified \(lines == 1 ? "line" : "lines")")
-                .font(.system(size: 11))
-                .foregroundStyle(p.muted)
-                .padding(.leading, 58)
-                .frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
-                .background(p.surface)
-                .padding(.horizontal, 8)
-        case .line(let file, _, let line):
-            DiffLine(line: line, language: Syntax.language(for: file), palette: p).padding(.horizontal, 8)
+        case .body(let file):
+            DiffText(file: file, colors: p.diff, syntax: p.code).padding(.horizontal, 8)
         case .note(_, let text):
             Text(text).font(.system(size: 12)).foregroundStyle(p.muted).padding(.leading, 58).frame(height: 24)
         }
@@ -405,44 +385,3 @@ private struct FileHeader: View {
     }
 }
 
-private struct DiffLine: View {
-    let line: Diff.Line
-    let language: Syntax.Language?
-    let palette: Palette
-
-    var body: some View {
-        HStack(spacing: 0) {
-            Rectangle().fill(tint.opacity(line.kind == .context ? 0 : 0.9)).frame(width: 3)
-            Text(line.number.map(String.init) ?? "")
-                .foregroundStyle(palette.muted)
-                .frame(width: 44, alignment: .trailing)
-                .padding(.trailing, 11)
-            // An overlay never sizes its parent, so a long line is cut at the card's edge instead of widening the list.
-            Color.clear.overlay(alignment: .leading) {
-                Text(colored)
-                    .foregroundStyle(palette.text)
-                    .lineLimit(1)
-                    .fixedSize()
-            }
-            .clipped()
-        }
-        .font(.system(size: 12, design: .monospaced))
-        .frame(height: 20)
-        .background(tint.opacity(line.kind == .context ? 0 : 0.14))
-    }
-
-    private var tint: Color { line.kind == .removed ? palette.removed : palette.added }
-
-    /// ponytail: each line is colored on its own, so a comment or string spanning lines shows plain after its first line.
-    private var colored: AttributedString {
-        // Tabs would line up differently from the file, so they show as four spaces.
-        let text = line.text.replacingOccurrences(of: "\t", with: "    ")
-        var result = AttributedString(text)
-        guard let language else { return result }
-        for token in Syntax.tokens(in: text, language) {
-            guard let range = Range(token.range, in: result) else { continue }
-            result[range].foregroundColor = Color(nsColor: palette.code.color(token.kind))
-        }
-        return result
-    }
-}
