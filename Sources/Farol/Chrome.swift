@@ -49,10 +49,11 @@ struct TopBar: View {
             .font(.system(size: 12, weight: .medium))
             .foregroundStyle(p.muted)
             .lineLimit(1)
-            // Centered over the content, right of the sidebar, so it never sits on the sidebar's edge.
+            // Centered over the content, between the open panels, so it never sits on a panel's edge.
             .padding(.horizontal, 120)
             .frame(maxWidth: .infinity)
-            .padding(.leading, state.sidebarVisible ? SidebarView.width : 0)
+            .padding(.leading, leftPanels)
+            .padding(.trailing, state.reviewWidth)
 
             HStack(spacing: 2) {
                 // Room for the traffic lights.
@@ -77,16 +78,27 @@ struct TopBar: View {
             .padding(.trailing, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // The sidebar runs up into the bar, like Mac apps with a sidebar, so the traffic lights sit on its color.
-        // The rest is one strip in the terminal's color, so no divider crosses the bar.
-        .background {
-            HStack(spacing: 0) {
-                Rectangle().fill(p.surface).frame(width: state.sidebarVisible ? SidebarView.width : 0)
-                Rectangle().fill(p.background)
-            }
-        }
+        .background { columns(p) }
         .contentShape(Rectangle())
         .onTapGesture(count: 2, perform: commands.titleBarDoubleClick)
+    }
+
+    /// Width of the side panels open on the left, which the title stays clear of.
+    private var leftPanels: CGFloat {
+        (state.sidebarVisible ? SidebarView.width : 0) + (state.filesVisible ? FilesPanel.width : 0)
+    }
+
+    /// Every panel runs up into the bar in its own color, like Mac apps with a sidebar, and the terminal's part matches the terminal.
+    private func columns(_ p: Palette) -> some View {
+        HStack(spacing: 0) {
+            Rectangle().fill(p.surface).frame(width: state.sidebarVisible ? SidebarView.width - 1 : 0)
+            Rectangle().fill(p.line).frame(width: state.sidebarVisible ? 1 : 0)
+            Rectangle().fill(p.surface).frame(width: state.filesVisible ? FilesPanel.width - 1 : 0)
+            Rectangle().fill(p.line).frame(width: state.filesVisible ? 1 : 0)
+            Rectangle().fill(p.background)
+            Rectangle().fill(p.line).frame(width: state.reviewWidth > 0 ? 1 : 0)
+            Rectangle().fill(p.background).frame(width: max(state.reviewWidth - 1, 0))
+        }
     }
 
     private func newSessionButton(_ p: Palette) -> some View {
