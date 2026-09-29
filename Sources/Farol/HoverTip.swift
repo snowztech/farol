@@ -12,7 +12,7 @@ final class HoverTip {
 
     private static let delay: TimeInterval = 0.5
     private let panel: NSPanel
-    private let label = NSTextField(labelWithString: "")
+    private let bubble = Bubble()
     private var pending: DispatchWorkItem?
     private weak var owner: NSWindow?
     private var clickMonitor: Any?
@@ -23,13 +23,7 @@ final class HoverTip {
         panel.backgroundColor = .clear
         panel.hasShadow = true
         panel.ignoresMouseEvents = true
-        let content = NSView()
-        content.wantsLayer = true
-        content.layer?.cornerRadius = 5
-        content.layer?.borderWidth = 1
-        label.font = .systemFont(ofSize: 11.5)
-        content.addSubview(label)
-        panel.contentView = content
+        panel.contentView = bubble
         restyle()
         // A click means the tip did its job, and the control may move or change under it.
         clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
@@ -56,10 +50,9 @@ final class HoverTip {
 
     private func present(_ text: String, below rect: NSRect, in window: NSWindow) {
         guard NSApp.isActive, window.isVisible else { return }
-        label.attributedStringValue = styled(text)
-        let size = label.attributedStringValue.size()
-        let width = ceil(size.width) + 16, height = ceil(size.height) + 8
-        label.frame = NSRect(x: 8, y: 4, width: ceil(size.width) + 2, height: ceil(size.height))
+        bubble.text = styled(text)
+        let size = bubble.text.size()
+        let width = ceil(size.width) + 2 * Bubble.padding.width, height = ceil(size.height) + 2 * Bubble.padding.height
         var origin = NSPoint(x: rect.midX - width / 2, y: rect.minY - 6 - height)
         // Stays on screen when the control sits near an edge.
         if let screen = window.screen?.visibleFrame {
@@ -84,19 +77,39 @@ final class HoverTip {
             name = text
             shortcut = nil
         }
-        let font = NSFont.systemFont(ofSize: 11.5)
+        let font = NSFont.systemFont(ofSize: 11, weight: .medium)
         let result = NSMutableAttributedString(string: name, attributes: [.font: font, .foregroundColor: colors.foreground])
         if let shortcut {
-            result.append(NSAttributedString(string: "  " + shortcut, attributes: [
-                .font: font, .foregroundColor: colors.background.mixed(with: colors.foreground, 0.55),
+            result.append(NSAttributedString(string: "   " + shortcut, attributes: [
+                .font: NSFont.systemFont(ofSize: 11), .foregroundColor: colors.background.mixed(with: colors.foreground, 0.5),
             ]))
         }
         return result
     }
 
     private func restyle() {
-        panel.contentView?.layer?.backgroundColor = colors.background.mixed(with: colors.foreground, 0.1).cgColor
-        panel.contentView?.layer?.borderColor = colors.background.mixed(with: colors.foreground, 0.2).cgColor
+        bubble.fill = colors.background.mixed(with: colors.foreground, 0.12)
+        bubble.edge = colors.background.mixed(with: colors.foreground, 0.16)
+        bubble.needsDisplay = true
+    }
+}
+
+/// The tip's rounded background and its text, drawn directly so every part of the text shows.
+private final class Bubble: NSView {
+    static let padding = NSSize(width: 8, height: 4)
+
+    var text = NSAttributedString() { didSet { needsDisplay = true } }
+    var fill = NSColor.darkGray
+    var edge = NSColor.gray
+
+    override func draw(_ dirtyRect: NSRect) {
+        let shape = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 6, yRadius: 6)
+        fill.setFill()
+        shape.fill()
+        edge.setStroke()
+        shape.lineWidth = 1
+        shape.stroke()
+        text.draw(at: NSPoint(x: Self.padding.width, y: Self.padding.height))
     }
 }
 
