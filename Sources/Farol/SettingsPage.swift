@@ -227,10 +227,14 @@ struct SettingsPage: View {
         Row(title: "In the menu bar", detail: "See agents working, waiting or done from any app, and jump to a session.", palette: p) {
             toggle($agents.menuBarStatus)
         }
-        if NotchStatus.isAvailable {
-            Row(title: "Around the notch", detail: "The notch grows a little while agents are active. Hover it to see the sessions.", palette: p) {
-                toggle($agents.notchStatus)
+        Row(title: "Status panel", detail: "A small black panel while agents are active. Hover it to see the sessions.", palette: p) {
+            Picker("", selection: statusPanel) {
+                Text("Off").tag("off")
+                if NotchStatus.isAvailable { Text("At the notch").tag(NotchStatus.Place.notch.rawValue) }
+                Text("On the screen edge").tag(NotchStatus.Place.edge.rawValue)
             }
+            .labelsHidden()
+            .fixedSize()
         }
 
         GroupTitle(title: "New sessions", palette: p)
@@ -293,6 +297,21 @@ struct SettingsPage: View {
             message: Text(agent.connectMessage),
             primaryButton: .default(Text("Connect")) { self.change(agent, connect: true) },
             secondaryButton: .cancel())
+    }
+
+    /// Off, or where the status panel shows. A notch choice on a Mac without one reads as the screen edge.
+    private var statusPanel: Binding<String> {
+        Binding(
+            get: {
+                guard agents.notchStatus else { return "off" }
+                return agents.statusPanelPlace == NotchStatus.Place.notch.rawValue && !NotchStatus.isAvailable
+                    ? NotchStatus.Place.edge.rawValue : agents.statusPanelPlace
+            },
+            set: { value in
+                if value == "off" { return agents.notchStatus = false }
+                agents.statusPanelPlace = value
+                agents.notchStatus = true
+            })
     }
 
     private static let custom = "custom"

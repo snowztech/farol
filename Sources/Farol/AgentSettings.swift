@@ -9,7 +9,9 @@ final class AgentSettings: ObservableObject {
     @Published var dockBadge: Bool { didSet { Self.defaults.set(dockBadge, forKey: "agents.dockBadge") } }
     /// Off until turned on, like every feature that shows outside Farol's window.
     @Published var menuBarStatus: Bool { didSet { Self.defaults.set(menuBarStatus, forKey: "agents.menuBarStatus") } }
+    /// The status panel, shown at the notch or on the screen edge. The key keeps its first name, from when only the notch existed.
     @Published var notchStatus: Bool { didSet { Self.defaults.set(notchStatus, forKey: "agents.notchStatus") } }
+    @Published var statusPanelPlace: String { didSet { Self.defaults.set(statusPanelPlace, forKey: "agents.statusPanelPlace") } }
     /// Typed into the shell of each new session, for example "claude". Empty starts a plain shell.
     @Published var startCommand: String { didSet { Self.defaults.set(startCommand, forKey: "agents.startCommand") } }
 
@@ -22,6 +24,7 @@ final class AgentSettings: ObservableObject {
         dockBadge = Self.defaults.bool(forKey: "agents.dockBadge")
         menuBarStatus = Self.defaults.bool(forKey: "agents.menuBarStatus")
         notchStatus = Self.defaults.bool(forKey: "agents.notchStatus")
+        statusPanelPlace = Self.defaults.string(forKey: "agents.statusPanelPlace") ?? "notch"
         startCommand = Self.defaults.string(forKey: "agents.startCommand") ?? ""
     }
 }
