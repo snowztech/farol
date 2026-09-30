@@ -15,6 +15,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Fixed
 
 - Settings → Shortcuts and the README list ⌥⌘G for the git graph.
+- Long lines in the review panel scroll sideways instead of being cut at the panel's edge.
 
 ## [0.15.0] - 2026-10-01
 

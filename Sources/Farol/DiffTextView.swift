@@ -28,14 +28,15 @@ struct DiffText: NSViewRepresentable {
     let colors: DiffColors
     let syntax: SyntaxColors
 
-    func makeNSView(context: Context) -> DiffTextView { DiffTextView() }
+    func makeNSView(context: Context) -> DiffScrollView { DiffScrollView() }
 
-    func updateNSView(_ view: DiffTextView, context: Context) {
-        view.show(file, colors: colors, syntax: syntax)
+    func updateNSView(_ view: DiffScrollView, context: Context) {
+        view.text.show(file, colors: colors, syntax: syntax)
+        view.needsLayout = true
     }
 
     /// Every row has the same height, so the size is known without laying the text out.
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView: DiffTextView, context: Context) -> CGSize? {
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: DiffScrollView, context: Context) -> CGSize? {
         CGSize(width: proposal.width ?? 400, height: CGFloat(DiffTextView.rowCount(file)) * DiffTextView.rowHeight)
     }
 }
@@ -46,6 +47,39 @@ private extension NSAttributedString.Key {
     static let diffGap = NSAttributedString.Key("farol.diffGap")
 }
 
+/// Scrolls one file's diff sideways, for lines longer than the panel is wide.
+/// Up and down belong to the review's own scroll view, so a gesture that starts vertical goes on to it.
+final class DiffScrollView: NSScrollView {
+    let text = DiffTextView()
+    private var sideways = false
+
+    init() {
+        super.init(frame: .zero)
+        documentView = text
+        drawsBackground = false
+        hasHorizontalScroller = true
+        hasVerticalScroller = false
+        autohidesScrollers = true
+        scrollerStyle = .overlay
+        verticalScrollElasticity = .none
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    override func scrollWheel(with event: NSEvent) {
+        // Decided once per gesture, so a swipe that drifts doesn't hop between the two scroll views halfway.
+        if event.phase == .began || (event.phase.isEmpty && event.momentumPhase.isEmpty) {
+            sideways = abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY)
+        }
+        if sideways { super.scrollWheel(with: event) } else { nextResponder?.scrollWheel(with: event) }
+    }
+
+    override func layout() {
+        super.layout()
+        text.frame = NSRect(x: 0, y: 0, width: max(text.contentWidth, contentSize.width), height: contentSize.height)
+    }
+}
+
 /// One text view per file, so a selection can run across lines and uses the theme's color, like the file pane.
 /// Each line carries its kind and number as attributes, and drawBackground paints the tints and numbers under the text.
 final class DiffTextView: NSTextView {
@@ -53,6 +87,8 @@ final class DiffTextView: NSTextView {
     static let gutter: CGFloat = 58
 
     private var shown: (file: Diff.File, colors: DiffColors, syntax: SyntaxColors)?
+    /// The width the longest line needs, so the scroll view knows how far it can go.
+    private(set) var contentWidth: CGFloat = 0
     private let diffLayout = NSLayoutManager()
     fileprivate var diffColors: DiffColors?
 
@@ -69,7 +105,7 @@ final class DiffTextView: NSTextView {
         isSelectable = true
         isVerticallyResizable = false
         isHorizontallyResizable = false
-        // Long lines are cut at the card's edge, like the rest of the panel. Views don't clip themselves since macOS 14.
+        // Views don't clip themselves since macOS 14, and the tints are drawn across the whole width.
         textContainerInset = NSSize(width: Self.gutter, height: 0)
         clipsToBounds = true
     }
@@ -136,6 +172,11 @@ final class DiffTextView: NSTextView {
         if let storage = textStorage {
             CodeText.highlight(storage, Syntax.language(for: file.path), syntax, plain: colors.foreground)
         }
+        if let container = textContainer {
+            diffLayout.ensureLayout(for: container)
+            contentWidth = ceil(diffLayout.usedRect(for: container).width) + Self.gutter + 16
+        }
+        enclosingScrollView?.needsLayout = true
         needsDisplay = true
     }
 }
