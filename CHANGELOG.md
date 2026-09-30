@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Agent status in the menu bar (Settings → Agents → Status in the menu bar, off by default). Farol's lighthouse sits in the menu bar, and its beams light up in the sidebar's colors for the most urgent state across sessions, so you see agents working from any app. Its menu lists the sessions and opens the one you pick.
+
 ## [0.11.2] - 2026-09-30
 
 Background agents no longer end a session early.

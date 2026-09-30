@@ -222,6 +222,9 @@ struct SettingsPage: View {
         Row(title: "When an agent is waiting for you", palette: p) { toggle($agents.notifyWaiting) }
         Row(title: "When an agent finishes", palette: p) { toggle($agents.notifyDone) }
         Row(title: "Waiting count on the Dock icon", palette: p) { toggle($agents.dockBadge) }
+        Row(title: "Status in the menu bar", detail: "See agents working, waiting or done from any app, and jump to a session.", palette: p) {
+            toggle($agents.menuBarStatus)
+        }
 
         GroupTitle(title: "New sessions", palette: p)
         Row(title: "Start with", detail: "Typed into the shell of every new session, so you are back in the shell when it exits.", palette: p) {
