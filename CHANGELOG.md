@@ -4,17 +4,15 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
-### Added
+## [0.12.0] - 2026-09-30
 
-- Agent status around the notch (Settings → Agents → Around the notch, on Macs with a notch, off by default). While agents are active the notch grows a little, with Farol's icon on one side and the number of active sessions on the other, in the state's color. Hover it to see the sessions and open one. Idle, the notch stays as it is.
-
-### Changed
-
-- The menu bar setting moved into a new Outside Farol group in Settings → Agents, next to the notch.
+See your agents from any app, in the menu bar or around the notch.
 
 ### Added
 
-- Agent status in the menu bar (Settings → Agents → Status in the menu bar, off by default). Farol's lighthouse sits in the menu bar, and its beams light up in the sidebar's colors for the most urgent state across sessions, so you see agents working from any app. Its menu lists the sessions and opens the one you pick.
+- Agent status in the menu bar. Farol's lighthouse sits in the menu bar, and its beams light up in the sidebar's colors for the most urgent state across sessions. Its menu lists the sessions and opens the one you pick.
+- Agent status around the notch, on Macs with one. While agents are active the notch grows a little, with Farol's icon on one side and the number of active sessions on the other, in the state's color. Hover it to see the sessions and open one. Idle, the notch stays as it is.
+- Both are in Settings → Agents → Outside Farol, off by default.
 
 ## [0.11.2] - 2026-09-30
 
@@ -297,7 +295,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.11.2...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/snowztech/farol/releases/tag/v0.12.0
 [0.11.2]: https://github.com/snowztech/farol/releases/tag/v0.11.2
 [0.11.1]: https://github.com/snowztech/farol/releases/tag/v0.11.1
 [0.11.0]: https://github.com/snowztech/farol/releases/tag/v0.11.0
