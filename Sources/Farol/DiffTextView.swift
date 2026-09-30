@@ -69,8 +69,9 @@ final class DiffTextView: NSTextView {
         isSelectable = true
         isVerticallyResizable = false
         isHorizontallyResizable = false
-        // Long lines are cut at the card's edge, like the rest of the panel.
+        // Long lines are cut at the card's edge, like the rest of the panel. Views don't clip themselves since macOS 14.
         textContainerInset = NSSize(width: Self.gutter, height: 0)
+        clipsToBounds = true
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
