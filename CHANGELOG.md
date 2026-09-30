@@ -6,6 +6,14 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
+- Agent status around the notch (Settings → Agents → Around the notch, on Macs with a notch, off by default). While agents are active the notch grows a little, with Farol's icon on one side and the number of active sessions on the other, in the state's color. Hover it to see the sessions and open one. Idle, the notch stays as it is.
+
+### Changed
+
+- The menu bar setting moved into a new Outside Farol group in Settings → Agents, next to the notch.
+
+### Added
+
 - Agent status in the menu bar (Settings → Agents → Status in the menu bar, off by default). Farol's lighthouse sits in the menu bar, and its beams light up in the sidebar's colors for the most urgent state across sessions, so you see agents working from any app. Its menu lists the sessions and opens the one you pick.
 
 ## [0.11.2] - 2026-09-30
