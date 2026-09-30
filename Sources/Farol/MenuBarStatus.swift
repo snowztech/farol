@@ -83,7 +83,7 @@ final class MenuBarStatus: NSObject, NSMenuDelegate {
 
     private func lighthouse(_ activity: Session.Activity) -> NSImage {
         // The menu bar's own text color, picked up each time the image draws, so it suits light and dark.
-        Lighthouse.image(beam: palette.color(activity), body: .labelColor)
+        Lighthouse.image(beam: palette.color(activity) ?? .secondaryLabelColor, body: .labelColor)
     }
 
     /// A filled dot in the sidebar's color for each state, and a hollow template circle when idle, so it follows the menu bar's look.

@@ -8,6 +8,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 Worktrees that run like the project they came from, and reliable status for Codex sessions.
 
+### Changed
+
+- The menu bar lighthouse keeps subtle beams while idle, then lights them in the agent status color when activity starts.
+
 ### Added
 
 - New worktrees copy ignored `.env` files by default, so tasks can build and run with the project's local environment. This can be turned off in Settings → Worktrees.
