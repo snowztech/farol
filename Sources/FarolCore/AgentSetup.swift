@@ -43,30 +43,36 @@ public struct AgentSetup {
             disconnect: { try hooks.write(hooks.remove(from: hooks.read())) })
     }
 
-    /// Terminal notifications only, see CodexNotifications. Connecting also clears the hooks Farol 0.6 added.
-    static func codex(config: URL = CodexNotifications.file, oldHooks: AgentHooks = .codex) -> AgentSetup {
-        let hasOldHooks = { (try? oldHooks.read()).map(oldHooks.hasAnyFarolHook) == true }
+    /// Codex 0.159.2 restored the pane environment in hooks. Connecting removes the terminal-notification workaround.
+    static func codex(hooks: AgentHooks = .codex, legacyConfig: URL = CodexNotifications.file) -> AgentSetup {
+        let hasLegacyNotifications = {
+            (try? CodexNotifications.read(legacyConfig)).map(CodexNotifications.hasFarolSettings) == true
+        }
         let edit = { (change: (String) throws -> String) in
-            let text = try CodexNotifications.read(config)
+            let text = try CodexNotifications.read(legacyConfig)
             let changed = try change(text)
-            if changed != text { try CodexNotifications.write(changed, to: config) }
+            if changed != text { try CodexNotifications.write(changed, to: legacyConfig) }
         }
         return AgentSetup(
             name: "Codex",
-            file: config,
-            summaryWhenDisconnected: "Get told when Codex needs you or finishes.",
-            summaryWhenConnected: "Farol tells you when Codex needs you or finishes. Codex doesn't report while it works, so the sidebar shows no working dot.",
-            connectMessage: "Farol turns on Codex's terminal notifications in \(tilde(config)), on lines marked as added by Farol. The rest of the file stays as it is, and the current one is kept as \(backup(config)). Codex sessions that are already open need a restart.",
-            disconnectMessage: "Farol stops notifying you when Codex needs you or finishes. Codex keeps working as before. Farol removes only the lines it added to \(tilde(config)) and keeps a backup.",
+            file: hooks.file,
+            summaryWhenDisconnected: "Show in the sidebar when Codex is working, waiting for you or done.",
+            summaryWhenConnected: "The sidebar shows when Codex is working, waiting for you or done.",
+            connectMessage: "Farol adds hooks for \(hooks.events.count) events to \(tilde(hooks.file)). Your other settings stay as they are, though the file may be reformatted. The current file is kept as \(backup(hooks.file)). Codex sessions that are already open need a restart.",
+            disconnectMessage: "The sidebar stops showing when Codex is working, waiting or done, and Farol stops notifying you. Codex keeps working as before. Farol removes only its own hooks from \(tilde(hooks.file)) and keeps a backup.",
             state: {
-                if hasOldHooks() { return .outdated }
-                return (try? CodexNotifications.read(config)).map(CodexNotifications.isEnabled) == true ? .connected : .disconnected
+                guard let settings = try? hooks.read() else { return .disconnected }
+                if hooks.isInstalled(in: settings), !hasLegacyNotifications() { return .connected }
+                return hooks.hasAnyFarolHook(in: settings) || hasLegacyNotifications() ? .outdated : .disconnected
             },
             connect: {
-                try edit(CodexNotifications.enable)
-                if hasOldHooks() { try oldHooks.write(oldHooks.remove(from: oldHooks.read())) }
+                try hooks.write(hooks.install(into: hooks.read()))
+                try edit(CodexNotifications.disable)
             },
-            disconnect: { try edit(CodexNotifications.disable) })
+            disconnect: {
+                try hooks.write(hooks.remove(from: hooks.read()))
+                try edit(CodexNotifications.disable)
+            })
     }
 
     private static func tilde(_ url: URL) -> String {

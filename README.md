@@ -72,7 +72,7 @@ When an agent waits or finishes while Farol is in the background, you get a noti
 
 **Claude Code:** open Settings → Agents and click **Connect**. Farol adds its hooks to `~/.claude/settings.json`, leaves everything else in the file alone and keeps a backup. **Disconnect** removes only Farol's hooks, and Claude Code keeps working as before.
 
-**Codex:** same place, click **Connect**. Farol turns on Codex's terminal notifications in `~/.codex/config.toml`, so you hear from Codex when it needs your approval or finishes a turn. The sidebar shows a yellow dot until you open the session. Codex can't report while it works, so there is no working dot. Farol marks the lines it adds and **Disconnect** removes only those.
+**Codex:** same place, click **Connect**. Farol adds its hooks to `~/.codex/hooks.json`, leaves other hooks alone and keeps a backup. Restart open Codex sessions, then review and trust the hooks with `/hooks`. **Disconnect** removes only Farol's hooks.
 
 **Other agents** can report with `"$FAROL_CLI" status working|waiting|done|clear`, which Farol makes available in every session. Agents that ring the terminal bell show as waiting without any setup.
 
@@ -98,18 +98,28 @@ Outside Farol `$FAROL_CLI` is unset, so the hooks do nothing. The Notification m
 </details>
 
 <details>
-<summary>The Codex settings, if you prefer to add them by hand</summary>
+<summary>The Codex hooks, if you prefer to add them by hand</summary>
 
-In `~/.codex/config.toml`:
+In `~/.codex/hooks.json`:
 
-```toml
-[tui]
-notifications = true
-notification_method = "osc9"
-notification_condition = "always"
+```json
+{
+  "hooks": {
+    "SessionStart": [{ "matcher": "startup|resume|clear", "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status clear" }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status working" }] }],
+    "PostToolUse": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status working" }] }],
+    "PermissionRequest": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status waiting" }] }],
+    "PreToolUse": [{ "matcher": "^request_user_input$", "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status waiting" }] }],
+    "Stop": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status done" }] }],
+    "Interrupt": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status clear" }] }],
+    "SessionEnd": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status clear" }] }],
+    "SubagentStart": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status subagent-start" }] }],
+    "SubagentStop": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status subagent-stop" }] }]
+  }
+}
 ```
 
-Farol ignores notifications from the session you are looking at, so "always" doesn't make it noisy.
+Outside Farol `$FAROL_CLI` is unset, so the hooks do nothing. Codex 0.159.2 or later is required because earlier versions did not pass Farol's pane environment to hooks.
 
 </details>
 

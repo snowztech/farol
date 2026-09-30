@@ -30,27 +30,32 @@ private func hooks(_ agent: AgentHooks, at url: URL) -> AgentHooks {
 
 @Test func codexConnectsAndDisconnectsLeavingTheFileAsItWas() throws {
     let config = tempFile("config.toml")
+    let codexHooks = hooks(.codex, at: tempFile("hooks.json"))
     let mine = "model = \"gpt-5.5\"\n"
     try FileManager.default.createDirectory(at: config.deletingLastPathComponent(), withIntermediateDirectories: true)
     try mine.write(to: config, atomically: true, encoding: .utf8)
-    let setup = AgentSetup.codex(config: config, oldHooks: hooks(.codex, at: tempFile("hooks.json")))
+    let setup = AgentSetup.codex(hooks: codexHooks, legacyConfig: config)
     #expect(setup.state() == .disconnected)
     try setup.connect()
     #expect(setup.state() == .connected)
+    #expect(codexHooks.isInstalled(in: try codexHooks.read()))
     try setup.disconnect()
     #expect(setup.state() == .disconnected)
+    #expect(!codexHooks.hasAnyFarolHook(in: try codexHooks.read()))
     #expect(try CodexNotifications.read(config) == mine)
 }
 
-/// Farol 0.6 hooks never reached Farol, so Codex shows as needing an update until connecting removes them.
-@Test func codexConnectRemovesOldHooks() throws {
-    let old = hooks(.codex, at: tempFile("hooks.json"))
-    try old.write(old.install(into: [:]))
-    let setup = AgentSetup.codex(config: tempFile("config.toml"), oldHooks: old)
+@Test func codexConnectReplacesTerminalNotificationsWithHooks() throws {
+    let config = tempFile("config.toml")
+    let codexHooks = hooks(.codex, at: tempFile("hooks.json"))
+    let mine = "model = \"gpt-5.5\"\n"
+    try CodexNotifications.write(CodexNotifications.enable(in: mine), to: config)
+    let setup = AgentSetup.codex(hooks: codexHooks, legacyConfig: config)
     #expect(setup.state() == .outdated)
     try setup.connect()
     #expect(setup.state() == .connected)
-    #expect(!old.hasAnyFarolHook(in: try old.read()))
+    #expect(codexHooks.isInstalled(in: try codexHooks.read()))
+    #expect(try CodexNotifications.read(config) == mine)
 }
 
 @Test func everyAgentHasItsOwnName() {

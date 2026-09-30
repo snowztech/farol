@@ -133,6 +133,25 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
 
 // MARK: Codex
 
+@Test func codexInstallsEveryStatusHook() {
+    let settings = AgentHooks.codex.install(into: [:])
+    #expect(commands(settings, "SessionStart") == [AgentHooks.command("clear")])
+    #expect(commands(settings, "UserPromptSubmit") == [AgentHooks.command("working")])
+    #expect(commands(settings, "PostToolUse") == [AgentHooks.command("working")])
+    #expect(commands(settings, "PermissionRequest") == [AgentHooks.command("waiting")])
+    #expect(commands(settings, "PreToolUse") == [AgentHooks.command("waiting")])
+    #expect(commands(settings, "Stop") == [AgentHooks.command("done")])
+    #expect(commands(settings, "Interrupt") == [AgentHooks.command("clear")])
+    #expect(commands(settings, "SessionEnd") == [AgentHooks.command("clear")])
+    #expect(commands(settings, "SubagentStart") == [AgentHooks.command("subagent-start")])
+    #expect(commands(settings, "SubagentStop") == [AgentHooks.command("subagent-stop")])
+    let hooks = settings["hooks"] as? [String: Any]
+    let sessionStart = hooks?["SessionStart"] as? [[String: Any]]
+    let question = hooks?["PreToolUse"] as? [[String: Any]]
+    #expect(sessionStart?.first?["matcher"] as? String == "startup|resume|clear")
+    #expect(question?.first?["matcher"] as? String == "^request_user_input$")
+}
+
 /// A hooks.json that already runs another tool at session start, like herdr's, keeps it through connect and disconnect.
 @Test func codexKeepsOtherHooks() throws {
     let theirs: [String: Any] = ["hooks": [

@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- Codex sessions now show working, waiting and done dots like Claude Code. Settings → Agents → Update replaces Farol's terminal-notification workaround with lifecycle hooks. Restart open Codex sessions and trust the new hooks with `/hooks`.
+
 ## [0.13.1] - 2026-09-30
 
 Long review lines stay inside their background.
