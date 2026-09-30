@@ -34,6 +34,7 @@ It needs a Mac with Apple Silicon and macOS 14 or later. Releases are signed and
 
 - **New task.** ⇧⌘N asks what to do, then starts Claude Code or Codex on it in a new worktree, with the task as its first prompt.
 - **Agent status.** Each session shows whether its agent is working, waiting for you or done, with a notification when it waits in the background. See [Agent status](#agent-status).
+- **Agents from any app.** Farol's lighthouse in the menu bar lights up while agents work, wait or finish, and its menu opens any session. Or pick a small status panel at the notch or on the screen edge, which you can drag anywhere along the side.
 - **Worktree sessions.** ⇧⌘T asks for a branch and opens a session in its own git worktree, so parallel agents never touch each other's files. Closing it offers to remove the worktree and always keeps the branch.
 - **Sessions in a sidebar.** Open as many as you like. Hidden sessions keep running but stop rendering, so twenty background agents cost no GPU time. Each row shows its git branch, and Settings → Appearance can group sessions under each project's name. Double-click to rename, drag to reorder.
 - **Files next to the terminal.** ⇧⌘E opens the session's project as a tree, with ignored files dimmed. Click a file to open it in a pane beside the terminal, with syntax colors from your theme, line numbers and ⌘F, and make a quick fix with ⌘S to save. When an agent changes the file you have open, it reloads, or asks first if you have unsaved edits. The tree updates as agents add files, and costs nothing while it is closed.
@@ -44,7 +45,7 @@ It needs a Mac with Apple Silicon and macOS 14 or later. Releases are signed and
 - **Themes and settings.** Ghostty's 600+ themes with live previews, and settings inside the window.
 - **Copy and paste, accents and input methods.** Pasting text that could run commands asks first, dead keys compose as you type, and input methods for other languages work at the cursor.
 
-Coming next: a review view for what an agent did, and GitLab, GitHub and Jira integrations. See [ROADMAP.md](ROADMAP.md).
+Coming next: push a branch and open a pull request from the session, and GitLab, GitHub and Jira integrations. See [ROADMAP.md](ROADMAP.md).
 
 <p align="center"><img src="site/screenshot-review.png" width="800" alt="The review panel next to Claude Code, showing a branch's changes since main as one scrolling diff"></p>
 
