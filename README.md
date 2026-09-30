@@ -45,6 +45,8 @@ It needs a Mac with Apple Silicon and macOS 14 or later. Releases are signed and
 - **Themes and settings.** Ghostty's 600+ themes with live previews, and settings inside the window.
 - **Copy and paste, accents and input methods.** Pasting text that could run commands asks first, dead keys compose as you type, and input methods for other languages work at the cursor.
 
+<p align="center"><img src="site/features/files.png" width="800" alt="The files panel next to the terminal, with src/queue.ts open in a pane with syntax colors and line numbers"></p>
+
 Coming next: push a branch and open a pull request from the session, and GitLab, GitHub and Jira integrations. See [ROADMAP.md](ROADMAP.md).
 
 ## Agent status
@@ -59,6 +61,14 @@ The dot next to each session shows what its agent is doing:
 The colors come from your theme's own cyan, yellow and green, so they always match it.
 
 When an agent waits or finishes while Farol is in the background, you get a notification, and the Dock icon counts the sessions that are waiting. To see agents working from any app too, turn on the menu bar item or the status panel, at the notch or on the screen edge, in Settings → Agents → Outside Farol.
+
+<p align="center">
+  <img src="site/features/menu-bar.png" width="520" alt="Farol's lighthouse in the menu bar with its menu open, listing sessions that are working, waiting and done">
+</p>
+<p align="center">
+  <img src="site/features/notch-open.png" width="420" alt="The status panel at the notch, opened on hover, listing the sessions and their state">
+  <img src="site/features/edge-open.png" width="300" alt="The status panel on the right screen edge, opened on hover, listing the sessions and their state">
+</p>
 
 **Claude Code:** open Settings → Agents and click **Connect**. Farol adds its hooks to `~/.claude/settings.json`, leaves everything else in the file alone and keeps a backup. **Disconnect** removes only Farol's hooks, and Claude Code keeps working as before.
 
