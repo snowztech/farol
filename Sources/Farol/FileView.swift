@@ -93,9 +93,11 @@ final class FileView: NSView {
         text.textContainerInset = NSSize(width: 8, height: 6)
         text.onFocus = { [weak self] in self?.onFocus?() }
         NotificationCenter.default.addObserver(forName: NSText.didChangeNotification, object: text, queue: .main) { [weak self] _ in
-            self?.isDirty = true
-            self?.gutter.textChanged()
-            self?.highlightSoon()
+            guard let self else { return }
+            // Typing a line and deleting it again leaves nothing to save.
+            isDirty = text.string != onDisk
+            gutter.textChanged()
+            highlightSoon()
         }
 
         scroll.documentView = text
@@ -306,6 +308,8 @@ final class FileView: NSView {
 
     /// Your next save overwrites what is on disk.
     @objc private func keepMine() {
+        // Compare later edits against the file as it is now, so matching the old version still counts as a change.
+        if case .text(let string)? = try? Files.read(path) { onDisk = string }
         conflict.isHidden = true
         needsLayout = true
     }
