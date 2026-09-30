@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Git graph panel. ⌥⌘G, or the icon next to the review counts, shows the session's commits as a colored graph with the branches listed above it. Click a branch to check it out, or double-click a commit. Right-click to create, rebase or delete a branch, and to cherry-pick or revert a commit.
+
 ## [0.14.0] - 2026-09-30
 
 Worktrees that run like the project they came from, and reliable status for Codex sessions.

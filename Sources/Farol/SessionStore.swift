@@ -229,9 +229,9 @@ final class SessionStore: ObservableObject {
         return session
     }
 
-    /// Splits the focused pane. The new one opens in the same folder.
-    func split(_ session: Session, _ direction: TerminalRequest.Direction) {
-        let terminal = makeTerminal(in: session.panes.focused.workingDirectory)
+    /// Splits the focused pane. The new one opens in the same folder, and runs `run` when given.
+    func split(_ session: Session, _ direction: TerminalRequest.Direction, run: String? = nil) {
+        let terminal = makeTerminal(in: session.panes.focused.workingDirectory, run: run)
         wire(terminal, to: session)
         session.panes.split(direction, with: terminal)
     }

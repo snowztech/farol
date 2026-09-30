@@ -53,6 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func toggleSettings(_ sender: Any?) { windowController.toggleSettings() }
     @objc func toggleSidebar(_ sender: Any?) { windowController.toggleSidebar() }
     @objc func toggleFiles(_ sender: Any?) { windowController.toggleFiles() }
+    @objc func toggleGraph(_ sender: Any?) { windowController.toggleGraph() }
     @objc func toggleReview(_ sender: Any?) { windowController.toggleReview() }
     @objc func reloadConfig(_ sender: Any?) {
         settings.reload()
@@ -125,6 +126,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let view = NSMenu(title: "View")
         view.addItem(withTitle: "Toggle Sidebar", action: #selector(toggleSidebar), keyEquivalent: "b")
         view.addItem(withTitle: "Toggle Files", action: #selector(toggleFiles), keyEquivalent: "E")
+        view.addItem(withTitle: "Toggle Git Graph", action: #selector(toggleGraph), keyEquivalent: "g")
+            .keyEquivalentModifierMask = [.command, .option]
         view.addItem(withTitle: "Review Changes", action: #selector(toggleReview), keyEquivalent: "r")
             .keyEquivalentModifierMask = [.command, .option]
         main.addItem(submenu: view, title: "View")

@@ -290,7 +290,7 @@ private struct ScopeMenu: View {
 }
 
 /// An NSMenuItem that runs a closure, for menus built on the spot.
-private final class ActionMenuItem: NSMenuItem {
+final class ActionMenuItem: NSMenuItem {
     private let handler: () -> Void
 
     init(title: String, handler: @escaping () -> Void) {
