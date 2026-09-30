@@ -86,3 +86,26 @@ private func write(_ text: String, _ name: String, in box: Sandbox) throws {
     #expect(try Diff.files(in: box.repo, .branch(base: "main")).map(\.path) == ["c.txt", "d.txt"])
     #expect(try Diff.files(in: box.repo, .uncommitted).map(\.path) == ["d.txt"])
 }
+
+@Test func readsWhatOneCommitChanged() throws {
+    let box = try Sandbox()
+    try write("one\n", "a.txt", in: box)
+    try commit(box, "add a")
+    try write("one\ntwo\n", "a.txt", in: box)
+    try write("b\n", "b.txt", in: box)
+    try commit(box, "change a, add b")
+    // Uncommitted work and untracked files don't belong to any commit.
+    try write("three\n", "c.txt", in: box)
+
+    let head = try Git.run(["rev-parse", "HEAD"], in: box.repo)
+    let files = try Diff.files(in: box.repo, .commit(head))
+    #expect(files.map(\.path) == ["a.txt", "b.txt"])
+    #expect(files[1].status == .added)
+    #expect(try Diff.stat(in: box.repo, .commit(head)) == Diff.Stat(files: 2, added: 2, removed: 0))
+
+    // The first commit of the repo, with no parent, shows everything it added.
+    let root = try Git.run(["rev-list", "--max-parents=0", "HEAD"], in: box.repo)
+    #expect(try Diff.files(in: box.repo, .commit(root)).isEmpty)
+    let first = try Git.run(["rev-parse", "HEAD~1"], in: box.repo)
+    #expect(try Diff.files(in: box.repo, .commit(first)).map(\.path) == ["a.txt"])
+}

@@ -7,6 +7,8 @@ public enum Diff {
         case uncommitted
         /// Working tree against the commit where HEAD left `base`, so committed and uncommitted work together.
         case branch(base: String)
+        /// What one commit changed, against its first parent. The working tree plays no part.
+        case commit(String)
     }
 
     public struct Line: Equatable {
@@ -86,14 +88,15 @@ public enum Diff {
     }
 
     public static func files(in directory: String, _ scope: Scope) throws -> [File] {
-        let output = try Git.run(["-c", "core.quotePath=false", "diff", "--no-color", "--no-ext-diff", "--find-renames",
-                                  try reference(scope, in: directory)], in: directory, trimming: false)
+        let output = try Git.run(["-c", "core.quotePath=false", "diff", "--no-color", "--no-ext-diff", "--find-renames"]
+                                 + range(scope, in: directory), in: directory, trimming: false)
+        if case .commit = scope { return parse(output) }
         return parse(output) + untracked(in: directory).compactMap { added($0, in: directory) }
     }
 
     /// Counts only, cheap enough to run after every change the agent makes.
     public static func stat(in directory: String, _ scope: Scope) throws -> Stat {
-        let output = try Git.run(["diff", "--numstat", "--find-renames", try reference(scope, in: directory)], in: directory)
+        let output = try Git.run(["diff", "--numstat", "--find-renames"] + range(scope, in: directory), in: directory)
         var stat = Stat()
         for line in output.split(separator: "\n") {
             let parts = line.split(separator: "\t")
@@ -102,6 +105,7 @@ public enum Diff {
             stat.added += Int(parts[0]) ?? 0
             stat.removed += Int(parts[1]) ?? 0
         }
+        if case .commit = scope { return stat }
         for path in untracked(in: directory) {
             stat.files += 1
             stat.added += lineCount(path, in: directory)
@@ -109,10 +113,15 @@ public enum Diff {
         return stat
     }
 
-    private static func reference(_ scope: Scope, in directory: String) throws -> String {
+    private static func range(_ scope: Scope, in directory: String) throws -> [String] {
         switch scope {
-        case .uncommitted: "HEAD"
-        case .branch(let base): try Git.run(["merge-base", "HEAD", base], in: directory)
+        case .uncommitted: return ["HEAD"]
+        case .branch(let base): return [try Git.run(["merge-base", "HEAD", base], in: directory)]
+        case .commit(let hash):
+            // The first commit has no parent, so it's compared with an empty tree and every file shows as new.
+            let parent = try (try? Git.run(["rev-parse", "--verify", "--quiet", hash + "^1"], in: directory))
+                ?? Git.run(["hash-object", "-t", "tree", "/dev/null"], in: directory)
+            return [parent, hash]
         }
     }
 
