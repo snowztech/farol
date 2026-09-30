@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-09-30
+
+Worktrees that run like the project they came from, and reliable status for Codex sessions.
+
 ### Added
 
 - New worktrees copy ignored `.env` files by default, so tasks can build and run with the project's local environment. This can be turned off in Settings → Worktrees.
