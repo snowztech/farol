@@ -37,6 +37,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var menuBarSwitch: AnyCancellable?
     private lazy var notch = NotchStatus(store: store, palette: state.palette)
     private var notchSwitch: AnyCancellable?
+    private var notchPlace: AnyCancellable?
     private var sessionsChange: AnyCancellable?
 
     init(store: SessionStore, runtime: TerminalRuntime, settings: Settings, agents: AgentSettings) {
@@ -161,6 +162,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         menuBarSwitch = agents.$menuBarStatus.sink { [weak self] in self?.menuBar.setVisible($0) }
         notch.onSelect = menuBar.onSelect
         notchSwitch = agents.$notchStatus.sink { [weak self] in self?.notch.setVisible($0) }
+        // A Mac without a notch shows it on the screen edge, whatever was saved.
+        notchPlace = agents.$statusPanelPlace.sink { [weak self] in
+            let place = NotchStatus.Place(rawValue: $0) ?? .edge
+            self?.notch.place = place == .notch && !NotchStatus.isAvailable ? .edge : place
+        }
         // A closed session no longer counts toward the lamp.
         sessionsChange = store.$sessions.dropFirst().sink { [weak self] _ in
             DispatchQueue.main.async {

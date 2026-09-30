@@ -4,6 +4,14 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- The status panel can sit on the screen edge instead of the notch: a slim tab on the right side, which doesn't get in the way of other apps that use the notch and works on any Mac. Pick it in Settings → Agents → Outside Farol → Status panel.
+
+### Fixed
+
+- The status panel opens as soon as you hover it, instead of flickering open and closed.
+
 ## [0.12.0] - 2026-09-30
 
 See your agents from any app, in the menu bar or around the notch.

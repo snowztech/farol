@@ -59,7 +59,7 @@ The dot next to each session shows what its agent is doing:
 
 The colors come from your theme's own cyan, yellow and green, so they always match it.
 
-When an agent waits or finishes while Farol is in the background, you get a notification, and the Dock icon counts the sessions that are waiting. To see agents working from any app too, turn on the menu bar or the notch in Settings → Agents → Outside Farol.
+When an agent waits or finishes while Farol is in the background, you get a notification, and the Dock icon counts the sessions that are waiting. To see agents working from any app too, turn on the menu bar item or the status panel, at the notch or on the screen edge, in Settings → Agents → Outside Farol.
 
 **Claude Code:** open Settings → Agents and click **Connect**. Farol adds its hooks to `~/.claude/settings.json`, leaves everything else in the file alone and keeps a backup. **Disconnect** removes only Farol's hooks, and Claude Code keeps working as before.
 
