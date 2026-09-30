@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- Settings → Shortcuts and the README list ⌥⌘G for the git graph.
+
 ## [0.15.0] - 2026-10-01
 
 A git graph for every session.
