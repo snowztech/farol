@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- The file editor's unsaved dot goes away when you undo or delete your edits back to what's saved.
+
 ## [0.16.0] - 2026-10-01
 
 See what each commit changed, right from the git graph.
