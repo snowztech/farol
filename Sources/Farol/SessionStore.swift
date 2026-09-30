@@ -13,7 +13,7 @@ final class Session: ObservableObject, Identifiable {
     @Published var customName: String?
     @Published var directory: String
     /// Reported per pane by agent hooks through `farol status`.
-    @Published private(set) var agentStatus: [UUID: AgentStatus] = [:]
+    @Published private(set) var agents: [UUID: AgentActivity] = [:]
     /// The program rang the bell or sent a notification while you were elsewhere. Covers agents without hooks.
     @Published var bellRang = false
     @Published private(set) var branch: String?
@@ -46,21 +46,24 @@ final class Session: ObservableObject, Identifiable {
     /// The most urgent state across the session's panes. Closed panes no longer count.
     var activity: Activity {
         let live = Set(panes.terminals.map(\.id))
-        let statuses = agentStatus.filter { live.contains($0.key) }.values
+        let statuses = agents.filter { live.contains($0.key) }.values.compactMap(\.status)
         if bellRang || statuses.contains(.waiting) { return .waiting }
         if statuses.contains(.working) { return .working }
         if statuses.contains(.done) { return .done }
         return .idle
     }
 
-    func setAgentStatus(_ status: AgentStatus?, pane: UUID) {
-        agentStatus[pane] = status
+    func apply(_ event: AgentEvent, pane: UUID) {
+        agents[pane, default: AgentActivity()].apply(event)
     }
+
+    /// An agent in one of the panes waits for your approval or answer, as opposed to a bell or terminal notification.
+    var agentIsWaiting: Bool { agents.values.contains { $0.status == .waiting } }
 
     /// Looking at the session is the acknowledgement, so the bell and "done" clear.
     func acknowledge() {
         bellRang = false
-        agentStatus = agentStatus.filter { $0.value != .done }
+        for pane in agents.keys { agents[pane]?.acknowledge() }
     }
 
     /// Looks up the branch off the main thread. The shell retitles at every prompt, so a `git checkout` shows up too.
@@ -162,9 +165,9 @@ final class SessionStore: ObservableObject {
         guard let pane = UUID(uuidString: message.pane),
               let session = sessions.first(where: { $0.panes.terminals.contains { $0.id == pane } }) else { return }
         let before = session.activity
+        session.apply(message.event, pane: pane)
         // A "done" you are already looking at needs no light.
-        let looking = session.id == selectedID && NSApp.isActive
-        session.setAgentStatus(message.status == .done && looking ? nil : message.status, pane: pane)
+        if session.id == selectedID && NSApp.isActive { session.acknowledge() }
         report(session, from: before)
     }
 

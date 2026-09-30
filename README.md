@@ -77,12 +77,14 @@ When an agent waits or finishes while Farol is in the background, you get a noti
     "PostToolUse": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status working" }] }],
     "Notification": [{ "matcher": "permission_prompt|elicitation_dialog", "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status waiting" }] }],
     "Stop": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status done" }] }],
-    "SessionEnd": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status clear" }] }]
+    "SessionEnd": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status clear" }] }],
+    "SubagentStart": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status subagent-start" }] }],
+    "SubagentStop": [{ "hooks": [{ "type": "command", "command": "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status subagent-stop" }] }]
   }
 }
 ```
 
-Outside Farol `$FAROL_CLI` is unset, so the hooks do nothing. The Notification matcher leaves out Claude's idle reminder, which would otherwise mark a finished session as waiting.
+Outside Farol `$FAROL_CLI` is unset, so the hooks do nothing. The Notification matcher leaves out Claude's idle reminder, which would otherwise mark a finished session as waiting. The Subagent hooks keep a session working while a background agent runs after Claude's turn ends.
 
 </details>
 

@@ -25,6 +25,9 @@ public struct AgentHooks {
         Event(name: "Notification", status: "waiting", matcher: "permission_prompt|elicitation_dialog"),
         Event(name: "Stop", status: "done", matcher: nil),
         Event(name: "SessionEnd", status: "clear", matcher: nil),
+        // A background agent keeps working after the main agent's Stop, so the pane stays working until it ends.
+        Event(name: "SubagentStart", status: "subagent-start", matcher: nil),
+        Event(name: "SubagentStop", status: "subagent-stop", matcher: nil),
     ])
 
     /// Farol 0.6 connected Codex through these hooks, which never reached Farol.

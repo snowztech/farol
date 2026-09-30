@@ -4,6 +4,14 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- Claude Code sessions stay working while a background agent runs, instead of showing done and notifying as soon as Claude's turn ends. You're notified once, when everything has finished. Settings → Agents asks to update Claude Code's hooks once to get this.
+
+### Changed
+
+- The "done" notification reads "Check the result or send the next prompt."
+
 ## [0.11.1] - 2026-09-29
 
 Tooltips that show, and small fixes.
