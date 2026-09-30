@@ -20,6 +20,8 @@ struct Palette: Equatable {
     let done: Color
     let added: Color
     let removed: Color
+    /// Git graph branches: twelve hues around the wheel, as bright and saturated as the theme's own colors.
+    let lanes: [Color]
     /// Tint for macOS switches and pickers. A mid gray, since white on a switch would hide its white knob.
     let control: Color
     let code: SyntaxColors
@@ -42,12 +44,28 @@ struct Palette: Equatable {
         control = Color(nsColor: bg.mixed(with: fg, 0.42))
         code = SyntaxColors(background: bg, foreground: fg, ansi: ansi)
         diff = DiffColors(background: bg, foreground: fg, added: ansi.count > 2 ? ansi[2] : fg, removed: ansi.count > 1 ? ansi[1] : fg)
+        lanes = Self.lanes(matching: Array(ansi.dropFirst().prefix(6)), dark: bg.isDark)
         let ansi = { (i: Int) in Color(nsColor: ansi.count > i ? ansi[i] : fg) }
         working = ansi(6)
         waiting = ansi(3)
         done = ansi(2)
         added = ansi(2)
         removed = ansi(1)
+    }
+}
+
+extension Palette {
+    /// A theme has six hues, too few for a busy graph, and mixing them gives muddy look-alikes.
+    /// Evenly spaced hues stay apart, and the theme's average saturation and brightness keep them in its style.
+    static func lanes(matching colors: [NSColor], dark: Bool) -> [Color] {
+        let hsb = colors.compactMap { $0.usingColorSpace(.sRGB) }.map { ($0.saturationComponent, $0.brightnessComponent) }
+        let count = CGFloat(max(hsb.count, 1))
+        let saturation = max(hsb.map(\.0).reduce(0, +) / count, 0.55)
+        let brightness = dark ? max(hsb.map(\.1).reduce(0, +) / count, 0.8) : min(hsb.map(\.1).reduce(0, +) / count, 0.7)
+        // Steps of 30 degrees, ordered so each color sits far from the one before it: blue, magenta, green, orange...
+        return [7, 10, 4, 1, 6, 0, 9, 2, 5, 11, 3, 8].map {
+            Color(nsColor: NSColor(hue: CGFloat($0) / 12, saturation: saturation, brightness: brightness, alpha: 1))
+        }
     }
 }
 

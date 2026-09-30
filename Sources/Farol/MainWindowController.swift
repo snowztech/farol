@@ -23,6 +23,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// Follows the selected session's folder while the files panel is open.
     private var filesRoot: AnyCancellable?
     private static let filesVisibleKey = "files.visible"
+    private var graphWidth: NSLayoutConstraint!
+    private let graph = GraphModel()
+    /// Follows the selected session's checkout and branch while the graph panel is open.
+    private var graphFollow: AnyCancellable?
+    private static let graphVisibleKey = "graph.visible"
+    private static let graphWidthKey = "graph.width"
     private var reviewWidth: NSLayoutConstraint!
     private let review = ReviewModel()
     /// Follows the selected session's checkout and branch, so the count in the title bar stays current.
@@ -70,6 +76,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             closeSession: { [weak self] in self?.requestClose($0) },
             toggleSidebar: { [weak self] in self?.toggleSidebar() },
             toggleFiles: { [weak self] in self?.toggleFiles() },
+            toggleGraph: { [weak self] in self?.toggleGraph() },
             toggleReview: { [weak self] in self?.toggleReview() },
             toggleSettings: { [weak self] in self?.toggleSettings() },
             titleBarDoubleClick: { [weak self] in self?.titleBarDoubleClicked() })
@@ -82,6 +89,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             self?.open(path)
         })
         filesPanel.clipsToBounds = true
+        let graphPanel = hosting(GraphPanel(graph: graph, state: state) { [weak self] in self?.setGraphWidth($0) })
+        graphPanel.clipsToBounds = true
         let reviewPanel = hosting(ReviewPanel(
             review: review, state: state,
             open: { [weak self] in self?.open($0, line: $1) },
@@ -89,19 +98,22 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             resize: { [weak self] in self?.setReviewWidth($0) }))
         reviewPanel.clipsToBounds = true
         state.filesVisible = UserDefaults.standard.bool(forKey: Self.filesVisibleKey)
+        state.graphVisible = UserDefaults.standard.bool(forKey: Self.graphVisibleKey)
         settingsView = hosting(SettingsPage(
             settings: settings, agents: agents, worktrees: worktrees, state: state, updates: updates))
         settingsView.isHidden = true
 
         content.wantsLayer = true
-        for v in [topBar, sidebar, filesPanel, content, reviewPanel] { root.addSubview(v) }
+        for v in [topBar, sidebar, filesPanel, graphPanel, content, reviewPanel] { root.addSubview(v) }
         for v in [terminalContainer, settingsView!] { content.addSubview(v) }
-        for v in [topBar, sidebar, filesPanel, content, reviewPanel, terminalContainer, settingsView!] {
+        for v in [topBar, sidebar, filesPanel, graphPanel, content, reviewPanel, terminalContainer, settingsView!] {
             v.translatesAutoresizingMaskIntoConstraints = false
         }
 
         sidebarWidth = sidebar.widthAnchor.constraint(equalToConstant: SidebarView.width)
         filesWidth = filesPanel.widthAnchor.constraint(equalToConstant: state.filesVisible ? FilesPanel.width : 0)
+        state.graphWidth = state.graphVisible ? savedGraphWidth : 0
+        graphWidth = graphPanel.widthAnchor.constraint(equalToConstant: state.graphWidth)
         reviewWidth = reviewPanel.widthAnchor.constraint(equalToConstant: 0)
         NSLayoutConstraint.activate([
             topBar.topAnchor.constraint(equalTo: root.topAnchor),
@@ -119,13 +131,18 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             filesPanel.bottomAnchor.constraint(equalTo: root.bottomAnchor),
             filesWidth,
 
+            graphPanel.topAnchor.constraint(equalTo: topBar.bottomAnchor),
+            graphPanel.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            graphPanel.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            graphWidth,
+
             content.topAnchor.constraint(equalTo: topBar.bottomAnchor),
             content.leadingAnchor.constraint(equalTo: filesPanel.trailingAnchor),
             content.trailingAnchor.constraint(equalTo: reviewPanel.leadingAnchor),
             content.bottomAnchor.constraint(equalTo: root.bottomAnchor),
 
             reviewPanel.topAnchor.constraint(equalTo: topBar.bottomAnchor),
-            reviewPanel.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            reviewPanel.trailingAnchor.constraint(equalTo: graphPanel.leadingAnchor),
             reviewPanel.bottomAnchor.constraint(equalTo: root.bottomAnchor),
             reviewWidth,
 
@@ -148,6 +165,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
         applyTheme()
         runtime.onConfigChange = { [weak self] in self?.applyTheme() }
+        graph.onGitChange = { [weak self] in self?.store.selected?.refreshGit() }
+        graph.onRunInTerminal = { [weak self] command in
+            guard let self, let session = store.selected else { return }
+            store.split(session, .down, run: command)
+        }
         store.onSessionCreated = { [weak self] in self?.host($0) }
         store.onTerminalCreated = { [weak self] in self?.configure($0) }
         store.onPaneExit = { [weak self] in self?.paneExited($1, in: $0) }
@@ -267,6 +289,41 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         followFiles(store.selected)
     }
 
+    /// Opens or closes the git graph. It remembers the choice, and only asks git while open.
+    func toggleGraph() {
+        let open = !state.graphVisible
+        UserDefaults.standard.set(open, forKey: Self.graphVisibleKey)
+        let width = open ? clampedGraphWidth(savedGraphWidth) : 0
+        withAnimation(.easeOut(duration: 0.18)) {
+            state.graphVisible = open
+            state.graphWidth = width
+        }
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.18
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            graphWidth.animator().constant = width
+        }
+        followGraph(store.selected)
+    }
+
+    private var savedGraphWidth: CGFloat {
+        let saved = UserDefaults.standard.double(forKey: Self.graphWidthKey)
+        return saved > 0 ? saved : GraphPanel.defaultWidth
+    }
+
+    private func setGraphWidth(_ width: CGFloat) {
+        let width = clampedGraphWidth(width)
+        graphWidth.constant = width
+        state.graphWidth = width
+        UserDefaults.standard.set(width, forKey: Self.graphWidthKey)
+    }
+
+    /// Room for the terminal stays, however wide the panel is dragged.
+    private func clampedGraphWidth(_ width: CGFloat) -> CGFloat {
+        let available = (window?.frame.width ?? 1200) - sidebarWidth.constant - filesWidth.constant - reviewWidth.constant - 360
+        return min(max(width, 280), max(available, 280))
+    }
+
     /// Text opens in the file pane. Images, PDFs and media open in their Mac app.
     /// Anything else is shown in Finder rather than opened, since opening an unknown binary could run it.
     private func open(_ path: String, line: Int? = nil) {
@@ -304,7 +361,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// Room for the terminal stays, however wide the panel is dragged.
     private func clampedReviewWidth(_ width: CGFloat) -> CGFloat {
-        let available = (window?.frame.width ?? 1200) - sidebarWidth.constant - filesWidth.constant - 360
+        let available = (window?.frame.width ?? 1200) - sidebarWidth.constant - filesWidth.constant - graphWidth.constant - 360
         return min(max(width, 320), max(available, 320))
     }
 
@@ -325,6 +382,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
         filesRoot = session.$topLevel.combineLatest(session.$directory)
             .sink { [weak self] topLevel, directory in self?.files.show(topLevel ?? directory) }
+    }
+
+    private func followGraph(_ session: Session?) {
+        guard state.graphVisible, let session else {
+            graphFollow = nil
+            return graph.show(nil, current: nil)
+        }
+        graphFollow = session.$topLevel.combineLatest(session.$branch)
+            .sink { [weak self] topLevel, branch in self?.graph.show(topLevel, current: branch) }
     }
 
     /// Does what the user chose in System Settings for a title bar double-click: zoom, minimize or nothing.
@@ -457,5 +523,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         if !settings, let session { window?.makeFirstResponder(session.panes.focusTarget) }
         followFiles(session)
         followReview(session)
+        followGraph(session)
     }
 }

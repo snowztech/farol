@@ -8,6 +8,9 @@ final class WindowState: ObservableObject {
     /// Mirrors the sidebar and the files panel, so the top bar can match the columns below it.
     @Published var sidebarVisible = true
     @Published var filesVisible = false
+    @Published var graphVisible = false
+    /// Zero while the graph panel is closed.
+    @Published var graphWidth: CGFloat = 0
     /// Zero while the review panel is closed.
     @Published var reviewWidth: CGFloat = 0
     let ghosttyConfigPreview: ThemeColors
@@ -24,6 +27,7 @@ struct Commands {
     let closeSession: (Session) -> Void
     let toggleSidebar: () -> Void
     let toggleFiles: () -> Void
+    let toggleGraph: () -> Void
     let toggleReview: () -> Void
     let toggleSettings: () -> Void
     let titleBarDoubleClick: () -> Void
@@ -53,7 +57,7 @@ struct TopBar: View {
             .padding(.horizontal, 120)
             .frame(maxWidth: .infinity)
             .padding(.leading, leftPanels)
-            .padding(.trailing, state.reviewWidth)
+            .padding(.trailing, state.reviewWidth + state.graphWidth)
 
             HStack(spacing: 2) {
                 // Room for the traffic lights.
@@ -64,10 +68,9 @@ struct TopBar: View {
                            palette: p, action: commands.toggleFiles)
                 newSessionButton(p)
                 Spacer()
-                // Only there when the session has changes, like the Update button.
-                if !review.stat.isEmpty || review.isOpen {
-                    ReviewButton(stat: review.stat, active: review.isOpen, palette: p, action: commands.toggleReview)
-                        .padding(.trailing, 6)
+                if let session = store.selected {
+                    GitButton(session: session, state: state, review: review,
+                              graph: commands.toggleGraph, changes: commands.toggleReview)
                 }
                 if let version = updates.available {
                     UpdateBadge(version: version, palette: p, action: updates.install)
@@ -99,6 +102,8 @@ struct TopBar: View {
             Rectangle().fill(p.background)
             Rectangle().fill(p.line).frame(width: state.reviewWidth > 0 ? 1 : 0)
             Rectangle().fill(p.background).frame(width: max(state.reviewWidth - 1, 0))
+            Rectangle().fill(p.line).frame(width: state.graphWidth > 0 ? 1 : 0)
+            Rectangle().fill(p.surface).frame(width: max(state.graphWidth - 1, 0))
         }
     }
 
@@ -132,30 +137,62 @@ private struct UpdateBadge: View {
     }
 }
 
-/// "± +821 −61": what the session changed, and the way into the review panel.
-private struct ReviewButton: View {
-    let stat: Diff.Stat
-    let active: Bool
-    let palette: Palette
-    let action: () -> Void
-
-    @State private var hovering = false
+/// "⛬ +821 −61": the graph icon opens the graph, the counts open the review.
+/// Only in a git repo, or while a panel is open so it can still be closed. The counts only when there are changes.
+private struct GitButton: View {
+    @ObservedObject var session: Session
+    @ObservedObject var state: WindowState
+    @ObservedObject var review: ReviewModel
+    let graph: () -> Void
+    let changes: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                Image(systemName: "plusminus").foregroundStyle(palette.muted)
-                Counts(added: stat.added, removed: stat.removed, palette: palette)
+        let p = state.palette
+        let counts = !review.stat.isEmpty || review.isOpen
+        if session.topLevel != nil || state.graphVisible || counts {
+            HStack(spacing: 0) {
+                Half(active: state.graphVisible, help: "Git graph (⌥⌘G)", palette: p, action: graph) { color in
+                    Image(systemName: "point.3.connected.trianglepath.dotted")
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundStyle(color)
+                }
+                if counts {
+                    Rectangle().fill(p.line).frame(width: 1, height: 12)
+                    Half(active: review.isOpen, help: "Review changes (⌥⌘R)", palette: p, action: changes) { _ in
+                        Counts(added: review.stat.added, removed: review.stat.removed, palette: p)
+                    }
+                }
             }
             .font(.system(size: 11, weight: .medium))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(palette.raised.opacity(hovering || active ? 1 : 0.6), in: Capsule())
-            .overlay(Capsule().strokeBorder(palette.line))
+            .background(p.raised.opacity(0.6), in: Capsule())
+            .clipShape(Capsule())
+            .overlay(Capsule().strokeBorder(p.line))
+            .padding(.trailing, 6)
         }
-        .buttonStyle(.plain)
-        .onClickableHover { hovering = $0 }
-        .hoverTip("Review changes (⌥⌘R)")
+    }
+
+    /// One clickable side of the pill, lit while hovered or while its panel is open.
+    private struct Half<Label: View>: View {
+        let active: Bool
+        let help: String
+        let palette: Palette
+        let action: () -> Void
+        @ViewBuilder let label: (Color) -> Label
+
+        @State private var hovering = false
+
+        var body: some View {
+            Button(action: action) {
+                label(active ? palette.accent : hovering ? palette.text : palette.muted)
+                    .padding(.horizontal, 8)
+                    .frame(height: 20)
+                    .background(hovering || active ? palette.raised : .clear)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .onClickableHover { hovering = $0 }
+            .hoverTip(help)
+        }
     }
 }
 
