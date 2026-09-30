@@ -44,6 +44,46 @@ struct Sandbox {
     #expect(Git.branch(of: path) == "resume-me")
 }
 
+@Test func copiesIgnoredEnvironmentFiles() throws {
+    let box = try Sandbox()
+    try ".env\n.env.local\n.envrc\n".write(
+        toFile: box.repo + "/.gitignore", atomically: true, encoding: .utf8)
+    try Git.run(["add", ".gitignore"], in: box.repo)
+    try Git.run([
+        "-c", "user.name=Farol", "-c", "user.email=farol@example.com",
+        "commit", "--quiet", "-m", "ignore local environment",
+    ], in: box.repo)
+    try "SEARCH_API=staging.search.com\n".write(
+        toFile: box.repo + "/.env", atomically: true, encoding: .utf8)
+    try "TOKEN=development\n".write(
+        toFile: box.repo + "/.env.local", atomically: true, encoding: .utf8)
+    try "SHARED=true\n".write(
+        toFile: box.repo + "/.env.shared", atomically: true, encoding: .utf8)
+    try "use flake\n".write(toFile: box.repo + "/.envrc", atomically: true, encoding: .utf8)
+    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: box.repo + "/.env")
+
+    let path = try box.worktrees.create(branch: "with-env", from: box.repo, copyEnvironmentFiles: true)
+
+    #expect(try String(contentsOfFile: path + "/.env", encoding: .utf8) == "SEARCH_API=staging.search.com\n")
+    #expect(try String(contentsOfFile: path + "/.env.local", encoding: .utf8) == "TOKEN=development\n")
+    #expect(!FileManager.default.fileExists(atPath: path + "/.env.shared"))
+    #expect(!FileManager.default.fileExists(atPath: path + "/.envrc"))
+    let permissions = try FileManager.default.attributesOfItem(atPath: path + "/.env")[.posixPermissions] as? NSNumber
+    #expect(permissions?.intValue == 0o600)
+    #expect(!box.worktrees.hasUncommittedChanges(path))
+}
+
+@Test func leavesEnvironmentFilesOutWhenCopyingIsDisabled() throws {
+    let box = try Sandbox()
+    try ".env\n".write(toFile: box.repo + "/.gitignore", atomically: true, encoding: .utf8)
+    try "SEARCH_API=staging.search.com\n".write(
+        toFile: box.repo + "/.env", atomically: true, encoding: .utf8)
+
+    let path = try box.worktrees.create(branch: "without-env", from: box.repo)
+
+    #expect(!FileManager.default.fileExists(atPath: path + "/.env"))
+}
+
 @Test func refusesSecondWorktreeAtSamePath() throws {
     let box = try Sandbox()
     _ = try box.worktrees.create(branch: "twice", from: box.repo)

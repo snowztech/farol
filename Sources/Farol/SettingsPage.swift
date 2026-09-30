@@ -7,6 +7,7 @@ import GhosttyTerminal
 struct SettingsPage: View {
     @ObservedObject var settings: Settings
     @ObservedObject var agents: AgentSettings
+    @ObservedObject var worktrees: WorktreeSettings
     @ObservedObject var state: WindowState
     @ObservedObject var updates: UpdateChecker
 
@@ -34,6 +35,7 @@ struct SettingsPage: View {
         case terminal = "Terminal"
         case appearance = "Appearance"
         case agents = "Agents"
+        case worktrees = "Worktrees"
         case shortcuts = "Shortcuts"
         case about = "About"
     }
@@ -65,6 +67,7 @@ struct SettingsPage: View {
                         case .appearance: appearance(p)
                         case .terminal: terminal(p)
                         case .agents: agentsSection(p)
+                        case .worktrees: worktreesSection(p)
                         case .shortcuts: shortcuts(p)
                         case .about: EmptyView()
                         }
@@ -260,6 +263,17 @@ struct SettingsPage: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.red)
                 .padding(.top, 12)
+        }
+    }
+
+    @ViewBuilder private func worktreesSection(_ p: Palette) -> some View {
+        Heading(title: "Worktrees", detail: "Applies to new tasks and worktree sessions.", palette: p)
+
+        GroupTitle(title: "Local environment", palette: p)
+        Row(title: "Copy local environment files",
+            detail: "Copies ignored .env files into each new worktree so projects can run immediately. Agents in the worktree can read their values.",
+            palette: p) {
+            toggle($worktrees.copyEnvironmentFiles)
         }
     }
 

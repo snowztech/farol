@@ -65,9 +65,13 @@ extension MainWindowController {
     }
 
     private func startWorktreeSession(branch: String, from directory: String, run command: String?) {
+        let copyEnvironmentFiles = worktreeSettings.copyEnvironmentFiles
         // Checking out a big repo can take a moment, so keep it off the main thread.
         DispatchQueue.global(qos: .userInitiated).async {
-            let result = Result { try Worktrees.default.create(branch: branch, from: directory) }
+            let result = Result {
+                try Worktrees.default.create(
+                    branch: branch, from: directory, copyEnvironmentFiles: copyEnvironmentFiles)
+            }
             DispatchQueue.main.async { [weak self] in
                 switch result {
                 case .success(let path): self?.store.create(directory: path, run: command)

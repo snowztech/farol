@@ -31,6 +31,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var settingsView: NSView!
 
     let agents: AgentSettings
+    let worktreeSettings: WorktreeSettings
     private let updates = UpdateChecker()
     private var badgeSwitch: AnyCancellable?
     private lazy var menuBar = MenuBarStatus(store: store, palette: state.palette)
@@ -40,8 +41,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var notchPlace: AnyCancellable?
     private var sessionsChange: AnyCancellable?
 
-    init(store: SessionStore, runtime: TerminalRuntime, settings: Settings, agents: AgentSettings) {
+    init(store: SessionStore, runtime: TerminalRuntime, settings: Settings, agents: AgentSettings,
+         worktrees: WorktreeSettings) {
         self.agents = agents
+        self.worktreeSettings = worktrees
         self.store = store
         self.runtime = runtime
         let base = runtime.ghosttyConfigColors
@@ -86,7 +89,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             resize: { [weak self] in self?.setReviewWidth($0) }))
         reviewPanel.clipsToBounds = true
         state.filesVisible = UserDefaults.standard.bool(forKey: Self.filesVisibleKey)
-        settingsView = hosting(SettingsPage(settings: settings, agents: agents, state: state, updates: updates))
+        settingsView = hosting(SettingsPage(
+            settings: settings, agents: agents, worktrees: worktrees, state: state, updates: updates))
         settingsView.isHidden = true
 
         content.wantsLayer = true
