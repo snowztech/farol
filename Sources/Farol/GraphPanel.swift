@@ -13,6 +13,9 @@ final class GraphModel: ObservableObject {
     @Published private(set) var remote: [String] = []
     @Published private(set) var rows: [History.Row] = []
     @Published private(set) var error: String?
+    /// The commit clicked in the history, and what it changed, for the pane under it.
+    @Published private(set) var selected: History.Commit?
+    @Published private(set) var selectedFiles: [Diff.File]?
 
     /// Your choice per checkout, so switching sessions doesn't reset it.
     private var onlyCurrent: Set<String> = []
@@ -20,6 +23,8 @@ final class GraphModel: ObservableObject {
     var onGitChange: (() -> Void)?
     /// Runs a command that needs you, like an interactive rebase, in a new pane of the session.
     var onRunInTerminal: ((String) -> Void)?
+    /// Opens the review panel on a commit.
+    var onShowInReview: ((History.Commit, _ file: String?) -> Void)?
     private var watcher: FolderWatcher?
     private var pending: DispatchWorkItem?
 
@@ -33,6 +38,8 @@ final class GraphModel: ObservableObject {
             watcher = nil
             rows = []
             error = nil
+            selected = nil
+            selectedFiles = nil
         }
         guard let root else {
             watcher = nil
@@ -60,6 +67,24 @@ final class GraphModel: ObservableObject {
 
     func checkout(_ commit: History.Commit, failed: @escaping (String) -> Void) {
         run(failed) { try History.checkout(commit, in: $0) }
+    }
+
+    /// Clicking the selected commit again closes the pane.
+    func select(_ commit: History.Commit?) {
+        guard commit?.hash != selected?.hash else {
+            selected = nil
+            return selectedFiles = nil
+        }
+        selected = commit
+        selectedFiles = nil
+        guard let root, let commit else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let files = (try? Diff.files(in: root, .commit(commit.hash))) ?? []
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.selected?.hash == commit.hash else { return }
+                self.selectedFiles = files
+            }
+        }
     }
 
     func createBranch(_ name: String, from start: String, failed: @escaping (String) -> Void) {
@@ -165,7 +190,13 @@ struct GraphPanel: View {
                         }
                         ForEach(rows, id: \.commit.hash) { row in
                             // Lines between commits that aren't neighbors anymore would mislead, so a search shows the dots only.
-                            CommitRow(row: row, lanes: lanes, showsLines: searchText.isEmpty, palette: p, current: graph.current,
+                            CommitRow(row: row, lanes: lanes, showsLines: searchText.isEmpty, selected: row.commit.hash == graph.selected?.hash,
+                                      palette: p, current: graph.current, select: { graph.select(row.commit) },
+                                      review: {
+                                          // Keeps the files pane on this commit too, instead of toggling it off.
+                                          if graph.selected?.hash != row.commit.hash { graph.select(row.commit) }
+                                          graph.onShowInReview?(row.commit, nil)
+                                      },
                                       cherryPick: { graph.cherryPick(row.commit, failed: gitError("Cherry-pick stopped")) },
                                       revert: { revert(row.commit) },
                                       rebase: { rebase(onto: row.commit) },
@@ -183,6 +214,12 @@ struct GraphPanel: View {
                     }
                     .padding(.horizontal, 6)
                     .padding(.bottom, 4)
+                }
+                .scrollIndicators(.hidden)
+                if let commit = graph.selected {
+                    Rectangle().fill(p.line).frame(height: 1)
+                    CommitPane(commit: commit, files: graph.selectedFiles, palette: p,
+                               review: { graph.onShowInReview?(commit, $0) }, close: { graph.select(nil) })
                 }
             }
         }
@@ -366,6 +403,7 @@ private struct BranchList: View {
                 .padding(.horizontal, 6)
                 .padding(.bottom, 8)
             }
+            .scrollIndicators(.hidden)
             .frame(height: min(CGFloat(max(entries.count, 1) + (graph.current == nil ? 1 : 0)) * BranchRow.height + 8, Self.maxHeight))
         }
     }
@@ -504,9 +542,12 @@ private struct CommitRow: View {
     let row: History.Row
     let lanes: Int
     var showsLines = true
+    var selected = false
     let palette: Palette
     /// The checked out branch, named in the cherry-pick item.
     var current: String?
+    var select: () -> Void = {}
+    var review: () -> Void = {}
     var cherryPick: () -> Void = {}
     var revert: () -> Void = {}
     var rebase: () -> Void = {}
@@ -554,12 +595,13 @@ private struct CommitRow: View {
         }
         .padding(.trailing, 6)
         .frame(maxWidth: .infinity, minHeight: Self.height, maxHeight: Self.height, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 5).fill(hovering ? palette.raised.opacity(0.35) : .clear))
+        .background(RoundedRectangle(cornerRadius: 5).fill(selected ? palette.raised : hovering ? palette.raised.opacity(0.35) : .clear))
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
-        .onTapGesture(count: 2, perform: checkout)
+        .onTapGesture(count: 2, perform: review)
+        .onTapGesture(perform: select)
         .hoverTip(([row.commit.shortHash + "  " + row.commit.author, row.commit.subject] + refs.flatMap(\.names)
-            + ["Double-click to check out"]).joined(separator: "\n"))
+            + ["Double-click to review the changes"]).joined(separator: "\n"))
         .contextMenu {
             // Says where a checkout lands: the branch pointing here, or the bare commit.
             Button(localBranch.map { "Check Out \u{201C}\(menuName($0))\u{201D}" } ?? "Check Out Commit (Detached)", action: checkout)
@@ -671,6 +713,141 @@ private struct CommitRow: View {
         formatter.unitsStyle = .abbreviated
         return formatter
     }()
+}
+
+/// The selected commit under the history: its title, who and when, and the files it changed by folder.
+/// Details, or any file, opens the full diff in the review panel.
+private struct CommitPane: View {
+    static let height: CGFloat = 250
+
+    let commit: History.Commit
+    /// Nil while git is still reading them.
+    let files: [Diff.File]?
+    let palette: Palette
+    /// Opens the commit in the review panel, at a file when one was clicked.
+    let review: (String?) -> Void
+    let close: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // The title sits in the bar, so the files get the room a second line would take.
+            HStack(spacing: 6) {
+                Text(commit.subject)
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(palette.text)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .hoverTip(commit.subject)
+                Spacer(minLength: 6)
+                IconButton(symbol: "arrow.up.right.square", help: "Open in review", palette: palette) { review(nil) }
+                CloseButton(help: "Close", palette: palette, action: close)
+            }
+            .padding(.leading, 14)
+            .padding(.trailing, 8)
+            .frame(height: 30)
+            .background(palette.background)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("\(commit.author) · \(Self.date.string(from: commit.date)) · \(commit.shortHash)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(palette.muted)
+                        .lineLimit(1)
+                        .padding(.bottom, 8)
+                    if let files {
+                        if files.isEmpty {
+                            Text("No file changes.").font(.system(size: 12)).foregroundStyle(palette.muted)
+                        }
+                        ForEach(folders(files), id: \.folder) { group in
+                            if !group.folder.isEmpty {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "folder").font(.system(size: 10.5))
+                                    Text(group.folder.replacingOccurrences(of: "/", with: " / ")).font(.system(size: 11.5)).lineLimit(1)
+                                }
+                                .foregroundStyle(palette.muted)
+                                .frame(height: 22)
+                            }
+                            ForEach(group.files, id: \.path) { file in
+                                ChangedFile(file: file, palette: palette) { review(file.path) }
+                                    .padding(.leading, group.folder.isEmpty ? 0 : 16)
+                            }
+                        }
+                    } else {
+                        Text("Loading…").font(.system(size: 12)).foregroundStyle(palette.muted)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+            }
+            .scrollIndicators(.hidden)
+        }
+        .frame(height: Self.height)
+    }
+
+    /// Files grouped under their folder, folders in the order git lists them.
+    private func folders(_ files: [Diff.File]) -> [(folder: String, files: [Diff.File])] {
+        var groups: [(folder: String, files: [Diff.File])] = []
+        for file in files {
+            let folder = (file.path as NSString).deletingLastPathComponent
+            if let index = groups.firstIndex(where: { $0.folder == folder }) {
+                groups[index].files.append(file)
+            } else {
+                groups.append((folder, [file]))
+            }
+        }
+        return groups
+    }
+
+    private static let date: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
+}
+
+private struct ChangedFile: View {
+    let file: Diff.File
+    let palette: Palette
+    let open: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "doc").font(.system(size: 10.5)).foregroundStyle(palette.muted)
+            Text((file.path as NSString).lastPathComponent)
+                .font(.system(size: 12))
+                .foregroundStyle(file.status == .added ? palette.added : file.status == .deleted ? palette.muted : palette.text)
+                .strikethrough(file.status == .deleted)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            if let note {
+                Text(note).font(.system(size: 10.5)).foregroundStyle(palette.muted).lineLimit(1)
+            }
+            if !file.isBinary {
+                Counts(added: file.added, removed: file.removed, palette: palette).font(.system(size: 11))
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 4)
+        .frame(height: 22)
+        .background(RoundedRectangle(cornerRadius: 4).fill(hovering ? palette.raised.opacity(0.5) : .clear))
+        .contentShape(Rectangle())
+        .onClickableHover { hovering = $0 }
+        .onTapGesture(perform: open)
+        .hoverTip("\(file.path)\nOpen the changes in the review panel")
+    }
+
+    private var note: String? {
+        if file.isBinary { return "binary" }
+        switch file.status {
+        case .added: return "new"
+        case .deleted: return "deleted"
+        case .renamed: return file.oldPath.map { "from \(($0 as NSString).lastPathComponent)" }
+        case .modified: return nil
+        }
+    }
 }
 
 /// Branch names like ECE-1737-homepage-ajout-du-bloc… would make menus as wide as the screen. The dialogs still show them whole.

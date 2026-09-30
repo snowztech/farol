@@ -27,7 +27,23 @@ final class ReviewModel: ObservableObject {
     @Published private(set) var stat = Diff.Stat()
     @Published private(set) var rows: [Row] = []
     @Published private(set) var error: String?
-    @Published var isOpen = false { didSet { if isOpen != oldValue { refresh() } } }
+    @Published var isOpen = false {
+        didSet {
+            guard isOpen != oldValue else { return }
+            // A commit is only looked at while the panel is open. Closing it brings back what the title bar counts.
+            if !isOpen, case .commit = scope, let root {
+                chosenScope[root] = scopeBeforeCommit
+                scope = scopeBeforeCommit ?? .uncommitted
+            }
+            refresh()
+        }
+    }
+    /// A file to bring into view once the diff is read. The id changes each time, so asking twice for one file scrolls again.
+    @Published private(set) var focus: (path: String, id: UUID)?
+    private var pendingFocus: String?
+    /// The subject of the commit being shown, for the compare menu.
+    @Published private(set) var commitSubject: String?
+    private var scopeBeforeCommit: Diff.Scope?
 
     private var files: [Diff.File] = []
     private var collapsed: Set<String> = []
@@ -73,6 +89,17 @@ final class ReviewModel: ObservableObject {
         }
     }
 
+    /// Shows what one commit changed, as from the git graph.
+    func show(commit hash: String, subject: String, file: String? = nil) {
+        guard let root else { return }
+        pendingFocus = file
+        if case .commit = scope {} else { scopeBeforeCommit = chosenScope[root] ?? scope }
+        commitSubject = subject
+        chosenScope[root] = .commit(hash)
+        scope = .commit(hash)
+        refresh()
+    }
+
     func choose(_ scope: Diff.Scope) {
         guard let root, scope != self.scope else { return }
         chosenScope[root] = scope
@@ -103,7 +130,15 @@ final class ReviewModel: ObservableObject {
                         self.collapsed.insert(file.path)
                     }
                     self.files = files
-                    self.rebuild()
+                    if let path = self.pendingFocus, files.contains(where: { $0.path == path }) {
+                        // A big file starts folded, which would scroll to a header with nothing under it.
+                        self.collapsed.remove(path)
+                        self.pendingFocus = nil
+                        self.rebuild()
+                        self.focus = (path, UUID())
+                    } else {
+                        self.rebuild()
+                    }
                 }
             }
         }
@@ -160,11 +195,17 @@ struct ReviewPanel: View {
             } else if review.rows.isEmpty {
                 message(review.root == nil ? "Not a git repository." : "No changes.", p)
             } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(review.rows) { row(for: $0, p) }
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            ForEach(review.rows) { row(for: $0, p) }
+                        }
+                        .padding(.bottom, 12)
                     }
-                    .padding(.bottom, 12)
+                    .onChange(of: review.focus?.id) { _ in
+                        guard let path = review.focus?.path else { return }
+                        withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(path, anchor: .top) }
+                    }
                 }
             }
         }
@@ -263,11 +304,17 @@ private struct ScopeMenu: View {
         switch review.scope {
         case .uncommitted: "Uncommitted changes"
         case .branch(let base): "Changes since \(Self.name(base))"
+        case .commit(let hash): "Commit \(hash.prefix(7))"
         }
     }
 
     private func showMenu() {
         let menu = NSMenu()
+        if case .commit(let hash) = review.scope {
+            let subject = review.commitSubject.map { ": " + ($0.count > 40 ? $0.prefix(40) + "…" : $0) } ?? ""
+            menu.addItem(item("Commit \(hash.prefix(7))" + subject, review.scope))
+            menu.addItem(.separator())
+        }
         menu.addItem(item("Uncommitted changes", .uncommitted))
         if !review.branches.isEmpty {
             menu.addItem(.separator())

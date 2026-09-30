@@ -4,6 +4,14 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Click a commit in the git graph to see its files under the history, by folder with their counts. Double-click it, or use the open button in that pane, to see its full diff in the review panel, which gets a "Commit" entry in its compare menu. Clicking a file scrolls the review to it.
+
+### Changed
+
+- Double-clicking a commit in the git graph opens its changes in the review panel instead of checking it out. Check Out stays in its right-click menu.
+
 ### Fixed
 
 - Settings → Shortcuts and the README list ⌥⌘G for the git graph.

@@ -166,6 +166,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         applyTheme()
         runtime.onConfigChange = { [weak self] in self?.applyTheme() }
         graph.onGitChange = { [weak self] in self?.store.selected?.refreshGit() }
+        graph.onShowInReview = { [weak self] commit, file in
+            guard let self else { return }
+            review.show(commit: commit.hash, subject: commit.subject, file: file)
+            if !review.isOpen { toggleReview() }
+        }
         graph.onRunInTerminal = { [weak self] command in
             guard let self, let session = store.selected else { return }
             store.split(session, .down, run: command)
