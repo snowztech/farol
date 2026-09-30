@@ -53,10 +53,12 @@ Coming next: push a branch and open a pull request from the session, and GitLab,
 
 The dot next to each session shows what its agent is doing:
 
-- **Idle:** a hollow gray dot.
-- **Working:** a cyan dot that breathes.
-- **Waiting for you:** a yellow dot that sends out a ripple, for a permission prompt or a question.
-- **Done:** a green dot, back to hollow when you open the session.
+| State | Dot | Meaning |
+| --- | --- | --- |
+| Idle | Hollow gray | No active agent state |
+| Working | Breathing cyan | The agent is processing the prompt or using tools |
+| Waiting | Yellow | The agent needs approval or an answer |
+| Done | Solid green | The turn finished while you were elsewhere |
 
 The colors come from your theme's own cyan, yellow and green, so they always match it.
 
