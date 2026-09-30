@@ -63,11 +63,11 @@ The colors come from your theme's own cyan, yellow and green, so they always mat
 When an agent waits or finishes while Farol is in the background, you get a notification, and the Dock icon counts the sessions that are waiting. To see agents working from any app too, turn on the menu bar item or the status panel, at the notch or on the screen edge, in Settings → Agents → Outside Farol.
 
 <p align="center">
-  <img src="site/features/menu-bar.png" width="360" alt="Farol's lighthouse in the menu bar with its menu open, listing sessions that are working, waiting and done">
+  <img src="site/features/menu-bar.png" width="320" alt="Farol's lighthouse in the menu bar with its menu open, listing sessions that are working, waiting and done">
 </p>
 <p align="center">
-  <img src="site/features/notch-open.png" width="380" alt="The status panel at the notch, opened on hover, listing the sessions and their state">
-  <img src="site/features/edge-open.png" width="360" alt="The status panel on the right screen edge, opened on hover, listing the sessions and their state">
+  <img src="site/features/notch-open.png" width="480" alt="The status panel at the notch, opened on hover, listing the sessions and their state">
+  <img src="site/features/edge-open.png" width="300" alt="The status panel on the right screen edge, opened on hover, listing the sessions and their state">
 </p>
 
 **Claude Code:** open Settings → Agents and click **Connect**. Farol adds its hooks to `~/.claude/settings.json`, leaves everything else in the file alone and keeps a backup. **Disconnect** removes only Farol's hooks, and Claude Code keeps working as before.
