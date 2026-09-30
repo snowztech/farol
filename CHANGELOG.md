@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- Long lines in the review panel no longer spill a few pixels past their green or red background.
+
 ## [0.13.0] - 2026-09-30
 
 A status panel on the screen edge, out of the notch's way.

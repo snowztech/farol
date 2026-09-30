@@ -71,6 +71,7 @@ Everything talks to your servers directly. Nothing goes through a Farol service.
 
 - Linear and GitHub Issues as ticket sources
 - Command palette
+- Farol Dark and Farol Light themes, tuned for the sidebar dots and syntax colors, with Farol Dark as the default
 
 ## Not planned
 
