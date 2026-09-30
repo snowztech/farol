@@ -25,6 +25,10 @@ final class NotchStatus {
     /// Where the panel is heading, which can differ from its frame while it animates.
     private var target = NSRect.zero
     private var hoverTimer: Timer?
+    /// Where the mouse grabbed the tab, relative to the panel's origin, while it's being dragged.
+    private var grab: NSPoint?
+    private static let edgeLeftKey = "agents.edgeLeft"
+    private static let edgeFromTopKey = "agents.edgeFromTop"
 
     /// How far the notch grows on each side.
     fileprivate static let wing: CGFloat = 36
@@ -40,6 +44,8 @@ final class NotchStatus {
     init(store: SessionStore, palette: Palette) {
         self.store = store
         model.palette = palette
+        model.edgeLeft = UserDefaults.standard.bool(forKey: Self.edgeLeftKey)
+        model.onDrag = { [weak self] ended in self?.drag(ended: ended) }
         model.onSelect = { [weak self] id in
             guard let self, let session = self.store.sessions.first(where: { $0.id == id }) else { return }
             self.model.expanded = false
@@ -112,6 +118,7 @@ final class NotchStatus {
     }
 
     private func checkHover() {
+        guard grab == nil else { return }
         let inside = target.insetBy(dx: -1, dy: -1).contains(NSEvent.mouseLocation)
         guard inside != model.expanded else { return }
         model.expanded = inside
@@ -133,15 +140,39 @@ final class NotchStatus {
         return NSRect(x: screen.frame.midX - width / 2, y: screen.frame.maxY - height, width: width, height: height)
     }
 
-    /// Against the right edge of the main screen, a little below the menu bar. It opens towards the left.
+    /// Against the left or right edge of the main screen, at the height it was dragged to. It opens away from the edge.
     private func edgeFrame() -> NSRect? {
         guard let screen = NSScreen.main ?? NSScreen.screens.first else { return nil }
         let tab = EdgeTab.size(dots: model.active.count)
         let list = CGFloat(model.rows.count) * Self.rowHeight + 20
         let width = model.expanded ? 300 : tab.width
         let height = model.expanded ? max(tab.height, list) : tab.height
-        let top = screen.visibleFrame.maxY - 48
-        return NSRect(x: screen.frame.maxX - width, y: top - height, width: width, height: height)
+        let visible = screen.visibleFrame
+        let saved = UserDefaults.standard.object(forKey: Self.edgeFromTopKey) as? Double ?? 48
+        // Kept on screen, however the saved height compares with this screen and this many rows.
+        let top = min(max(visible.maxY - CGFloat(saved), visible.minY + height), visible.maxY)
+        let x = model.edgeLeft ? screen.frame.minX : screen.frame.maxX - width
+        return NSRect(x: x, y: top - height, width: width, height: height)
+    }
+
+    /// Follows the mouse while the tab is dragged, then snaps to the nearer side and keeps the height for next time.
+    private func drag(ended: Bool) {
+        guard let panel, let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+        let mouse = NSEvent.mouseLocation
+        if grab == nil {
+            model.expanded = false
+            grab = NSPoint(x: mouse.x - panel.frame.minX, y: mouse.y - panel.frame.minY)
+        }
+        guard let grab else { return }
+        if !ended {
+            panel.setFrameOrigin(NSPoint(x: mouse.x - grab.x, y: mouse.y - grab.y))
+            return
+        }
+        self.grab = nil
+        model.edgeLeft = panel.frame.midX < screen.frame.midX
+        UserDefaults.standard.set(model.edgeLeft, forKey: Self.edgeLeftKey)
+        UserDefaults.standard.set(Double(screen.visibleFrame.maxY - panel.frame.maxY), forKey: Self.edgeFromTopKey)
+        layout(animated: true)
     }
 
     private func makePanel() -> NSPanel {
@@ -172,7 +203,11 @@ private final class NotchModel: ObservableObject {
     @Published var palette: Palette?
     @Published var notch = NSSize(width: 180, height: 32)
     @Published var place = NotchStatus.Place.notch
+    /// The edge tab sits on the left side, after being dragged there.
+    @Published var edgeLeft = false
     var onSelect: ((UUID) -> Void)?
+    /// Called as the edge tab is dragged, with true when the drag ends.
+    var onDrag: ((Bool) -> Void)?
 
     var active: [Row] { rows.filter { $0.activity != .idle } }
     var isActive: Bool { !active.isEmpty }
@@ -248,7 +283,9 @@ private struct EdgeView: View {
     @ObservedObject var model: NotchModel
 
     var body: some View {
+        let left = model.edgeLeft
         HStack(alignment: .top, spacing: 0) {
+            if left { tab }
             if model.expanded {
                 VStack(spacing: 0) {
                     ForEach(model.rows) { row in
@@ -256,13 +293,25 @@ private struct EdgeView: View {
                     }
                 }
                 .padding(.vertical, 10)
-                .padding(.leading, 8)
+                .padding(left ? .trailing : .leading, 8)
                 .frame(maxWidth: .infinity)
             }
-            EdgeTab(dots: model.active.map { color($0.activity) ?? .white })
+            if !left { tab }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-        .background(Color.black, in: UnevenRoundedRectangle(topLeadingRadius: 14, bottomLeadingRadius: 14))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: left ? .topLeading : .topTrailing)
+        // Rounded on the side away from the screen edge, square against it.
+        .background(Color.black, in: UnevenRoundedRectangle(
+            topLeadingRadius: left ? 0 : 14, bottomLeadingRadius: left ? 0 : 14,
+            bottomTrailingRadius: left ? 14 : 0, topTrailingRadius: left ? 14 : 0))
+    }
+
+    /// Dragging the tab moves the panel. The window moves under the mouse, so the drag reads the mouse on screen, not the gesture.
+    private var tab: some View {
+        EdgeTab(dots: model.active.map { color($0.activity) ?? .white })
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 3)
+                .onChanged { _ in model.onDrag?(false) }
+                .onEnded { _ in model.onDrag?(true) })
     }
 
     private func color(_ activity: Session.Activity) -> Color? {
