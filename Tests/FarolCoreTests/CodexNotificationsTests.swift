@@ -46,6 +46,11 @@ private let config = """
     #expect(try CodexNotifications.enable(in: once) == once)
 }
 
+@Test func findsOnlySettingsFarolAdded() throws {
+    #expect(CodexNotifications.hasFarolSettings(in: try CodexNotifications.enable(in: config)))
+    #expect(!CodexNotifications.hasFarolSettings(in: "[tui]\nnotifications = true\n"))
+}
+
 @Test func keepsKeysYouSetYourself() throws {
     let mine = "[tui]\nnotification_method = 'osc9'\n"
     let enabled = try CodexNotifications.enable(in: mine)

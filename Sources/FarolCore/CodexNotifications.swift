@@ -1,7 +1,7 @@
 import Foundation
 
-/// Turns on Codex's terminal notifications, since its hooks run in a background process that doesn't know their terminal.
-/// The file is edited line by line so comments survive, and turning off removes only the lines Farol marked.
+/// Removes the terminal-notification setup used before Codex passed Farol's pane environment to hooks.
+/// The file is edited line by line so comments survive, and cleanup removes only the lines Farol marked.
 public enum CodexNotifications {
     public static let file = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex/config.toml")
 
@@ -34,6 +34,15 @@ public enum CodexNotifications {
     public static func isEnabled(in text: String) -> Bool {
         let values = tuiValues(in: text.components(separatedBy: "\n"))
         return settings.allSatisfy { values[$0.0].map(unquoted) == unquoted($0.1) }
+    }
+
+    public static func hasFarolSettings(in text: String) -> Bool {
+        text.components(separatedBy: "\n").contains { line in
+            guard line.hasSuffix(mark) else { return false }
+            if isHeader(line, "tui") { return true }
+            let key = line.split(separator: "=", maxSplits: 1).first?.trimmingCharacters(in: .whitespaces)
+            return settings.contains { $0.0 == key }
+        }
     }
 
     /// Adds the missing keys, at the end of [tui] or in a new [tui] table. Running it again changes nothing.

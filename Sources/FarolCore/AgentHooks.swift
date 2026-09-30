@@ -30,15 +30,19 @@ public struct AgentHooks {
         Event(name: "SubagentStop", status: "subagent-stop", matcher: nil),
     ])
 
-    /// Farol 0.6 connected Codex through these hooks, which never reached Farol.
-    /// Codex runs them in a background process that doesn't know their terminal.
-    /// Kept so enabling Codex in Settings can remove them.
+    /// Codex 0.159.2 and later pass Farol's pane environment to lifecycle hooks.
     public static let codex = AgentHooks(name: "Codex", file: home(".codex/hooks.json"), events: [
-        Event(name: "SessionStart", status: "clear", matcher: nil),
+        // Compaction also starts a session event in the middle of a turn, so it must not clear the dot.
+        Event(name: "SessionStart", status: "clear", matcher: "startup|resume|clear"),
         Event(name: "UserPromptSubmit", status: "working", matcher: nil),
         Event(name: "PostToolUse", status: "working", matcher: nil),
         Event(name: "PermissionRequest", status: "waiting", matcher: nil),
+        Event(name: "PreToolUse", status: "waiting", matcher: "^request_user_input$"),
         Event(name: "Stop", status: "done", matcher: nil),
+        Event(name: "Interrupt", status: "clear", matcher: nil),
+        Event(name: "SessionEnd", status: "clear", matcher: nil),
+        Event(name: "SubagentStart", status: "subagent-start", matcher: nil),
+        Event(name: "SubagentStop", status: "subagent-stop", matcher: nil),
     ], asksToApproveHooks: true)
 
     private static func home(_ path: String) -> URL {

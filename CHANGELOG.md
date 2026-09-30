@@ -8,6 +8,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - New worktrees copy ignored `.env` files by default, so tasks can build and run with the project's local environment. This can be turned off in Settings → Worktrees.
 
+### Fixed
+
+- Codex sessions now show working, waiting and done dots like Claude Code. Farol follows the interactive TUI's terminal titles live, while lifecycle hooks cover non-interactive runs and background agents. Settings → Agents → Update replaces the old terminal-notification workaround. Restart open Codex sessions and trust the new hooks with `/hooks`.
+
 ## [0.13.1] - 2026-09-30
 
 Long review lines stay inside their background.

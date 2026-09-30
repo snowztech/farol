@@ -19,3 +19,17 @@ import Testing
     #expect(AgentTitle.withoutStatus("npm run dev") == "npm run dev")
     #expect(AgentTitle.withoutStatus("git log a|b") == "git log a|b")
 }
+
+@Test func readsCodexActivityFromInteractiveTitles() {
+    #expect(AgentTitle.event(from: "farol", to: "⠋ farol") == .working)
+    #expect(AgentTitle.event(from: "⠋ Run tests | farol", to: "⠙ Run tests | farol") == nil)
+    #expect(AgentTitle.event(from: "⠙ Run tests | farol", to: "[ ! ] Action Required | Run tests | farol") == .waiting)
+    #expect(AgentTitle.event(from: "[ ! ] Action Required | Run tests | farol", to: "[ . ] Action Required | Run tests | farol") == nil)
+    #expect(AgentTitle.event(from: "[ . ] Action Required | Run tests | farol", to: "⠹ Run tests | farol") == .working)
+    #expect(AgentTitle.event(from: "⠹ Run tests | farol", to: "Run tests | farol") == .done)
+}
+
+@Test func ignoresOrdinaryTitleChanges() {
+    #expect(AgentTitle.event(from: "farol", to: "vim README.md") == nil)
+    #expect(AgentTitle.event(from: "vim README.md", to: "farol") == nil)
+}
