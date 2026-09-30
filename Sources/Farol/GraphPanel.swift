@@ -384,16 +384,20 @@ private struct BranchList: View {
 
     @ViewBuilder private func menu(for branch: String, remote: Bool, current: Bool) -> some View {
         let here = graph.current ?? "HEAD"
-        Button("Check Out") { graph.checkout(branch, remote: remote, failed: gitError("Couldn't check out")) }
+        Button(remote ? "Check Out as Local Branch" : "Check Out") { graph.checkout(branch, remote: remote, failed: gitError("Couldn't check out")) }
             .disabled(current)
-        Button("New Branch from \u{201C}\(branch)\u{201D}…") {
+        Button("Copy Branch Name") {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(branch, forType: .string)
+        }
+        Button("Create Branch from This One…") {
             let suggested = remote ? String(branch.drop { $0 != "/" }.dropFirst()) + "-copy" : branch + "-copy"
             askBranchName(from: branch, suggested: suggested) { name in
                 graph.createBranch(name, from: branch, failed: gitError("Couldn't create the branch"))
             }
         }
         Divider()
-        Button("Rebase \u{201C}\(here)\u{201D} onto \u{201C}\(branch)\u{201D}") {
+        Button("Rebase Current Branch onto This One…") {
             confirm("Rebase \(here) onto \(branch)?",
                     "Your commits on \(here) are replayed on top of \(branch). If they conflict, git stops and the terminal shows how to go on.",
                     button: "Rebase") {
@@ -401,7 +405,7 @@ private struct BranchList: View {
             }
         }
         .disabled(current)
-        Button("Rebase \u{201C}\(here)\u{201D} onto \u{201C}\(branch)\u{201D} Interactively…") {
+        Button("Interactive Rebase onto This One…") {
             graph.rebase(onto: branch, interactive: true, failed: gitError("Couldn't rebase"))
         }
         .disabled(current)
@@ -409,11 +413,11 @@ private struct BranchList: View {
         // A local branch and its twin on the server can go separately, since deleting either doesn't touch the other.
         let twin = remote ? branch : graph.remote.first { $0.drop { $0 != "/" }.dropFirst() == branch }
         if !remote {
-            Button("Delete Local Branch \u{201C}\(branch)\u{201D}…") { delete(branch) }
+            Button("Delete Local Branch…") { delete(branch) }
                 .disabled(current)
         }
         if let twin {
-            Button("Delete Remote Branch \u{201C}\(twin)\u{201D}…") { deleteRemote(twin) }
+            Button("Delete Remote Branch (\(twin.prefix { $0 != "/" }))…") { deleteRemote(twin) }
         }
     }
 
@@ -557,21 +561,24 @@ private struct CommitRow: View {
         .hoverTip(([row.commit.shortHash + "  " + row.commit.author, row.commit.subject] + refs.flatMap(\.names)
             + ["Double-click to check out"]).joined(separator: "\n"))
         .contextMenu {
-            Button("Check Out", action: checkout)
+            // Says where a checkout lands: the branch pointing here, or the bare commit.
+            Button(localBranch.map { "Check Out \u{201C}\(menuName($0))\u{201D}" } ?? "Check Out Commit (Detached)", action: checkout)
+                .disabled(isHead)
+            Button("Create Branch at This Commit…", action: newBranch)
+            Divider()
             // A merge has two parents, and picking one needs a choice this menu can't offer.
-            Button("Cherry-Pick onto \u{201C}\(current ?? "HEAD")\u{201D}", action: cherryPick)
+            Button("Cherry-Pick into Current Branch", action: cherryPick)
                 .disabled(isHead || row.commit.parents.count > 1)
-            Button("New Branch from Here…", action: newBranch)
+            Button("Revert This Commit…", action: revert)
             Divider()
             // Rebasing onto the commit you're on would change nothing.
-            Button("Rebase \u{201C}\(current ?? "HEAD")\u{201D} onto Here…", action: rebase)
+            Button("Rebase Current Branch onto This Commit…", action: rebase)
                 .disabled(isHead)
-            Button("Interactive Rebase from Here…", action: rebaseInteractively)
+            Button("Interactive Rebase from This Commit…", action: rebaseInteractively)
                 .disabled(isHead)
-            Button("Revert Commit…", action: revert)
             Divider()
-            Button("Copy Hash") { copy(row.commit.hash) }
-            Button("Copy Subject") { copy(row.commit.subject) }
+            Button("Copy Commit Hash") { copy(row.commit.hash) }
+            Button("Copy Commit Title") { copy(row.commit.subject) }
         }
     }
 
@@ -609,6 +616,11 @@ private struct CommitRow: View {
     }
 
     private func color(_ tone: Int) -> Color { palette.lanes[tone % palette.lanes.count] }
+
+    /// The local branch a checkout switches to, like History.checkout picks it.
+    private var localBranch: String? {
+        refs.first { !$0.isTag && !$0.name.hasPrefix("origin/") }?.name
+    }
 
     private var isHead: Bool { row.commit.refs.contains { $0 == "HEAD" || $0.hasPrefix("HEAD -> ") } }
 
@@ -659,6 +671,11 @@ private struct CommitRow: View {
         formatter.unitsStyle = .abbreviated
         return formatter
     }()
+}
+
+/// Branch names like ECE-1737-homepage-ajout-du-bloc… would make menus as wide as the screen. The dialogs still show them whole.
+private func menuName(_ branch: String) -> String {
+    branch.count > 20 ? branch.prefix(20) + "…" : branch
 }
 
 /// Shows git's own message, which says why and often what to do next, like resolving a conflict.
