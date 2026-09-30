@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         settings = Settings()
         let agents = AgentSettings()
         settings.onChange = { runtime.reloadConfig() }
+        let worktrees = WorktreeSettings()
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let socket = support.appendingPathComponent("Farol/\(Bundle.main.bundleIdentifier ?? "farol").sock").path
         store = SessionStore(runtime: runtime, socketPath: socket)
@@ -21,7 +22,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             self?.quitConfirmed = true
             NSApp.terminate(nil)
         }
-        windowController = MainWindowController(store: store, runtime: runtime, settings: settings, agents: agents)
+        windowController = MainWindowController(
+            store: store, runtime: runtime, settings: settings, agents: agents, worktrees: worktrees)
         NSApp.mainMenu = makeMenu()
 
         AppIcon.apply()

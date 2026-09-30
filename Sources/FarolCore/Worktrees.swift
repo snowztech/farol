@@ -40,10 +40,11 @@ public struct Worktrees {
 
     /// Creates a worktree for `branch` from the repo containing `directory`.
     /// A new branch starts from whatever `directory` has checked out. An existing branch is checked out as is.
-    public func create(branch: String, from directory: String) throws -> String {
+    public func create(branch: String, from directory: String, copyEnvironmentFiles: Bool = false) throws -> String {
         guard let root = Git.repoRoot(of: directory) else {
             throw GitError(description: "\(directory) is not inside a git repository.")
         }
+        let source = Git.topLevel(of: directory) ?? root
         let repoName = URL(fileURLWithPath: root).lastPathComponent
         let path = base.appendingPathComponent(repoName)
             .appendingPathComponent(branch.replacingOccurrences(of: "/", with: "-")).path
@@ -59,7 +60,35 @@ public struct Worktrees {
         } else {
             try Git.run(["worktree", "add", "-b", branch, path], in: directory)
         }
+        if copyEnvironmentFiles {
+            do {
+                try inheritEnvironmentFiles(from: source, to: path)
+            } catch {
+                _ = try? Git.run(["worktree", "remove", "--force", path], in: directory)
+                throw error
+            }
+        }
         return path
+    }
+
+    /// Copies local environment files so a worktree can run like the checkout it came from.
+    private func inheritEnvironmentFiles(from source: String, to destination: String) throws {
+        let files = try FileManager.default.contentsOfDirectory(
+            at: URL(fileURLWithPath: source), includingPropertiesForKeys: nil)
+        for file in files {
+            let name = file.lastPathComponent
+            guard name == ".env" || name.hasPrefix(".env.") else { continue }
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: file.path, isDirectory: &isDirectory),
+                  !isDirectory.boolValue,
+                  (try? Git.run(["check-ignore", "--quiet", "--", name], in: source)) != nil,
+                  (try? Git.run(["check-ignore", "--quiet", "--", name], in: destination)) != nil else { continue }
+            let target = URL(fileURLWithPath: destination).appendingPathComponent(name)
+            guard !FileManager.default.fileExists(atPath: target.path) else { continue }
+            try FileManager.default.copyItem(
+                at: file.resolvingSymlinksInPath(),
+                to: target)
+        }
     }
 
     /// Modified or new files that removing the worktree would lose. Git refuses to remove it while there are any.
