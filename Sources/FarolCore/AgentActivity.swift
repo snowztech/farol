@@ -1,11 +1,11 @@
-/// What an agent's hooks report, one per `farol status` call.
+/// One agent activity event, reported by a hook or an interactive terminal title.
 public enum AgentEvent: String, Codable, CaseIterable, Sendable {
     case working, waiting, done, clear
     case subagentStart = "subagent-start"
     case subagentStop = "subagent-stop"
 }
 
-/// One pane's agent, rebuilt from its hook events. The only place that decides what the sidebar dot shows.
+/// One pane's agent, rebuilt from its activity events. The only place that decides what the sidebar dot shows.
 /// An agent can end its turn while a background subagent keeps running, so counting them keeps the pane working.
 public struct AgentActivity: Equatable, Sendable {
     /// What the main agent last reported. Nil before anything is reported, and after it's cleared or acknowledged.

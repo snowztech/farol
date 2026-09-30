@@ -1,6 +1,6 @@
 import Foundation
 
-/// What an agent in a pane is doing, as reported by its hooks through the `farol` command.
+/// What an agent in a pane is doing, as reported by hooks or an interactive terminal title.
 public enum AgentStatus: String, Codable, CaseIterable, Sendable {
     case working
     /// Blocked on the user: a permission prompt or a question.

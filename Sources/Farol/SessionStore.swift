@@ -12,7 +12,7 @@ final class Session: ObservableObject, Identifiable {
     /// Set by renaming the session in the sidebar. Wins over every automatic name.
     @Published var customName: String?
     @Published var directory: String
-    /// Reported per pane by agent hooks through `farol status`.
+    /// Reported per pane by agent hooks or interactive terminal titles.
     @Published private(set) var agents: [UUID: AgentActivity] = [:]
     /// The program rang the bell or sent a notification while you were elsewhere. Covers agents without hooks.
     @Published var bellRang = false
@@ -239,8 +239,14 @@ final class SessionStore: ObservableObject {
     /// Every terminal reports to its session, but only the focused pane decides what the session shows.
     private func wire(_ terminal: TerminalView, to session: Session) {
         onTerminalCreated?(terminal)
-        terminal.onTitleChange = { [weak session, weak terminal] in
-            guard let session, terminal === session.panes.focused else { return }
+        var previousTitle = terminal.title
+        terminal.onTitleChange = { [weak self, weak session, weak terminal] in
+            guard let self, let session, let terminal else { return }
+            if let event = AgentTitle.event(from: previousTitle, to: $0) {
+                receive(StatusMessage(pane: terminal.id.uuidString, event: event))
+            }
+            previousTitle = $0
+            guard terminal === session.panes.focused else { return }
             // Agents animate a glyph in the title many times a second, and those frames are not worth a git lookup.
             // A shell re-sends the same title at each prompt, which is how a `git checkout` gets noticed.
             let glyphOnly = $0 != AgentTitle.withoutStatus($0) && AgentTitle.withoutStatus($0) == AgentTitle.withoutStatus(session.title)

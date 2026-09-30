@@ -74,7 +74,7 @@ When an agent waits or finishes while Farol is in the background, you get a noti
 
 **Claude Code:** open Settings → Agents and click **Connect**. Farol adds its hooks to `~/.claude/settings.json`, leaves everything else in the file alone and keeps a backup. **Disconnect** removes only Farol's hooks, and Claude Code keeps working as before.
 
-**Codex:** same place, click **Connect**. Farol adds its hooks to `~/.codex/hooks.json`, leaves other hooks alone and keeps a backup. Restart open Codex sessions, then review and trust the hooks with `/hooks`. **Disconnect** removes only Farol's hooks.
+**Codex:** interactive sessions work automatically through Codex's terminal titles. Keep Codex's terminal-title setting enabled. To cover non-interactive runs and background agents too, click **Connect**. Farol adds hooks to `~/.codex/hooks.json`, leaves other hooks alone and keeps a backup. Restart open Codex sessions, then review and trust the hooks with `/hooks`. **Disconnect** removes only Farol's hooks. Interactive status keeps working.
 
 **Other agents** can report with `"$FAROL_CLI" status working|waiting|done|clear`, which Farol makes available in every session. Agents that ring the terminal bell show as waiting without any setup.
 
@@ -121,7 +121,7 @@ In `~/.codex/hooks.json`:
 }
 ```
 
-Outside Farol `$FAROL_CLI` is unset, so the hooks do nothing. Codex 0.159.2 or later is required because earlier versions did not pass Farol's pane environment to hooks.
+These hooks complement the terminal-title status used by interactive Codex sessions. Outside Farol `$FAROL_CLI` is unset, so the hooks do nothing. Codex 0.159.2 or later is required because earlier versions did not pass Farol's pane environment to hooks.
 
 </details>
 
