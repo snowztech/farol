@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-09-30
+
+Long review lines stay inside their background.
+
 ### Fixed
 
 - Long lines in the review panel no longer spill a few pixels past their green or red background.
@@ -311,7 +315,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.13.1...HEAD
+[0.13.1]: https://github.com/snowztech/farol/releases/tag/v0.13.1
 [0.13.0]: https://github.com/snowztech/farol/releases/tag/v0.13.0
 [0.12.0]: https://github.com/snowztech/farol/releases/tag/v0.12.0
 [0.11.2]: https://github.com/snowztech/farol/releases/tag/v0.11.2
