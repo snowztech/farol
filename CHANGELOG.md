@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- New worktrees copy ignored `.env` files by default, so tasks can build and run with the project's local environment. This can be turned off in Settings → Worktrees.
+
 ## [0.13.1] - 2026-09-30
 
 Long review lines stay inside their background.
