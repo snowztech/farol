@@ -168,6 +168,10 @@ struct GraphPanel: View {
                             CommitRow(row: row, lanes: lanes, showsLines: searchText.isEmpty, palette: p, current: graph.current,
                                       cherryPick: { graph.cherryPick(row.commit, failed: gitError("Cherry-pick stopped")) },
                                       revert: { revert(row.commit) },
+                                      rebase: { rebase(onto: row.commit) },
+                                      rebaseInteractively: {
+                                          graph.rebase(onto: row.commit.hash, interactive: true, failed: gitError("Couldn't rebase"))
+                                      },
                                       newBranch: {
                                           askBranchName(from: row.commit.shortHash, suggested: "") { name in
                                               graph.createBranch(name, from: row.commit.hash, failed: gitError("Couldn't create the branch"))
@@ -185,6 +189,15 @@ struct GraphPanel: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(p.surface)
         .overlay(alignment: .leading) { edge(p) }
+    }
+
+    private func rebase(onto commit: History.Commit) {
+        let branch = graph.current ?? "HEAD"
+        confirm("Rebase \(branch) onto \(commit.shortHash)?",
+                "Your commits on \(branch) are replayed on top of \u{201C}\(commit.subject)\u{201D}. If they conflict, git stops and the terminal shows how to go on.",
+                button: "Rebase") {
+            graph.rebase(onto: commit.hash, interactive: false, failed: gitError("Rebase stopped"))
+        }
     }
 
     private func revert(_ commit: History.Commit) {
@@ -492,6 +505,8 @@ private struct CommitRow: View {
     var current: String?
     var cherryPick: () -> Void = {}
     var revert: () -> Void = {}
+    var rebase: () -> Void = {}
+    var rebaseInteractively: () -> Void = {}
     var newBranch: () -> Void = {}
     let checkout: () -> Void
 
@@ -548,6 +563,11 @@ private struct CommitRow: View {
                 .disabled(isHead || row.commit.parents.count > 1)
             Button("New Branch from Here…", action: newBranch)
             Divider()
+            // Rebasing onto the commit you're on would change nothing.
+            Button("Rebase \u{201C}\(current ?? "HEAD")\u{201D} onto Here…", action: rebase)
+                .disabled(isHead)
+            Button("Interactive Rebase from Here…", action: rebaseInteractively)
+                .disabled(isHead)
             Button("Revert Commit…", action: revert)
             Divider()
             Button("Copy Hash") { copy(row.commit.hash) }
