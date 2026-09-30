@@ -35,6 +35,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var badgeSwitch: AnyCancellable?
     private lazy var menuBar = MenuBarStatus(store: store, palette: state.palette)
     private var menuBarSwitch: AnyCancellable?
+    private lazy var notch = NotchStatus(store: store, palette: state.palette)
+    private var notchSwitch: AnyCancellable?
     private var sessionsChange: AnyCancellable?
 
     init(store: SessionStore, runtime: TerminalRuntime, settings: Settings, agents: AgentSettings) {
@@ -150,15 +152,21 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             notifier.activityChanged(session, from: before, to: after)
             refreshBadge(enabled: agents.dockBadge)
             menuBar.refresh()
+            notch.refresh()
         }
         menuBar.onSelect = { [weak self] session in
             self?.window?.makeKeyAndOrderFront(nil)
             self?.store.select(session)
         }
         menuBarSwitch = agents.$menuBarStatus.sink { [weak self] in self?.menuBar.setVisible($0) }
+        notch.onSelect = menuBar.onSelect
+        notchSwitch = agents.$notchStatus.sink { [weak self] in self?.notch.setVisible($0) }
         // A closed session no longer counts toward the lamp.
         sessionsChange = store.$sessions.dropFirst().sink { [weak self] _ in
-            DispatchQueue.main.async { self?.menuBar.refresh() }
+            DispatchQueue.main.async {
+                self?.menuBar.refresh()
+                self?.notch.refresh()
+            }
         }
         // @Published reports the new value before the property changes, so pass it along.
         badgeSwitch = agents.$dockBadge.dropFirst().sink { [weak self] in self?.refreshBadge(enabled: $0) }
@@ -338,6 +346,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let bg = runtime.backgroundColor
         state.palette = Palette(runtime)
         menuBar.apply(state.palette)
+        notch.apply(state.palette)
         HoverTip.shared.colors = (bg, runtime.foregroundColor)
         window?.backgroundColor = bg
         window?.appearance = NSAppearance(named: bg.isDark ? .darkAqua : .aqua)

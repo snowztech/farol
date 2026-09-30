@@ -32,6 +32,7 @@ Someone who downloads Farol understands what it is for in the first minute.
 - [x] Sessions grouped by project in the sidebar, as a setting
 - [x] Update check: a quiet Update button when a new version is out
 - [x] Agent status in the menu bar: a lamp with the most urgent state across sessions, and a menu to jump to any of them, so you see agents working from any app
+- [x] Agent status around the notch, as another option next to the menu bar
 - [ ] Install updates in place (Sparkle), behind the same button
 - [ ] Homebrew cask
 
@@ -70,7 +71,6 @@ Everything talks to your servers directly. Nothing goes through a Farol service.
 
 - Linear and GitHub Issues as ticket sources
 - Command palette
-- Agent status in the notch, as another style of the menu bar item
 
 ## Not planned
 

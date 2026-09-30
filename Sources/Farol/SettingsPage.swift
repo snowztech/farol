@@ -222,8 +222,15 @@ struct SettingsPage: View {
         Row(title: "When an agent is waiting for you", palette: p) { toggle($agents.notifyWaiting) }
         Row(title: "When an agent finishes", palette: p) { toggle($agents.notifyDone) }
         Row(title: "Waiting count on the Dock icon", palette: p) { toggle($agents.dockBadge) }
-        Row(title: "Status in the menu bar", detail: "See agents working, waiting or done from any app, and jump to a session.", palette: p) {
+
+        GroupTitle(title: "Outside Farol", palette: p)
+        Row(title: "In the menu bar", detail: "See agents working, waiting or done from any app, and jump to a session.", palette: p) {
             toggle($agents.menuBarStatus)
+        }
+        if NotchStatus.isAvailable {
+            Row(title: "Around the notch", detail: "The notch grows a little while agents are active. Hover it to see the sessions.", palette: p) {
+                toggle($agents.notchStatus)
+            }
         }
 
         GroupTitle(title: "New sessions", palette: p)

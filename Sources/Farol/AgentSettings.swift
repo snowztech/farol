@@ -9,6 +9,7 @@ final class AgentSettings: ObservableObject {
     @Published var dockBadge: Bool { didSet { Self.defaults.set(dockBadge, forKey: "agents.dockBadge") } }
     /// Off until turned on, like every feature that shows outside Farol's window.
     @Published var menuBarStatus: Bool { didSet { Self.defaults.set(menuBarStatus, forKey: "agents.menuBarStatus") } }
+    @Published var notchStatus: Bool { didSet { Self.defaults.set(notchStatus, forKey: "agents.notchStatus") } }
     /// Typed into the shell of each new session, for example "claude". Empty starts a plain shell.
     @Published var startCommand: String { didSet { Self.defaults.set(startCommand, forKey: "agents.startCommand") } }
 
@@ -20,6 +21,7 @@ final class AgentSettings: ObservableObject {
         notifyDone = Self.defaults.bool(forKey: "agents.notifyDone")
         dockBadge = Self.defaults.bool(forKey: "agents.dockBadge")
         menuBarStatus = Self.defaults.bool(forKey: "agents.menuBarStatus")
+        notchStatus = Self.defaults.bool(forKey: "agents.notchStatus")
         startCommand = Self.defaults.string(forKey: "agents.startCommand") ?? ""
     }
 }

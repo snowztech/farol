@@ -81,61 +81,15 @@ final class MenuBarStatus: NSObject, NSMenuDelegate {
 
     // MARK: Drawing
 
-    /// Farol's lighthouse, its two beams lit in the state's color. Idle, it's just the tower, like any menu bar icon.
-    /// Drawn in the menu bar's own text color, which the drawing picks up each time it renders, so it suits light and dark.
     private func lighthouse(_ activity: Session.Activity) -> NSImage {
-        let beam: NSColor? = switch activity {
-        case .working: NSColor(palette.working)
-        case .waiting: NSColor(palette.waiting)
-        case .done: NSColor(palette.done)
-        case .idle: nil
-        }
-        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
-            NSColor.labelColor.setFill()
-            // Tower, narrowing towards the top, on a wider base.
-            let tower = NSBezierPath()
-            tower.move(to: NSPoint(x: 6, y: 2.5))
-            tower.line(to: NSPoint(x: 12, y: 2.5))
-            tower.line(to: NSPoint(x: 10.6, y: 10.5))
-            tower.line(to: NSPoint(x: 7.4, y: 10.5))
-            tower.close()
-            tower.fill()
-            NSBezierPath(rect: NSRect(x: 4.5, y: 1.2, width: 9, height: 1.3)).fill()
-            // Lamp room and roof.
-            NSBezierPath(rect: NSRect(x: 7.6, y: 11.3, width: 2.8, height: 2.4)).fill()
-            let roof = NSBezierPath()
-            roof.move(to: NSPoint(x: 7.1, y: 14.3))
-            roof.line(to: NSPoint(x: 10.9, y: 14.3))
-            roof.line(to: NSPoint(x: 9, y: 16.4))
-            roof.close()
-            roof.fill()
-            // The beams, pointing at the lamp like the app icon's.
-            guard let beam else { return true }
-            beam.setStroke()
-            for side in [CGFloat(-1), 1] {
-                let path = NSBezierPath()
-                path.lineWidth = 1.6
-                path.lineCapStyle = .round
-                path.lineJoinStyle = .round
-                path.move(to: NSPoint(x: 9 + side * 6.8, y: 14.6))
-                path.line(to: NSPoint(x: 9 + side * 3.6, y: 12.5))
-                path.line(to: NSPoint(x: 9 + side * 6.8, y: 10.4))
-                path.stroke()
-            }
-            return true
-        }
-        return image
+        // The menu bar's own text color, picked up each time the image draws, so it suits light and dark.
+        Lighthouse.image(beam: palette.color(activity), body: .labelColor)
     }
 
     /// A filled dot in the sidebar's color for each state, and a hollow template circle when idle, so it follows the menu bar's look.
-    private func lamp(_ activity: Session.Activity, size: CGFloat) -> NSImage {
+    func lamp(_ activity: Session.Activity, size: CGFloat) -> NSImage {
         let canvas = NSSize(width: 18, height: 18)
-        let color: NSColor? = switch activity {
-        case .working: NSColor(palette.working)
-        case .waiting: NSColor(palette.waiting)
-        case .done: NSColor(palette.done)
-        case .idle: nil
-        }
+        let color = palette.color(activity)
         let image = NSImage(size: canvas, flipped: false) { rect in
             let dot = NSRect(x: rect.midX - size / 2, y: rect.midY - size / 2, width: size, height: size)
             if let color {
