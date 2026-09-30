@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-09-30
+
+A status panel on the screen edge, out of the notch's way.
+
 ### Added
 
 - The status panel can sit on the screen edge instead of the notch: a slim tab on the right side, which doesn't get in the way of other apps that use the notch and works on any Mac. Pick it in Settings → Agents → Outside Farol → Status panel. Drag the tab up or down, or to the left edge, and it stays where you leave it.
@@ -303,7 +307,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/snowztech/farol/releases/tag/v0.13.0
 [0.12.0]: https://github.com/snowztech/farol/releases/tag/v0.12.0
 [0.11.2]: https://github.com/snowztech/farol/releases/tag/v0.11.2
 [0.11.1]: https://github.com/snowztech/farol/releases/tag/v0.11.1
