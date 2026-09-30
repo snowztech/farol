@@ -4,9 +4,14 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-01
+
+A git graph for every session.
+
 ### Added
 
-- Git graph panel. ⌥⌘G, or the icon next to the review counts, shows the session's commits as a colored graph with the branches listed above it. Click a branch to check it out, or double-click a commit. Right-click to create, rebase or delete a branch, and to cherry-pick or revert a commit.
+- Git graph panel. ⌥⌘G, or the icon next to the review counts, shows the session's commits as a colored graph with the branches listed above it. Click a branch to check it out, or double-click a commit. Right-click to create, rebase or delete a branch, to cherry-pick or revert a commit, or to copy a branch name, commit hash or commit title.
+- Rebase the current branch onto any commit or branch from the graph, or start an interactive rebase from there. If git stops on a conflict, the terminal shows how to go on.
 
 ## [0.14.0] - 2026-09-30
 
@@ -335,7 +340,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/snowztech/farol/releases/tag/v0.15.0
 [0.14.0]: https://github.com/snowztech/farol/releases/tag/v0.14.0
 [0.13.1]: https://github.com/snowztech/farol/releases/tag/v0.13.1
 [0.13.0]: https://github.com/snowztech/farol/releases/tag/v0.13.0
