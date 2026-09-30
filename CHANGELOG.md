@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-09-30
+
+Background agents no longer end a session early.
+
 ### Fixed
 
 - Claude Code sessions stay working while a background agent runs, instead of showing done and notifying as soon as Claude's turn ends. You're notified once, when everything has finished. Settings → Agents asks to update Claude Code's hooks once to get this.
@@ -281,7 +285,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.11.1...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.11.2...HEAD
+[0.11.2]: https://github.com/snowztech/farol/releases/tag/v0.11.2
 [0.11.1]: https://github.com/snowztech/farol/releases/tag/v0.11.1
 [0.11.0]: https://github.com/snowztech/farol/releases/tag/v0.11.0
 [0.10.0]: https://github.com/snowztech/farol/releases/tag/v0.10.0
