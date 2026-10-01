@@ -53,10 +53,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         self.worktreeSettings = worktrees
         self.store = store
         self.runtime = runtime
-        let base = runtime.ghosttyConfigColors
         self.state = WindowState(
             palette: Palette(runtime),
-            ghosttyConfigPreview: ThemeColors(background: base.background, foreground: base.foreground))
+            ghosttyConfigPreview: runtime.ghosttyConfigColors.map { ThemeColors(background: $0.background, foreground: $0.foreground) })
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1200, height: 760),

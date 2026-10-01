@@ -33,6 +33,7 @@ Someone who downloads Farol understands what it is for in the first minute.
 - [x] Update check: a quiet Update button when a new version is out
 - [x] Agent status in the menu bar: a lamp with the most urgent state across sessions, and a menu to jump to any of them, so you see agents working from any app
 - [x] Agent status around the notch, as another option next to the menu bar
+- [x] Farol Dark and Farol Light themes, with Farol Dark as the default
 - [ ] Install updates in place (Sparkle), behind the same button
 - [ ] Homebrew cask
 
@@ -74,7 +75,6 @@ Everything talks to your servers directly. Nothing goes through a Farol service.
 
 - Linear as a ticket source
 - Command palette
-- Farol Dark and Farol Light themes, tuned for the sidebar dots and syntax colors, with Farol Dark as the default
 
 ## Not planned
 

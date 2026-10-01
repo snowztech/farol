@@ -7,8 +7,8 @@ public final class TerminalRuntime {
     private var config: ghostty_config_t!
     private let overrideFiles: [URL]
 
-    /// Colors from the user's Ghostty config alone, before Farol's overrides.
-    public private(set) var ghosttyConfigColors: (background: NSColor, foreground: NSColor) = (.black, .white)
+    /// Colors from the user's Ghostty config alone, before Farol's overrides. Nil when it sets none, which leaves Farol Dark.
+    public private(set) var ghosttyConfigColors: (background: NSColor, foreground: NSColor)?
 
     /// App level requests from key bindings, like quitting. Surface level ones go to TerminalView.onRequest.
     public var onRequest: ((TerminalRequest) -> Void)?
@@ -21,6 +21,11 @@ public final class TerminalRuntime {
 
     /// `overrideFiles` load after the user's Ghostty config, so they win.
     public init(overrideFiles: [URL] = []) {
+        // Opened from a Ghostty terminal, Farol is handed Ghostty's own resources folder, which has no Farol themes.
+        if let resources = Bundle.main.resourceURL?.appendingPathComponent("ghostty").path,
+           FileManager.default.fileExists(atPath: resources) {
+            setenv("GHOSTTY_RESOURCES_DIR", resources, 1)
+        }
         if ghostty_init(UInt(CommandLine.argc), CommandLine.unsafeArgv) != GHOSTTY_SUCCESS {
             fatalError("ghostty_init failed")
         }
@@ -28,8 +33,11 @@ public final class TerminalRuntime {
         config = Self.loadConfig(overrideFiles)
 
         let base = Self.loadConfig([])
-        ghosttyConfigColors = (Self.color(base, "background") ?? .black, Self.color(base, "foreground") ?? .white)
+        let plain = Self.loadConfig([], ghosttyFiles: false)
+        let colors = [base, plain].map { [Self.color($0, "background") ?? .black, Self.color($0, "foreground") ?? .white] }
+        if colors[0] != colors[1] { ghosttyConfigColors = (colors[0][0], colors[0][1]) }
         ghostty_config_free(base)
+        ghostty_config_free(plain)
 
         var rt = ghostty_runtime_config_s()
         rt.userdata = Unmanaged.passUnretained(self).toOpaque()
@@ -114,18 +122,19 @@ public final class TerminalRuntime {
         Bundle.main.resourceURL?.appendingPathComponent("ghostty/themes")
     }
 
+    /// Farol Dark is the theme until a config names another.
     /// Shell integration sets a bar cursor at every prompt, which hides the cursor-style setting.
-    /// Loaded first, so the user's Ghostty config and the override files can still turn it back on.
-    private static let defaults = "shell-integration-features = no-cursor\n"
+    /// Loaded first, so the user's Ghostty config and the override files can still change both.
+    private static let defaults = "theme = Farol Dark\nshell-integration-features = no-cursor\n"
 
-    private static func loadConfig(_ overrides: [URL]) -> ghostty_config_t {
+    private static func loadConfig(_ overrides: [URL], ghosttyFiles: Bool = true) -> ghostty_config_t {
         let config = ghostty_config_new()!
         // libghostty only reads config from files.
         let defaultsFile = FileManager.default.temporaryDirectory.appendingPathComponent("farol-defaults")
         if (try? defaults.write(to: defaultsFile, atomically: true, encoding: .utf8)) != nil {
             ghostty_config_load_file(config, defaultsFile.path)
         }
-        ghostty_config_load_default_files(config)
+        if ghosttyFiles { ghostty_config_load_default_files(config) }
         for url in overrides where FileManager.default.fileExists(atPath: url.path) {
             ghostty_config_load_file(config, url.path)
         }

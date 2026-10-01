@@ -12,7 +12,7 @@ struct ThemeColors {
     private static let defaultANSI = ["1d1f21", "cc6666", "b5bd68", "f0c674", "81a2be", "b294bb", "8abeb7", "c5c8c6"]
         .map { Color(hex: $0)! }
 
-    /// Preview for "no Farol theme": whatever the user's Ghostty config sets.
+    /// Preview for the user's Ghostty config, which only says its background and foreground.
     init(background: NSColor, foreground: NSColor) {
         self.background = Color(nsColor: background)
         self.foreground = Color(nsColor: foreground)
@@ -67,7 +67,10 @@ struct Theme: Hashable {
 
     static let userDirectory = Settings.fileURL.deletingLastPathComponent().appendingPathComponent("themes")
 
-    /// Your own themes first, then Ghostty's. Yours are set by full path, since Ghostty only looks for names in its own folders.
+    /// Farol's own. The first is in use until a theme is picked, unless your Ghostty config sets its own colors.
+    static let farol = ["Farol Dark", "Farol Light"]
+
+    /// Farol's themes, then yours, then Ghostty's. Yours are set by full path, since Ghostty only looks for names in its own folders.
     static func all() -> [Theme] {
         let user = ((try? FileManager.default.contentsOfDirectory(atPath: userDirectory.path)) ?? [])
             .filter { !$0.hasPrefix(".") }
@@ -76,17 +79,18 @@ struct Theme: Hashable {
                 let url = userDirectory.appendingPathComponent(name)
                 return Theme(name: name, value: url.path, url: url)
             }
-        let bundled = TerminalRuntime.bundledThemes.map {
-            Theme(name: $0, value: $0, url: TerminalRuntime.themesDirectory?.appendingPathComponent($0))
+        let bundled = { (name: String) in
+            Theme(name: name, value: name, url: TerminalRuntime.themesDirectory?.appendingPathComponent(name))
         }
-        return [Theme(name: "Default", value: "", url: nil)] + user + bundled
+        return farol.map(bundled) + user + TerminalRuntime.bundledThemes.filter { !farol.contains($0) }.map(bundled)
     }
 }
 
 struct ThemeGallery: View {
     let query: String
     @Binding var selected: String
-    let ghosttyConfig: ThemeColors
+    /// Nil when your Ghostty config sets no colors of its own.
+    let ghosttyConfig: ThemeColors?
     let palette: Palette
 
     let themes: [Theme]
@@ -94,15 +98,20 @@ struct ThemeGallery: View {
     var body: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 172), spacing: 14)], spacing: 18) {
             ForEach(filtered, id: \.self) { theme in
-                ThemeCard(name: theme.name, colors: theme.url.map(ThemeColors.load) ?? ghosttyConfig,
-                          selected: theme.value == selected, palette: palette)
+                ThemeCard(name: theme.value == fallback ? "\(theme.name) (default)" : theme.name,
+                          colors: theme.url.map(ThemeColors.load) ?? ghosttyConfig ?? ThemeColors(background: .black, foreground: .white),
+                          selected: theme.value == (selected.isEmpty ? fallback : selected), palette: palette)
                     .onTapGesture { selected = theme.value }
             }
         }
     }
 
+    /// What is in use with nothing picked: your Ghostty config when it sets colors, Farol Dark otherwise.
+    private var fallback: String { ghosttyConfig == nil ? Theme.farol[0] : "" }
+
     private var filtered: [Theme] {
-        query.isEmpty ? themes : themes.filter { $0.name.localizedCaseInsensitiveContains(query) }
+        let cards = (ghosttyConfig == nil ? [] : [Theme(name: "Ghostty config", value: "", url: nil)]) + themes
+        return query.isEmpty ? cards : cards.filter { $0.name.localizedCaseInsensitiveContains(query) }
     }
 }
 
