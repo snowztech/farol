@@ -322,7 +322,7 @@ struct SettingsPage: View {
         Row(title: "Jira", detail: jiraDetail, icon: ForgeIcon(source: .jira, size: 13), link: ("Jira CLI (jira)", Jira.docs), palette: p) {
             toolControl(jira, avatar: jiraAvatar, setup: Jira.setupCommand(from:), p)
         }
-        if case .connected = jira {
+        if listsBoards {
             Row(title: "Tickets to list",
                 detail: "Your own open tickets, or everything open on a team's board. A scrum board lists its current sprint.",
                 palette: p) {
@@ -337,8 +337,16 @@ struct SettingsPage: View {
                 .labelsHidden()
                 // The menu would grow as wide as the longest board's name and squeeze the words beside it.
                 .frame(width: 220)
+                .disabled(jira == nil)
             }
         }
+    }
+
+    /// The board row is there while jira-cli is still being asked, when its config file says it is set up.
+    /// Otherwise it would drop in under the Jira row a few seconds after the page opens.
+    private var listsBoards: Bool {
+        if case .connected = jira { return true }
+        return jira == nil && Jira.isSetUp
     }
 
     private var jiraDetail: String {
@@ -383,6 +391,9 @@ struct SettingsPage: View {
                         runInTerminal(setup(state))
                     }
                 }
+            } else {
+                // Asking the tool takes a moment, and an empty side would read as nothing found.
+                ProgressView().controlSize(.mini)
             }
         }
     }
