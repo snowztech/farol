@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Drop files or text on the terminal. Files go in as their paths, so an image dropped on Claude Code's prompt is attached.
+
 ## [0.20.0] - 2026-10-01
 
 Fetch, update and push branches from the git graph.

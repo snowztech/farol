@@ -49,6 +49,7 @@ public final class TerminalView: NSView {
         self.id = id
         self.workingDirectory = workingDirectory
         super.init(frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        registerForDraggedTypes([.fileURL, .string])
 
         var cfg = ghostty_surface_config_new()
         cfg.platform_tag = GHOSTTY_PLATFORM_MACOS
@@ -206,6 +207,22 @@ public final class TerminalView: NSView {
         guard let surface else { return }
         ghostty_surface_set_content_scale(surface, scale, scale)
         setFrameSize(frame.size)
+    }
+
+    // MARK: Drops
+
+    public override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        Clipboard.droppedText(in: sender.draggingPasteboard) == nil ? [] : .copy
+    }
+
+    /// Goes in as a paste, so a program that asks for bracketed paste, like an agent's prompt, gets it in one piece.
+    public override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        guard let surface, let text = Clipboard.droppedText(in: sender.draggingPasteboard), !text.isEmpty else { return false }
+        ghostty_surface_text(surface, text, UInt(text.utf8.count))
+        // The drop came from another app, so typing should land here next.
+        NSApp.activate(ignoringOtherApps: true)
+        window?.makeFirstResponder(self)
+        return true
     }
 
     public override var acceptsFirstResponder: Bool { true }
