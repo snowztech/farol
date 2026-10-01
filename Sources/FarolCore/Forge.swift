@@ -2,17 +2,60 @@ import Foundation
 
 /// Where a repo is hosted, read from its remote's URL, to link to the page that opens a pull request there.
 public struct Forge: Equatable {
-    public enum Kind { case github, gitlab }
+    public enum Kind: CaseIterable {
+        case github, gitlab
+
+        /// "GitHub", for labels.
+        public var name: String { self == .github ? "GitHub" : "GitLab" }
+        /// What a request to merge is called there.
+        public var request: String { self == .github ? "pull request" : "merge request" }
+        public var requestShort: String { self == .github ? "PR" : "MR" }
+        /// The forge's own command line tool, which Farol asks about requests and creates them with.
+        public var tool: String { self == .github ? "gh" : "glab" }
+
+        var toolPath: String? {
+            // ponytail: looks where Homebrew and the official installers put them. Other setups, like nix, read as not installed.
+            let folders = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", NSHomeDirectory() + "/.local/bin"]
+            return folders.map { "\($0)/\(tool)" }.first(where: FileManager.default.isExecutableFile(atPath:))
+        }
+
+        /// Whether the tool is there and logged in, for Settings. Runs the tool, so call it off the main thread.
+        public func toolState() -> ToolState {
+            guard let path = toolPath else { return .missing }
+            // glab reports on stderr, and so did gh before it moved to stdout.
+            guard let status = try? Git.run(path, ["auth", "status"], in: NSHomeDirectory(), mergingErrors: true) else {
+                return .loggedOut
+            }
+            return .connected(account: Self.account(from: status))
+        }
+
+        /// "Logged in to github.com account ana (keyring)" from gh, "Logged in to gitlab.com as ana" from glab and older gh.
+        static func account(from status: String) -> String? {
+            guard let match = status.firstMatch(of: #/Logged in to \S+ (?:account|as) (\S+)/#) else { return nil }
+            return String(match.1)
+        }
+
+        /// Typed into a terminal to get from `state` to connected. Logging in asks questions, so it can't run in the background.
+        public func setupCommand(from state: ToolState) -> String {
+            (state == .missing ? "brew install \(tool) && " : "") + "\(tool) auth login"
+        }
+    }
+
+    public enum ToolState: Equatable {
+        case missing
+        /// Installed, but it has no account to act for.
+        case loggedOut
+        case connected(account: String?)
+    }
 
     public let kind: Kind
     /// The repo's page, like https://github.com/snowztech/farol.
     public let web: String
 
-    /// "GitHub", for labels.
-    public var name: String { kind == .github ? "GitHub" : "GitLab" }
-    /// What a request to merge is called there.
-    public var request: String { kind == .github ? "pull request" : "merge request" }
-    public var requestShort: String { kind == .github ? "PR" : "MR" }
+    public var name: String { kind.name }
+    public var request: String { kind.request }
+    public var requestShort: String { kind.requestShort }
+    public var tool: String { kind.tool }
 
     /// Understands the forms git accepts: https://host/path, ssh://git@host:22/path and git@host:path, with or without .git.
     public init?(remote: String) {
@@ -60,12 +103,9 @@ public struct Forge: Equatable {
         case open(number: Int, url: URL)
     }
 
-    /// The tool's name, for telling people what to install.
-    public var tool: String { kind == .github ? "gh" : "glab" }
-
     /// Whether `branch` has an open pull request, or merge request. Talks to the forge, so call it off the main thread.
     public func request(for branch: String, in directory: String) -> RequestState {
-        guard let path = toolPath else { return .unknown }
+        guard let path = kind.toolPath else { return .unknown }
         let arguments = switch kind {
         case .github: ["pr", "list", "--head", branch, "--state", "open", "--json", "number,url", "--limit", "1"]
         case .gitlab: ["mr", "list", "--source-branch", branch, "--output", "json"]
@@ -77,19 +117,13 @@ public struct Forge: Equatable {
 
     /// Creates the request for `branch`, titled and described from its commits. The branch has to be pushed first.
     public func createRequest(for branch: String, in directory: String) throws {
-        guard let path = toolPath else { throw GitError(description: "\(tool) isn't installed.") }
+        guard let path = kind.toolPath else { throw GitError(description: "\(tool) isn't installed.") }
         // Both flags keep the tools from stopping to ask, which they can't here.
         let arguments = switch kind {
         case .github: ["pr", "create", "--fill", "--head", branch]
         case .gitlab: ["mr", "create", "--fill", "--yes", "--source-branch", branch]
         }
         try Git.run(path, arguments, in: directory)
-    }
-
-    private var toolPath: String? {
-        // ponytail: looks where Homebrew and the official installers put them. Other setups, like nix, read as not installed.
-        let folders = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", NSHomeDirectory() + "/.local/bin"]
-        return folders.map { "\($0)/\(tool)" }.first(where: FileManager.default.isExecutableFile(atPath:))
     }
 
     /// Reads either tool's JSON list: gh says number and url, glab says iid and web_url.
