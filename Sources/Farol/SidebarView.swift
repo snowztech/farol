@@ -49,7 +49,8 @@ struct SidebarView: View {
         .frame(width: Self.width)
         .frame(maxHeight: .infinity)
         .background(p.surface)
-        .overlay(alignment: .trailing) { Rectangle().fill(p.line).frame(width: 1) }
+        // A boxed panel has a border all around, drawn by the window.
+        .overlay(alignment: .trailing) { Rectangle().fill(p.boxed ? .clear : p.line).frame(width: 1) }
     }
 }
 
@@ -139,7 +140,7 @@ private struct SessionRow: View {
     /// Selection stays neutral, so color only ever means agent status.
     private var background: some View {
         RoundedRectangle(cornerRadius: 6)
-            .fill(selected ? palette.raised : hovering ? palette.raised.opacity(0.35) : .clear)
+            .fill(selected ? palette.selection : hovering ? palette.raised.opacity(0.35) : .clear)
     }
 }
 
@@ -165,10 +166,12 @@ private struct NewTaskRow: View {
                     .foregroundStyle(palette.muted)
             }
         }
-        .foregroundStyle(hovering ? palette.text : palette.muted)
+        .foregroundStyle(hovering || palette.vivid ? palette.text : palette.muted)
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
-        .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised.opacity(0.5) : .clear))
+        // With color, starting a task is the one filled button in the sidebar.
+        .background(RoundedRectangle(cornerRadius: 6)
+            .fill(palette.vivid ? palette.selection.opacity(hovering ? 1 : 0.6) : hovering ? palette.raised.opacity(0.5) : .clear))
         .contentShape(Rectangle())
         .onTapGesture(perform: action)
         .onClickableHover { hovering = $0 }
@@ -184,7 +187,7 @@ struct RepoHeader: View {
         Text(name.uppercased())
             .font(.system(size: 10.5, weight: .semibold))
             .tracking(0.6)
-            .foregroundStyle(palette.muted)
+            .foregroundStyle(palette.vivid ? palette.pull : palette.muted)
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 10)

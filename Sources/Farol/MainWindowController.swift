@@ -40,6 +40,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     let worktreeSettings: WorktreeSettings
     private let updates = UpdateChecker()
     private var badgeSwitch: AnyCancellable?
+    private var styleSwitch: AnyCancellable?
+    /// Every panel below the title bar, left to right. Boxed, each is a card of its own.
+    private var panels: [NSView] = []
+    /// The space before each panel, in the same order, then after the last one, then under each.
+    private var gaps: (before: [NSLayoutConstraint], after: NSLayoutConstraint?, under: [NSLayoutConstraint]) = ([], nil, [])
     private lazy var menuBar = MenuBarStatus(store: store, palette: state.palette)
     private var menuBarSwitch: AnyCancellable?
     private lazy var notch = NotchStatus(store: store, palette: state.palette)
@@ -54,7 +59,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         self.store = store
         self.runtime = runtime
         self.state = WindowState(
-            palette: Palette(runtime),
+            palette: Palette(runtime, style: UIStyle.saved),
             ghosttyConfigPreview: runtime.ghosttyConfigColors.map { ThemeColors(background: $0.background, foreground: $0.foreground) })
 
         let window = NSWindow(
@@ -106,6 +111,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
                 store.create(run: command)
             }))
         settingsView.isHidden = true
+        settingsView.wantsLayer = true
 
         content.wantsLayer = true
         for v in [topBar, sidebar, filesPanel, graphPanel, content, reviewPanel] { root.addSubview(v) }
@@ -119,6 +125,16 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         state.graphWidth = state.graphVisible ? savedGraphWidth : 0
         graphWidth = graphPanel.widthAnchor.constraint(equalToConstant: state.graphWidth)
         reviewWidth = reviewPanel.widthAnchor.constraint(equalToConstant: 0)
+        panels = [sidebar, filesPanel, content, reviewPanel, graphPanel]
+        var edge = root.leadingAnchor
+        for panel in panels {
+            panel.wantsLayer = true
+            gaps.before.append(panel.leadingAnchor.constraint(equalTo: edge))
+            gaps.under.append(root.bottomAnchor.constraint(equalTo: panel.bottomAnchor))
+            edge = panel.trailingAnchor
+        }
+        gaps.after = root.trailingAnchor.constraint(equalTo: edge)
+        NSLayoutConstraint.activate(gaps.before + gaps.under + [gaps.after!])
         NSLayoutConstraint.activate([
             topBar.topAnchor.constraint(equalTo: root.topAnchor),
             topBar.leadingAnchor.constraint(equalTo: root.leadingAnchor),
@@ -126,28 +142,17 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             topBar.heightAnchor.constraint(equalToConstant: Self.topBarHeight),
 
             sidebar.topAnchor.constraint(equalTo: topBar.bottomAnchor),
-            sidebar.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            sidebar.bottomAnchor.constraint(equalTo: root.bottomAnchor),
             sidebarWidth,
 
             filesPanel.topAnchor.constraint(equalTo: topBar.bottomAnchor),
-            filesPanel.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
-            filesPanel.bottomAnchor.constraint(equalTo: root.bottomAnchor),
             filesWidth,
 
             graphPanel.topAnchor.constraint(equalTo: topBar.bottomAnchor),
-            graphPanel.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            graphPanel.bottomAnchor.constraint(equalTo: root.bottomAnchor),
             graphWidth,
 
             content.topAnchor.constraint(equalTo: topBar.bottomAnchor),
-            content.leadingAnchor.constraint(equalTo: filesPanel.trailingAnchor),
-            content.trailingAnchor.constraint(equalTo: reviewPanel.leadingAnchor),
-            content.bottomAnchor.constraint(equalTo: root.bottomAnchor),
 
             reviewPanel.topAnchor.constraint(equalTo: topBar.bottomAnchor),
-            reviewPanel.trailingAnchor.constraint(equalTo: graphPanel.leadingAnchor),
-            reviewPanel.bottomAnchor.constraint(equalTo: root.bottomAnchor),
             reviewWidth,
 
             // Breathing room around the text. It shares the terminal background, so it reads as terminal.
@@ -209,6 +214,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
                 self?.notch.refresh()
             }
         }
+        styleSwitch = state.$style.dropFirst().sink { [weak self] in self?.applyTheme(style: $0) }
         // @Published reports the new value before the property changes, so pass it along.
         badgeSwitch = agents.$dockBadge.dropFirst().sink { [weak self] in self?.refreshBadge(enabled: $0) }
         notifier.onOpen = { [weak self] id in
@@ -282,6 +288,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             ctx.duration = 0.18
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
             sidebarWidth.animator().constant = open ? SidebarView.width : 0
+            layoutGaps(animated: true)
         }
     }
 
@@ -294,6 +301,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             ctx.duration = 0.18
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
             filesWidth.animator().constant = open ? FilesPanel.width : 0
+            layoutGaps(animated: true)
         }
         followFiles(store.selected)
     }
@@ -311,6 +319,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             ctx.duration = 0.18
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
             graphWidth.animator().constant = width
+            layoutGaps(animated: true)
         }
         followGraph(store.selected)
     }
@@ -358,6 +367,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             ctx.duration = 0.18
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
             reviewWidth.animator().constant = width
+            layoutGaps(animated: true)
         }
     }
 
@@ -419,7 +429,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// Settings hide the session's title, which the list opens under.
     func switchSession() {
         if state.showingSettings { toggleSettings() }
-        state.switchingSession = true
+        state.switchingSession.toggle()
     }
 
     // MARK: Layout
@@ -433,19 +443,47 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         return host
     }
 
-    private func applyTheme() {
+    private func applyTheme(style: UIStyle? = nil) {
         let bg = runtime.backgroundColor
-        state.palette = Palette(runtime)
+        state.palette = Palette(runtime, style: style ?? state.style)
         menuBar.apply(state.palette)
         notch.apply(state.palette)
         HoverTip.shared.colors = (bg, runtime.foregroundColor)
-        window?.backgroundColor = bg
+        applyStyle()
         window?.appearance = NSAppearance(named: bg.isDark ? .darkAqua : .aqua)
         content.layer?.backgroundColor = bg.cgColor
         store.sessions.forEach {
             $0.panes.theme = theme
             $0.panes.syntax = state.palette.code
         }
+    }
+
+    /// Boxed, every panel is a card: round corners, a border, and the backdrop showing in the gaps around it.
+    private func applyStyle() {
+        let palette = state.palette
+        window?.backgroundColor = NSColor(palette.backdrop)
+        // The side panels already clip, which a closed one relies on to hide what is in it, so their corners come for free.
+        // The terminal stays clear of its card's corners by its own margin, which spares it a mask.
+        for panel in panels {
+            panel.layer?.cornerRadius = palette.style.radius
+            panel.layer?.borderWidth = palette.boxed ? 1 : 0
+            panel.layer?.borderColor = NSColor(palette.line).cgColor
+        }
+        // Settings fills the terminal's card to its edges, so it is cut to the same corners.
+        settingsView.layer?.cornerRadius = palette.style.radius
+        settingsView.layer?.masksToBounds = palette.boxed
+        layoutGaps()
+    }
+
+    /// A closed panel takes no gap, or two gaps would sit side by side where it was.
+    private func layoutGaps(animated: Bool = false) {
+        let gap = state.palette.style.gap
+        let open = [state.sidebarVisible, state.filesVisible, true, state.reviewWidth > 0, state.graphWidth > 0]
+        for (constraint, open) in zip(gaps.before, open) {
+            (animated ? constraint.animator() : constraint).constant = open ? gap : 0
+        }
+        gaps.after?.constant = gap
+        gaps.under.forEach { $0.constant = gap }
     }
 
     private var theme: (background: NSColor, foreground: NSColor) { (runtime.backgroundColor, runtime.foregroundColor) }
