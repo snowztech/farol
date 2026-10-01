@@ -69,9 +69,10 @@ private func gitFailure(_ title: String, _ info: String) {
     if let window = NSApp.keyWindow { alert.beginSheetModal(for: window) } else { alert.runModal() }
 }
 
-private struct ShipButton: View {
+/// The quiet bordered button of the review panel, also used at the end of a settings row.
+struct ShipButton: View {
     let title: String
-    let help: String
+    var help: String? = nil
     let busy: Bool
     /// The forge's mark before the title, on the buttons that send you there.
     var icon: Forge.Kind? = nil
@@ -81,6 +82,10 @@ private struct ShipButton: View {
     @State private var hovering = false
 
     var body: some View {
+        if let help { button.hoverTip(help) } else { button }
+    }
+
+    private var button: some View {
         Button(action: action) {
             HStack(spacing: 6) {
                 if let icon { ForgeIcon(kind: icon) }
@@ -96,7 +101,6 @@ private struct ShipButton: View {
         .buttonStyle(.plain)
         .disabled(busy)
         .onClickableHover { hovering = $0 }
-        .hoverTip(help)
     }
 }
 

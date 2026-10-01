@@ -143,7 +143,7 @@ struct SettingsPage: View {
             .background(p.surface, in: RoundedRectangle(cornerRadius: 7))
             .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(p.line))
 
-            Button("Themes folder", action: openThemesFolder)
+            ShipButton(title: "Themes folder", busy: false, palette: p, action: openThemesFolder)
         }
         .padding(.bottom, 20)
 
@@ -211,7 +211,7 @@ struct SettingsPage: View {
         Row(title: "~/.config/farol/config",
             detail: "Everything on this page is saved here. Add any other option and save, and it applies right away. If you also use Ghostty, its config loads first and Farol's wins.",
             palette: p) {
-            Button("Open", action: settings.openFile)
+            ShipButton(title: "Open", busy: false, palette: p, action: settings.openFile)
         }
     }
 
@@ -225,11 +225,9 @@ struct SettingsPage: View {
         if notificationsBlocked {
             Row(title: "macOS is blocking Farol's notifications",
                 detail: "Turn them on for Farol in System Settings, under Notifications.", palette: p) {
-                Button("Open System Settings") {
+                ShipButton(title: "Open System Settings", busy: false, palette: p) {
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")!)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
             }
         }
         Row(title: "When an agent is waiting for you", palette: p) { toggle($agents.notifyWaiting) }
@@ -317,12 +315,14 @@ struct SettingsPage: View {
                         ToolStateLabel(state: state, palette: p)
                     }
                     if state == .missing || state == .loggedOut {
-                        Button(state == .missing ? "Install" : "Log In") { runInTerminal(kind.setupCommand(from: state)) }
+                        // The system's small button reads as switched off in a dark theme, and a filled one shouts for something optional.
+                        ShipButton(title: state == .missing ? "Install" : "Log In",
+                                   help: "Opens a terminal with: \(kind.setupCommand(from: state))", busy: false, palette: p) {
+                            runInTerminal(kind.setupCommand(from: state))
+                        }
                     }
                 }
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
         }
     }
 
@@ -334,15 +334,13 @@ struct SettingsPage: View {
                 SetupState(state: state, palette: p)
                 switch state {
                 case .outdated:
-                    Button("Update") { change(agent, connect: true) }
+                    ShipButton(title: "Update", busy: false, palette: p) { change(agent, connect: true) }
                 case .connected:
-                    Button("Disconnect") { agentChange = AgentChange(agent: agent, connect: false) }
+                    ShipButton(title: "Disconnect", busy: false, palette: p) { agentChange = AgentChange(agent: agent, connect: false) }
                 case .disconnected:
-                    Button("Connect") { agentChange = AgentChange(agent: agent, connect: true) }
+                    ShipButton(title: "Connect", busy: false, palette: p) { agentChange = AgentChange(agent: agent, connect: true) }
                 }
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
         }
     }
 

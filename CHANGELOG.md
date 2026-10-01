@@ -7,6 +7,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Changed
 
 - Settings → Integrations shows the connected account's picture and name next to its state.
+- Buttons in Settings use Farol's own quiet style. The system ones looked switched off in dark themes.
 
 ## [0.20.1] - 2026-10-01
 
