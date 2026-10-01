@@ -8,8 +8,13 @@ public struct GitError: Error, CustomStringConvertible {
 public enum Git {
     @discardableResult
     static func run(_ arguments: [String], in directory: String, trimming: Bool = true) throws -> String {
+        try run("/usr/bin/git", arguments, in: directory, trimming: trimming)
+    }
+
+    /// Runs any command line tool the same way, as for the forges' own tools.
+    static func run(_ executable: String, _ arguments: [String], in directory: String, trimming: Bool = true) throws -> String {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
         process.currentDirectoryURL = URL(fileURLWithPath: directory)
         let output = Pipe()
@@ -24,7 +29,8 @@ public enum Git {
 
         guard process.terminationStatus == 0 else {
             let message = String(decoding: err, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-            throw GitError(description: message.isEmpty ? "git \(arguments.joined(separator: " ")) failed" : message)
+            let name = URL(fileURLWithPath: executable).lastPathComponent
+            throw GitError(description: message.isEmpty ? "\(name) \(arguments.joined(separator: " ")) failed" : message)
         }
         let text = String(decoding: out, as: UTF8.self)
         // A diff's leading spaces are context lines, so it can't be trimmed.

@@ -36,6 +36,7 @@ final class ReviewModel: ObservableObject {
                 scope = scopeBeforeCommit ?? .uncommitted
             }
             refresh()
+            if isOpen { checkRequest() }
         }
     }
     /// A file to bring into view once the diff is read. The id changes each time, so asking twice for one file scrolls again.
@@ -47,6 +48,8 @@ final class ReviewModel: ObservableObject {
     @Published private(set) var isShipping = false
     /// Where the branch is pushed, when that is GitHub or GitLab, to offer opening a pull request there.
     @Published private(set) var forge: Forge?
+    /// Whether the branch has an open pull request. Unknown without the forge's command line tool.
+    @Published private(set) var request = Forge.RequestState.unknown
     /// How many files a commit would take. "Changes since main" also counts work that is already committed.
     @Published private(set) var uncommitted = 0
     private var scopeBeforeCommit: Diff.Scope?
@@ -62,11 +65,19 @@ final class ReviewModel: ObservableObject {
     /// Big diffs, like a lockfile, start folded so they don't bury everything else.
     private static let foldedAbove = 800
 
+    init() {
+        // You create the request in the browser, so coming back to Farol is when it may have appeared.
+        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            if self?.isOpen == true { self?.checkRequest() }
+        }
+    }
+
     /// Follows another checkout, or stops when `root` is nil, as outside a git repo.
     func follow(_ root: String?, branch: String?) {
         let branchChanged = branch != self.branch
         self.branch = branch
         guard root != self.root || branchChanged else { return refresh() }
+        request = .unknown
         let rootChanged = root != self.root
         self.root = root
         if rootChanged {
@@ -95,6 +106,7 @@ final class ReviewModel: ObservableObject {
                 self.ignored = ignored
                 self.scope = self.chosenScope[root] ?? scope
                 self.refresh()
+                self.checkRequest()
             }
         }
     }
@@ -138,6 +150,7 @@ final class ReviewModel: ObservableObject {
                 self?.isShipping = false
                 if let failure { failed(failure.0, failure.1) } else if let link { NSWorkspace.shared.open(link) }
                 self?.refresh()
+                self?.checkRequest()
             }
         }
     }
@@ -149,6 +162,24 @@ final class ReviewModel: ObservableObject {
             let files = (try? Diff.files(in: root, .uncommitted)) ?? []
             DispatchQueue.main.async { done(files) }
         }
+    }
+
+    /// Asks the forge whether the branch has an open request. A network call, so only when something may have changed it.
+    func checkRequest() {
+        guard let root, let branch, let forge, !isOnBaseBranch else { return }
+        DispatchQueue.global(qos: .utility).async {
+            let state = forge.request(for: branch, in: root)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.root == root, self.branch == branch else { return }
+                self.request = state
+            }
+        }
+    }
+
+    /// False once the branch has a request, or on the base branch, where there is nothing to request.
+    var canStartRequest: Bool {
+        if case .open = request { return false }
+        return forge != nil && branch != nil && !isOnBaseBranch
     }
 
     /// The branch everything is compared with, like main. A request from it into itself makes no sense.
@@ -243,9 +274,10 @@ struct ReviewPanel: View {
                 Spacer(minLength: 0)
                 // The slot holds the next step: commit what's there, then open the request for the branch.
                 if !isCommit {
+                    RequestBadge(review: review, palette: p)
                     if review.uncommitted > 0 {
                         CommitButton(review: review, palette: p)
-                    } else if !review.isOnBaseBranch {
+                    } else if review.canStartRequest {
                         RequestButton(review: review, palette: p)
                     }
                 }
