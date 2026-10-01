@@ -50,6 +50,8 @@ final class ReviewModel: ObservableObject {
     @Published private(set) var forge: Forge?
     /// Whether the branch has an open pull request. Unknown without the forge's command line tool.
     @Published private(set) var request = Forge.RequestState.unknown
+    /// Commits on the branch that its base doesn't have. With none, there is nothing to make a request of.
+    @Published private(set) var ahead = 0
     /// How many files a commit would take. "Changes since main" also counts work that is already committed.
     @Published private(set) var uncommitted = 0
     private var scopeBeforeCommit: Diff.Scope?
@@ -87,6 +89,7 @@ final class ReviewModel: ObservableObject {
             rows = []
             stat = Diff.Stat()
             uncommitted = 0
+            ahead = 0
             forge = nil
             ignored = []
         }
@@ -133,7 +136,10 @@ final class ReviewModel: ObservableObject {
     /// `failed` gets a title and git's own message.
     func ship(message: String?, then next: AfterCommit, failed: @escaping (String, String) -> Void) {
         guard let root, !isShipping else { return }
-        let link = next == .openRequest ? branch.flatMap { forge?.newRequest(from: $0) } : nil
+        // With the forge's tool the request is created right here. Without it, its form opens in the browser.
+        let create = next == .openRequest && canCreateRequest ? forge : nil
+        let link = next == .openRequest && create == nil ? branch.flatMap { forge?.newRequest(from: $0) } : nil
+        let branch = branch
         isShipping = true
         DispatchQueue.global(qos: .userInitiated).async {
             let failure: (String, String)? = {
@@ -144,13 +150,20 @@ final class ReviewModel: ObservableObject {
                 do { try History.push(in: root) } catch {
                     return (message == nil ? "Couldn't push" : "Committed, but couldn't push", String(describing: error))
                 }
+                guard let create, let branch else { return nil }
+                do { try create.createRequest(for: branch, in: root) } catch {
+                    return ("Pushed, but couldn't create the \(create.request)", String(describing: error))
+                }
                 return nil
             }()
+            // Read here, while the button is still busy, so it turns straight into "PR #5".
+            let created = create.flatMap { forge in branch.map { forge.request(for: $0, in: root) } }
             DispatchQueue.main.async { [weak self] in
-                self?.isShipping = false
+                guard let self else { return }
+                self.isShipping = false
                 if let failure { failed(failure.0, failure.1) } else if let link { NSWorkspace.shared.open(link) }
-                self?.refresh()
-                self?.checkRequest()
+                self.refresh()
+                if let created, self.root == root, self.branch == branch { self.request = created } else { self.checkRequest() }
             }
         }
     }
@@ -176,6 +189,9 @@ final class ReviewModel: ObservableObject {
         }
     }
 
+    /// The forge's tool answered and found no request, so it can create one.
+    var canCreateRequest: Bool { request == .none && canStartRequest }
+
     /// False once the branch has a request, or on the base branch, where there is nothing to request.
     var canStartRequest: Bool {
         if case .open = request { return false }
@@ -197,15 +213,17 @@ final class ReviewModel: ObservableObject {
     func refresh() {
         pending?.cancel()
         guard let root else { return }
-        let scope = scope, withFiles = isOpen
+        let scope = scope, withFiles = isOpen, base = branches.first
         DispatchQueue.global(qos: .userInitiated).async {
             let stat = Result { try Diff.stat(in: root, scope) }
+            let ahead = base.map { History.commitsAhead(of: $0, in: root) } ?? 0
             let uncommitted = scope == .uncommitted ? stat : Result { try Diff.stat(in: root, .uncommitted) }
             let files = withFiles ? Result { try Diff.files(in: root, scope) } : nil
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root, self.scope == scope else { return }
                 self.stat = (try? stat.get()) ?? Diff.Stat()
                 self.uncommitted = (try? uncommitted.get())?.files ?? 0
+                self.ahead = ahead
                 self.error = (try? files?.get()) == nil && files != nil ? "Couldn't read the changes." : nil
                 if let files = try? files?.get() {
                     let known = Set(self.files.map(\.path))
@@ -277,7 +295,7 @@ struct ReviewPanel: View {
                     RequestBadge(review: review, palette: p)
                     if review.uncommitted > 0 {
                         CommitButton(review: review, palette: p)
-                    } else if review.canStartRequest {
+                    } else if review.canStartRequest, review.ahead > 0 {
                         RequestButton(review: review, palette: p)
                     }
                 }

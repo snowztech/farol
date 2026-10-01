@@ -28,18 +28,19 @@ struct CommitButton: View {
     }
 }
 
-/// Shown once there is nothing left to commit. Pushes the branch, then opens the forge's form, where you create the request.
-/// "Start PR" when the forge's tool says there is none yet. Without the tool Farol can't tell, so it only says "Pull Request".
+/// Shown once there is nothing left to commit.
+/// "Create PR" when the forge's tool says there is none yet: pushes the branch and creates it, titled from the commits.
+/// Without the tool Farol can't tell or create, so it says "Pull Request" and opens the forge's page after the push.
 struct RequestButton: View {
     @ObservedObject var review: ReviewModel
     let palette: Palette
 
     var body: some View {
         if let forge = review.forge, let branch = review.branch {
-            let known = review.request == .none
-            ShipButton(title: review.isShipping ? "Pushing…" : known ? "Start \(forge.requestShort)" : forge.request.capitalized,
-                       help: known ? "Push \(branch) and open the new \(forge.request) form on \(forge.name)"
-                           : "Push \(branch) and open its \(forge.request) page on \(forge.name). Install \(forge.tool) to see its number here.",
+            let create = review.canCreateRequest
+            ShipButton(title: review.isShipping ? "Pushing…" : create ? "Create \(forge.requestShort)" : forge.request.capitalized,
+                       help: create ? "Push \(branch) and create a \(forge.request) on \(forge.name), titled from its commits"
+                           : "Push \(branch) and open its \(forge.request) page on \(forge.name). Install \(forge.tool) to create it from here.",
                        busy: review.isShipping, palette: palette) {
                 review.ship(message: nil, then: .openRequest, failed: gitFailure)
             }
@@ -136,7 +137,7 @@ private struct CommitSheet: View {
                     option(.nothing, "Commit", p)
                     option(.push, "Commit and push", p)
                     if let forge = review.forge, review.canStartRequest {
-                        option(.openRequest, "Commit, push and start a \(forge.request) on \(forge.name)", p)
+                        option(.openRequest, "Commit, push and \(review.canCreateRequest ? "create" : "start") a \(forge.request) on \(forge.name)", p)
                     }
                 }
             }
@@ -173,7 +174,7 @@ private struct CommitSheet: View {
         switch next {
         case .nothing: "Commit"
         case .push: "Commit and Push"
-        case .openRequest: "Commit and Start \(review.forge?.requestShort ?? "PR")"
+        case .openRequest: "Commit and \(review.canCreateRequest ? "Create" : "Start") \(review.forge?.requestShort ?? "PR")"
         }
     }
 

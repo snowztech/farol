@@ -7,7 +7,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Added
 
 - Start a pull request on GitHub, or a merge request on GitLab, from the review panel. Once everything is committed, Start PR pushes the branch and opens the new request form in your browser, with the branch filled in. You create it there.
-- The review panel shows the branch's open pull request, like "PR #5", and opens it on click. This needs GitHub's `gh` or GitLab's `glab` installed and logged in. Without it the button reads Pull Request, and still pushes and opens the page.
+- With GitHub's `gh` or GitLab's `glab` installed and logged in, the review panel creates the pull request itself, titled from the commits, and then shows it as "PR #5", which opens it on click. Without the tool the button reads Pull Request, and pushes and opens the forge's page as before.
 
 ### Changed
 

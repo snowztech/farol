@@ -65,11 +65,7 @@ public struct Forge: Equatable {
 
     /// Whether `branch` has an open pull request, or merge request. Talks to the forge, so call it off the main thread.
     public func request(for branch: String, in directory: String) -> RequestState {
-        // ponytail: looks where Homebrew and the official installers put them. Other setups, like nix, read as not installed.
-        let folders = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", NSHomeDirectory() + "/.local/bin"]
-        guard let path = folders.map({ "\($0)/\(tool)" }).first(where: FileManager.default.isExecutableFile(atPath:)) else {
-            return .unknown
-        }
+        guard let path = toolPath else { return .unknown }
         let arguments = switch kind {
         case .github: ["pr", "list", "--head", branch, "--state", "open", "--json", "number,url", "--limit", "1"]
         case .gitlab: ["mr", "list", "--source-branch", branch, "--output", "json"]
@@ -77,6 +73,23 @@ public struct Forge: Equatable {
         // Not logged in, offline, or a repo the tool can't place all end here.
         guard let output = try? Git.run(path, arguments, in: directory) else { return .unknown }
         return Self.request(from: output)
+    }
+
+    /// Creates the request for `branch`, titled and described from its commits. The branch has to be pushed first.
+    public func createRequest(for branch: String, in directory: String) throws {
+        guard let path = toolPath else { throw GitError(description: "\(tool) isn't installed.") }
+        // Both flags keep the tools from stopping to ask, which they can't here.
+        let arguments = switch kind {
+        case .github: ["pr", "create", "--fill", "--head", branch]
+        case .gitlab: ["mr", "create", "--fill", "--yes", "--source-branch", branch]
+        }
+        try Git.run(path, arguments, in: directory)
+    }
+
+    private var toolPath: String? {
+        // ponytail: looks where Homebrew and the official installers put them. Other setups, like nix, read as not installed.
+        let folders = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", NSHomeDirectory() + "/.local/bin"]
+        return folders.map { "\($0)/\(tool)" }.first(where: FileManager.default.isExecutableFile(atPath:))
     }
 
     /// Reads either tool's JSON list: gh says number and url, glab says iid and web_url.

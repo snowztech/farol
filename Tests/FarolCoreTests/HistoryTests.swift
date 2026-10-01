@@ -209,6 +209,9 @@ private func edges(_ pairs: (Int, Int)...) -> [History.Edge] {
     // Nothing is left to commit, and git says so.
     #expect(throws: GitError.self) { try History.commitAll("again", in: box.repo) }
 
+    #expect(History.commitsAhead(of: "main", in: box.repo) == 1)
+    #expect(History.commitsAhead(of: "feat", in: box.repo) == 0)
+
     try History.push(in: box.repo)
     #expect(History.branches(in: origin.repo).local.contains("feat"))
     #expect(try Git.run(["rev-parse", "--abbrev-ref", "feat@{upstream}"], in: box.repo) == "origin/feat")
