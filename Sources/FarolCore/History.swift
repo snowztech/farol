@@ -133,6 +133,11 @@ public enum History {
         try Git.run(["push", "--set-upstream", pushRemote(in: directory), "HEAD"], in: directory)
     }
 
+    /// How many commits the checked out branch has that `base` doesn't. Zero means there is nothing to request a merge of.
+    public static func commitsAhead(of base: String, in directory: String) -> Int {
+        (try? Git.run(["rev-list", "--count", "\(base)..HEAD"], in: directory)).flatMap(Int.init) ?? 0
+    }
+
     static func pushRemote(in directory: String) -> String {
         let configured = Git.branch(of: directory).flatMap { try? Git.run(["config", "branch.\($0).remote"], in: directory) }
         // "." means the branch tracks a local one, which is no place to push to.

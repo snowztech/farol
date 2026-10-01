@@ -50,6 +50,8 @@ final class ReviewModel: ObservableObject {
     @Published private(set) var forge: Forge?
     /// Whether the branch has an open pull request. Unknown without the forge's command line tool.
     @Published private(set) var request = Forge.RequestState.unknown
+    /// Commits on the branch that its base doesn't have. With none, there is nothing to make a request of.
+    @Published private(set) var ahead = 0
     /// How many files a commit would take. "Changes since main" also counts work that is already committed.
     @Published private(set) var uncommitted = 0
     private var scopeBeforeCommit: Diff.Scope?
@@ -87,6 +89,7 @@ final class ReviewModel: ObservableObject {
             rows = []
             stat = Diff.Stat()
             uncommitted = 0
+            ahead = 0
             forge = nil
             ignored = []
         }
@@ -210,15 +213,17 @@ final class ReviewModel: ObservableObject {
     func refresh() {
         pending?.cancel()
         guard let root else { return }
-        let scope = scope, withFiles = isOpen
+        let scope = scope, withFiles = isOpen, base = branches.first
         DispatchQueue.global(qos: .userInitiated).async {
             let stat = Result { try Diff.stat(in: root, scope) }
+            let ahead = base.map { History.commitsAhead(of: $0, in: root) } ?? 0
             let uncommitted = scope == .uncommitted ? stat : Result { try Diff.stat(in: root, .uncommitted) }
             let files = withFiles ? Result { try Diff.files(in: root, scope) } : nil
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root, self.scope == scope else { return }
                 self.stat = (try? stat.get()) ?? Diff.Stat()
                 self.uncommitted = (try? uncommitted.get())?.files ?? 0
+                self.ahead = ahead
                 self.error = (try? files?.get()) == nil && files != nil ? "Couldn't read the changes." : nil
                 if let files = try? files?.get() {
                     let known = Set(self.files.map(\.path))
@@ -290,7 +295,7 @@ struct ReviewPanel: View {
                     RequestBadge(review: review, palette: p)
                     if review.uncommitted > 0 {
                         CommitButton(review: review, palette: p)
-                    } else if review.canStartRequest {
+                    } else if review.canStartRequest, review.ahead > 0 {
                         RequestButton(review: review, palette: p)
                     }
                 }
