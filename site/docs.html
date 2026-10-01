@@ -33,15 +33,14 @@
 
     .topbar {
       min-height: 64px; display: flex; align-items: center; justify-content: space-between;
-      gap: 24px; border-bottom: 1px solid var(--sn-border-subtle);
+      gap: 24px;
     }
     .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; text-decoration: none; }
     .brand img { width: 30px; height: 30px; }
-    .topbar nav { display: flex; align-items: center; gap: 20px; font-size: var(--sn-text-sm); }
-    .topbar nav a { color: var(--sn-fg-muted); text-decoration: none; }
-    .topbar nav a:hover, .topbar nav a[aria-current="page"] { color: var(--sn-fg); }
+    .download { color: var(--sn-fg-muted); font-size: var(--sn-text-sm); text-decoration: none; }
+    .download:hover { color: var(--sn-fg); }
 
-    .docs-hero { position: relative; padding: 72px 0 64px; overflow: hidden; }
+    .docs-hero { position: relative; padding: 48px 0 64px; overflow: hidden; }
     .docs-hero::before {
       content: ""; position: absolute; inset: -80% 5% auto; height: 180%; z-index: 0;
       background: radial-gradient(ellipse at center, var(--sn-accent-soft), transparent 68%);
@@ -114,8 +113,7 @@
     footer a:hover { color: var(--sn-fg); }
 
     @media (max-width: 760px) {
-      .topbar nav a:not(.sn-btn) { display: none; }
-      .docs-hero { padding: 52px 0 44px; }
+      .docs-hero { padding: 36px 0 44px; }
       h1 { font-size: 29px; }
       .docs-layout { display: block; }
       .toc { position: static; margin-bottom: 56px; padding-bottom: 24px; border-bottom: 1px solid var(--sn-border-subtle); }
@@ -131,12 +129,7 @@
 
   <header class="topbar wide">
     <a class="brand" href="index.html"><img src="icon.png" alt="">Farol</a>
-    <nav aria-label="Main navigation">
-      <a href="index.html">Home</a>
-      <a href="docs.html" aria-current="page">Docs</a>
-      <a href="https://github.com/snowztech/farol">GitHub</a>
-      <a class="sn-btn sn-btn--primary" href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Download</a>
-    </nav>
+    <a class="download" href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Download for Mac</a>
   </header>
 
   <main>
