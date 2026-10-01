@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-10-01
+
+Fetch, update and push branches from the git graph.
+
 ### Added
 
 - A refresh button in the git graph fetches from every remote and drops branches deleted on the server.
@@ -14,6 +18,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Changed
 
 - The git graph uses many more colors, so two branches rarely share one.
+- The rebase items in the git graph's menus name both branches, like Rebase "feat/x" onto "main", so it is clear which one moves.
 
 ## [0.19.0] - 2026-10-01
 
@@ -415,7 +420,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/snowztech/farol/releases/tag/v0.20.0
 [0.19.0]: https://github.com/snowztech/farol/releases/tag/v0.19.0
 [0.18.0]: https://github.com/snowztech/farol/releases/tag/v0.18.0
 [0.17.0]: https://github.com/snowztech/farol/releases/tag/v0.17.0
