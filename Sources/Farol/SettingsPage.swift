@@ -312,12 +312,10 @@ struct SettingsPage: View {
             HStack(spacing: 12) {
                 if let state {
                     if case .connected(let account?) = state {
-                        HStack(spacing: 6) {
-                            Avatar(url: avatars[kind], name: account, palette: p)
-                            Text(account).font(.system(size: 12))
-                        }
+                        AccountPill(url: avatars[kind], name: account, palette: p)
+                    } else {
+                        ToolStateLabel(state: state, palette: p)
                     }
-                    ToolStateLabel(state: state, palette: p)
                     if state == .missing || state == .loggedOut {
                         Button(state == .missing ? "Install" : "Log In") { runInTerminal(kind.setupCommand(from: state)) }
                     }
@@ -650,6 +648,34 @@ private struct SetupState: View {
     }
 }
 
+/// The connected account as one thing: its picture with a green dot on the corner, then its name.
+/// The dot stands for "Connected", which the other states spell out since they have no account to show.
+private struct AccountPill: View {
+    let url: URL?
+    let name: String
+    let palette: Palette
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Avatar(url: url, name: name, palette: palette)
+                .overlay(alignment: .bottomTrailing) {
+                    Circle().fill(Color.green)
+                        .frame(width: 7, height: 7)
+                        // A ring in the pill's color, so the dot reads as sitting on the picture.
+                        .overlay(Circle().strokeBorder(palette.surface, lineWidth: 1.5).padding(-1.5))
+                        .offset(x: 2, y: 2)
+                }
+            Text(name).font(.system(size: 12, weight: .medium))
+        }
+        .padding(.leading, 4)
+        .padding(.trailing, 10)
+        .frame(height: 26)
+        .background(palette.surface, in: Capsule())
+        .overlay(Capsule().strokeBorder(palette.line))
+        .hoverTip("Connected")
+    }
+}
+
 /// An account's picture. The slot keeps its size and shows the name's first letter until the picture is there, so the row never shifts.
 private struct Avatar: View {
     private static let cache = NSCache<NSURL, NSImage>()
@@ -663,7 +689,7 @@ private struct Avatar: View {
 
     var body: some View {
         ZStack {
-            Circle().fill(palette.raised)
+            Circle().fill(palette.line)
             Text(name.prefix(1).uppercased())
                 .font(.system(size: 9.5, weight: .semibold))
                 .foregroundStyle(palette.muted)
