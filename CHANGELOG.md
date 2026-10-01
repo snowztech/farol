@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-10-01
+
+Switch sessions from the window title, and put the panels in rounded cards.
+
 ### Added
 
 - Click the window title or press ⌘P to switch sessions, with a search, even with the sidebar closed. Each session shows its status and branch. The arrow keys move through the list and Return opens the session, and each row shows its ⌘1 to ⌘9 shortcut.
@@ -479,7 +483,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.22.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.23.0...HEAD
+[0.23.0]: https://github.com/snowztech/farol/releases/tag/v0.23.0
 [0.22.0]: https://github.com/snowztech/farol/releases/tag/v0.22.0
 [0.21.1]: https://github.com/snowztech/farol/releases/tag/v0.21.1
 [0.21.0]: https://github.com/snowztech/farol/releases/tag/v0.21.0
