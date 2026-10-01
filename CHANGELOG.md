@@ -4,9 +4,13 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.20.2] - 2026-10-01
+
+A clearer Settings: your connected account at a glance, and buttons that look like buttons.
+
 ### Changed
 
-- Settings → Integrations shows the connected account's picture and name next to its state.
+- Settings → Integrations shows the connected account as one pill: its picture with a green dot, and its name. The rows name the tools in full, like the GitHub CLI (gh).
 - Buttons in Settings use Farol's own quiet style. The system ones looked switched off in dark themes.
 
 ## [0.20.1] - 2026-10-01
@@ -433,7 +437,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.20.1...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.20.2...HEAD
+[0.20.2]: https://github.com/snowztech/farol/releases/tag/v0.20.2
 [0.20.1]: https://github.com/snowztech/farol/releases/tag/v0.20.1
 [0.20.0]: https://github.com/snowztech/farol/releases/tag/v0.20.0
 [0.19.0]: https://github.com/snowztech/farol/releases/tag/v0.19.0
