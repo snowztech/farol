@@ -1,6 +1,6 @@
 name: Site
 
-# Publishes site/ to GitHub Pages, served at farol.snowztech.com.
+# Publishes site/ to GitHub Pages, served at farol.sh.
 on:
   push:
     branches: [main]
