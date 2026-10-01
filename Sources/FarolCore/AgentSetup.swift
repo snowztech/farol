@@ -1,7 +1,7 @@
 import Foundation
 
 /// One row in Settings → Agents: what Farol changes in an agent's config to hear from it, and how to undo it.
-/// Adding an agent is one more value in `all`.
+/// There is one per config folder found, so a second account is one more row.
 public struct AgentSetup {
     public enum State {
         case disconnected
@@ -11,6 +11,7 @@ public struct AgentSetup {
     }
 
     public let name: String
+    public let id: String
     /// The file Connect and Disconnect change.
     public let file: URL
     public let summaryWhenDisconnected: String
@@ -23,12 +24,20 @@ public struct AgentSetup {
     public let connect: () throws -> Void
     public let disconnect: () throws -> Void
 
-    public static let all = [claude(), codex()]
+    public static func all(folders: [AgentFolder] = AgentFolder.find()) -> [AgentSetup] {
+        folders.map { folder in
+            switch folder.kind {
+            case .claude: claude(hooks: .claude(in: folder))
+            case .codex: codex(config: folder.directory.appendingPathComponent("config.toml"), hooks: .codex(in: folder))
+            }
+        }
+    }
 
     /// Hooks report working, waiting and done.
     static func claude(hooks: AgentHooks = .claude) -> AgentSetup {
         AgentSetup(
             name: hooks.name,
+            id: hooks.file.path,
             file: hooks.file,
             summaryWhenDisconnected: "Show in the sidebar when Claude Code is working, waiting for you or done.",
             summaryWhenConnected: "The sidebar shows when Claude Code is working, waiting for you or done.",
@@ -44,7 +53,7 @@ public struct AgentSetup {
     }
 
     /// Interactive Codex reports through its title. Hooks cover non-interactive runs and background agents.
-    static func codex(hooks: AgentHooks = .codex, legacyConfig: URL = CodexNotifications.file) -> AgentSetup {
+    static func codex(config legacyConfig: URL = CodexNotifications.file, hooks: AgentHooks = .codex) -> AgentSetup {
         let hasLegacyNotifications = {
             (try? CodexNotifications.read(legacyConfig)).map(CodexNotifications.hasFarolSettings) == true
         }
@@ -54,7 +63,8 @@ public struct AgentSetup {
             if changed != text { try CodexNotifications.write(changed, to: legacyConfig) }
         }
         return AgentSetup(
-            name: "Codex",
+            name: hooks.name,
+            id: hooks.file.path,
             file: hooks.file,
             summaryWhenDisconnected: "Interactive Codex sessions already show status. Connect hooks for non-interactive runs and background agents.",
             summaryWhenConnected: "Codex sessions show when they are working, waiting for you or done, including non-interactive runs.",

@@ -19,7 +19,13 @@ public struct AgentHooks {
     public var asksToApproveHooks = false
 
     /// Notification also fires as an idle reminder after a finished turn. Only permission prompts and questions mean waiting.
-    public static let claude = AgentHooks(name: "Claude Code", file: home(".claude/settings.json"), events: [
+    public static let claude = claude(in: AgentFolder(kind: .claude, directory: home(".claude")))
+
+    public static func claude(in folder: AgentFolder) -> AgentHooks {
+        AgentHooks(name: folder.label, file: folder.directory.appendingPathComponent("settings.json"), events: claudeEvents)
+    }
+
+    private static let claudeEvents = [
         Event(name: "UserPromptSubmit", status: "working", matcher: nil),
         Event(name: "PostToolUse", status: "working", matcher: nil),
         Event(name: "Notification", status: "waiting", matcher: "permission_prompt|elicitation_dialog"),
@@ -28,10 +34,17 @@ public struct AgentHooks {
         // A background agent keeps working after the main agent's Stop, so the pane stays working until it ends.
         Event(name: "SubagentStart", status: "subagent-start", matcher: nil),
         Event(name: "SubagentStop", status: "subagent-stop", matcher: nil),
-    ])
+    ]
 
     /// Codex 0.159.2 and later pass Farol's pane environment to lifecycle hooks.
-    public static let codex = AgentHooks(name: "Codex", file: home(".codex/hooks.json"), events: [
+    public static let codex = codex(in: AgentFolder(kind: .codex, directory: home(".codex")))
+
+    public static func codex(in folder: AgentFolder) -> AgentHooks {
+        AgentHooks(name: folder.label, file: folder.directory.appendingPathComponent("hooks.json"), events: codexEvents,
+                   asksToApproveHooks: true)
+    }
+
+    private static let codexEvents = [
         // Compaction also starts a session event in the middle of a turn, so it must not clear the dot.
         Event(name: "SessionStart", status: "clear", matcher: "startup|resume|clear"),
         Event(name: "UserPromptSubmit", status: "working", matcher: nil),
@@ -43,7 +56,7 @@ public struct AgentHooks {
         Event(name: "SessionEnd", status: "clear", matcher: nil),
         Event(name: "SubagentStart", status: "subagent-start", matcher: nil),
         Event(name: "SubagentStop", status: "subagent-stop", matcher: nil),
-    ], asksToApproveHooks: true)
+    ]
 
     private static func home(_ path: String) -> URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(path)

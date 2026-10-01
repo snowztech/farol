@@ -16,7 +16,9 @@ struct SettingsPage: View {
     @AppStorage(AppIcon.key) private var appIcon = AppIcon.default.rawValue
     @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = false
     @State private var versionCopied = false
-    /// Each agent's setup state, by name.
+    /// One setup per Claude Code and Codex config folder, with each one's state by id.
+    @State private var agentSetups: [AgentSetup] = []
+    @State private var agentFolders = AgentFolder.find()
     @State private var setups: [String: AgentSetup.State] = [:]
     @State private var agentChange: AgentChange?
     @State private var agentError: String?
@@ -36,7 +38,7 @@ struct SettingsPage: View {
     private struct AgentChange: Identifiable {
         let agent: AgentSetup
         let connect: Bool
-        var id: String { agent.name + (connect ? " connect" : " disconnect") }
+        var id: String { agent.id + (connect ? " connect" : " disconnect") }
     }
 
     @State private var section = Section.terminal
@@ -225,7 +227,7 @@ struct SettingsPage: View {
         Heading(title: "Agents", detail: "Set up your coding agents so Farol can tell you when they need you.", palette: p)
 
         GroupTitle(title: "Status", palette: p)
-        ForEach(AgentSetup.all, id: \.name) { agentRow($0, p) }
+        ForEach(Array(agentSetups.enumerated()), id: \.element.id) { agentRow($0.element, in: agentFolders[$0.offset], p) }
 
         GroupTitle(title: "Notifications", palette: p)
         if notificationsBlocked {
@@ -258,8 +260,7 @@ struct SettingsPage: View {
         Row(title: "Start with", detail: "Typed into the shell of every new session, so you are back in the shell when it exits.", palette: p) {
             Picker("", selection: startPreset) {
                 Text("Shell").tag("")
-                Text("Claude Code").tag("claude")
-                Text("Codex").tag("codex")
+                ForEach(agentFolders, id: \.id) { Text($0.label).tag($0.command()) }
                 Text("Custom").tag(Self.custom)
             }
             .labelsHidden()
@@ -374,10 +375,12 @@ struct SettingsPage: View {
         }
     }
 
-    private func agentRow(_ agent: AgentSetup, _ p: Palette) -> some View {
-        let state = setups[agent.name] ?? .disconnected
+    private func agentRow(_ agent: AgentSetup, in folder: AgentFolder, _ p: Palette) -> some View {
+        let state = setups[agent.id] ?? .disconnected
+        // The folder tells accounts apart, so it shows only when an agent has more than one.
+        let shared = agentFolders.filter { $0.kind == folder.kind }.count > 1
         let summary = state == .connected ? agent.summaryWhenConnected : agent.summaryWhenDisconnected
-        return Row(title: agent.name, detail: summary, palette: p) {
+        return Row(title: agent.name, subtitle: shared ? (folder.directory.path as NSString).abbreviatingWithTildeInPath : nil, detail: summary, palette: p) {
             HStack(spacing: 12) {
                 SetupState(state: state, palette: p)
                 switch state {
@@ -426,7 +429,7 @@ struct SettingsPage: View {
     private static let custom = "custom"
 
     private var isCustomStart: Bool {
-        !["", "claude", "codex"].contains(agents.startCommand)
+        !([""] + agentFolders.map { $0.command() }).contains(agents.startCommand)
     }
 
     /// The picker shows a preset, and "Custom" reveals a field for any other command.
@@ -445,7 +448,9 @@ struct SettingsPage: View {
             let blocked = settings.authorizationStatus == .denied
             DispatchQueue.main.async { notificationsBlocked = blocked }
         }
-        for agent in AgentSetup.all { setups[agent.name] = agent.state() }
+        agentFolders = AgentFolder.find()
+        agentSetups = AgentSetup.all(folders: agentFolders)
+        for agent in agentSetups { setups[agent.id] = agent.state() }
         guard section == .integrations else { return }
         DispatchQueue.global(qos: .userInitiated).async {
             let states = Dictionary(uniqueKeysWithValues: Forge.Kind.allCases.map { ($0, $0.toolState()) })
@@ -647,6 +652,8 @@ private struct Heading: View {
 
 private struct Row<Control: View>: View {
     let title: String
+    /// Muted after the title, like the folder of one of several accounts.
+    var subtitle: String? = nil
     var detail: String? = nil
     var icon: ForgeIcon? = nil
     /// Words of the detail that open a page, like a tool's name and its documentation.
@@ -660,6 +667,7 @@ private struct Row<Control: View>: View {
                 HStack(spacing: 6) {
                     if let icon { icon }
                     Text(title).font(.system(size: 13))
+                    if let subtitle { Text(subtitle).font(.system(size: 11.5)).foregroundStyle(palette.muted) }
                 }
                 if let detail {
                     // The link is a view of its own between the words around it. Inside one text it couldn't tell when it is hovered.
