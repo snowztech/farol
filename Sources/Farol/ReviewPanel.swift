@@ -385,7 +385,7 @@ private struct CommitButton: View {
                 .foregroundStyle(review.isCommitting ? palette.muted : palette.text)
                 .padding(.horizontal, 10)
                 .frame(height: 24)
-                .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised : .clear))
+                .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised : palette.surface))
                 .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(palette.line))
                 .contentShape(Rectangle())
         }
