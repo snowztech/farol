@@ -22,6 +22,8 @@ struct SettingsPage: View {
     @State private var agentError: String?
     /// Whether gh and glab are there and logged in. Empty while they are being asked.
     @State private var tools: [Forge.Kind: Forge.ToolState] = [:]
+    /// Where each connected account's picture is, once known.
+    @State private var avatars: [Forge.Kind: URL] = [:]
     /// macOS refuses Farol's notifications, so turning them on here would do nothing.
     @State private var notificationsBlocked = false
 
@@ -141,7 +143,7 @@ struct SettingsPage: View {
             .background(p.surface, in: RoundedRectangle(cornerRadius: 7))
             .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(p.line))
 
-            Button("Themes folder", action: openThemesFolder)
+            ShipButton(title: "Themes folder", busy: false, palette: p, action: openThemesFolder)
         }
         .padding(.bottom, 20)
 
@@ -209,7 +211,7 @@ struct SettingsPage: View {
         Row(title: "~/.config/farol/config",
             detail: "Everything on this page is saved here. Add any other option and save, and it applies right away. If you also use Ghostty, its config loads first and Farol's wins.",
             palette: p) {
-            Button("Open", action: settings.openFile)
+            ShipButton(title: "Open", busy: false, palette: p, action: settings.openFile)
         }
     }
 
@@ -223,11 +225,9 @@ struct SettingsPage: View {
         if notificationsBlocked {
             Row(title: "macOS is blocking Farol's notifications",
                 detail: "Turn them on for Farol in System Settings, under Notifications.", palette: p) {
-                Button("Open System Settings") {
+                ShipButton(title: "Open System Settings", busy: false, palette: p) {
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")!)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
             }
         }
         Row(title: "When an agent is waiting for you", palette: p) { toggle($agents.notifyWaiting) }
@@ -298,23 +298,31 @@ struct SettingsPage: View {
 
     private func toolRow(_ kind: Forge.Kind, _ p: Palette) -> some View {
         let state = tools[kind]
+        // "the GitHub CLI (gh)": the name people know, and the command they would type.
+        let cli = "the \(kind.name) CLI (\(kind.tool))"
         let detail = switch state {
-        case nil: "Checking \(kind.tool)…"
-        case .connected(let account): "Logged in\(account.map { " as \($0)" } ?? ""), through \(kind.tool)."
-        case .loggedOut: "\(kind.tool) is installed but not logged in."
-        case .missing: "\(kind.tool) isn't installed. A \(kind.request) opens in your browser."
+        case nil: "Checking \(cli)…"
+        case .connected: "Uses \(cli)."
+        case .loggedOut: "\(cli.prefix(1).uppercased() + cli.dropFirst()) is installed but not logged in."
+        case .missing: "\(cli.prefix(1).uppercased() + cli.dropFirst()) isn't installed. A \(kind.request) opens in your browser."
         }
         return Row(title: kind.name, detail: detail, icon: kind, palette: p) {
             HStack(spacing: 12) {
                 if let state {
-                    ToolStateLabel(state: state, palette: p)
+                    if case .connected(let account?) = state {
+                        AccountPill(url: avatars[kind], name: account, palette: p)
+                    } else {
+                        ToolStateLabel(state: state, palette: p)
+                    }
                     if state == .missing || state == .loggedOut {
-                        Button(state == .missing ? "Install" : "Log In") { runInTerminal(kind.setupCommand(from: state)) }
+                        // The system's small button reads as switched off in a dark theme, and a filled one shouts for something optional.
+                        ShipButton(title: state == .missing ? "Install" : "Log In",
+                                   help: "Opens a terminal with: \(kind.setupCommand(from: state))", busy: false, palette: p) {
+                            runInTerminal(kind.setupCommand(from: state))
+                        }
                     }
                 }
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
         }
     }
 
@@ -326,15 +334,13 @@ struct SettingsPage: View {
                 SetupState(state: state, palette: p)
                 switch state {
                 case .outdated:
-                    Button("Update") { change(agent, connect: true) }
+                    ShipButton(title: "Update", busy: false, palette: p) { change(agent, connect: true) }
                 case .connected:
-                    Button("Disconnect") { agentChange = AgentChange(agent: agent, connect: false) }
+                    ShipButton(title: "Disconnect", busy: false, palette: p) { agentChange = AgentChange(agent: agent, connect: false) }
                 case .disconnected:
-                    Button("Connect") { agentChange = AgentChange(agent: agent, connect: true) }
+                    ShipButton(title: "Connect", busy: false, palette: p) { agentChange = AgentChange(agent: agent, connect: true) }
                 }
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
         }
     }
 
@@ -396,6 +402,13 @@ struct SettingsPage: View {
         DispatchQueue.global(qos: .userInitiated).async {
             let states = Dictionary(uniqueKeysWithValues: Forge.Kind.allCases.map { ($0, $0.toolState()) })
             DispatchQueue.main.async { tools = states }
+            // After the states are on screen, since GitLab's picture takes another call to its server.
+            var found: [Forge.Kind: URL] = [:]
+            for (kind, state) in states {
+                if case .connected(let account?) = state { found[kind] = kind.avatar(of: account) }
+            }
+            let avatars = found
+            DispatchQueue.main.async { self.avatars = avatars }
         }
     }
 
@@ -630,6 +643,69 @@ private struct SetupState: View {
                 .font(.system(size: 12))
                 .foregroundStyle(palette.muted)
         }
+    }
+}
+
+/// The connected account as one thing: its picture with a green dot on the corner, then its name.
+/// The dot stands for "Connected", which the other states spell out since they have no account to show.
+private struct AccountPill: View {
+    let url: URL?
+    let name: String
+    let palette: Palette
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Avatar(url: url, name: name, palette: palette)
+                .overlay(alignment: .bottomTrailing) {
+                    Circle().fill(Color.green)
+                        .frame(width: 7, height: 7)
+                        // A ring in the pill's color, so the dot reads as sitting on the picture.
+                        .overlay(Circle().strokeBorder(palette.surface, lineWidth: 1.5).padding(-1.5))
+                        .offset(x: 2, y: 2)
+                }
+            Text(name).font(.system(size: 12, weight: .medium))
+        }
+        .padding(.leading, 4)
+        .padding(.trailing, 10)
+        .frame(height: 26)
+        .background(palette.surface, in: Capsule())
+        .overlay(Capsule().strokeBorder(palette.line))
+        .hoverTip("Connected")
+    }
+}
+
+/// An account's picture. The slot keeps its size and shows the name's first letter until the picture is there, so the row never shifts.
+private struct Avatar: View {
+    private static let cache = NSCache<NSURL, NSImage>()
+    private static let size: CGFloat = 18
+
+    let url: URL?
+    let name: String
+    let palette: Palette
+
+    @State private var image: NSImage?
+
+    var body: some View {
+        ZStack {
+            Circle().fill(palette.line)
+            Text(name.prefix(1).uppercased())
+                .font(.system(size: 9.5, weight: .semibold))
+                .foregroundStyle(palette.muted)
+            if let image {
+                Image(nsImage: image).resizable().interpolation(.high).clipShape(Circle())
+            }
+        }
+        .frame(width: Self.size, height: Self.size)
+        .task(id: url) { await load() }
+    }
+
+    /// A picture loaded before shows at once, with no fade, when you come back to the page.
+    private func load() async {
+        guard let url else { return }
+        if let known = Self.cache.object(forKey: url as NSURL) { return image = known }
+        guard let (data, _) = try? await URLSession.shared.data(from: url), let loaded = NSImage(data: data) else { return }
+        Self.cache.setObject(loaded, forKey: url as NSURL)
+        withAnimation(.easeOut(duration: 0.15)) { image = loaded }
     }
 }
 

@@ -64,3 +64,12 @@ import Testing
     #expect(Forge.Kind.github.setupCommand(from: .missing) == "brew install gh && gh auth login")
     #expect(Forge.Kind.gitlab.setupCommand(from: .loggedOut) == "glab auth login")
 }
+
+@Test func findsTheAccountsPicture() {
+    #expect(Forge.Kind.github.avatar(of: "ana")?.absoluteString == "https://github.com/ana.png?size=64")
+    #expect(Forge.Kind.avatar(fromUser: #"{"username":"ana","avatar_url":"https://gitlab.com/uploads/-/system/user/avatar/7/a.png"}"#)?.absoluteString
+        == "https://gitlab.com/uploads/-/system/user/avatar/7/a.png")
+    // GitLab sends null for an account with no picture.
+    #expect(Forge.Kind.avatar(fromUser: #"{"username":"ana","avatar_url":null}"#) == nil)
+    #expect(Forge.Kind.avatar(fromUser: "not logged in") == nil)
+}

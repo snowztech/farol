@@ -35,6 +35,24 @@ public struct Forge: Equatable {
             return String(match.1)
         }
 
+        /// Where the account's picture is. GitLab has to be asked, so call it off the main thread.
+        public func avatar(of account: String) -> URL? {
+            switch self {
+            case .github:
+                // ponytail: github.com only. An account on GitHub Enterprise keeps the placeholder until the host is read too.
+                return URL(string: "https://github.com/\(account).png?size=64")
+            case .gitlab:
+                guard let path = toolPath, let user = try? Git.run(path, ["api", "user"], in: NSHomeDirectory()) else { return nil }
+                return Self.avatar(fromUser: user)
+            }
+        }
+
+        /// Reads `avatar_url` from GitLab's answer about the logged in user.
+        static func avatar(fromUser json: String) -> URL? {
+            let user = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
+            return (user?["avatar_url"] as? String).flatMap(URL.init(string:))
+        }
+
         /// Typed into a terminal to get from `state` to connected. Logging in asks questions, so it can't run in the background.
         public func setupCommand(from state: ToolState) -> String {
             (state == .missing ? "brew install \(tool) && " : "") + "\(tool) auth login"
