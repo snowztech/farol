@@ -39,6 +39,9 @@
     .actions a.sn-btn--primary:hover { color: var(--sn-fg-inverse); background: var(--sn-fg); border-color: var(--sn-fg); opacity: 0.85; }
     .actions a.sn-btn--secondary:hover { color: var(--sn-fg); }
     .fine { color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); margin: 14px 0 0; }
+    .docs-link { margin: 7px 0 0; font-size: var(--sn-text-xs); }
+    .docs-link a { color: var(--sn-fg); cursor: pointer; font-weight: 500; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    .docs-link a:hover { color: var(--sn-fg-muted); }
 
     /* A faint beam of light behind the window, the lighthouse without saying it. */
     .showcase { position: relative; margin: 44px auto 88px; }
@@ -58,6 +61,20 @@
     @media (min-width: 980px) { .features { grid-template-columns: repeat(3, 1fr); } }
     .features b { display: block; font-weight: 500; margin-bottom: 6px; }
     .features span { color: var(--sn-fg-muted); font-size: var(--sn-text-sm); }
+
+    .reel { margin: 96px auto 0; text-align: center; }
+    .reel h2 { font-size: 20px; font-weight: 500; margin: 0 0 20px; letter-spacing: -0.01em; }
+    .reel-frame { position: relative; }
+    .reel-frame::before {
+      content: ""; position: absolute; inset: -10% 10% auto; height: 72%; z-index: 0;
+      background: radial-gradient(ellipse at center, var(--sn-accent-soft), transparent 72%);
+      filter: blur(32px); opacity: 0.55;
+    }
+    .reel video {
+      position: relative; z-index: 1; display: block; width: 100%; height: auto;
+      border: 1px solid var(--sn-border-strong); border-radius: 12px; background: #000;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+    }
 
     footer {
       margin: 96px auto 0; padding: 20px 20px 40px; max-width: 1040px;
@@ -79,7 +96,8 @@
         <a class="sn-btn sn-btn--primary sn-btn--lg" href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Download for Mac</a>
         <a class="sn-btn sn-btn--secondary sn-btn--lg" href="https://github.com/snowztech/farol">GitHub</a>
       </div>
-      <p class="fine">Apple Silicon, macOS 14 or later. Free and open source.</p>
+      <p class="fine">Requires Apple silicon and macOS 14 or later. Free and open source.</p>
+      <p class="docs-link"><a href="docs.html">Read the docs →</a></p>
     </section>
 
     <div class="showcase wide">
@@ -95,11 +113,22 @@
       <li><b>A task in one step</b><span>Describe it and pick an agent. Farol opens a worktree on a new branch and starts the agent on it.</span></li>
       <li><b>Built on libghostty</b><span>Ghostty's speed, themes and config, in a native Mac app.</span></li>
     </ul>
+
+    <section class="reel wide" aria-labelledby="reel-title">
+      <h2 id="reel-title">See Farol in motion</h2>
+      <div class="reel-frame">
+        <video controls playsinline preload="metadata" poster="farol-reel-poster.jpg"
+               aria-label="A 40-second tour of Farol">
+          <source src="farol-reel.mp4" type="video/mp4">
+          <a href="farol-reel.mp4">Watch the Farol tour</a>
+        </video>
+      </div>
+    </section>
   </main>
 
   <footer>
     <span>© 2026 Lucas Neves Pereira, <a href="https://github.com/snowztech">snowztech</a></span>
-    <span><a href="https://github.com/snowztech/farol/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://github.com/snowztech/farol/blob/main/LICENSE">MIT</a></span>
+    <span><a href="docs.html">Docs</a> · <a href="https://github.com/snowztech/farol/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://github.com/snowztech/farol/blob/main/LICENSE">MIT</a></span>
   </footer>
 </body>
 </html>

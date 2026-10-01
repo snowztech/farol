@@ -4,6 +4,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- The website now includes a short video tour of Farol.
+- The website now has documentation for setup, everyday workflows and shortcuts.
+
 ## [0.24.1] - 2026-10-01
 
 No more panels that grow or jump a moment after they open.
