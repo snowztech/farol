@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.20.1] - 2026-10-01
+
+Drop files or text straight onto the terminal.
+
 ### Added
 
 - Drop files or text on the terminal. Files go in as their paths, so an image dropped on Claude Code's prompt is attached.
@@ -424,7 +428,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.20.1...HEAD
+[0.20.1]: https://github.com/snowztech/farol/releases/tag/v0.20.1
 [0.20.0]: https://github.com/snowztech/farol/releases/tag/v0.20.0
 [0.19.0]: https://github.com/snowztech/farol/releases/tag/v0.19.0
 [0.18.0]: https://github.com/snowztech/farol/releases/tag/v0.18.0
