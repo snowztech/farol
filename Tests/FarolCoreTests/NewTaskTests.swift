@@ -14,8 +14,10 @@ import Testing
 }
 
 @Test func commandQuotesTheTask() {
-    #expect(NewTask.command(.claude, task: "Fix the login bug") == "claude 'Fix the login bug'")
-    #expect(NewTask.command(.codex, task: "it's done") == #"codex 'it'\''s done'"#)
+    let claude = AgentFolder(kind: .claude, directory: URL(fileURLWithPath: "/h/.claude"))
+    let codex = AgentFolder(kind: .codex, directory: URL(fileURLWithPath: "/h/.codex"))
+    #expect(claude.command(task: "Fix the login bug") == "claude 'Fix the login bug'")
+    #expect(codex.command(task: "it's done") == #"codex 'it'\''s done'"#)
 }
 
 /// Nothing in the task may run as a command, whatever it contains.

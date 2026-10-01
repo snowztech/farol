@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Connect and start more than one Claude Code or Codex account. Farol finds `~/.claude-*` and `~/.codex-*` folders, lists each one in Settings → Agents, and offers each one in New task and Start with.
+
 ## [0.23.0] - 2026-10-01
 
 Switch sessions from the window title, and put the panels in rounded cards.

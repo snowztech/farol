@@ -14,7 +14,9 @@ struct NewTaskSheet: View {
     let start: (String, String) -> Void
     let close: () -> Void
 
-    @AppStorage("newTask.agent") private var agent = NewTask.Agent.claude.rawValue
+    @AppStorage("newTask.agent") private var agent = AgentFolder.Kind.claude.rawValue
+    /// Every Claude Code and Codex config folder found, so each account is a choice.
+    @State private var folders = AgentFolder.find()
     @State private var task = ""
     @State private var branch = ""
     /// The branch follows the task until you edit it yourself.
@@ -49,7 +51,7 @@ struct NewTaskSheet: View {
         [picked?.task ?? "", text].filter { !$0.isEmpty }.joined(separator: "\n\n")
     }
     private var name: String? { Worktrees.branchName(from: branch) }
-    private var choice: NewTask.Agent { NewTask.Agent(rawValue: agent) ?? .claude }
+    private var choice: AgentFolder { AgentFolder.choice(agent, in: folders) ?? folders[0] }
 
     var body: some View {
         let p = palette
@@ -99,7 +101,7 @@ struct NewTaskSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button("Start") {
                     guard let name else { return }
-                    let command = NewTask.command(choice, task: prompt)
+                    let command = choice.command(task: prompt)
                     close()
                     // The worktree may fail and show why, which needs this sheet gone first.
                     DispatchQueue.main.async { start(name, command) }
@@ -192,17 +194,17 @@ struct NewTaskSheet: View {
     private func agentSelect(_ p: Palette) -> some View {
         SheetSelect(palette: p, open: $pickingAgent) {
             Image(systemName: "terminal").foregroundStyle(p.muted)
-            Text(choice.title)
+            Text(choice.label)
         } choices: {
             VStack(spacing: 1) {
-                ForEach(NewTask.Agent.allCases, id: \.self) { option in
+                ForEach(folders, id: \.id) { option in
                     SheetChoice(palette: p) {
-                        agent = option.rawValue
+                        agent = option.id
                         pickingAgent = false
                     } label: {
-                        Text(option.title)
+                        Text(option.label)
                         Spacer()
-                        if option == choice { Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)) }
+                        if option.id == choice.id { Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)) }
                     }
                 }
             }

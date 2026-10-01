@@ -34,7 +34,7 @@ private func hooks(_ agent: AgentHooks, at url: URL) -> AgentHooks {
     let mine = "model = \"gpt-5.5\"\n"
     try FileManager.default.createDirectory(at: config.deletingLastPathComponent(), withIntermediateDirectories: true)
     try mine.write(to: config, atomically: true, encoding: .utf8)
-    let setup = AgentSetup.codex(hooks: codexHooks, legacyConfig: config)
+    let setup = AgentSetup.codex(config: config, hooks: codexHooks)
     #expect(setup.state() == .disconnected)
     try setup.connect()
     #expect(setup.state() == .connected)
@@ -50,7 +50,7 @@ private func hooks(_ agent: AgentHooks, at url: URL) -> AgentHooks {
     let codexHooks = hooks(.codex, at: tempFile("hooks.json"))
     let mine = "model = \"gpt-5.5\"\n"
     try CodexNotifications.write(CodexNotifications.enable(in: mine), to: config)
-    let setup = AgentSetup.codex(hooks: codexHooks, legacyConfig: config)
+    let setup = AgentSetup.codex(config: config, hooks: codexHooks)
     #expect(setup.state() == .outdated)
     try setup.connect()
     #expect(setup.state() == .connected)
@@ -58,6 +58,13 @@ private func hooks(_ agent: AgentHooks, at url: URL) -> AgentHooks {
     #expect(try CodexNotifications.read(config) == mine)
 }
 
-@Test func everyAgentHasItsOwnName() {
-    #expect(Set(AgentSetup.all.map(\.name)).count == AgentSetup.all.count)
+@Test func everyFolderHasItsOwnSetup() {
+    let folders = ["claude", "claude-work", "codex", "codex-work"].map {
+        AgentFolder(kind: $0.hasPrefix("claude") ? .claude : .codex, directory: URL(fileURLWithPath: "/h/.\($0)"))
+    }
+    let setups = AgentSetup.all(folders: folders)
+    #expect(setups.map(\.name) == ["Claude Code", "Claude Code (work)", "Codex", "Codex (work)"])
+    #expect(Set(setups.map(\.id)).count == setups.count)
+    #expect(setups[1].file.path == "/h/.claude-work/settings.json")
+    #expect(setups[3].file.path == "/h/.codex-work/hooks.json")
 }
