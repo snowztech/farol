@@ -138,7 +138,7 @@ private struct UpdateBadge: View {
 }
 
 /// "⛬ +821 −61": the graph icon opens the graph, the counts open the review.
-/// Only in a git repo, or while a panel is open so it can still be closed. The counts only when there are changes.
+/// Only in a git repo, or while a panel is open so it can still be closed. The counts, and the pill around both, only when there are changes.
 private struct GitButton: View {
     @ObservedObject var session: Session
     @ObservedObject var state: WindowState
@@ -149,7 +149,11 @@ private struct GitButton: View {
     var body: some View {
         let p = state.palette
         let counts = !review.stat.isEmpty || review.isOpen
-        if session.topLevel != nil || state.graphVisible || counts {
+        if !counts, session.topLevel != nil || state.graphVisible {
+            // Alone, the icon sits bare like the others in the title bar. A pill around it reads as switched on.
+            IconButton(symbol: "point.3.connected.trianglepath.dotted", help: "Git graph (⌥⌘G)", active: state.graphVisible,
+                       palette: p, action: graph)
+        } else if counts {
             HStack(spacing: 0) {
                 Half(active: state.graphVisible, help: "Git graph (⌥⌘G)", palette: p, action: graph) { color in
                     Image(systemName: "point.3.connected.trianglepath.dotted")
