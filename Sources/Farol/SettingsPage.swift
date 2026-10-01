@@ -40,7 +40,7 @@ struct SettingsPage: View {
         case appearance = "Appearance"
         case agents = "Agents"
         case worktrees = "Worktrees"
-        case requests = "Pull requests"
+        case integrations = "Integrations"
         case shortcuts = "Shortcuts"
         case about = "About"
     }
@@ -73,7 +73,7 @@ struct SettingsPage: View {
                         case .terminal: terminal(p)
                         case .agents: agentsSection(p)
                         case .worktrees: worktreesSection(p)
-                        case .requests: requestsSection(p)
+                        case .integrations: integrationsSection(p)
                         case .shortcuts: shortcuts(p)
                         case .about: EmptyView()
                         }
@@ -216,7 +216,7 @@ struct SettingsPage: View {
     @ViewBuilder private func agentsSection(_ p: Palette) -> some View {
         Heading(title: "Agents", detail: "Set up your coding agents so Farol can tell you when they need you.", palette: p)
 
-        GroupTitle(title: "Integrations", palette: p)
+        GroupTitle(title: "Status", palette: p)
         ForEach(AgentSetup.all, id: \.name) { agentRow($0, p) }
 
         GroupTitle(title: "Notifications", palette: p)
@@ -285,10 +285,14 @@ struct SettingsPage: View {
         }
     }
 
-    @ViewBuilder private func requestsSection(_ p: Palette) -> some View {
-        Heading(title: "Pull requests",
-                detail: "Farol creates pull requests and shows their state through GitHub's and GitLab's own command line tools. Without them it opens the new request page in your browser.",
-                palette: p)
+    @ViewBuilder private func integrationsSection(_ p: Palette) -> some View {
+        Heading(title: "Integrations", detail: "The services Farol works with, through their own command line tools.", palette: p)
+
+        GroupTitle(title: "Pull requests", palette: p)
+        Text("Farol creates pull requests and shows their state through these tools. Without them it opens the new request page in your browser.")
+            .font(.system(size: 11.5))
+            .foregroundStyle(p.muted)
+            .padding(.bottom, 4)
         ForEach(Forge.Kind.allCases, id: \.self) { toolRow($0, p) }
     }
 
@@ -388,7 +392,7 @@ struct SettingsPage: View {
             DispatchQueue.main.async { notificationsBlocked = blocked }
         }
         for agent in AgentSetup.all { setups[agent.name] = agent.state() }
-        guard section == .requests else { return }
+        guard section == .integrations else { return }
         DispatchQueue.global(qos: .userInitiated).async {
             let states = Dictionary(uniqueKeysWithValues: Forge.Kind.allCases.map { ($0, $0.toolState()) })
             DispatchQueue.main.async { tools = states }
