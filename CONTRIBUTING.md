@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping. Small, focused pull requests are the easiest to review and merge.
+Thanks for helping. Small, focused pull requests are the easiest to review and merge. For a new feature, open an issue first: [ROADMAP.md](ROADMAP.md) lists what's planned and what's not.
 
 ## Run it
 
@@ -24,7 +24,6 @@ make lint
 - Commits are one line in the Conventional Commits style: `fix(sidebar): keep the selected session in view`.
 - If users would notice the change, add a line under **Unreleased** in `CHANGELOG.md`.
 - For UI changes, add a screenshot.
-- Check [ROADMAP.md](ROADMAP.md) first, including what's not planned. For anything bigger than a fix, open an issue before writing code.
 
 ## Writing
 
