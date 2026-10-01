@@ -105,6 +105,15 @@ enum Clipboard {
         }
     }
 
+    /// What a drop types into the terminal: the files' paths, or the dragged text.
+    /// An image dropped on an agent's prompt arrives as its path, which is how agents take attachments.
+    static func droppedText(in pasteboard: NSPasteboard) -> String? {
+        if let urls = fileURLs(in: pasteboard), !urls.isEmpty {
+            return urls.map { escapedPath($0.path) }.joined(separator: " ")
+        }
+        return pasteboard.string(forType: .string)
+    }
+
     private static func availableMimes(in pasteboard: NSPasteboard) -> [String] {
         var mimes: [String] = []
         if pasteboard.string(forType: .string) != nil || fileURLs(in: pasteboard)?.isEmpty == false {
