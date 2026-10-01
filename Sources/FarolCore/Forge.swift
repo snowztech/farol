@@ -135,6 +135,9 @@ public struct Forge: Equatable {
         return Self.request(from: output)
     }
 
+    /// Whether this forge's issues can be listed at all, without asking it.
+    public var listsIssues: Bool { kind == .github && kind.toolPath != nil }
+
     /// The repo's open issues, newest first, to start a task from. Talks to the forge, so call it off the main thread.
     public func issues(in directory: String) -> [Ticket] {
         // ponytail: GitHub only, and the newest 30. glab lists issues too, for when GitLab needs them.

@@ -9,6 +9,8 @@ struct NewTaskSheet: View {
     let directory: String
     let repo: String
     let base: String
+    /// A tool that lists tickets is set up, so the select is worth holding a place for while they load.
+    let expectsTickets: Bool
     let palette: Palette
     /// Gets a valid branch and the command that launches the agent.
     let start: (String, String) -> Void
@@ -22,8 +24,13 @@ struct NewTaskSheet: View {
     /// The branch follows the task until you edit it yourself.
     @State private var branchEdited = false
     @FocusState private var focus: Field?
-    /// Your open Jira tickets and the repo's open GitHub issues. Empty until they load, and without the tools that list them.
-    @State private var tickets: [Ticket] = []
+    /// Your open Jira tickets and the repo's open GitHub issues, once they have loaded.
+    @State private var loaded: [Ticket]?
+    /// What each folder's tickets were the last time, since asking Jira takes seconds.
+    /// The sheet opens with these and swaps in the new list when it arrives.
+    private static var remembered: [String: [Ticket]] = [:]
+    /// Empty without the tools that list them, and the first time, until they load.
+    private var tickets: [Ticket] { loaded ?? Self.remembered[directory] ?? [] }
     @State private var picked: Ticket?
     @State private var pickingTicket = false
     @State private var pickingAgent = false
@@ -36,6 +43,7 @@ struct NewTaskSheet: View {
             directory: directory,
             repo: Git.repoRoot(of: directory).map { URL(fileURLWithPath: $0).lastPathComponent } ?? "repository",
             base: Git.branch(of: directory) ?? "the current commit",
+            expectsTickets: Jira.isSetUp || Forge.detect(in: directory)?.listsIssues == true,
             palette: palette, start: start,
             close: { [weak window, weak sheet] in sheet.map { window?.endSheet($0) } })
         let host = NSHostingController(rootView: view)
@@ -63,7 +71,15 @@ struct NewTaskSheet: View {
                         .foregroundStyle(p.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                if !tickets.isEmpty { ticketSelect(p) }
+                if !tickets.isEmpty {
+                    ticketSelect(p)
+                        // The list is last time's until the new one arrives. Left of the select's own arrows.
+                        .overlay(alignment: .trailing) {
+                            if loaded == nil { ProgressView().controlSize(.mini).padding(.trailing, 32) }
+                        }
+                } else if expectsTickets {
+                    ticketPlaceholder(p)
+                }
                 // Return starts the task. Option-Return adds a line, for longer ones.
                 TextField(picked == nil ? "What should the agent do?" : "Anything to add? The agent gets the ticket as it is.",
                           text: $task, axis: .vertical)
@@ -125,7 +141,9 @@ struct NewTaskSheet: View {
             let board = Jira.Board(line: UserDefaults.standard.string(forKey: Jira.boardKey) ?? "")
             async let jira = Task.detached { (try? Jira.tickets(on: board)) ?? [] }.value
             async let issues = Task.detached { Forge.detect(in: directory)?.issues(in: directory) ?? [] }.value
-            tickets = await jira + issues
+            let tickets = await jira + issues
+            loaded = tickets
+            Self.remembered[directory] = tickets
         }
     }
 
@@ -135,6 +153,18 @@ struct NewTaskSheet: View {
             let text = "\(ticket.key) \(ticket.summary)".lowercased()
             return words.allSatisfy(text.contains)
         }
+    }
+
+    /// Holds the select's place while the tickets load, so the sheet doesn't grow under your hands when they arrive.
+    private func ticketPlaceholder(_ p: Palette) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "ticket")
+            Text(loaded == nil ? "Loading tickets…" : "No open tickets")
+            Spacer(minLength: 0)
+            if loaded == nil { ProgressView().controlSize(.mini) }
+        }
+        .foregroundStyle(p.muted.opacity(0.6))
+        .sheetField(p, focused: false)
     }
 
     private func ticketSelect(_ p: Palette) -> some View {

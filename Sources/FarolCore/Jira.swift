@@ -10,6 +10,11 @@ public enum Jira {
         return .connected(account: me.split(separator: "\n").last.map(String.init))
     }
 
+    /// Whether jira-cli has been set up, read from its config file, which costs nothing next to asking the tool.
+    public static var isSetUp: Bool {
+        FileManager.default.fileExists(atPath: NSHomeDirectory() + "/.config/.jira/.config.yml")
+    }
+
     /// Where jira-cli's own documentation is, for installing it and setting it up.
     public static let docs = "https://github.com/ankitpokhrel/jira-cli"
 

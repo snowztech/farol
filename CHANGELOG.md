@@ -7,6 +7,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Fixed
 
 - The session list under the window title no longer leaves an empty gap at its end when sessions are grouped by project.
+- New Task no longer grows a few seconds after it opens. The ticket select is there from the start, grayed out while your tickets load the first time, and with last time's list after that.
 
 ## [0.24.0] - 2026-10-01
 
