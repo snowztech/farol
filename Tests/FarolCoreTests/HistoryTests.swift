@@ -190,3 +190,26 @@ private func edges(_ pairs: (Int, Int)...) -> [History.Edge] {
     #expect(!FileManager.default.fileExists(atPath: box.repo + "/a.txt"))
     #expect(FileManager.default.fileExists(atPath: box.repo + "/b.txt"))
 }
+
+@Test func commitsEverythingAndPushes() throws {
+    let origin = try Sandbox()
+    let box = try Sandbox()
+    try Git.run(["remote", "add", "origin", origin.repo], in: box.repo)
+    try Git.run(["config", "user.name", "Farol"], in: box.repo)
+    try Git.run(["config", "user.email", "farol@example.com"], in: box.repo)
+    try History.createBranch("feat", from: "main", in: box.repo)
+
+    try "staged".write(toFile: box.repo + "/staged.txt", atomically: true, encoding: .utf8)
+    try Git.run(["add", "staged.txt"], in: box.repo)
+    try "new".write(toFile: box.repo + "/untracked.txt", atomically: true, encoding: .utf8)
+    try History.commitAll("add files", in: box.repo)
+
+    #expect(try Git.run(["status", "--porcelain"], in: box.repo).isEmpty)
+    #expect(try Git.run(["log", "-1", "--format=%s"], in: box.repo) == "add files")
+    // Nothing is left to commit, and git says so.
+    #expect(throws: GitError.self) { try History.commitAll("again", in: box.repo) }
+
+    try History.push(in: box.repo)
+    #expect(History.branches(in: origin.repo).local.contains("feat"))
+    #expect(try Git.run(["rev-parse", "--abbrev-ref", "feat@{upstream}"], in: box.repo) == "origin/feat")
+}

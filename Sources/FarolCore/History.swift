@@ -122,6 +122,20 @@ public enum History {
         try Git.run(["cherry-pick", commit.hash], in: directory)
     }
 
+    /// Commits what the review panel shows as uncommitted: staged, unstaged and untracked files together.
+    public static func commitAll(_ message: String, in directory: String) throws {
+        try Git.run(["add", "--all"], in: directory)
+        try Git.run(["commit", "--message", message], in: directory)
+    }
+
+    /// Pushes the checked out branch under its own name and tracks it there. A branch with no remote yet goes to origin.
+    public static func push(in directory: String) throws {
+        let configured = Git.branch(of: directory).flatMap { try? Git.run(["config", "branch.\($0).remote"], in: directory) }
+        // "." means the branch tracks a local one, which is no place to push to.
+        let remote = configured.flatMap { $0 == "." || $0.isEmpty ? nil : $0 } ?? "origin"
+        try Git.run(["push", "--set-upstream", remote, "HEAD"], in: directory)
+    }
+
     static func parse(_ output: String) -> [Commit] {
         output.split(separator: "\n").compactMap { line in
             let fields = line.split(separator: "\u{1f}", omittingEmptySubsequences: false).map(String.init)
