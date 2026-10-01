@@ -20,7 +20,9 @@ struct Palette: Equatable {
     let done: Color
     let added: Color
     let removed: Color
-    /// Git graph branches: twelve hues around the wheel, as bright and saturated as the theme's own colors.
+    /// A branch with commits to pull, in the theme's blue. One with commits to push uses `added`.
+    let pull: Color
+    /// Git graph branches: 64 colors, each far from the ones before it, as bright and saturated as the theme's own colors.
     let lanes: [Color]
     /// Tint for macOS switches and pickers. A mid gray, since white on a switch would hide its white knob.
     let control: Color
@@ -51,6 +53,7 @@ struct Palette: Equatable {
         done = ansi(2)
         added = ansi(2)
         removed = ansi(1)
+        pull = ansi(4)
     }
 }
 
@@ -62,9 +65,14 @@ extension Palette {
         let count = CGFloat(max(hsb.count, 1))
         let saturation = max(hsb.map(\.0).reduce(0, +) / count, 0.55)
         let brightness = dark ? max(hsb.map(\.1).reduce(0, +) / count, 0.8) : min(hsb.map(\.1).reduce(0, +) / count, 0.7)
-        // Steps of 30 degrees, ordered so each color sits far from the one before it: blue, magenta, green, orange...
-        return [7, 10, 4, 1, 6, 0, 9, 2, 5, 11, 3, 8].map {
-            Color(nsColor: NSColor(hue: CGFloat($0) / 12, saturation: saturation, brightness: brightness, alpha: 1))
+        // Each hue turns by the golden angle, so it lands in the widest gap left by the ones before and never comes back.
+        // Past the first dozen the hues get close, so every dozen also changes tone: full, then softer, then deeper.
+        return (0..<64).map { index in
+            let hue = (7.0 / 12 + Double(index) * 0.381966).truncatingRemainder(dividingBy: 1)
+            let tone = index / 12 % 3
+            let s = tone == 1 ? saturation * 0.55 : saturation
+            let b = tone == 2 ? brightness * (dark ? 0.78 : 0.75) : brightness
+            return Color(nsColor: NSColor(hue: CGFloat(hue), saturation: s, brightness: b, alpha: 1))
         }
     }
 }

@@ -11,15 +11,16 @@ private func edges(_ pairs: (Int, Int)...) -> [History.Edge] {
 }
 
 @Test func parsesLogLines() {
-    let line = ["abc123def", "p1 p2", "Ana", "1700000000", "HEAD -> main, origin/main, tag: v1", "Merge a\u{1f}b"]
+    let line = ["abc123def", "p1 p2", "Ana", "1700000000", "HEAD -> main, origin/main, tag: v1", "ana@example.com", "Merge a\u{1f}b"]
         .joined(separator: "\u{1f}")
-    let commits = History.parse(line + "\n" + ["root", "", "Ana", "1600000000", "", "init"].joined(separator: "\u{1f}"))
+    let commits = History.parse(line + "\n" + ["root", "", "Ana", "1600000000", "", "", "init"].joined(separator: "\u{1f}"))
 
     #expect(commits.count == 2)
     #expect(commits[0].parents == ["p1", "p2"])
     #expect(commits[0].refs == ["HEAD -> main", "origin/main", "tag: v1"])
     #expect(commits[0].subject == "Merge a\u{1f}b")
     #expect(commits[0].shortHash == "abc123d")
+    #expect(commits[0].email == "ana@example.com")
     #expect(commits[1].parents.isEmpty)
     #expect(commits[1].refs.isEmpty)
 }
@@ -215,4 +216,68 @@ private func edges(_ pairs: (Int, Int)...) -> [History.Edge] {
     try History.push(in: box.repo)
     #expect(History.branches(in: origin.repo).local.contains("feat"))
     #expect(try Git.run(["rev-parse", "--abbrev-ref", "feat@{upstream}"], in: box.repo) == "origin/feat")
+}
+
+@Test func fetchesAndFastForwardsBranches() throws {
+    let origin = try Sandbox()
+    let box = try Sandbox()
+    let commit = { (message: String, repo: String) in
+        try Git.run(["-c", "user.name=Farol", "-c", "user.email=farol@example.com", "commit", "--quiet", "--allow-empty",
+                     "-m", message], in: repo)
+    }
+    try Git.run(["remote", "add", "origin", origin.repo], in: box.repo)
+    try Git.run(["branch", "gone"], in: origin.repo)
+    try History.fetch(in: box.repo)
+    try Git.run(["branch", "--quiet", "--set-upstream-to=origin/main", "main"], in: box.repo)
+    try Git.run(["reset", "--quiet", "--hard", "origin/main"], in: box.repo)
+    try Git.run(["branch", "--quiet", "--track", "side", "origin/main"], in: box.repo)
+    #expect(History.upstreams(in: box.repo) == ["main": .init(name: "origin/main", ahead: 0, behind: 0),
+                                                     "side": .init(name: "origin/main", ahead: 0, behind: 0)])
+
+    // A branch deleted on the server goes away on the next fetch.
+    try Git.run(["branch", "-D", "gone"], in: origin.repo)
+    try commit("server work", origin.repo)
+    try History.fetch(in: box.repo)
+    #expect(!History.branches(in: box.repo).remote.contains("origin/gone"))
+    #expect(History.upstreams(in: box.repo)["side"]?.behind == 1)
+    #expect(History.oneSided(History.upstreams(in: box.repo), in: box.repo).count == 1)
+
+    try History.update("side", current: false, in: box.repo)
+    #expect(try History.commits(in: box.repo, branch: "side").first?.subject == "server work")
+    try History.update("main", current: true, in: box.repo)
+    #expect(try History.commits(in: box.repo, branch: "HEAD").first?.subject == "server work")
+
+    // Once both sides have their own commits, neither update merges.
+    try commit("local work", box.repo)
+    try commit("more server work", origin.repo)
+    #expect(throws: GitError.self) { try History.update("main", current: true, in: box.repo) }
+    #expect(try History.commits(in: box.repo, branch: "HEAD").first?.subject == "local work")
+    try Git.run(["branch", "--quiet", "--force", "side", "main"], in: box.repo)
+    #expect(throws: GitError.self) { try History.update("side", current: false, in: box.repo) }
+
+    // Pushing is never forced: main is behind the server, so it's refused until it catches up.
+    #expect(throws: GitError.self) { try History.push("main", in: box.repo) }
+    try Git.run(["-c", "user.name=Farol", "-c", "user.email=farol@example.com", "pull", "--quiet", "--rebase"], in: box.repo)
+    // The server's main is checked out, so it takes the push only into another branch.
+    try Git.run(["switch", "--quiet", "--detach"], in: origin.repo)
+    try History.push("main", in: box.repo)
+    #expect(History.upstreams(in: box.repo)["main"]?.ahead == 0)
+    #expect(try History.commits(in: origin.repo, branch: "main").first?.subject == "local work")
+}
+
+@Test func dashesLanesLeadingDownFromOneSidedCommits() {
+    // x and y are only on the local branch, a is on both.
+    let rows = History.graph([commit("x", "y"), commit("y", "a"), commit("a")], oneSided: ["x", "y"])
+    #expect(rows.map(\.oneSided) == [true, true, false])
+    #expect(rows[1].dashedAbove == [true])
+    #expect(rows[2].dashedAbove == [true])
+    #expect(History.graph([commit("x", "a"), commit("a")]).allSatisfy { !$0.oneSided && !$0.dashedBelow.contains(true) })
+}
+
+@Test func findsTheCommitABranchPointsTo() {
+    let commit = History.Commit(hash: "a", parents: [], author: "Ana", date: Date(), refs: ["HEAD -> main", "origin/main", "tag: v1"], subject: "init")
+    #expect(commit.points("main"))
+    #expect(commit.points("origin/main"))
+    #expect(!commit.points("ma"))
+    #expect(!commit.points("v1"))
 }
