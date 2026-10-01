@@ -4,15 +4,19 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-10-01
+
+Pull requests from the review panel, on GitHub and GitLab.
+
 ### Added
 
-- Start a pull request on GitHub, or a merge request on GitLab, from the review panel. Once everything is committed, Start PR pushes the branch and opens the new request form in your browser, with the branch filled in. You create it there.
-- With GitHub's `gh` or GitLab's `glab` installed and logged in, the review panel creates the pull request itself, titled from the commits, and then shows it as "PR #5", which opens it on click. Without the tool the button reads Pull Request, and pushes and opens the forge's page as before.
+- Pull requests on GitHub, and merge requests on GitLab, from the review panel. Once the branch has commits of its own and nothing is left to commit, a button pushes it and opens the forge's new request form in your browser, with the branch filled in. The commit sheet offers the same as a third choice.
+- With GitHub's `gh` or GitLab's `glab` installed and logged in, Farol creates the request itself, titled from the commits. The button reads Create PR, and once the branch has an open request it shows as "PR #5", which opens it on click.
 
 ### Changed
 
+- Committing from the review panel opens a sheet in Farol's own style. It lists the files that go in, takes a message with a body, and remembers whether you commit, commit and push, or go on to a pull request.
 - The New Task sheet matches the commit sheet, in the theme's colors. Start stays off until there is a task and a branch name git accepts.
-- Committing from the review panel opens a sheet in Farol's own style. It lists the files that go in, takes a message with a body, and remembers whether you commit, commit and push, or go on to start a pull request.
 
 ## [0.17.0] - 2026-10-01
 
@@ -387,7 +391,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/snowztech/farol/releases/tag/v0.18.0
 [0.17.0]: https://github.com/snowztech/farol/releases/tag/v0.17.0
 [0.16.1]: https://github.com/snowztech/farol/releases/tag/v0.16.1
 [0.16.0]: https://github.com/snowztech/farol/releases/tag/v0.16.0
