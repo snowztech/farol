@@ -32,19 +32,19 @@ It needs a Mac with Apple Silicon and macOS 14 or later. Releases are signed and
 
 ## Features
 
-- **New task.** ⇧⌘N asks what to do, then starts Claude Code or Codex on it in a new worktree, with the task as its first prompt. Or pick one of your open Jira tickets or the repo's GitHub issues, and the branch is named after it and the agent gets the ticket in full.
+- **New task.** ⇧⌘N asks what to do, then starts Claude Code or Codex on it in a new worktree, with the task as its first prompt. Or pick one of your open Jira tickets or the repo's GitHub issues, and the branch is named after it and the agent gets the ticket in full. With more than one Claude Code or Codex account, each one is a choice.
 - **Agent status.** Each session shows whether its agent is working, waiting for you or done, with a notification when it waits in the background. See [Agent status](#agent-status).
 - **Agents from any app.** Farol's lighthouse in the menu bar lights up while agents work, wait or finish, and its menu opens any session. Or pick a small status panel at the notch or on the screen edge, which you can drag anywhere along the side.
 - **Worktree sessions.** ⇧⌘T asks for a branch and opens a session in its own git worktree, so parallel agents never touch each other's files. Closing it offers to remove the worktree and always keeps the branch.
-- **Sessions in a sidebar.** Open as many as you like. Hidden sessions keep running but stop rendering, so twenty background agents cost no GPU time. Each row shows its git branch, and Settings → Appearance can group sessions under each project's name. Double-click to rename, drag to reorder.
+- **Sessions in a sidebar.** Open as many as you like. Hidden sessions keep running but stop rendering, so twenty background agents cost no GPU time. Each row shows its git branch, and Settings → Appearance can group sessions under each project's name. Double-click to rename, drag to reorder. Click the window title or press ⌘P to search every session and switch, even with the sidebar closed.
 - **Files next to the terminal.** ⇧⌘E opens the session's project as a tree, with ignored files dimmed. Click a file to open it in a pane beside the terminal, with syntax colors from your theme, line numbers and ⌘F, and make a quick fix with ⌘S to save. When an agent changes the file you have open, it reloads, or asks first if you have unsaved edits. The tree updates as agents add files, and costs nothing while it is closed.
-- **Review what the agent did.** The title bar shows what the session changed, like `± +821 −61`, and only while there is something to see. Click it, or ⌥⌘R, for every changed file as one scrolling diff, uncommitted work or everything since the branch left main or any other branch. Open a file from there to land on its first change and fix it.
-- **Git graph.** ⌥⌘G, or the icon next to the change count, shows the session's branches and commits as a colored graph. Click a branch to check it out. Right-click to create, rebase or delete a branch, or to cherry-pick or revert a commit.
+- **Review what the agent did.** The title bar shows what the session changed, like `± +821 −61`, and only while there is something to see. Click it, or ⌥⌘R, for every changed file as one scrolling diff, uncommitted work or everything since the branch left main or any other branch. Open a file from there to land on its first change and fix it. Then commit, push and open a pull request on GitHub or a merge request on GitLab, without leaving the panel.
+- **Git graph.** ⌥⌘G, or the icon next to the change count, shows the session's branches and commits as a colored graph. Click a branch to check it out. Right-click to create, rebase or delete a branch, or to cherry-pick or revert a commit. Fetch, update and push branches from there too.
 - **Split panes.** ⌘D splits a session, and the new pane opens in the same folder. ⇧⌘R gives a pane a name, like "back" or "tunnel". Layouts and names come back after a relaunch.
 - **Find in scrollback.** ⌘F searches the focused pane and shows the match count.
 - **Ghostty inside.** Same rendering, speed and escape sequence support, and your Ghostty config is loaded.
-- **Themes and settings.** Farol's own four themes, in the colors of the app icons and with Farol Beam as the default, plus Ghostty's 600+ themes with live previews, and settings inside the window.
-- **Copy and paste, accents and input methods.** Pasting text that could run commands asks first, dead keys compose as you type, and input methods for other languages work at the cursor.
+- **Themes and settings.** Farol's own four themes, in the colors of the app icons and with Farol Beam as the default, plus Ghostty's 600+ themes with live previews, and settings inside the window. Settings → Appearance → Style can put each panel in a rounded card, with or without your theme's color.
+- **Copy and paste, accents and input methods.** Pasting text that could run commands asks first, files and text can be dropped on the terminal, dead keys compose as you type, and input methods for other languages work at the cursor.
 
 <p align="center"><img src="site/features/files.png" width="800" alt="The files panel next to the terminal, with src/store.ts open in a pane with syntax colors and line numbers"></p>
 
@@ -73,7 +73,7 @@ When an agent waits or finishes while Farol is in the background, you get a noti
   <img src="site/features/edge-open.png" width="300" alt="The status panel on the right screen edge, opened on hover, listing the sessions and their state">
 </p>
 
-**Claude Code:** open Settings → Agents and click **Connect**. Farol adds its hooks to `~/.claude/settings.json`, leaves everything else in the file alone and keeps a backup. **Disconnect** removes only Farol's hooks, and Claude Code keeps working as before.
+**Claude Code:** open Settings → Agents and click **Connect**. Farol adds its hooks to `~/.claude/settings.json`, leaves everything else in the file alone and keeps a backup. If you have more than one account, in folders like `~/.claude-work`, each one gets its own row. **Disconnect** removes only Farol's hooks, and Claude Code keeps working as before.
 
 **Codex:** interactive sessions work automatically through Codex's terminal titles. Keep Codex's terminal-title setting enabled. To cover non-interactive runs and background agents too, click **Connect**. Farol adds hooks to `~/.codex/hooks.json`, leaves other hooks alone and keeps a backup. Restart open Codex sessions, then review and trust the hooks with `/hooks`. **Disconnect** removes only Farol's hooks. Interactive status keeps working.
 
