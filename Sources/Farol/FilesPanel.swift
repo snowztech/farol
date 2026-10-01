@@ -126,7 +126,7 @@ struct FilesPanel: View {
         .frame(width: Self.width, alignment: .leading)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(p.surface)
-        .overlay(alignment: .trailing) { Rectangle().fill(p.line).frame(width: 1) }
+        .overlay(alignment: .trailing) { Rectangle().fill(p.boxed ? .clear : p.line).frame(width: 1) }
     }
 }
 

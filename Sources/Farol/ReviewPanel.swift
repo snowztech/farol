@@ -374,7 +374,7 @@ struct ReviewPanel: View {
     /// The line between the terminal and the panel, wide enough to grab and drag.
     private func edge(_ p: Palette) -> some View {
         // At the very edge, so it continues the title bar's column line.
-        Rectangle().fill(p.line).frame(width: 1)
+        Rectangle().fill(p.boxed ? .clear : p.line).frame(width: 1)
             .frame(width: 7, alignment: .leading)
             .contentShape(Rectangle())
             .onHover { inside in (inside ? NSCursor.resizeLeftRight : NSCursor.arrow).set() }
