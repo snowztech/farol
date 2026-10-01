@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- Settings → Integrations shows the connected account's picture and name next to its state.
+
 ## [0.20.1] - 2026-10-01
 
 Drop files or text straight onto the terminal.

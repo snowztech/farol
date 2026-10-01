@@ -22,6 +22,8 @@ struct SettingsPage: View {
     @State private var agentError: String?
     /// Whether gh and glab are there and logged in. Empty while they are being asked.
     @State private var tools: [Forge.Kind: Forge.ToolState] = [:]
+    /// Where each connected account's picture is, once known.
+    @State private var avatars: [Forge.Kind: URL] = [:]
     /// macOS refuses Farol's notifications, so turning them on here would do nothing.
     @State private var notificationsBlocked = false
 
@@ -298,15 +300,23 @@ struct SettingsPage: View {
 
     private func toolRow(_ kind: Forge.Kind, _ p: Palette) -> some View {
         let state = tools[kind]
+        // "the GitHub CLI (gh)": the name people know, and the command they would type.
+        let cli = "the \(kind.name) CLI (\(kind.tool))"
         let detail = switch state {
-        case nil: "Checking \(kind.tool)…"
-        case .connected(let account): "Logged in\(account.map { " as \($0)" } ?? ""), through \(kind.tool)."
-        case .loggedOut: "\(kind.tool) is installed but not logged in."
-        case .missing: "\(kind.tool) isn't installed. A \(kind.request) opens in your browser."
+        case nil: "Checking \(cli)…"
+        case .connected: "Uses \(cli)."
+        case .loggedOut: "\(cli.prefix(1).uppercased() + cli.dropFirst()) is installed but not logged in."
+        case .missing: "\(cli.prefix(1).uppercased() + cli.dropFirst()) isn't installed. A \(kind.request) opens in your browser."
         }
         return Row(title: kind.name, detail: detail, icon: kind, palette: p) {
             HStack(spacing: 12) {
                 if let state {
+                    if case .connected(let account?) = state {
+                        HStack(spacing: 6) {
+                            Avatar(url: avatars[kind], name: account, palette: p)
+                            Text(account).font(.system(size: 12))
+                        }
+                    }
                     ToolStateLabel(state: state, palette: p)
                     if state == .missing || state == .loggedOut {
                         Button(state == .missing ? "Install" : "Log In") { runInTerminal(kind.setupCommand(from: state)) }
@@ -396,6 +406,13 @@ struct SettingsPage: View {
         DispatchQueue.global(qos: .userInitiated).async {
             let states = Dictionary(uniqueKeysWithValues: Forge.Kind.allCases.map { ($0, $0.toolState()) })
             DispatchQueue.main.async { tools = states }
+            // After the states are on screen, since GitLab's picture takes another call to its server.
+            var found: [Forge.Kind: URL] = [:]
+            for (kind, state) in states {
+                if case .connected(let account?) = state { found[kind] = kind.avatar(of: account) }
+            }
+            let avatars = found
+            DispatchQueue.main.async { self.avatars = avatars }
         }
     }
 
@@ -630,6 +647,41 @@ private struct SetupState: View {
                 .font(.system(size: 12))
                 .foregroundStyle(palette.muted)
         }
+    }
+}
+
+/// An account's picture. The slot keeps its size and shows the name's first letter until the picture is there, so the row never shifts.
+private struct Avatar: View {
+    private static let cache = NSCache<NSURL, NSImage>()
+    private static let size: CGFloat = 18
+
+    let url: URL?
+    let name: String
+    let palette: Palette
+
+    @State private var image: NSImage?
+
+    var body: some View {
+        ZStack {
+            Circle().fill(palette.raised)
+            Text(name.prefix(1).uppercased())
+                .font(.system(size: 9.5, weight: .semibold))
+                .foregroundStyle(palette.muted)
+            if let image {
+                Image(nsImage: image).resizable().interpolation(.high).clipShape(Circle())
+            }
+        }
+        .frame(width: Self.size, height: Self.size)
+        .task(id: url) { await load() }
+    }
+
+    /// A picture loaded before shows at once, with no fade, when you come back to the page.
+    private func load() async {
+        guard let url else { return }
+        if let known = Self.cache.object(forKey: url as NSURL) { return image = known }
+        guard let (data, _) = try? await URLSession.shared.data(from: url), let loaded = NSImage(data: data) else { return }
+        Self.cache.setObject(loaded, forKey: url as NSURL)
+        withAnimation(.easeOut(duration: 0.15)) { image = loaded }
     }
 }
 
