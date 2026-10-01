@@ -11,6 +11,11 @@ final class GraphModel: ObservableObject {
     @Published private(set) var showsAll = true
     @Published private(set) var local: [String] = []
     @Published private(set) var remote: [String] = []
+    /// Each local branch's upstream, for the Update item.
+    @Published private(set) var upstreams: [String: History.Upstream] = [:]
+    @Published private(set) var fetching = false
+    /// The branch under the mouse in the list, so the history can light up the commit it points to.
+    @Published var hoveredBranch: String?
     @Published private(set) var rows: [History.Row] = []
     @Published private(set) var error: String?
     /// The commit clicked in the history, and what it changed, for the pane under it.
@@ -99,6 +104,21 @@ final class GraphModel: ObservableObject {
         run(failed) { try History.deleteRemoteBranch(branch, in: $0) }
     }
 
+    func fetch(failed: @escaping (String) -> Void) {
+        guard !fetching else { return }
+        fetching = true
+        run(failed, then: { [weak self] in self?.fetching = false }) { try History.fetch(in: $0) }
+    }
+
+    func update(_ branch: String, failed: @escaping (String) -> Void) {
+        let current = branch == current
+        run(failed) { try History.update(branch, current: current, in: $0) }
+    }
+
+    func push(_ branch: String, failed: @escaping (String) -> Void) {
+        run(failed) { try History.push(branch, in: $0) }
+    }
+
     func rebase(onto base: String, interactive: Bool, failed: @escaping (String) -> Void) {
         if interactive { return onRunInTerminal?(History.interactiveRebaseCommand(onto: base)) ?? () }
         run(failed) { try History.rebase(onto: base, in: $0) }
@@ -112,11 +132,12 @@ final class GraphModel: ObservableObject {
         run(failed) { try History.cherryPick(commit, in: $0) }
     }
 
-    private func run(_ failed: @escaping (String) -> Void, _ work: @escaping (String) throws -> Void) {
-        guard let root else { return }
+    private func run(_ failed: @escaping (String) -> Void, then done: (() -> Void)? = nil, _ work: @escaping (String) throws -> Void) {
+        guard let root else { return done?() ?? () }
         DispatchQueue.global(qos: .userInitiated).async {
             let result = Result { try work(root) }
             DispatchQueue.main.async { [weak self] in
+                done?()
                 if case .failure(let error) = result { failed(String(describing: error)) }
                 self?.onGitChange?()
                 self?.reload()
@@ -128,15 +149,19 @@ final class GraphModel: ObservableObject {
         pending?.cancel()
         guard let root else { return }
         let all = !onlyCurrent.contains(root)
+        let current = current
         showsAll = all
         DispatchQueue.global(qos: .userInitiated).async {
             let branches = History.branches(in: root)
+            let upstreams = History.upstreams(in: root)
             let commits = Result { try History.commits(in: root, branch: all ? nil : "HEAD") }
-            let rows = (try? commits.get()).map(History.graph)
+            let oneSided = all ? History.oneSided(upstreams, in: root) : History.oneSided(upstreams.filter { $0.key == current }, in: root)
+            let rows = (try? commits.get()).map { History.graph($0, oneSided: oneSided) }
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root else { return }
                 self.local = branches.local
                 self.remote = branches.remote
+                self.upstreams = upstreams
                 self.rows = rows ?? []
                 self.error = rows == nil ? "Couldn't read the history." : nil
             }
@@ -191,7 +216,8 @@ struct GraphPanel: View {
                         ForEach(rows, id: \.commit.hash) { row in
                             // Lines between commits that aren't neighbors anymore would mislead, so a search shows the dots only.
                             CommitRow(row: row, lanes: lanes, showsLines: searchText.isEmpty, selected: row.commit.hash == graph.selected?.hash,
-                                      palette: p, current: graph.current, select: { graph.select(row.commit) },
+                                      highlighted: graph.hoveredBranch.map(row.commit.points) ?? false,
+                                      palette: p, current: graph.current, upstreams: graph.upstreams, select: { graph.select(row.commit) },
                                       review: {
                                           // Keeps the files pane on this commit too, instead of toggling it off.
                                           if graph.selected?.hash != row.commit.hash { graph.select(row.commit) }
@@ -284,6 +310,13 @@ struct GraphPanel: View {
                     .padding(.leading, 6)
             }
             Spacer()
+            if graph.fetching {
+                ProgressView().controlSize(.mini).frame(width: 26, height: 20)
+            } else {
+                IconButton(symbol: "arrow.clockwise", help: "Fetch from the server", palette: p) {
+                    graph.fetch(failed: gitError("Couldn't fetch"))
+                }
+            }
             ForEach([("All", true), ("Current", false)], id: \.0) { title, all in
                 Button { graph.show(all: all) } label: {
                     Text(title)
@@ -387,8 +420,14 @@ private struct BranchList: View {
                     ForEach(entries, id: \.name) { entry in
                         let current = !entry.remote && entry.name == graph.current
                         BranchRow(name: entry.name, remote: entry.remote, current: current,
+                                  upstream: entry.remote ? nil : graph.upstreams[entry.name],
                                   color: colors[entry.name].map { palette.lanes[$0 % palette.lanes.count] } ?? palette.muted,
-                                  palette: palette) {
+                                  palette: palette,
+                                  update: { graph.update(entry.name, failed: gitError("Couldn't update \(entry.name)")) },
+                                  push: { graph.push(entry.name, failed: gitError("Couldn't push \(entry.name)")) },
+                                  hover: { inside in
+                                      if inside { graph.hoveredBranch = entry.name } else if graph.hoveredBranch == entry.name { graph.hoveredBranch = nil }
+                                  }) {
                             graph.checkout(entry.name, remote: entry.remote, failed: gitError("Couldn't check out"))
                         }
                         .contextMenu { menu(for: entry.name, remote: entry.remote, current: current) }
@@ -424,6 +463,10 @@ private struct BranchList: View {
         let here = graph.current ?? "HEAD"
         Button(remote ? "Check Out as Local Branch" : "Check Out") { graph.checkout(branch, remote: remote, failed: gitError("Couldn't check out")) }
             .disabled(current)
+        if !remote, let upstream = graph.upstreams[branch] {
+            Button("Update from \(menuName(upstream.name))") { graph.update(branch, failed: gitError("Couldn't update \(branch)")) }
+                .disabled(upstream.behind == 0)
+        }
         Button("Copy Branch Name") {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(branch, forType: .string)
@@ -493,8 +536,12 @@ private struct BranchRow: View {
     let name: String
     let remote: Bool
     let current: Bool
+    var upstream: History.Upstream?
     let color: Color
     let palette: Palette
+    var update: () -> Void = {}
+    var push: () -> Void = {}
+    var hover: (Bool) -> Void = { _ in }
     let checkout: () -> Void
 
     @State private var hovering = false
@@ -512,6 +559,18 @@ private struct BranchRow: View {
                 Text("remote").font(.system(size: 10)).foregroundStyle(palette.muted).fixedSize()
             }
             Spacer(minLength: 4)
+            if let upstream, upstream.ahead + upstream.behind > 0 {
+                HStack(spacing: 2) {
+                    if upstream.behind > 0 {
+                        DriftButton(symbol: "arrow.down", count: upstream.behind, label: "Update", showsLabel: hovering, color: palette.pull,
+                                    help: "Update from \(upstream.name)", palette: palette, action: update)
+                    }
+                    if upstream.ahead > 0 {
+                        DriftButton(symbol: "arrow.up", count: upstream.ahead, label: "Push", showsLabel: hovering, color: palette.added,
+                                    help: "Push to \(upstream.name)", palette: palette, action: push)
+                    }
+                }
+            }
             if current {
                 Image(systemName: "checkmark").font(.system(size: 10, weight: .semibold)).foregroundStyle(palette.text)
             }
@@ -520,9 +579,52 @@ private struct BranchRow: View {
         .frame(height: Self.height)
         .background(RoundedRectangle(cornerRadius: 5).fill(current ? palette.raised : hovering ? palette.raised.opacity(0.35) : .clear))
         .contentShape(Rectangle())
-        .onClickableHover { hovering = $0 }
+        .onClickableHover {
+            hovering = $0
+            hover($0)
+        }
         .onTapGesture { if !current { checkout() } }
-        .hoverTip(current ? "Checked out" : remote ? "Check out \(name) as a local branch" : "Check out \(name)")
+        .hoverTip(([current ? "Checked out" : remote ? "Check out \(name) as a local branch" : "Check out \(name)"] + drift)
+            .joined(separator: "\n"))
+    }
+
+
+    private var drift: [String] {
+        guard let upstream else { return [] }
+        return [upstream.behind > 0 ? "\(upstream.behind) to pull from \(upstream.name)" : nil,
+                upstream.ahead > 0 ? "\(upstream.ahead) to push to \(upstream.name)" : nil].compactMap { $0 }
+    }
+}
+
+/// Commits to pull or push and the action that takes care of them. The action is named while the row is hovered.
+private struct DriftButton: View {
+    let symbol: String
+    let count: Int
+    let label: String
+    let showsLabel: Bool
+    let color: Color
+    let help: String
+    let palette: Palette
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 2) {
+                Image(systemName: symbol).font(.system(size: 9, weight: .bold))
+                Text("\(count)").font(.system(size: 10.5, weight: .semibold).monospacedDigit())
+                if showsLabel { Text(label).font(.system(size: 10.5, weight: .medium)) }
+            }
+            .foregroundStyle(color)
+            .padding(.horizontal, 5)
+            .frame(height: 18)
+            .background(RoundedRectangle(cornerRadius: 4).fill(hovering ? palette.text.opacity(0.08) : .clear))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onClickableHover { hovering = $0 }
+        .hoverTip(help)
     }
 }
 
@@ -543,9 +645,12 @@ private struct CommitRow: View {
     let lanes: Int
     var showsLines = true
     var selected = false
+    /// Set while the mouse is on a branch that points here.
+    var highlighted = false
     let palette: Palette
     /// The checked out branch, named in the cherry-pick item.
     var current: String?
+    var upstreams: [String: History.Upstream] = [:]
     var select: () -> Void = {}
     var review: () -> Void = {}
     var cherryPick: () -> Void = {}
@@ -570,6 +675,12 @@ private struct CommitRow: View {
                 .foregroundStyle(palette.text)
                 .lineLimit(1)
                 .truncationMode(.tail)
+            if let drift {
+                Text(drift.counts)
+                    .font(.system(size: 10).monospacedDigit())
+                    .foregroundStyle(palette.muted)
+                    .fixedSize()
+            }
             Spacer(minLength: 4)
             Text(row.commit.author)
                 .font(.system(size: 11))
@@ -577,6 +688,7 @@ private struct CommitRow: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(width: Self.authorWidth, alignment: .leading)
+                .hoverTip(row.commit.email.isEmpty ? row.commit.author : "\(row.commit.author) <\(row.commit.email)>")
             Text(copied ? "Copied" : row.commit.shortHash)
                 .font(.system(size: 10.5, design: .monospaced))
                 .foregroundStyle(copied ? palette.text : hoveringHash ? palette.text : palette.muted.opacity(0.8))
@@ -595,13 +707,13 @@ private struct CommitRow: View {
         }
         .padding(.trailing, 6)
         .frame(maxWidth: .infinity, minHeight: Self.height, maxHeight: Self.height, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 5).fill(selected ? palette.raised : hovering ? palette.raised.opacity(0.35) : .clear))
+        .background(RoundedRectangle(cornerRadius: 5).fill(selected || highlighted ? palette.raised : hovering ? palette.raised.opacity(0.35) : .clear))
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture(count: 2, perform: review)
         .onTapGesture(perform: select)
         .hoverTip(([row.commit.shortHash + "  " + row.commit.author, row.commit.subject] + refs.flatMap(\.names)
-            + ["Double-click to review the changes"]).joined(separator: "\n"))
+            + (drift.map { [driftTip($0.branch, $0.upstream)] } ?? []) + ["Double-click to review the changes"]).joined(separator: "\n"))
         .contextMenu {
             // Says where a checkout lands: the branch pointing here, or the bare commit.
             Button(localBranch.map { "Check Out \u{201C}\(menuName($0))\u{201D}" } ?? "Check Out Commit (Detached)", action: checkout)
@@ -629,7 +741,7 @@ private struct CommitRow: View {
         Canvas { context, size in
             let middle = size.height / 2
             func x(_ lane: Int) -> CGFloat { CGFloat(lane) * Self.laneWidth + Self.laneWidth / 2 + 2 }
-            func stroke(_ edge: History.Edge, from y0: CGFloat, to y1: CGFloat, tone: Int) {
+            func stroke(_ edge: History.Edge, from y0: CGFloat, to y1: CGFloat, tone: Int, dashed: Bool) {
                 var path = Path()
                 path.move(to: CGPoint(x: x(edge.from), y: y0))
                 if edge.from == edge.to {
@@ -639,11 +751,18 @@ private struct CommitRow: View {
                     path.addCurve(to: CGPoint(x: x(edge.to), y: y1),
                                   control1: CGPoint(x: x(edge.from), y: bend), control2: CGPoint(x: x(edge.to), y: bend))
                 }
-                context.stroke(path, with: .color(color(tone)), lineWidth: 2)
+                // Half a row is 12 points, so the dashes run on unbroken from one row to the next.
+                context.stroke(path, with: .color(color(tone)), style: StrokeStyle(lineWidth: 2, dash: dashed ? [3, 3] : []))
             }
             if showsLines {
-                for edge in row.top { stroke(edge, from: 0, to: middle, tone: row.colorsAbove[edge.from]) }
-                for edge in row.bottom { stroke(edge, from: middle, to: size.height, tone: row.colorsBelow[edge.to]) }
+                for edge in row.top {
+                    stroke(edge, from: 0, to: middle, tone: row.colorsAbove[edge.from], dashed: row.dashedAbove[edge.from])
+                }
+                for edge in row.bottom {
+                    // The commit's own lines follow the commit. The lanes passing by keep whatever they lead from.
+                    let dashed = edge.from == row.column ? row.oneSided : row.dashedBelow[edge.to]
+                    stroke(edge, from: middle, to: size.height, tone: row.colorsBelow[edge.to], dashed: dashed)
+                }
             }
             let tint = color(row.color)
             if isHead {
@@ -662,6 +781,21 @@ private struct CommitRow: View {
     /// The local branch a checkout switches to, like History.checkout picks it.
     private var localBranch: String? {
         refs.first { !$0.isTag && !$0.name.hasPrefix("origin/") }?.name
+    }
+
+    /// How far a local branch here is from its upstream, as "↑2 ↓1". Nil when they match.
+    private var drift: (branch: String, upstream: History.Upstream, counts: String)? {
+        for ref in refs where !ref.isTag {
+            guard let upstream = upstreams[ref.name], upstream.ahead + upstream.behind > 0 else { continue }
+            let counts = [upstream.ahead > 0 ? "↑\(upstream.ahead)" : nil, upstream.behind > 0 ? "↓\(upstream.behind)" : nil]
+            return (ref.name, upstream, counts.compactMap { $0 }.joined(separator: " "))
+        }
+        return nil
+    }
+
+    private func driftTip(_ branch: String, _ upstream: History.Upstream) -> String {
+        let parts = [upstream.ahead > 0 ? "\(upstream.ahead) to push" : nil, upstream.behind > 0 ? "\(upstream.behind) to pull" : nil]
+        return "\(branch) vs \(upstream.name): " + parts.compactMap { $0 }.joined(separator: ", ")
     }
 
     private var isHead: Bool { row.commit.refs.contains { $0 == "HEAD" || $0.hasPrefix("HEAD -> ") } }

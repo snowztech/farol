@@ -19,6 +19,8 @@ public enum Git {
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
         process.currentDirectoryURL = URL(fileURLWithPath: directory)
+        // There's no terminal to type a password into, so git fails right away instead of waiting forever.
+        process.environment = ProcessInfo.processInfo.environment.merging(["GIT_TERMINAL_PROMPT": "0"]) { $1 }
         let output = Pipe()
         let errors = Pipe()
         process.standardOutput = output

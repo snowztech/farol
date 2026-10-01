@@ -10,8 +10,14 @@ public enum History {
         /// Branches and tags pointing here, as git decorates them: "HEAD -> main", "origin/main", "tag: v1".
         public let refs: [String]
         public let subject: String
+        public var email = ""
 
         public var shortHash: String { String(hash.prefix(7)) }
+
+        /// Whether `branch`, local like main or remote like origin/main, points here.
+        public func points(_ branch: String) -> Bool {
+            refs.contains { $0 == branch || $0 == "HEAD -> " + branch }
+        }
     }
 
     /// A line drawn in one half of a row, from lane `from` to lane `to`.
@@ -33,6 +39,11 @@ public enum History {
         public var color = 0
         public var colorsAbove: [Int] = []
         public var colorsBelow: [Int] = []
+        /// Set when only one side of a branch and its upstream has the commit, so its lines are drawn dashed down to its parents.
+        public var oneSided = false
+        /// Each lane above and below the dot, indexed by lane: true while it leads down from a one sided commit.
+        public var dashedAbove: [Bool] = []
+        public var dashedBelow: [Bool] = []
         /// Lanes in use on this row, to size the graph column.
         public var width: Int { ([column] + top.flatMap { [$0.from, $0.to] } + bottom.flatMap { [$0.from, $0.to] }).max()! + 1 }
     }
@@ -42,7 +53,7 @@ public enum History {
 
     /// The commits reachable from `branch`, or from every branch when it is nil, newest first.
     public static func commits(in directory: String, branch: String?, limit: Int = limit) throws -> [Commit] {
-        let format = ["%H", "%P", "%an", "%at", "%D", "%s"].joined(separator: "%x1f")
+        let format = ["%H", "%P", "%an", "%at", "%D", "%ae", "%s"].joined(separator: "%x1f")
         let output = try Git.run(["log", "--topo-order", "--no-color", "--format=\(format)", "-n", "\(limit)",
                                   branch ?? "--all"], in: directory)
         return parse(output)
@@ -62,6 +73,43 @@ public enum History {
             }
         }
         return (local, remote)
+    }
+
+    public struct Upstream: Equatable {
+        public let name: String
+        /// Commits the branch has that the upstream doesn't, and the other way around, as of the last fetch.
+        public let ahead: Int
+        public let behind: Int
+    }
+
+    /// Each local branch's upstream, like main to origin/main. Branches that track nothing are left out.
+    public static func upstreams(in directory: String) -> [String: Upstream] {
+        let format = "--format=%(refname:short)%1f%(upstream:short)%1f%(upstream:track,nobracket)"
+        let output = (try? Git.run(["for-each-ref", format, "refs/heads"], in: directory)) ?? ""
+        var upstreams: [String: Upstream] = [:]
+        for line in output.split(separator: "\n") {
+            let fields = line.split(separator: "\u{1f}", omittingEmptySubsequences: false).map(String.init)
+            guard fields.count == 3, !fields[1].isEmpty else { continue }
+            // Reads like "ahead 2, behind 1", or "gone" once the server branch is deleted.
+            func count(_ word: String) -> Int {
+                fields[2].split(separator: ",").compactMap { part -> Int? in
+                    let words = part.split(separator: " ")
+                    return words.count == 2 && words[0] == word ? Int(words[1]) : nil
+                }.first ?? 0
+            }
+            upstreams[fields[0]] = Upstream(name: fields[1], ahead: count("ahead"), behind: count("behind"))
+        }
+        return upstreams
+    }
+
+    /// The commits only a branch or only its upstream has, like work not pushed yet or not pulled yet.
+    public static func oneSided(_ upstreams: [String: Upstream], in directory: String, limit: Int = limit) -> Set<String> {
+        var hashes: Set<String> = []
+        for (branch, upstream) in upstreams where upstream.ahead + upstream.behind > 0 {
+            let output = (try? Git.run(["rev-list", "-n", "\(limit)", "refs/heads/\(branch)...\(upstream.name)"], in: directory)) ?? ""
+            hashes.formUnion(output.split(separator: "\n").map(String.init))
+        }
+        return hashes
     }
 
     /// Checks out `branch`. A remote one switches to the local branch of the same name, made to track it if it doesn't exist yet.
@@ -100,6 +148,37 @@ public enum History {
     public static func deleteRemoteBranch(_ branch: String, in directory: String) throws {
         guard let slash = branch.firstIndex(of: "/") else { throw GitError(description: "\(branch) isn't a remote branch.") }
         try Git.run(["push", String(branch[..<slash]), "--delete", String(branch[branch.index(after: slash)...])], in: directory)
+    }
+
+    /// Brings every remote's branches up to date and drops the ones deleted on the server.
+    public static func fetch(in directory: String) throws {
+        try Git.run(["fetch", "--all", "--prune"], in: directory)
+    }
+
+    /// Moves `branch` up to its upstream. The checked out one pulls, any other moves without a checkout.
+    /// Neither merges, so a branch that went its own way stays put and git says why.
+    public static func update(_ branch: String, current: Bool, in directory: String) throws {
+        guard !current else {
+            try Git.run(["pull", "--ff-only"], in: directory)
+            return
+        }
+        let (remote, ref) = try tracked(branch, in: directory)
+        try Git.run(["fetch", remote, "\(ref):refs/heads/\(branch)"], in: directory)
+    }
+
+    /// Sends `branch` to its upstream. Never forced, so the server refuses when it has commits the branch doesn't.
+    public static func push(_ branch: String, in directory: String) throws {
+        let (remote, ref) = try tracked(branch, in: directory)
+        try Git.run(["push", remote, "refs/heads/\(branch):\(ref)"], in: directory)
+    }
+
+    /// The remote and the branch on it that `branch` follows, like origin and refs/heads/main.
+    private static func tracked(_ branch: String, in directory: String) throws -> (remote: String, ref: String) {
+        guard let remote = try? Git.run(["config", "--get", "branch.\(branch).remote"], in: directory),
+              let ref = try? Git.run(["config", "--get", "branch.\(branch).merge"], in: directory) else {
+            throw GitError(description: "\(branch) doesn't track another branch.")
+        }
+        return (remote, ref)
     }
 
     /// Replays the checked out branch on top of `base`. On a conflict git stops and says how to go on.
@@ -147,7 +226,7 @@ public enum History {
     static func parse(_ output: String) -> [Commit] {
         output.split(separator: "\n").compactMap { line in
             let fields = line.split(separator: "\u{1f}", omittingEmptySubsequences: false).map(String.init)
-            guard fields.count >= 6, let time = TimeInterval(fields[3]) else { return nil }
+            guard fields.count >= 7, let time = TimeInterval(fields[3]) else { return nil }
             return Commit(
                 hash: fields[0],
                 parents: fields[1].split(separator: " ").map(String.init),
@@ -155,16 +234,18 @@ public enum History {
                 date: Date(timeIntervalSince1970: time),
                 refs: fields[4].isEmpty ? [] : fields[4].components(separatedBy: ", "),
                 // A subject can hold the separator itself, so the rest of the line is all subject.
-                subject: fields[5...].joined(separator: "\u{1f}"))
+                subject: fields[6...].joined(separator: "\u{1f}"),
+                email: fields[5])
         }
     }
 
     /// Places each commit in a lane and lists the lines that join it to its children above and its parents below.
     /// Commits must be in topological order, children before parents.
-    public static func graph(_ commits: [Commit]) -> [Row] {
+    public static func graph(_ commits: [Commit], oneSided: Set<String> = []) -> [Row] {
         // What each lane waits for: the hash of the next commit it leads to, or nil when the lane is free.
         var lanes: [String?] = []
         var colors: [Int] = []
+        var dashed: [Bool] = []
         var next = 0
         func newColor() -> Int {
             defer { next += 1 }
@@ -177,8 +258,11 @@ public enum History {
             if column == lanes.count {
                 lanes.append(nil)
                 colors.append(0)
+                dashed.append(false)
             }
             let colorsAbove = colors
+            let dashedAbove = dashed
+            let isOneSided = oneSided.contains(commit.hash)
             let color = waited.map { colors[$0] } ?? newColor()
 
             var top: [Edge] = []
@@ -200,6 +284,7 @@ public enum History {
                     // Each branch keeps its own lane down to where it forked, even when another lane waits for the same parent.
                     lanes[column] = parent
                     colors[column] = color
+                    dashed[column] = isOneSided
                     fromCommit.insert(column)
                 } else if let lane = lanes.firstIndex(of: parent) {
                     // Another branch already leads to this parent, so the two lines meet in its lane.
@@ -209,9 +294,11 @@ public enum History {
                     if lane == lanes.count {
                         lanes.append(nil)
                         colors.append(0)
+                        dashed.append(false)
                     }
                     lanes[lane] = parent
                     colors[lane] = newColor()
+                    dashed[lane] = isOneSided
                     fromCommit.insert(lane)
                 }
             }
@@ -219,13 +306,16 @@ public enum History {
             let bottom = passing.sorted().map { Edge(from: $0, to: $0) }
                 + fromCommit.sorted().map { Edge(from: column, to: $0) }
             let colorsBelow = colors
+            let dashedBelow = dashed
             while lanes.last == .some(nil) {
                 lanes.removeLast()
                 colors.removeLast()
+                dashed.removeLast()
             }
 
             rows.append(Row(commit: commit, column: column, top: top, bottom: bottom,
-                            color: color, colorsAbove: colorsAbove, colorsBelow: colorsBelow))
+                            color: color, colorsAbove: colorsAbove, colorsBelow: colorsBelow,
+                            oneSided: isOneSided, dashedAbove: dashedAbove, dashedBelow: dashedBelow))
         }
         return rows
     }

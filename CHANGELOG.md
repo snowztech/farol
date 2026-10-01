@@ -4,6 +4,17 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- A refresh button in the git graph fetches from every remote and drops branches deleted on the server.
+- Branches that are behind or ahead of their remote show the count in blue or green. Click it to update or push the branch. Update is also in the branch's right-click menu, grayed out when there is nothing to pull.
+- In the history, the line between a branch and its remote is dashed, and the branch's commit shows how far apart they are.
+- Hovering a branch highlights the commit it points to. Hovering an author shows their email.
+
+### Changed
+
+- The git graph uses many more colors, so two branches rarely share one.
+
 ## [0.19.0] - 2026-10-01
 
 See in Settings whether GitHub and GitLab are connected.
