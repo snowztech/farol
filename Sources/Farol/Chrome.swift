@@ -47,7 +47,7 @@ struct TopBar: View {
                 if state.showingSettings {
                     Text("Settings")
                 } else if let session = store.selected {
-                    SessionTitle(session: session)
+                    SessionMenu(session: session, store: store, palette: p)
                 }
             }
             .font(.system(size: 12, weight: .medium))
@@ -200,9 +200,111 @@ private struct GitButton: View {
     }
 }
 
-private struct SessionTitle: View {
+/// The title opens a searchable list of every session, grouped like the sidebar, so you can switch with the sidebar closed.
+private struct SessionMenu: View {
     @ObservedObject var session: Session
-    var body: some View { Text(session.displayName) }
+    @ObservedObject var store: SessionStore
+    let palette: Palette
+
+    @State private var open = false
+    @State private var hovering = false
+    @State private var query = ""
+    @FocusState private var searching: Bool
+
+    var body: some View {
+        let p = palette
+        Button { open.toggle() } label: {
+            HStack(spacing: 5) {
+                Text(session.displayName)
+                Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
+            }
+            .foregroundStyle(hovering || open ? p.text : p.muted)
+            .padding(.horizontal, 8)
+            .frame(height: 20)
+            .background(RoundedRectangle(cornerRadius: 6).fill(hovering || open ? p.raised : .clear))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .onClickableHover { hovering = $0 }
+        .hoverTip("Switch session")
+        .popover(isPresented: $open, arrowEdge: .bottom) { list(p) }
+        .onChange(of: open) { _, open in if !open { query = "" } }
+    }
+
+    private func list(_ p: Palette) -> some View {
+        let groups = matches
+        return VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass").foregroundStyle(p.muted)
+                // Return takes the first match, so a session is a few letters away.
+                TextField("Search \(store.sessions.count) sessions", text: $query)
+                    .textFieldStyle(.plain)
+                    .focused($searching)
+                    .onSubmit { groups.first?.items.first.map(choose) }
+            }
+            .padding(12)
+            Rectangle().fill(p.line).frame(height: 1)
+            ScrollView {
+                LazyVStack(spacing: 1) {
+                    ForEach(groups, id: \.key) { group in
+                        if let key = group.key {
+                            RepoHeader(name: URL(fileURLWithPath: key).lastPathComponent, palette: p)
+                        }
+                        ForEach(group.items) { item in
+                            SheetChoice(palette: p) { choose(item) } label: {
+                                SessionChoice(session: item, selected: item.id == store.selectedID, palette: p)
+                            }
+                        }
+                    }
+                    if groups.isEmpty {
+                        Text("No session matches.").foregroundStyle(p.muted).padding(.vertical, 12)
+                    }
+                }
+                .padding(6)
+            }
+            .frame(maxHeight: 320)
+        }
+        .frame(width: 320)
+        .font(.system(size: 13))
+        .foregroundStyle(p.text)
+        .background(p.background)
+        .onAppear { searching = true }
+    }
+
+    /// The sidebar's groups, keeping only the sessions whose name, repo or branch has every word typed.
+    private var matches: [Grouping.Group<Session>] {
+        let words = query.lowercased().split(separator: " ")
+        return store.groups.compactMap { group in
+            let items = group.items.filter { item in
+                let text = [item.displayName, item.repoName ?? "", item.branch ?? ""].joined(separator: " ").lowercased()
+                return words.allSatisfy(text.contains)
+            }
+            return items.isEmpty ? nil : Grouping.Group(key: group.key, items: items)
+        }
+    }
+
+    private func choose(_ item: Session) {
+        open = false
+        if item.id != store.selectedID { store.select(item) }
+    }
+}
+
+/// A session in the title's list: its lamp, its name, its branch, and a check on the one you are in.
+private struct SessionChoice: View {
+    @ObservedObject var session: Session
+    let selected: Bool
+    let palette: Palette
+
+    var body: some View {
+        Lamp(activity: session.activity, selected: selected, palette: palette)
+        Text(session.displayName).lineLimit(1).truncationMode(.tail)
+        Spacer(minLength: 8)
+        if let branch = session.branch {
+            Text(branch).font(.system(size: 11.5)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.middle)
+        }
+        Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)).opacity(selected ? 1 : 0)
+    }
 }
 
 extension View {
