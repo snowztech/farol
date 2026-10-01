@@ -4,6 +4,18 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Farol Beam, Farol Dark, Farol Navy and Farol Light, four themes in the colors of the four app icons. They come first in Settings → Appearance.
+
+### Changed
+
+- Farol Beam is the theme until you pick one, and its card says so. When your Ghostty config sets its own colors, those stay the default, under a card named Ghostty config.
+
+### Fixed
+
+- Opened from a Ghostty terminal, Farol used Ghostty's own themes and shell integration rather than the ones it ships with.
+
 ## [0.21.1] - 2026-10-01
 
 Keep your chosen cursor style at the shell prompt.

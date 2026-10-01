@@ -13,9 +13,9 @@ final class WindowState: ObservableObject {
     @Published var graphWidth: CGFloat = 0
     /// Zero while the review panel is closed.
     @Published var reviewWidth: CGFloat = 0
-    let ghosttyConfigPreview: ThemeColors
+    let ghosttyConfigPreview: ThemeColors?
 
-    init(palette: Palette, ghosttyConfigPreview: ThemeColors) {
+    init(palette: Palette, ghosttyConfigPreview: ThemeColors?) {
         self.palette = palette
         self.ghosttyConfigPreview = ghosttyConfigPreview
     }
