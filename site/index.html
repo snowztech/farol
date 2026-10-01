@@ -48,7 +48,7 @@
     .showcase::before {
       content: ""; position: absolute; inset: -12% 8% auto; height: 70%; z-index: 0;
       background: radial-gradient(ellipse at center, var(--sn-accent-soft), transparent 70%);
-      filter: blur(24px);
+      filter: blur(24px); pointer-events: none;
     }
     .shot {
       position: relative; z-index: 1; display: block; width: 100%; height: auto;
@@ -96,7 +96,7 @@
         <a class="sn-btn sn-btn--primary sn-btn--lg" href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Download for Mac</a>
         <a class="sn-btn sn-btn--secondary sn-btn--lg" href="https://github.com/snowztech/farol">GitHub</a>
       </div>
-      <p class="fine">Requires Apple silicon and macOS 14 or later. Free and open source.</p>
+      <p class="fine">Apple silicon, macOS 14+. Free and open source.</p>
       <p class="docs-link"><a href="docs.html">Read the docs →</a></p>
     </section>
 
