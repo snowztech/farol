@@ -52,10 +52,13 @@ Most of the time with parallel agents goes into checking what they did. That wor
 
 Work comes from a ticket and goes out as a merge request, on the services teams already use, hosted or self-hosted.
 
-- [ ] Settings → Integrations for GitLab, GitHub and Jira, with a server field for self-hosted instances
-- [ ] Reuse `glab` and `gh` logins when they exist, otherwise a token stored in the macOS Keychain
-- [ ] Jira Cloud and Jira Data Center, detected from the URL
-- [ ] Start a New task from a Jira ticket: branch named after the ticket, ticket text as the first prompt, ticket moved to In Progress
+- [x] Settings → Integrations shows whether `gh`, `glab` and jira-cli are set up, and for which account
+- [x] Reuse the `gh`, `glab` and jira-cli logins when they exist
+- [x] Start a New task from a Jira ticket or a GitHub issue: branch named after the ticket, ticket text as the first prompt
+- [ ] Start a New task from a GitLab issue
+- [ ] A server field for self-hosted instances, and a token stored in the macOS Keychain for when the tools aren't installed
+- [ ] A board's tickets on Jira Data Center, which only Jira Cloud answers today
+- [ ] The Jira ticket moved to In Progress when its task starts
 - [ ] The session shows its ticket and links to it
 - [ ] MCP config written into the worktree, so the agent can read and update the ticket and the merge request
 
@@ -69,7 +72,7 @@ Everything talks to your servers directly. Nothing goes through a Farol service.
 
 ## Later
 
-- Linear and GitHub Issues as ticket sources
+- Linear as a ticket source
 - Command palette
 - Farol Dark and Farol Light themes, tuned for the sidebar dots and syntax colors, with Farol Dark as the default
 
