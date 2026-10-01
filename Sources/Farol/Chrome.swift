@@ -5,6 +5,8 @@ import SwiftUI
 final class WindowState: ObservableObject {
     @Published var palette: Palette
     @Published var showingSettings = false
+    /// The session list under the title is open, from a click or ⌘P.
+    @Published var switchingSession = false
     /// Mirrors the sidebar and the files panel, so the top bar can match the columns below it.
     @Published var sidebarVisible = true
     @Published var filesVisible = false
@@ -47,7 +49,7 @@ struct TopBar: View {
                 if state.showingSettings {
                     Text("Settings")
                 } else if let session = store.selected {
-                    SessionMenu(session: session, store: store, palette: p)
+                    SessionMenu(session: session, store: store, state: state)
                 }
             }
             .font(.system(size: 12, weight: .medium))
@@ -204,16 +206,18 @@ private struct GitButton: View {
 private struct SessionMenu: View {
     @ObservedObject var session: Session
     @ObservedObject var store: SessionStore
-    let palette: Palette
+    @ObservedObject var state: WindowState
 
-    @State private var open = false
     @State private var hovering = false
     @State private var query = ""
     @FocusState private var searching: Bool
 
+    private var palette: Palette { state.palette }
+    private var open: Bool { state.switchingSession }
+
     var body: some View {
         let p = palette
-        Button { open.toggle() } label: {
+        Button { state.switchingSession.toggle() } label: {
             HStack(spacing: 5) {
                 Text(session.displayName)
                 Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
@@ -227,9 +231,9 @@ private struct SessionMenu: View {
         .buttonStyle(.plain)
         .fixedSize()
         .onClickableHover { hovering = $0 }
-        .hoverTip("Switch session")
-        .popover(isPresented: $open, arrowEdge: .bottom) { list(p) }
-        .onChange(of: open) { _, open in if !open { query = "" } }
+        .hoverTip("Switch session (⌘P)")
+        .popover(isPresented: $state.switchingSession, arrowEdge: .bottom) { list(p) }
+        .onChange(of: state.switchingSession) { _, open in if !open { query = "" } }
     }
 
     private func list(_ p: Palette) -> some View {
@@ -285,7 +289,7 @@ private struct SessionMenu: View {
     }
 
     private func choose(_ item: Session) {
-        open = false
+        state.switchingSession = false
         if item.id != store.selectedID { store.select(item) }
     }
 }

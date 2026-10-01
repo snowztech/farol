@@ -416,6 +416,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         show(store.selected)
     }
 
+    /// Settings hide the session's title, which the list opens under.
+    func switchSession() {
+        if state.showingSettings { toggleSettings() }
+        state.switchingSession = true
+    }
+
     // MARK: Layout
 
     private func hosting<V: View>(_ view: V) -> NSHostingView<V> {

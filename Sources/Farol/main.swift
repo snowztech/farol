@@ -49,6 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func nextSession(_ sender: Any?) { store.selectNext(offset: 1) }
     @objc func previousSession(_ sender: Any?) { store.selectNext(offset: -1) }
     @objc func selectSession(_ sender: NSMenuItem) { store.select(index: sender.tag) }
+    @objc func switchSession(_ sender: Any?) { windowController.switchSession() }
 
     @objc func toggleSettings(_ sender: Any?) { windowController.toggleSettings() }
     @objc func toggleSidebar(_ sender: Any?) { windowController.toggleSidebar() }
@@ -116,6 +117,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             .keyEquivalentModifierMask = [.command, .shift]
         sessions.addItem(withTitle: "Previous Session", action: #selector(previousSession), keyEquivalent: "[")
             .keyEquivalentModifierMask = [.command, .shift]
+        sessions.addItem(withTitle: "Switch Session…", action: #selector(switchSession), keyEquivalent: "p")
         sessions.addItem(.separator())
         for i in 0..<9 {
             let item = sessions.addItem(withTitle: "Session \(i + 1)", action: #selector(selectSession), keyEquivalent: "\(i + 1)")
