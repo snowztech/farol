@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-01
+
+Commit and push straight from the review panel.
+
 ### Added
 
 - Commit button in the review panel. When the checkout has uncommitted changes, it asks for a message and commits all of them, staged or not. Commit and Push also pushes the branch, to origin when it has no remote yet.
@@ -373,7 +377,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.16.1...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/snowztech/farol/releases/tag/v0.17.0
 [0.16.1]: https://github.com/snowztech/farol/releases/tag/v0.16.1
 [0.16.0]: https://github.com/snowztech/farol/releases/tag/v0.16.0
 [0.15.0]: https://github.com/snowztech/farol/releases/tag/v0.15.0
