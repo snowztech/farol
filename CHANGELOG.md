@@ -4,6 +4,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Settings → Pull requests shows whether GitHub's `gh` and GitLab's `glab` are installed and which account they are logged in as. Install and Log In open a terminal with the command typed in.
+- GitHub's and GitLab's marks on the pull request buttons in the review panel.
+
 ## [0.18.0] - 2026-10-01
 
 Pull requests from the review panel, on GitHub and GitLab.

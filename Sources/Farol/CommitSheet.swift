@@ -41,7 +41,7 @@ struct RequestButton: View {
             ShipButton(title: review.isShipping ? "Pushing…" : create ? "Create \(forge.requestShort)" : forge.request.capitalized,
                        help: create ? "Push \(branch) and create a \(forge.request) on \(forge.name), titled from its commits"
                            : "Push \(branch) and open its \(forge.request) page on \(forge.name). Install \(forge.tool) to create it from here.",
-                       busy: review.isShipping, palette: palette) {
+                       busy: review.isShipping, icon: forge.kind, palette: palette) {
                 review.ship(message: nil, then: .openRequest, failed: gitFailure)
             }
         }
@@ -56,7 +56,7 @@ struct RequestBadge: View {
     var body: some View {
         if let forge = review.forge, case .open(let number, let url) = review.request {
             ShipButton(title: "\(forge.requestShort) #\(number)", help: "View \(forge.request) #\(number) on \(forge.name)",
-                       busy: false, palette: palette) { NSWorkspace.shared.open(url) }
+                       busy: false, icon: forge.kind, palette: palette) { NSWorkspace.shared.open(url) }
         }
     }
 }
@@ -73,6 +73,8 @@ private struct ShipButton: View {
     let title: String
     let help: String
     let busy: Bool
+    /// The forge's mark before the title, on the buttons that send you there.
+    var icon: Forge.Kind? = nil
     let palette: Palette
     let action: () -> Void
 
@@ -80,14 +82,16 @@ private struct ShipButton: View {
 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(busy ? palette.muted : palette.text)
-                .padding(.horizontal, 10)
-                .frame(height: 24)
-                .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised : palette.surface))
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(palette.line))
-                .contentShape(Rectangle())
+            HStack(spacing: 6) {
+                if let icon { ForgeIcon(kind: icon) }
+                Text(title).font(.system(size: 12, weight: .medium))
+            }
+            .foregroundStyle(busy ? palette.muted : palette.text)
+            .padding(.horizontal, 10)
+            .frame(height: 24)
+            .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised : palette.surface))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(palette.line))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(busy)

@@ -10,6 +10,8 @@ struct SettingsPage: View {
     @ObservedObject var worktrees: WorktreeSettings
     @ObservedObject var state: WindowState
     @ObservedObject var updates: UpdateChecker
+    /// Opens a session with a command typed in, for setting up a tool that asks questions.
+    let runInTerminal: (String) -> Void
 
     @AppStorage(AppIcon.key) private var appIcon = AppIcon.default.rawValue
     @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = false
@@ -18,6 +20,8 @@ struct SettingsPage: View {
     @State private var setups: [String: AgentSetup.State] = [:]
     @State private var agentChange: AgentChange?
     @State private var agentError: String?
+    /// Whether gh and glab are there and logged in. Empty while they are being asked.
+    @State private var tools: [Forge.Kind: Forge.ToolState] = [:]
     /// macOS refuses Farol's notifications, so turning them on here would do nothing.
     @State private var notificationsBlocked = false
 
@@ -36,6 +40,7 @@ struct SettingsPage: View {
         case appearance = "Appearance"
         case agents = "Agents"
         case worktrees = "Worktrees"
+        case requests = "Pull requests"
         case shortcuts = "Shortcuts"
         case about = "About"
     }
@@ -68,6 +73,7 @@ struct SettingsPage: View {
                         case .terminal: terminal(p)
                         case .agents: agentsSection(p)
                         case .worktrees: worktreesSection(p)
+                        case .requests: requestsSection(p)
                         case .shortcuts: shortcuts(p)
                         case .about: EmptyView()
                         }
@@ -86,6 +92,8 @@ struct SettingsPage: View {
         .tint(p.control)
         .onAppear(perform: refreshAgents)
         .onChange(of: section) { _, _ in refreshAgents() }
+        // The page stays alive while hidden, so coming back from a login in the terminal has to ask again.
+        .onChange(of: state.showingSettings) { _, showing in if showing { refreshAgents() } }
         .alert(item: $agentChange, content: agentAlert)
         .onChange(of: appIcon) { _, name in AppIcon.apply(AppIcon(rawValue: name) ?? .default) }
     }
@@ -277,6 +285,35 @@ struct SettingsPage: View {
         }
     }
 
+    @ViewBuilder private func requestsSection(_ p: Palette) -> some View {
+        Heading(title: "Pull requests",
+                detail: "Farol creates pull requests and shows their state through GitHub's and GitLab's own command line tools. Without them it opens the new request page in your browser.",
+                palette: p)
+        ForEach(Forge.Kind.allCases, id: \.self) { toolRow($0, p) }
+    }
+
+    private func toolRow(_ kind: Forge.Kind, _ p: Palette) -> some View {
+        let state = tools[kind]
+        let detail = switch state {
+        case nil: "Checking \(kind.tool)…"
+        case .connected(let account): "Logged in\(account.map { " as \($0)" } ?? ""), through \(kind.tool)."
+        case .loggedOut: "\(kind.tool) is installed but not logged in."
+        case .missing: "\(kind.tool) isn't installed. A \(kind.request) opens in your browser."
+        }
+        return Row(title: kind.name, detail: detail, icon: kind, palette: p) {
+            HStack(spacing: 12) {
+                if let state {
+                    ToolStateLabel(state: state, palette: p)
+                    if state == .missing || state == .loggedOut {
+                        Button(state == .missing ? "Install" : "Log In") { runInTerminal(kind.setupCommand(from: state)) }
+                    }
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+    }
+
     private func agentRow(_ agent: AgentSetup, _ p: Palette) -> some View {
         let state = setups[agent.name] ?? .disconnected
         let summary = state == .connected ? agent.summaryWhenConnected : agent.summaryWhenDisconnected
@@ -351,6 +388,11 @@ struct SettingsPage: View {
             DispatchQueue.main.async { notificationsBlocked = blocked }
         }
         for agent in AgentSetup.all { setups[agent.name] = agent.state() }
+        guard section == .requests else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let states = Dictionary(uniqueKeysWithValues: Forge.Kind.allCases.map { ($0, $0.toolState()) })
+            DispatchQueue.main.async { tools = states }
+        }
     }
 
     private func change(_ agent: AgentSetup, connect: Bool) {
@@ -533,13 +575,17 @@ private struct Heading: View {
 private struct Row<Control: View>: View {
     let title: String
     var detail: String? = nil
+    var icon: Forge.Kind? = nil
     let palette: Palette
     @ViewBuilder let control: Control
 
     var body: some View {
         HStack(alignment: .center, spacing: 24) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.system(size: 13))
+                HStack(spacing: 6) {
+                    if let icon { ForgeIcon(kind: icon, size: 13) }
+                    Text(title).font(.system(size: 13))
+                }
                 if let detail {
                     Text(detail).font(.system(size: 11.5)).foregroundStyle(palette.muted)
                 }
@@ -577,6 +623,23 @@ private struct SetupState: View {
                 .fill(state == .connected ? Color.green : state == .outdated ? Color.yellow : palette.muted.opacity(0.5))
                 .frame(width: 6, height: 6)
             Text(state == .connected ? "Connected" : state == .outdated ? "Needs update" : "Not connected")
+                .font(.system(size: 12))
+                .foregroundStyle(palette.muted)
+        }
+    }
+}
+
+/// "Connected" with a green dot, "Not logged in" with a yellow one, or a muted "Not installed".
+private struct ToolStateLabel: View {
+    let state: Forge.ToolState
+    let palette: Palette
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(state == .missing ? palette.muted.opacity(0.5) : state == .loggedOut ? Color.yellow : Color.green)
+                .frame(width: 6, height: 6)
+            Text(state == .missing ? "Not installed" : state == .loggedOut ? "Not logged in" : "Connected")
                 .font(.system(size: 12))
                 .foregroundStyle(palette.muted)
         }

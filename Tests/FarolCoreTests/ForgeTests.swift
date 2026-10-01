@@ -53,3 +53,14 @@ import Testing
     #expect(Forge.request(from: "no pull requests found") == .unknown)
     #expect(Forge.request(from: #"[{"title":"x"}]"#) == .unknown)
 }
+
+@Test func readsTheAccountFromEitherToolsStatus() {
+    #expect(Forge.Kind.account(from: "github.com\n  ✓ Logged in to github.com account ana (keyring)\n  - Active account: true") == "ana")
+    #expect(Forge.Kind.account(from: "gitlab.com\n  ✓ Logged in to gitlab.com as ana (GITLAB_TOKEN)") == "ana")
+    #expect(Forge.Kind.account(from: "You are not logged into any GitHub hosts.") == nil)
+}
+
+@Test func setupInstallsOnlyWhenTheToolIsMissing() {
+    #expect(Forge.Kind.github.setupCommand(from: .missing) == "brew install gh && gh auth login")
+    #expect(Forge.Kind.gitlab.setupCommand(from: .loggedOut) == "glab auth login")
+}

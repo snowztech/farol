@@ -100,7 +100,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         state.filesVisible = UserDefaults.standard.bool(forKey: Self.filesVisibleKey)
         state.graphVisible = UserDefaults.standard.bool(forKey: Self.graphVisibleKey)
         settingsView = hosting(SettingsPage(
-            settings: settings, agents: agents, worktrees: worktrees, state: state, updates: updates))
+            settings: settings, agents: agents, worktrees: worktrees, state: state, updates: updates,
+            runInTerminal: { [weak self] command in
+                guard let self else { return }
+                if state.showingSettings { toggleSettings() }
+                store.create(run: command)
+            }))
         settingsView.isHidden = true
 
         content.wantsLayer = true

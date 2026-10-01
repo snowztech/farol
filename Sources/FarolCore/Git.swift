@@ -12,7 +12,9 @@ public enum Git {
     }
 
     /// Runs any command line tool the same way, as for the forges' own tools.
-    static func run(_ executable: String, _ arguments: [String], in directory: String, trimming: Bool = true) throws -> String {
+    /// Some tools report on stderr even when all is well, and `mergingErrors` returns that with the output.
+    static func run(_ executable: String, _ arguments: [String], in directory: String, trimming: Bool = true,
+                    mergingErrors: Bool = false) throws -> String {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
@@ -32,7 +34,7 @@ public enum Git {
             let name = URL(fileURLWithPath: executable).lastPathComponent
             throw GitError(description: message.isEmpty ? "\(name) \(arguments.joined(separator: " ")) failed" : message)
         }
-        let text = String(decoding: out, as: UTF8.self)
+        let text = String(decoding: mergingErrors ? out + err : out, as: UTF8.self)
         // A diff's leading spaces are context lines, so it can't be trimmed.
         return trimming ? text.trimmingCharacters(in: .whitespacesAndNewlines) : text
     }
