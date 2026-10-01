@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Click the window title or press ⌘P to switch sessions, with a search, even with the sidebar closed. Each session shows its status and branch.
+
 ## [0.22.0] - 2026-10-01
 
 Farol gets its own themes, one for each app icon.

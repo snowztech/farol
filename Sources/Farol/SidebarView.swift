@@ -176,7 +176,7 @@ private struct NewTaskRow: View {
 }
 
 /// A repo's name above its sessions, only there once sessions span several repos.
-private struct RepoHeader: View {
+struct RepoHeader: View {
     let name: String
     let palette: Palette
 
@@ -217,7 +217,7 @@ private struct Reorder: DropDelegate {
 }
 
 /// Hollow when nothing is happening, breathing while the agent works, rippling when it waits for you, filled when it is done.
-private struct Lamp: View {
+struct Lamp: View {
     let activity: Session.Activity
     /// A session you are looking at has no need to ripple.
     let selected: Bool

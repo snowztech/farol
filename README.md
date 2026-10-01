@@ -136,6 +136,7 @@ These hooks complement the terminal-title status used by interactive Codex sessi
 | Close pane or session | ⌘W |
 | Next or previous session | ⇧⌘] and ⇧⌘[ |
 | Go to session 1 to 9 | ⌘1 to ⌘9 |
+| Search sessions | ⌘P |
 | Split right or down | ⌘D and ⇧⌘D |
 | Move between panes | ⌘[ and ⌘], or ⌘⌥ with arrows |
 | Resize the focused pane | ⌘⌃ with arrows |
