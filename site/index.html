@@ -59,6 +59,14 @@
     .features b { display: block; font-weight: 500; margin-bottom: 6px; }
     .features span { color: var(--sn-fg-muted); font-size: var(--sn-text-sm); }
 
+    .reel { margin: 96px auto 0; text-align: center; }
+    .reel h2 { font-size: 20px; font-weight: 500; margin: 0 0 20px; letter-spacing: -0.01em; }
+    .reel video {
+      display: block; width: 100%; height: auto; border-radius: 12px;
+      border: 1px solid var(--sn-border-strong); background: #000;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+    }
+
     footer {
       margin: 96px auto 0; padding: 20px 20px 40px; max-width: 1040px;
       border-top: 1px solid var(--sn-border-subtle);
@@ -95,6 +103,15 @@
       <li><b>A task in one step</b><span>Describe it and pick an agent. Farol opens a worktree on a new branch and starts the agent on it.</span></li>
       <li><b>Built on libghostty</b><span>Ghostty's speed, themes and config, in a native Mac app.</span></li>
     </ul>
+
+    <section class="reel wide" aria-labelledby="reel-title">
+      <h2 id="reel-title">See Farol in motion</h2>
+      <video controls playsinline preload="metadata" poster="farol-reel-poster.jpg"
+             aria-label="A 25-second tour of Farol">
+        <source src="farol-reel.mp4" type="video/mp4">
+        <a href="farol-reel.mp4">Watch the Farol tour</a>
+      </video>
+    </section>
   </main>
 
   <footer>
