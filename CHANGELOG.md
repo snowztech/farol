@@ -6,7 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
-- Click the window title or press ⌘P to switch sessions, with a search, even with the sidebar closed. Each session shows its status and branch.
+- Click the window title or press ⌘P to switch sessions, with a search, even with the sidebar closed. Each session shows its status and branch. The arrow keys move through the list and Return opens the session, and each row shows its ⌘1 to ⌘9 shortcut.
 
 ## [0.22.0] - 2026-10-01
 

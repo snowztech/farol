@@ -210,6 +210,8 @@ private struct SessionMenu: View {
 
     @State private var hovering = false
     @State private var query = ""
+    /// The row the arrows or the mouse are on. Without one, Return goes to the first match.
+    @State private var active: UUID?
     @FocusState private var searching: Bool
 
     private var palette: Palette { state.palette }
@@ -233,7 +235,8 @@ private struct SessionMenu: View {
         .onClickableHover { hovering = $0 }
         .hoverTip("Switch session (⌘P)")
         .popover(isPresented: $state.switchingSession, arrowEdge: .bottom) { list(p) }
-        .onChange(of: state.switchingSession) { _, open in if !open { query = "" } }
+        .onChange(of: state.switchingSession) { _, open in if !open { (query, active) = ("", nil) } }
+        .onChange(of: query) { _, _ in active = nil }
     }
 
     private func list(_ p: Palette) -> some View {
@@ -245,7 +248,10 @@ private struct SessionMenu: View {
                 TextField("Search \(store.sessions.count) sessions", text: $query)
                     .textFieldStyle(.plain)
                     .focused($searching)
-                    .onSubmit { groups.first?.items.first.map(choose) }
+                    .onSubmit { highlighted.map(choose) }
+                    .onKeyPress(.downArrow) { move(1) }
+                    .onKeyPress(.upArrow) { move(-1) }
+                Text("⌘P").font(.system(size: 11.5)).foregroundStyle(p.muted)
             }
             .padding(12)
             Rectangle().fill(p.line).frame(height: 1)
@@ -256,9 +262,14 @@ private struct SessionMenu: View {
                             RepoHeader(name: URL(fileURLWithPath: key).lastPathComponent, palette: p)
                         }
                         ForEach(group.items) { item in
-                            SheetChoice(palette: p) { choose(item) } label: {
-                                SessionChoice(session: item, selected: item.id == store.selectedID, palette: p)
-                            }
+                            SessionChoice(
+                                session: item,
+                                current: item.id == store.selectedID,
+                                lit: item.id == highlighted?.id,
+                                shortcut: shortcut(for: item),
+                                palette: p,
+                                hover: { if $0 { active = item.id } },
+                                choose: { choose(item) })
                         }
                     }
                     if groups.isEmpty {
@@ -269,7 +280,7 @@ private struct SessionMenu: View {
             }
             .frame(maxHeight: 320)
         }
-        .frame(width: 320)
+        .frame(width: 340)
         .font(.system(size: 13))
         .foregroundStyle(p.text)
         .background(p.background)
@@ -288,26 +299,67 @@ private struct SessionMenu: View {
         }
     }
 
+    private var shown: [Session] { matches.flatMap(\.items) }
+
+    /// The row Return opens: the one the arrows or the mouse are on, else where you are, else the first match.
+    private var highlighted: Session? {
+        let shown = shown
+        return shown.first { $0.id == active } ?? shown.first { $0.id == store.selectedID && query.isEmpty } ?? shown.first
+    }
+
+    private func move(_ step: Int) -> KeyPress.Result {
+        let shown = shown
+        guard !shown.isEmpty else { return .handled }
+        let index = shown.firstIndex { $0.id == highlighted?.id } ?? 0
+        active = shown[(index + step + shown.count) % shown.count].id
+        return .handled
+    }
+
+    /// ⌘1 to ⌘9 as in the sidebar, shown until you type. A search changes the order, so the numbers would mislead.
+    private func shortcut(for item: Session) -> String? {
+        guard query.isEmpty, let index = store.ordered.firstIndex(where: { $0.id == item.id }), index < 9 else { return nil }
+        return "⌘\(index + 1)"
+    }
+
     private func choose(_ item: Session) {
         state.switchingSession = false
         if item.id != store.selectedID { store.select(item) }
     }
 }
 
-/// A session in the title's list: its lamp, its name, its branch, and a check on the one you are in.
+/// A session in the title's list: a check on the one you are in, its lamp, its name and branch, and its shortcut.
 private struct SessionChoice: View {
     @ObservedObject var session: Session
-    let selected: Bool
+    let current: Bool
+    /// Under the arrows or the mouse.
+    let lit: Bool
+    let shortcut: String?
     let palette: Palette
+    let hover: (Bool) -> Void
+    let choose: () -> Void
 
     var body: some View {
-        Lamp(activity: session.activity, selected: selected, palette: palette)
-        Text(session.displayName).lineLimit(1).truncationMode(.tail)
-        Spacer(minLength: 8)
-        if let branch = session.branch {
-            Text(branch).font(.system(size: 11.5)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.middle)
+        Button(action: choose) {
+            HStack(spacing: 9) {
+                // Always takes its room, so every name starts at the same place.
+                Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).opacity(current ? 1 : 0)
+                Lamp(activity: session.activity, selected: true, palette: palette)
+                Text(session.displayName).lineLimit(1).truncationMode(.tail).layoutPriority(1)
+                if let branch = session.branch {
+                    Text(branch).font(.system(size: 11.5)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.middle)
+                }
+                Spacer(minLength: 8)
+                if let shortcut {
+                    Text(shortcut).font(.system(size: 11.5)).monospacedDigit().foregroundStyle(palette.muted)
+                }
+            }
+            .padding(.horizontal, 9)
+            .frame(height: 28)
+            .background(RoundedRectangle(cornerRadius: 6).fill(lit ? palette.raised : .clear))
+            .contentShape(Rectangle())
         }
-        Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)).opacity(selected ? 1 : 0)
+        .buttonStyle(.plain)
+        .onClickableHover(hover)
     }
 }
 
