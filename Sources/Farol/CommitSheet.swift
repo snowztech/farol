@@ -115,10 +115,7 @@ private struct CommitSheet: View {
                     .textFieldStyle(.plain)
                     .lineLimit(3...8)
                     .focused($typing)
-                    .tint(p.text)
-                    .padding(10)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(p.surface))
-                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(typing ? p.muted : p.line))
+                    .sheetField(p, focused: typing)
                 VStack(spacing: 6) {
                     option(.nothing, "Commit", p)
                     option(.push, "Commit and push", p)
@@ -207,40 +204,6 @@ private struct CommitSheet: View {
     }
 
     private func option(_ step: AfterCommit, _ title: String, _ p: Palette) -> some View {
-        let selected = next == step
-        return Button { remembered = step.rawValue } label: {
-            HStack(spacing: 8) {
-                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
-                    .foregroundStyle(selected ? p.text : p.muted)
-                Text(title)
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .frame(height: 32)
-            .background(RoundedRectangle(cornerRadius: 8).fill(selected ? p.raised : .clear))
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(p.line))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-/// The sheet's own buttons, in the theme's colors.
-/// The system ones take the macOS accent color, blue by default, which belongs to no terminal theme.
-private struct SheetButton: ButtonStyle {
-    let palette: Palette
-    let primary: Bool
-
-    @Environment(\.isEnabled) private var enabled
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(primary ? palette.background : palette.text)
-            .padding(.horizontal, 14)
-            .frame(height: 28)
-            .background(RoundedRectangle(cornerRadius: 7).fill(primary ? palette.text : palette.raised))
-            .opacity(!enabled ? 0.35 : configuration.isPressed ? 0.8 : 1)
-            .contentShape(Rectangle())
+        SheetOption(title: title, selected: next == step, palette: p) { remembered = step.rawValue }
     }
 }

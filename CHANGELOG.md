@@ -10,6 +10,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Changed
 
+- The New Task sheet matches the commit sheet, in the theme's colors. Start stays off until there is a task and a branch name git accepts.
 - Committing from the review panel opens a sheet in Farol's own style. It lists the files that go in, takes a message with a body, and remembers whether you commit, commit and push, or go on to start a pull request.
 
 ## [0.17.0] - 2026-10-01
