@@ -114,8 +114,17 @@ public final class TerminalRuntime {
         Bundle.main.resourceURL?.appendingPathComponent("ghostty/themes")
     }
 
+    /// Shell integration sets a bar cursor at every prompt, which hides the cursor-style setting.
+    /// Loaded first, so the user's Ghostty config and the override files can still turn it back on.
+    private static let defaults = "shell-integration-features = no-cursor\n"
+
     private static func loadConfig(_ overrides: [URL]) -> ghostty_config_t {
         let config = ghostty_config_new()!
+        // libghostty only reads config from files.
+        let defaultsFile = FileManager.default.temporaryDirectory.appendingPathComponent("farol-defaults")
+        if (try? defaults.write(to: defaultsFile, atomically: true, encoding: .utf8)) != nil {
+            ghostty_config_load_file(config, defaultsFile.path)
+        }
         ghostty_config_load_default_files(config)
         for url in overrides where FileManager.default.fileExists(atPath: url.path) {
             ghostty_config_load_file(config, url.path)
