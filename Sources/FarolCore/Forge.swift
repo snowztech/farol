@@ -12,6 +12,8 @@ public struct Forge: Equatable {
         public var requestShort: String { self == .github ? "PR" : "MR" }
         /// The forge's own command line tool, which Farol asks about requests and creates them with.
         public var tool: String { self == .github ? "gh" : "glab" }
+        /// Where the tool's own documentation is, for installing it and logging in.
+        public var docs: String { self == .github ? "https://cli.github.com" : "https://docs.gitlab.com/cli/" }
 
         var toolPath: String? {
             // ponytail: looks where Homebrew and the official installers put them. Other setups, like nix, read as not installed.
@@ -131,6 +133,24 @@ public struct Forge: Equatable {
         // Not logged in, offline, or a repo the tool can't place all end here.
         guard let output = try? Git.run(path, arguments, in: directory) else { return .unknown }
         return Self.request(from: output)
+    }
+
+    /// The repo's open issues, newest first, to start a task from. Talks to the forge, so call it off the main thread.
+    public func issues(in directory: String) -> [Ticket] {
+        // ponytail: GitHub only, and the newest 30. glab lists issues too, for when GitLab needs them.
+        let arguments = ["issue", "list", "--state", "open", "--json", "number,title,body", "--limit", "30"]
+        guard kind == .github, let path = kind.toolPath,
+              let output = try? Git.run(path, arguments, in: directory) else { return [] }
+        return Self.issues(from: output)
+    }
+
+    static func issues(from json: String) -> [Ticket] {
+        let list = (try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]]) ?? []
+        return list.compactMap { issue in
+            guard let number = issue["number"] as? Int, let title = issue["title"] as? String else { return nil }
+            let body = (issue["body"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            return Ticket(source: .github, key: "#\(number)", summary: title, description: body)
+        }
     }
 
     /// Creates the request for `branch`, titled and described from its commits. The branch has to be pushed first.
