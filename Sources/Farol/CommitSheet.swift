@@ -28,18 +28,34 @@ struct CommitButton: View {
     }
 }
 
-/// "Start PR", shown once there is nothing left to commit. Pushes the branch, then opens the forge's form, where you create it.
+/// Shown once there is nothing left to commit. Pushes the branch, then opens the forge's form, where you create the request.
+/// "Start PR" when the forge's tool says there is none yet. Without the tool Farol can't tell, so it only says "Pull Request".
 struct RequestButton: View {
     @ObservedObject var review: ReviewModel
     let palette: Palette
 
     var body: some View {
         if let forge = review.forge, let branch = review.branch {
-            ShipButton(title: review.isShipping ? "Pushing…" : "Start \(forge.requestShort)",
-                       help: "Push \(branch) and open the new \(forge.request) form on \(forge.name)",
+            let known = review.request == .none
+            ShipButton(title: review.isShipping ? "Pushing…" : known ? "Start \(forge.requestShort)" : forge.request.capitalized,
+                       help: known ? "Push \(branch) and open the new \(forge.request) form on \(forge.name)"
+                           : "Push \(branch) and open its \(forge.request) page on \(forge.name). Install \(forge.tool) to see its number here.",
                        busy: review.isShipping, palette: palette) {
                 review.ship(message: nil, then: .openRequest, failed: gitFailure)
             }
+        }
+    }
+}
+
+/// "PR #5", once the branch has an open request. Opens it in the browser.
+struct RequestBadge: View {
+    @ObservedObject var review: ReviewModel
+    let palette: Palette
+
+    var body: some View {
+        if let forge = review.forge, case .open(let number, let url) = review.request {
+            ShipButton(title: "\(forge.requestShort) #\(number)", help: "View \(forge.request) #\(number) on \(forge.name)",
+                       busy: false, palette: palette) { NSWorkspace.shared.open(url) }
         }
     }
 }
@@ -91,10 +107,10 @@ private struct CommitSheet: View {
     @State private var files: [Diff.File]?
     @FocusState private var typing: Bool
 
-    /// The remembered choice, unless this repo can't do it, as with a pull request outside GitHub and GitLab.
+    /// The remembered choice, unless it makes no sense here, as when the branch already has a pull request.
     private var next: AfterCommit {
         let choice = AfterCommit(rawValue: remembered) ?? .nothing
-        return choice == .openRequest && review.forge == nil ? .push : choice
+        return choice == .openRequest && !review.canStartRequest ? .push : choice
     }
 
     private var ready: Bool { !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -119,7 +135,7 @@ private struct CommitSheet: View {
                 VStack(spacing: 6) {
                     option(.nothing, "Commit", p)
                     option(.push, "Commit and push", p)
-                    if let forge = review.forge {
+                    if let forge = review.forge, review.canStartRequest {
                         option(.openRequest, "Commit, push and start a \(forge.request) on \(forge.name)", p)
                     }
                 }

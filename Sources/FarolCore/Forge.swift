@@ -52,6 +52,42 @@ public struct Forge: Equatable {
         web = "\(scheme)://\(authority)/\(path)"
     }
 
+    /// What is known about a branch's request. Asking needs the forge's own command line tool, gh or glab, installed and logged in.
+    public enum RequestState: Equatable {
+        /// The tool is missing or couldn't answer, so there may or may not be one.
+        case unknown
+        case none
+        case open(number: Int, url: URL)
+    }
+
+    /// The tool's name, for telling people what to install.
+    public var tool: String { kind == .github ? "gh" : "glab" }
+
+    /// Whether `branch` has an open pull request, or merge request. Talks to the forge, so call it off the main thread.
+    public func request(for branch: String, in directory: String) -> RequestState {
+        // ponytail: looks where Homebrew and the official installers put them. Other setups, like nix, read as not installed.
+        let folders = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", NSHomeDirectory() + "/.local/bin"]
+        guard let path = folders.map({ "\($0)/\(tool)" }).first(where: FileManager.default.isExecutableFile(atPath:)) else {
+            return .unknown
+        }
+        let arguments = switch kind {
+        case .github: ["pr", "list", "--head", branch, "--state", "open", "--json", "number,url", "--limit", "1"]
+        case .gitlab: ["mr", "list", "--source-branch", branch, "--output", "json"]
+        }
+        // Not logged in, offline, or a repo the tool can't place all end here.
+        guard let output = try? Git.run(path, arguments, in: directory) else { return .unknown }
+        return Self.request(from: output)
+    }
+
+    /// Reads either tool's JSON list: gh says number and url, glab says iid and web_url.
+    static func request(from json: String) -> RequestState {
+        guard let list = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]] else { return .unknown }
+        guard let first = list.first else { return .none }
+        guard let number = (first["number"] ?? first["iid"]) as? Int,
+              let url = ((first["url"] ?? first["web_url"]) as? String).flatMap(URL.init(string:)) else { return .unknown }
+        return .open(number: number, url: url)
+    }
+
     /// The forge the checked out branch pushes to, or nil when its remote isn't GitHub or GitLab.
     public static func detect(in directory: String) -> Forge? {
         (try? Git.run(["remote", "get-url", History.pushRemote(in: directory)], in: directory)).flatMap(Forge.init(remote:))

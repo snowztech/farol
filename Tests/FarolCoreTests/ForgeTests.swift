@@ -42,3 +42,14 @@ import Testing
     try Git.run(["remote", "add", "origin", "git@github.com:snowztech/farol.git"], in: box.repo)
     #expect(Forge.detect(in: box.repo)?.web == "https://github.com/snowztech/farol")
 }
+
+@Test func readsAnOpenRequestFromEitherTool() {
+    #expect(Forge.request(from: #"[{"number":5,"url":"https://github.com/snowztech/farol/pull/5"}]"#)
+        == .open(number: 5, url: URL(string: "https://github.com/snowztech/farol/pull/5")!))
+    #expect(Forge.request(from: #"[{"iid":12,"web_url":"https://gitlab.com/group/app/-/merge_requests/12","title":"x"}]"#)
+        == .open(number: 12, url: URL(string: "https://gitlab.com/group/app/-/merge_requests/12")!))
+    #expect(Forge.request(from: "[]") == .none)
+    // An error message, or a shape that isn't a list, says nothing either way.
+    #expect(Forge.request(from: "no pull requests found") == .unknown)
+    #expect(Forge.request(from: #"[{"title":"x"}]"#) == .unknown)
+}
