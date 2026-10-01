@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Documentation · Farol</title>
+  <meta name="description" content="Install Farol, connect coding agents and learn its tasks, worktrees, review tools, settings and shortcuts.">
+  <meta property="og:title" content="Farol documentation">
+  <meta property="og:description" content="Set up Farol and learn the workflows for coding with agents.">
+  <meta property="og:image" content="https://farol.sh/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="icon.png">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.2/dist/snowztech-ui.min.css">
+  <script>
+    if (matchMedia("(prefers-color-scheme: light)").matches) document.documentElement.dataset.theme = "light";
+  </script>
+  <style>
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0; background: var(--sn-bg); color: var(--sn-fg);
+      font-family: var(--sn-font-mono); font-size: var(--sn-text-base);
+      line-height: var(--sn-leading-normal);
+    }
+    a { color: inherit; }
+    .wide { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+    .skip {
+      position: absolute; left: 20px; top: -60px; z-index: 10; padding: 8px 12px;
+      border-radius: 6px; background: var(--sn-fg); color: var(--sn-bg);
+    }
+    .skip:focus { top: 12px; }
+
+    .topbar {
+      min-height: 64px; display: flex; align-items: center; justify-content: space-between;
+      gap: 24px; border-bottom: 1px solid var(--sn-border-subtle);
+    }
+    .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; text-decoration: none; }
+    .brand img { width: 30px; height: 30px; }
+    .topbar nav { display: flex; align-items: center; gap: 20px; font-size: var(--sn-text-sm); }
+    .topbar nav a { color: var(--sn-fg-muted); text-decoration: none; }
+    .topbar nav a:hover, .topbar nav a[aria-current="page"] { color: var(--sn-fg); }
+
+    .docs-hero { position: relative; padding: 72px 0 64px; overflow: hidden; }
+    .docs-hero::before {
+      content: ""; position: absolute; inset: -80% 5% auto; height: 180%; z-index: 0;
+      background: radial-gradient(ellipse at center, var(--sn-accent-soft), transparent 68%);
+      filter: blur(32px); opacity: 0.55;
+    }
+    .docs-hero > div { position: relative; z-index: 1; max-width: 720px; }
+    .eyebrow { margin: 0 0 10px; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); text-transform: uppercase; letter-spacing: 0.12em; }
+    h1 { margin: 0 0 12px; font-size: 34px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.2; }
+    .lede { margin: 0; max-width: 620px; color: var(--sn-fg-muted); font-size: var(--sn-text-md); }
+
+    .docs-layout { display: grid; grid-template-columns: 210px minmax(0, 720px); gap: 64px; align-items: start; }
+    .toc { position: sticky; top: 28px; }
+    .toc b { display: block; margin-bottom: 12px; font-size: var(--sn-text-sm); font-weight: 500; }
+    .toc ul { list-style: none; margin: 0; padding: 0; }
+    .toc li + li { margin-top: 8px; }
+    .toc a { color: var(--sn-fg-subtle); font-size: var(--sn-text-sm); text-decoration: none; }
+    .toc a:hover { color: var(--sn-fg); }
+
+    .content section { scroll-margin-top: 28px; }
+    .content section + section { margin-top: 72px; padding-top: 72px; border-top: 1px solid var(--sn-border-subtle); }
+    h2 { margin: 0 0 18px; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+    h3 { margin: 32px 0 10px; font-size: 16px; font-weight: 600; }
+    p { margin: 0 0 16px; }
+    .content p, .content li { color: var(--sn-fg-muted); }
+    .content strong { color: var(--sn-fg); font-weight: 500; }
+    .content ol, .content ul { margin: 0 0 20px; padding-left: 22px; }
+    .content li + li { margin-top: 8px; }
+    .content a { color: var(--sn-fg); text-underline-offset: 3px; }
+    code, kbd {
+      border: 1px solid var(--sn-border-subtle); border-radius: 4px;
+      background: var(--sn-bg-raised); color: var(--sn-fg); font: inherit;
+    }
+    code { padding: 1px 5px; }
+    kbd { display: inline-block; min-width: 1.3em; padding: 0 5px; text-align: center; box-shadow: 0 1px 0 var(--sn-border-strong); }
+    pre {
+      margin: 18px 0; padding: 16px 18px; overflow-x: auto;
+      border: 1px solid var(--sn-border-subtle); border-radius: 8px;
+      background: var(--sn-bg-raised); color: var(--sn-fg-muted);
+    }
+    pre code { padding: 0; border: 0; background: none; }
+    .note {
+      margin: 22px 0; padding: 15px 17px; border: 1px solid var(--sn-border-subtle);
+      border-left: 3px solid var(--sn-accent); border-radius: 8px; background: var(--sn-bg-raised);
+    }
+    .note p { margin: 0; }
+    .status-table, .shortcuts { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    .status-table th, .status-table td, .shortcuts th, .shortcuts td {
+      padding: 11px 12px; border-bottom: 1px solid var(--sn-border-subtle); text-align: left;
+      color: var(--sn-fg-muted); font-size: var(--sn-text-sm); vertical-align: top;
+    }
+    .status-table th, .shortcuts th { color: var(--sn-fg); font-weight: 500; }
+    .dot { display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: currentColor; }
+    .dot-idle { border: 1px solid var(--sn-fg-subtle); background: transparent; color: var(--sn-fg-subtle); }
+    .dot-working { color: #67e8f9; box-shadow: 0 0 8px currentColor; }
+    .dot-waiting { color: #fde68a; box-shadow: 0 0 8px currentColor; }
+    .dot-done { color: #86efac; }
+    .doc-shot {
+      display: block; width: 100%; height: auto; margin: 24px 0 0;
+      border: 1px solid var(--sn-border-strong); border-radius: 10px;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.3);
+    }
+
+    footer {
+      margin: 96px auto 0; padding: 20px 20px 40px; max-width: 1040px;
+      border-top: 1px solid var(--sn-border-subtle); display: flex;
+      justify-content: space-between; flex-wrap: wrap; gap: 8px;
+      color: var(--sn-fg-subtle); font-size: var(--sn-text-xs);
+    }
+    footer a { color: var(--sn-fg-muted); text-decoration: none; }
+    footer a:hover { color: var(--sn-fg); }
+
+    @media (max-width: 760px) {
+      .topbar nav a:not(.sn-btn) { display: none; }
+      .docs-hero { padding: 52px 0 44px; }
+      h1 { font-size: 29px; }
+      .docs-layout { display: block; }
+      .toc { position: static; margin-bottom: 56px; padding-bottom: 24px; border-bottom: 1px solid var(--sn-border-subtle); }
+      .toc ul { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+      .toc li + li { margin-top: 0; }
+      .content section + section { margin-top: 56px; padding-top: 56px; }
+      .status-table, .shortcuts { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#content">Skip to documentation</a>
+
+  <header class="topbar wide">
+    <a class="brand" href="index.html"><img src="icon.png" alt="">Farol</a>
+    <nav aria-label="Main navigation">
+      <a href="index.html">Home</a>
+      <a href="docs.html" aria-current="page">Docs</a>
+      <a href="https://github.com/snowztech/farol">GitHub</a>
+      <a class="sn-btn sn-btn--primary" href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Download</a>
+    </nav>
+  </header>
+
+  <main>
+    <header class="docs-hero wide">
+      <div>
+        <p class="eyebrow">Documentation</p>
+        <h1>Work with agents in Farol</h1>
+        <p class="lede">Install the app, connect your coding agents and learn the workflows that take a task from prompt to pull request.</p>
+      </div>
+    </header>
+
+    <div class="docs-layout wide">
+      <nav class="toc" aria-label="Documentation sections">
+        <b>On this page</b>
+        <ul>
+          <li><a href="#install">Install</a></li>
+          <li><a href="#agents">Connect agents</a></li>
+          <li><a href="#tasks">Tasks and worktrees</a></li>
+          <li><a href="#status">Agent status</a></li>
+          <li><a href="#review">Review and ship</a></li>
+          <li><a href="#outside">From any app</a></li>
+          <li><a href="#configuration">Configuration</a></li>
+          <li><a href="#shortcuts">Shortcuts</a></li>
+          <li><a href="#troubleshooting">Troubleshooting</a></li>
+        </ul>
+      </nav>
+
+      <article class="content" id="content">
+        <section id="install">
+          <h2>Install</h2>
+          <ol>
+            <li>Download the latest <a href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Farol.dmg</a>.</li>
+            <li>Open it and drag Farol to Applications.</li>
+            <li>Open Farol from Applications or Spotlight.</li>
+          </ol>
+          <p>Farol needs Apple Silicon and macOS 14 or later. Releases are signed and notarized.</p>
+          <div class="note"><p><strong>Already use Ghostty?</strong> Farol reads your Ghostty configuration first, then applies anything in its own configuration file.</p></div>
+        </section>
+
+        <section id="agents">
+          <h2>Connect agents</h2>
+          <p>Open <strong>Settings → Agents</strong> to connect an agent. Farol keeps each tool's existing settings and makes a backup before adding hooks.</p>
+
+          <h3>Claude Code</h3>
+          <p>Click <strong>Connect</strong>. Farol adds status hooks to <code>~/.claude/settings.json</code>. Disconnect removes only Farol's hooks.</p>
+
+          <h3>Codex</h3>
+          <p>Interactive sessions report their status through terminal titles automatically. Keep terminal titles enabled in Codex. Click <strong>Connect</strong> to cover non-interactive runs and background agents too, then restart open sessions and review the hooks with <code>/hooks</code>.</p>
+          <p>Codex hooks require version 0.159.2 or later.</p>
+
+          <h3>More than one account</h3>
+          <p>Farol finds agent folders such as <code>~/.claude-*</code> and <code>~/.codex-*</code>. Connect each account in Settings, then choose the one you want when starting a task.</p>
+
+          <h3>Other agents</h3>
+          <p>Every Farol session exposes <code>$FAROL_CLI</code>. An agent can report its state with:</p>
+          <pre><code>"$FAROL_CLI" status working
+"$FAROL_CLI" status waiting
+"$FAROL_CLI" status done
+"$FAROL_CLI" status clear</code></pre>
+          <p>An agent that rings the terminal bell also shows as waiting without setup.</p>
+        </section>
+
+        <section id="tasks">
+          <h2>Tasks and worktrees</h2>
+          <p>Press <kbd>⇧⌘N</kbd> to start a task. Describe the work, choose an agent and account, then pick a branch name. Farol creates a git worktree and sends the task as the agent's first prompt.</p>
+          <p>You can start from one of your open Jira tickets or the repository's GitHub issues. Farol names the branch from the ticket and gives the agent its full description.</p>
+          <div class="note"><p><strong>Why worktrees?</strong> Each task gets its own checkout, so agents on different branches never write to the same files.</p></div>
+          <p>Press <kbd>⇧⌘T</kbd> when you want a worktree session without starting an agent. Closing a worktree session offers to remove the checkout and always keeps its branch.</p>
+        </section>
+
+        <section id="status">
+          <h2>Agent status</h2>
+          <p>The dot beside a session tells you what needs attention. Its colors come from the active terminal theme.</p>
+          <table class="status-table">
+            <thead><tr><th>State</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td><span class="dot dot-idle"></span>Idle</td><td>No active agent state.</td></tr>
+              <tr><td><span class="dot dot-working"></span>Working</td><td>The agent is processing a prompt or using tools.</td></tr>
+              <tr><td><span class="dot dot-waiting"></span>Waiting</td><td>The agent needs approval or an answer.</td></tr>
+              <tr><td><span class="dot dot-done"></span>Done</td><td>The turn finished while you were elsewhere.</td></tr>
+            </tbody>
+          </table>
+          <p>Use <kbd>⌘P</kbd> to search and switch sessions. Settings can also group sessions under each project's name.</p>
+        </section>
+
+        <section id="review">
+          <h2>Review and ship</h2>
+          <p>The title bar shows the current branch's changed lines. Click the count or press <kbd>⌥⌘R</kbd> to review every changed file as one scrolling diff.</p>
+          <ul>
+            <li><strong>Files:</strong> Press <kbd>⇧⌘E</kbd> to browse the project, open a file beside the terminal and save quick fixes with <kbd>⌘S</kbd>.</li>
+            <li><strong>Review:</strong> Compare uncommitted work or everything since the branch left main or another branch.</li>
+            <li><strong>Git graph:</strong> Press <kbd>⌥⌘G</kbd> to inspect branches and commits, then check out, create, rebase, delete, cherry-pick or revert.</li>
+            <li><strong>Ship:</strong> Commit, push and open a pull request on GitHub or GitLab from the review panel.</li>
+          </ul>
+          <img class="doc-shot" src="screenshot-review.png" width="2400" height="1520" alt="Farol showing agent sessions, a terminal and the review panel with the branch changes">
+        </section>
+
+        <section id="outside">
+          <h2>From any app</h2>
+          <p>In <strong>Settings → Agents → Outside Farol</strong>, turn on the menu bar lighthouse or the small status panel. The panel can sit at the notch or on a screen edge, and you can drag it along that edge.</p>
+          <p>Both show which sessions are working, waiting or done. Open a session directly from either one. When an agent waits or finishes in the background, Farol sends a notification and counts waiting sessions on the Dock icon.</p>
+          <img class="doc-shot" src="features/menu-bar.png" width="620" height="410" alt="Farol's menu bar lighthouse listing sessions and their current status">
+        </section>
+
+        <section id="configuration">
+          <h2>Configuration</h2>
+          <p>Use Settings or edit <code>~/.config/farol/config</code>. Both update the same file, and changes apply to every session when you save.</p>
+          <pre><code>theme = Farol Dark
+font-family = JetBrains Mono
+font-size = 14</code></pre>
+          <p>The file uses Ghostty's configuration format, so options from the <a href="https://ghostty.org/docs/config">Ghostty documentation</a> work in Farol.</p>
+
+          <h3>Custom themes</h3>
+          <p>Put Ghostty theme files in <code>~/.config/farol/themes</code>. They appear in Settings → Appearance after Farol's built-in themes. The <strong>Themes folder</strong> button opens the right location.</p>
+        </section>
+
+        <section id="shortcuts">
+          <h2>Shortcuts</h2>
+          <table class="shortcuts">
+            <thead><tr><th>Action</th><th>Keys</th></tr></thead>
+            <tbody>
+              <tr><td>New task</td><td><kbd>⇧⌘N</kbd></td></tr>
+              <tr><td>New session</td><td><kbd>⌘T</kbd> or <kbd>⌘N</kbd></td></tr>
+              <tr><td>New worktree session</td><td><kbd>⇧⌘T</kbd></td></tr>
+              <tr><td>Search sessions</td><td><kbd>⌘P</kbd></td></tr>
+              <tr><td>Split right or down</td><td><kbd>⌘D</kbd> or <kbd>⇧⌘D</kbd></td></tr>
+              <tr><td>Toggle sidebar</td><td><kbd>⌘B</kbd></td></tr>
+              <tr><td>Toggle files</td><td><kbd>⇧⌘E</kbd></td></tr>
+              <tr><td>Review changes</td><td><kbd>⌥⌘R</kbd></td></tr>
+              <tr><td>Git graph</td><td><kbd>⌥⌘G</kbd></td></tr>
+              <tr><td>Find in the focused pane</td><td><kbd>⌘F</kbd></td></tr>
+              <tr><td>Settings</td><td><kbd>⌘,</kbd></td></tr>
+            </tbody>
+          </table>
+          <p>Ghostty's other default shortcuts, such as <kbd>⌘K</kbd> to clear and <kbd>⌘+</kbd> to zoom, also work in Farol.</p>
+        </section>
+
+        <section id="troubleshooting">
+          <h2>Troubleshooting</h2>
+
+          <h3>An agent stays idle</h3>
+          <p>Open Settings → Agents and check its connection. For Codex, keep terminal titles enabled. After connecting hooks, restart sessions that were already open.</p>
+
+          <h3>A configuration change does not appear</h3>
+          <p>Save <code>~/.config/farol/config</code>, or press <kbd>⇧⌘,</kbd> to reload the configuration manually.</p>
+
+          <h3>Something else is wrong</h3>
+          <p>Check the <a href="https://github.com/snowztech/farol/releases/latest">latest release</a>, then <a href="https://github.com/snowztech/farol/issues">open an issue</a> with your macOS version and the steps that reproduce the problem.</p>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <footer>
+    <span>© 2026 Lucas Neves Pereira, <a href="https://github.com/snowztech">snowztech</a></span>
+    <span><a href="index.html">Home</a> · <a href="https://github.com/snowztech/farol/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://github.com/snowztech/farol/blob/main/LICENSE">MIT</a></span>
+  </footer>
+</body>
+</html>
