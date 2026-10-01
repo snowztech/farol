@@ -130,10 +130,13 @@ public enum History {
 
     /// Pushes the checked out branch under its own name and tracks it there. A branch with no remote yet goes to origin.
     public static func push(in directory: String) throws {
+        try Git.run(["push", "--set-upstream", pushRemote(in: directory), "HEAD"], in: directory)
+    }
+
+    static func pushRemote(in directory: String) -> String {
         let configured = Git.branch(of: directory).flatMap { try? Git.run(["config", "branch.\($0).remote"], in: directory) }
         // "." means the branch tracks a local one, which is no place to push to.
-        let remote = configured.flatMap { $0 == "." || $0.isEmpty ? nil : $0 } ?? "origin"
-        try Git.run(["push", "--set-upstream", remote, "HEAD"], in: directory)
+        return configured.flatMap { $0 == "." || $0.isEmpty ? nil : $0 } ?? "origin"
     }
 
     static func parse(_ output: String) -> [Commit] {

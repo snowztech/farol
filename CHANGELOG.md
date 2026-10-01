@@ -4,6 +4,14 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Start a pull request on GitHub, or a merge request on GitLab, from the review panel. Once everything is committed, Start PR pushes the branch and opens the new request form in your browser, with the branch filled in. You create it there.
+
+### Changed
+
+- Committing from the review panel opens a sheet in Farol's own style. It lists the files that go in, takes a message with a body, and remembers whether you commit, commit and push, or go on to start a pull request.
+
 ## [0.17.0] - 2026-10-01
 
 Commit and push straight from the review panel.
