@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- The cursor style setting now applies at the shell prompt. Shell integration used to force a bar there, whatever you picked. If you use zsh vi mode and want the cursor to follow the mode, add `shell-integration-features = cursor` to the config file.
+
 ## [0.21.0] - 2026-10-01
 
 Start tasks from Jira tickets and GitHub issues.
