@@ -32,7 +32,7 @@ It needs a Mac with Apple Silicon and macOS 14 or later. Releases are signed and
 
 ## Features
 
-- **New task.** ⇧⌘N asks what to do, then starts Claude Code or Codex on it in a new worktree, with the task as its first prompt.
+- **New task.** ⇧⌘N asks what to do, then starts Claude Code or Codex on it in a new worktree, with the task as its first prompt. Or pick one of your open Jira tickets or the repo's GitHub issues, and the branch is named after it and the agent gets the ticket in full.
 - **Agent status.** Each session shows whether its agent is working, waiting for you or done, with a notification when it waits in the background. See [Agent status](#agent-status).
 - **Agents from any app.** Farol's lighthouse in the menu bar lights up while agents work, wait or finish, and its menu opens any session. Or pick a small status panel at the notch or on the screen edge, which you can drag anywhere along the side.
 - **Worktree sessions.** ⇧⌘T asks for a branch and opens a session in its own git worktree, so parallel agents never touch each other's files. Closing it offers to remove the worktree and always keeps the branch.
@@ -48,7 +48,7 @@ It needs a Mac with Apple Silicon and macOS 14 or later. Releases are signed and
 
 <p align="center"><img src="site/features/files.png" width="800" alt="The files panel next to the terminal, with src/store.ts open in a pane with syntax colors and line numbers"></p>
 
-Coming next: pipeline status and review comments in the sidebar, and GitLab, GitHub and Jira integrations. See [ROADMAP.md](ROADMAP.md).
+Coming next: pipeline status and review comments in the sidebar, tasks from GitLab issues, and sessions that show their ticket. See [ROADMAP.md](ROADMAP.md).
 
 ## Agent status
 
