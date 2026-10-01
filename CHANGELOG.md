@@ -4,6 +4,15 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Start a task from a ticket. New Task lists your open Jira tickets, through jira-cli, and the open issues of a repo on GitHub, with a search. Picking one names the branch after it and hands the agent the ticket in full, with anything you add.
+- Settings → Integrations shows whether jira-cli is set up, and for which account. Each tool there links to its documentation. Choose there between your own tickets and everything open on a team's board.
+
+### Changed
+
+- The agent in New Task is a select, like the ticket above it.
+
 ## [0.20.2] - 2026-10-01
 
 A clearer Settings: your connected account at a glance, and buttons that look like buttons.

@@ -24,6 +24,12 @@ struct SettingsPage: View {
     @State private var tools: [Forge.Kind: Forge.ToolState] = [:]
     /// Where each connected account's picture is, once known.
     @State private var avatars: [Forge.Kind: URL] = [:]
+    /// Whether jira-cli is there and set up. Nil while it is being asked.
+    @State private var jira: Forge.ToolState?
+    @State private var jiraAvatar: URL?
+    @State private var jiraBoards: [Jira.Board] = []
+    /// A line that says which board, or empty for your own tickets.
+    @AppStorage(Jira.boardKey) private var jiraBoard = ""
     /// macOS refuses Farol's notifications, so turning them on here would do nothing.
     @State private var notificationsBlocked = false
 
@@ -294,6 +300,41 @@ struct SettingsPage: View {
             .foregroundStyle(p.muted)
             .padding(.bottom, 4)
         ForEach(Forge.Kind.allCases, id: \.self) { toolRow($0, p) }
+
+        GroupTitle(title: "Tickets", palette: p)
+        Text("New Task lists your open Jira tickets, next to the open issues of a repo on GitHub. Picking one names the branch after it and hands the agent the ticket in full.")
+            .font(.system(size: 11.5))
+            .foregroundStyle(p.muted)
+            .padding(.bottom, 4)
+        Row(title: "Jira", detail: jiraDetail, icon: ForgeIcon(source: .jira, size: 13), link: ("Jira CLI (jira)", Jira.docs), palette: p) {
+            toolControl(jira, avatar: jiraAvatar, setup: Jira.setupCommand(from:), p)
+        }
+        if case .connected = jira {
+            Row(title: "Tickets to list",
+                detail: "Your own open tickets, or everything open on a team's board. A scrum board lists its current sprint.",
+                palette: p) {
+                Picker("", selection: $jiraBoard) {
+                    Text("Assigned to me").tag("")
+                    Divider()
+                    // The chosen board is listed before the others load, so the picker never shows a blank.
+                    ForEach(jiraBoards.isEmpty ? [Jira.Board(line: jiraBoard)].compactMap { $0 } : jiraBoards, id: \.id) { board in
+                        Text(board.name).tag(board.line)
+                    }
+                }
+                .labelsHidden()
+                // The menu would grow as wide as the longest board's name and squeeze the words beside it.
+                .frame(width: 220)
+            }
+        }
+    }
+
+    private var jiraDetail: String {
+        switch jira {
+        case nil: "Checking the Jira CLI (jira)…"
+        case .connected: "Uses the Jira CLI (jira)."
+        case .loggedOut: "The Jira CLI (jira) is installed but not set up. It reads your token from JIRA_API_TOKEN."
+        case .missing: "The Jira CLI (jira) isn't installed."
+        }
     }
 
     private func toolRow(_ kind: Forge.Kind, _ p: Palette) -> some View {
@@ -304,22 +345,29 @@ struct SettingsPage: View {
         case nil: "Checking \(cli)…"
         case .connected: "Uses \(cli)."
         case .loggedOut: "\(cli.prefix(1).uppercased() + cli.dropFirst()) is installed but not logged in."
-        case .missing: "\(cli.prefix(1).uppercased() + cli.dropFirst()) isn't installed. A \(kind.request) opens in your browser."
+        case .missing: "\(cli.prefix(1).uppercased() + cli.dropFirst()) isn't installed."
         }
-        return Row(title: kind.name, detail: detail, icon: kind, palette: p) {
-            HStack(spacing: 12) {
-                if let state {
-                    if case .connected(let account?) = state {
-                        AccountPill(url: avatars[kind], name: account, palette: p)
-                    } else {
-                        ToolStateLabel(state: state, palette: p)
-                    }
-                    if state == .missing || state == .loggedOut {
-                        // The system's small button reads as switched off in a dark theme, and a filled one shouts for something optional.
-                        ShipButton(title: state == .missing ? "Install" : "Log In",
-                                   help: "Opens a terminal with: \(kind.setupCommand(from: state))", busy: false, palette: p) {
-                            runInTerminal(kind.setupCommand(from: state))
-                        }
+        return Row(title: kind.name, detail: detail, icon: ForgeIcon(kind: kind, size: 13),
+                   link: ("\(kind.name) CLI (\(kind.tool))", kind.docs), palette: p) {
+            toolControl(state, avatar: avatars[kind], setup: kind.setupCommand(from:), p)
+        }
+    }
+
+    /// The right side of a tool's row: its account or state, and a button to set it up when it isn't.
+    private func toolControl(_ state: Forge.ToolState?, avatar: URL?, setup: @escaping (Forge.ToolState) -> String,
+                             _ p: Palette) -> some View {
+        HStack(spacing: 12) {
+            if let state {
+                if case .connected(let account?) = state {
+                    AccountPill(url: avatar, name: account, palette: p)
+                } else {
+                    ToolStateLabel(state: state, palette: p)
+                }
+                if state == .missing || state == .loggedOut {
+                    // The system's small button reads as switched off in a dark theme, and a filled one shouts for something optional.
+                    ShipButton(title: state == .missing ? "Install" : "Log In",
+                               help: "Opens a terminal with: \(setup(state))", busy: false, palette: p) {
+                        runInTerminal(setup(state))
                     }
                 }
             }
@@ -402,6 +450,8 @@ struct SettingsPage: View {
         DispatchQueue.global(qos: .userInitiated).async {
             let states = Dictionary(uniqueKeysWithValues: Forge.Kind.allCases.map { ($0, $0.toolState()) })
             DispatchQueue.main.async { tools = states }
+            let jira = Jira.toolState()
+            DispatchQueue.main.async { self.jira = jira }
             // After the states are on screen, since GitLab's picture takes another call to its server.
             var found: [Forge.Kind: URL] = [:]
             for (kind, state) in states {
@@ -409,6 +459,11 @@ struct SettingsPage: View {
             }
             let avatars = found
             DispatchQueue.main.async { self.avatars = avatars }
+            guard case .connected = jira else { return }
+            let picture = Jira.avatar()
+            DispatchQueue.main.async { jiraAvatar = picture }
+            let boards = Jira.boards()
+            DispatchQueue.main.async { jiraBoards = boards }
         }
     }
 
@@ -592,7 +647,9 @@ private struct Heading: View {
 private struct Row<Control: View>: View {
     let title: String
     var detail: String? = nil
-    var icon: Forge.Kind? = nil
+    var icon: ForgeIcon? = nil
+    /// Words of the detail that open a page, like a tool's name and its documentation.
+    var link: (words: String, url: String)? = nil
     let palette: Palette
     @ViewBuilder let control: Control
 
@@ -600,11 +657,22 @@ private struct Row<Control: View>: View {
         HStack(alignment: .center, spacing: 24) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    if let icon { ForgeIcon(kind: icon, size: 13) }
+                    if let icon { icon }
                     Text(title).font(.system(size: 13))
                 }
                 if let detail {
-                    Text(detail).font(.system(size: 11.5)).foregroundStyle(palette.muted)
+                    // The link is a view of its own between the words around it. Inside one text it couldn't tell when it is hovered.
+                    HStack(alignment: .firstTextBaseline, spacing: 0) {
+                        if let link, let url = URL(string: link.url), let words = detail.range(of: link.words) {
+                            Text(detail[..<words.lowerBound])
+                            QuietLink(words: link.words, url: url, palette: palette)
+                            Text(detail[words.upperBound...])
+                        } else {
+                            Text(detail)
+                        }
+                    }
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(palette.muted)
                 }
             }
             Spacer(minLength: 0)
@@ -612,6 +680,23 @@ private struct Row<Control: View>: View {
         }
         .padding(.vertical, 10)
         .overlay(alignment: .bottom) { Rectangle().fill(palette.line).frame(height: 1) }
+    }
+}
+
+/// Words that read as the text around them until the mouse is over them, then as a link.
+private struct QuietLink: View {
+    let words: String
+    let url: URL
+    let palette: Palette
+
+    @State private var hovering = false
+
+    var body: some View {
+        Link(destination: url) {
+            Text(words).underline(hovering).foregroundStyle(hovering ? palette.text : palette.muted)
+        }
+        .onClickableHover { hovering = $0 }
+        .hoverTip(url.host ?? "")
     }
 }
 
