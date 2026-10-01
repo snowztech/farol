@@ -7,7 +7,7 @@ public final class TerminalRuntime {
     private var config: ghostty_config_t!
     private let overrideFiles: [URL]
 
-    /// Colors from the user's Ghostty config alone, before Farol's overrides. Nil when it sets none, which leaves Farol Dark.
+    /// Colors from the user's Ghostty config alone, before Farol's overrides. Nil when it sets none, which leaves Farol Beam.
     public private(set) var ghosttyConfigColors: (background: NSColor, foreground: NSColor)?
 
     /// App level requests from key bindings, like quitting. Surface level ones go to TerminalView.onRequest.
@@ -122,10 +122,10 @@ public final class TerminalRuntime {
         Bundle.main.resourceURL?.appendingPathComponent("ghostty/themes")
     }
 
-    /// Farol Dark is the theme until a config names another.
+    /// Farol Beam is the theme until a config names another.
     /// Shell integration sets a bar cursor at every prompt, which hides the cursor-style setting.
     /// Loaded first, so the user's Ghostty config and the override files can still change both.
-    private static let defaults = "theme = Farol Dark\nshell-integration-features = no-cursor\n"
+    private static let defaults = "theme = Farol Beam\nshell-integration-features = no-cursor\n"
 
     private static func loadConfig(_ overrides: [URL], ghosttyFiles: Bool = true) -> ghostty_config_t {
         let config = ghostty_config_new()!

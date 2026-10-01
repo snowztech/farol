@@ -43,7 +43,7 @@ It needs a Mac with Apple Silicon and macOS 14 or later. Releases are signed and
 - **Split panes.** ⌘D splits a session, and the new pane opens in the same folder. ⇧⌘R gives a pane a name, like "back" or "tunnel". Layouts and names come back after a relaunch.
 - **Find in scrollback.** ⌘F searches the focused pane and shows the match count.
 - **Ghostty inside.** Same rendering, speed and escape sequence support, and your Ghostty config is loaded.
-- **Themes and settings.** Farol Dark by default and Farol Light, in the colors of the app icons, plus Ghostty's 600+ themes with live previews, and settings inside the window.
+- **Themes and settings.** Farol's own four themes, in the colors of the app icons and with Farol Beam as the default, plus Ghostty's 600+ themes with live previews, and settings inside the window.
 - **Copy and paste, accents and input methods.** Pasting text that could run commands asks first, dead keys compose as you type, and input methods for other languages work at the cursor.
 
 <p align="center"><img src="site/features/files.png" width="800" alt="The files panel next to the terminal, with src/store.ts open in a pane with syntax colors and line numbers"></p>

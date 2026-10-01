@@ -6,11 +6,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
-- Farol Dark and Farol Light, two themes in the colors of the app icons. They come first in Settings → Appearance.
+- Farol Beam, Farol Dark, Farol Navy and Farol Light, four themes in the colors of the four app icons. They come first in Settings → Appearance.
 
 ### Changed
 
-- Farol Dark is the theme until you pick one, and its card says so. When your Ghostty config sets its own colors, those stay the default, under a card named Ghostty config.
+- Farol Beam is the theme until you pick one, and its card says so. When your Ghostty config sets its own colors, those stay the default, under a card named Ghostty config.
 
 ### Fixed
 
