@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Commit button in the review panel. When the checkout has uncommitted changes, it asks for a message and commits all of them, staged or not. Commit and Push also pushes the branch, to origin when it has no remote yet.
+
 ## [0.16.1] - 2026-10-01
 
 The unsaved dot only stays when something is left to save.
