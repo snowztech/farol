@@ -16,6 +16,9 @@ final class WindowState: ObservableObject {
     /// Zero while the review panel is closed.
     @Published var reviewWidth: CGFloat = 0
     let ghosttyConfigPreview: ThemeColors?
+    @Published var style = UIStyle.saved {
+        didSet { UserDefaults.standard.set(style.rawValue, forKey: UIStyle.key) }
+    }
 
     init(palette: Palette, ghosttyConfigPreview: ThemeColors?) {
         self.palette = palette
@@ -56,10 +59,11 @@ struct TopBar: View {
             .foregroundStyle(p.muted)
             .lineLimit(1)
             // Centered over the content, between the open panels, so it never sits on a panel's edge.
+            // Boxed, the bar is one strip with no panel running up into it, so the title sits in the middle of the window.
             .padding(.horizontal, 120)
             .frame(maxWidth: .infinity)
-            .padding(.leading, leftPanels)
-            .padding(.trailing, state.reviewWidth + state.graphWidth)
+            .padding(.leading, p.boxed ? 0 : leftPanels)
+            .padding(.trailing, p.boxed ? 0 : state.reviewWidth + state.graphWidth)
 
             HStack(spacing: 2) {
                 // Room for the traffic lights.
@@ -95,7 +99,16 @@ struct TopBar: View {
     }
 
     /// Every panel runs up into the bar in its own color, like Mac apps with a sidebar, and the terminal's part matches the terminal.
-    private func columns(_ p: Palette) -> some View {
+    @ViewBuilder private func columns(_ p: Palette) -> some View {
+        // Boxed, the panels are cards below the bar, and the bar is part of what is around them.
+        if p.boxed {
+            p.backdrop
+        } else {
+            touchingColumns(p)
+        }
+    }
+
+    private func touchingColumns(_ p: Palette) -> some View {
         HStack(spacing: 0) {
             Rectangle().fill(p.surface).frame(width: state.sidebarVisible ? SidebarView.width - 1 : 0)
             Rectangle().fill(p.line).frame(width: state.sidebarVisible ? 1 : 0)
@@ -224,10 +237,12 @@ private struct SessionMenu: View {
                 Text(session.displayName)
                 Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
             }
-            .foregroundStyle(hovering || open ? p.text : p.muted)
+            .foregroundStyle(hovering || open || p.vivid ? p.text : p.muted)
             .padding(.horizontal, 8)
             .frame(height: 20)
-            .background(RoundedRectangle(cornerRadius: 6).fill(hovering || open ? p.raised : .clear))
+            // With color, the title is a pill all the time, and lights up like a selected row.
+            .background(RoundedRectangle(cornerRadius: 6)
+                .fill(hovering || open ? p.selection : p.vivid ? p.raised : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -268,7 +283,10 @@ private struct SessionMenu: View {
                                 lit: item.id == highlighted?.id,
                                 shortcut: shortcut(for: item),
                                 palette: p,
-                                hover: { if $0 { active = item.id } },
+                                // Leaving a row hands Return back to the session you are in, as a menu would.
+                                hover: { inside in
+                                    if inside { active = item.id } else if active == item.id { active = nil }
+                                },
                                 choose: { choose(item) })
                         }
                     }
@@ -283,7 +301,8 @@ private struct SessionMenu: View {
         .frame(width: 340)
         .font(.system(size: 13))
         .foregroundStyle(p.text)
-        .background(p.background)
+        // Boxed, the list is one more panel, in the color of the panels around the terminal.
+        .background(p.boxed ? p.surface : p.background)
         .onAppear { searching = true }
     }
 
@@ -342,7 +361,9 @@ private struct SessionChoice: View {
         Button(action: choose) {
             HStack(spacing: 9) {
                 // Always takes its room, so every name starts at the same place.
-                Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).opacity(current ? 1 : 0)
+                Image(systemName: "checkmark").font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(palette.vivid ? palette.pull : palette.text)
+                    .opacity(current ? 1 : 0)
                 Lamp(activity: session.activity, selected: true, palette: palette)
                 Text(session.displayName).lineLimit(1).truncationMode(.tail).layoutPriority(1)
                 if let branch = session.branch {
@@ -355,7 +376,7 @@ private struct SessionChoice: View {
             }
             .padding(.horizontal, 9)
             .frame(height: 28)
-            .background(RoundedRectangle(cornerRadius: 6).fill(lit ? palette.raised : .clear))
+            .background(RoundedRectangle(cornerRadius: 6).fill(lit ? palette.selection : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

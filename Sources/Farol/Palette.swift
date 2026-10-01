@@ -3,6 +3,32 @@ import AppKit
 import GhosttyTerminal
 import SwiftUI
 
+/// Settings → Appearance → Style. How the panels around the terminal are shaped and lit.
+enum UIStyle: String, CaseIterable {
+    /// Panels touch, with a line between them, and every highlight is a quiet gray.
+    case classic
+    /// Every panel is a rounded card with a gap around it, on a darker backdrop.
+    case boxed
+    /// Boxed, with the theme's blue tinting the panels and lighting what is selected.
+    case vivid
+
+    static let key = "appearance.style"
+    static var saved: UIStyle { UserDefaults.standard.string(forKey: key).flatMap(UIStyle.init) ?? .classic }
+
+    var title: String {
+        switch self {
+        case .classic: "Classic"
+        case .boxed: "Boxed"
+        case .vivid: "Boxed with color"
+        }
+    }
+
+    /// The space around each panel.
+    var gap: CGFloat { self == .classic ? 0 : 8 }
+    /// How round a panel's corners are. With the gap around it, they follow the window's own corners.
+    var radius: CGFloat { self == .classic ? 0 : 10 }
+}
+
 /// Every color comes from the terminal theme, so Farol looks right with any of them.
 /// The chrome is monochrome. Only agent status gets a hue, taken from the theme's own ANSI colors.
 struct Palette: Equatable {
@@ -29,17 +55,35 @@ struct Palette: Equatable {
     let code: SyntaxColors
     let diff: DiffColors
     let isDark: Bool
+    let style: UIStyle
+    /// What shows around the panels when they are boxed. The terminal's own color otherwise.
+    let backdrop: Color
+    /// The selected row. Gray, or lit in the theme's blue in the style with color.
+    let selection: Color
 
-    init(_ runtime: TerminalRuntime) {
-        self.init(background: runtime.backgroundColor, foreground: runtime.foregroundColor, ansi: runtime.ansiColors)
+    var boxed: Bool { style != .classic }
+    var vivid: Bool { style == .vivid }
+
+    init(_ runtime: TerminalRuntime, style: UIStyle = .classic) {
+        self.init(background: runtime.backgroundColor, foreground: runtime.foregroundColor, ansi: runtime.ansiColors,
+                  style: style)
     }
 
-    init(background bg: NSColor, foreground fg: NSColor, ansi: [NSColor]) {
+    init(background bg: NSColor, foreground fg: NSColor, ansi: [NSColor], style: UIStyle = .classic) {
         isDark = bg.isDark
+        self.style = style
         background = Color(nsColor: bg)
-        surface = Color(nsColor: bg.mixed(with: fg, 0.035))
-        raised = Color(nsColor: bg.mixed(with: fg, 0.085))
-        line = Color(nsColor: bg.mixed(with: fg, 0.11))
+        // With color, the panels lean toward the theme's blue. Leaning toward the text, as the other styles do, leaves them gray.
+        let blue = ansi.count > 4 ? ansi[4] : fg
+        let vivid = style == .vivid
+        let tint = vivid ? blue : fg
+        surface = Color(nsColor: bg.mixed(with: tint, vivid ? 0.06 : 0.035))
+        raised = Color(nsColor: bg.mixed(with: tint, vivid ? 0.14 : 0.085))
+        line = Color(nsColor: bg.mixed(with: tint, vivid ? 0.2 : 0.11))
+        selection = vivid ? Color(nsColor: bg.mixed(with: blue, 0.3)) : raised
+        // Darker than the terminal in a dark theme, so the cards stand out from it. A light theme has no room above white.
+        let black = NSColor(srgbRed: 0, green: 0, blue: 0, alpha: 1)
+        backdrop = Color(nsColor: style == .classic ? bg : bg.isDark ? bg.mixed(with: black, 0.35) : bg.mixed(with: fg, 0.07))
         text = Color(nsColor: fg)
         muted = Color(nsColor: bg.mixed(with: fg, 0.55))
         accent = Color(nsColor: fg)

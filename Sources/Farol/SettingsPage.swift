@@ -132,6 +132,18 @@ struct SettingsPage: View {
             palette: p) {
             toggle($groupByRepo)
         }
+        .padding(.bottom, 8)
+
+        GroupTitle(title: "Window", palette: p)
+        Row(title: "Style",
+            detail: "Boxed puts each panel in a rounded card. With color, the panels take a tint of your theme's blue, which also lights what is selected.",
+            palette: p) {
+            Picker("", selection: $state.style) {
+                ForEach(UIStyle.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
+            .labelsHidden()
+            .fixedSize()
+        }
         .padding(.bottom, 32)
 
         Heading(title: "Theme",
