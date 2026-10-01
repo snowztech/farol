@@ -43,7 +43,10 @@ final class ReviewModel: ObservableObject {
     private var pendingFocus: String?
     /// The subject of the commit being shown, for the compare menu.
     @Published private(set) var commitSubject: String?
-    @Published private(set) var isCommitting = false
+    /// While a commit or a push runs.
+    @Published private(set) var isShipping = false
+    /// Where the branch is pushed, when that is GitHub or GitLab, to offer opening a pull request there.
+    @Published private(set) var forge: Forge?
     /// How many files a commit would take. "Changes since main" also counts work that is already committed.
     @Published private(set) var uncommitted = 0
     private var scopeBeforeCommit: Diff.Scope?
@@ -73,6 +76,7 @@ final class ReviewModel: ObservableObject {
             rows = []
             stat = Diff.Stat()
             uncommitted = 0
+            forge = nil
             ignored = []
         }
         guard let root else { return }
@@ -83,9 +87,11 @@ final class ReviewModel: ObservableObject {
             let branches = (base.map { [$0] } ?? []) + local.filter { base != $0 && base != "origin/\($0)" }
             let scope = Diff.defaultScope(in: root)
             let ignored = Files.ignored(in: root).map { $0 + "/" }
+            let forge = Forge.detect(in: root)
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root else { return }
                 self.branches = branches
+                self.forge = forge
                 self.ignored = ignored
                 self.scope = self.chosenScope[root] ?? scope
                 self.refresh()
@@ -111,23 +117,44 @@ final class ReviewModel: ObservableObject {
         refresh()
     }
 
-    /// Commits every uncommitted file, then pushes if asked. `failed` gets a title and git's own message.
-    func commit(_ message: String, push: Bool, failed: @escaping (String, String) -> Void) {
-        guard let root, !isCommitting else { return }
-        isCommitting = true
+    /// Commits every uncommitted file when there is a message, then goes as far as `next` says.
+    /// `failed` gets a title and git's own message.
+    func ship(message: String?, then next: AfterCommit, failed: @escaping (String, String) -> Void) {
+        guard let root, !isShipping else { return }
+        let link = next == .openRequest ? branch.flatMap { forge?.newRequest(from: $0) } : nil
+        isShipping = true
         DispatchQueue.global(qos: .userInitiated).async {
             let failure: (String, String)? = {
-                do { try History.commitAll(message, in: root) } catch { return ("Couldn't commit", String(describing: error)) }
-                guard push else { return nil }
-                do { try History.push(in: root) } catch { return ("Committed, but couldn't push", String(describing: error)) }
+                if let message {
+                    do { try History.commitAll(message, in: root) } catch { return ("Couldn't commit", String(describing: error)) }
+                }
+                guard next != .nothing else { return nil }
+                do { try History.push(in: root) } catch {
+                    return (message == nil ? "Couldn't push" : "Committed, but couldn't push", String(describing: error))
+                }
                 return nil
             }()
             DispatchQueue.main.async { [weak self] in
-                self?.isCommitting = false
-                if let failure { failed(failure.0, failure.1) }
+                self?.isShipping = false
+                if let failure { failed(failure.0, failure.1) } else if let link { NSWorkspace.shared.open(link) }
                 self?.refresh()
             }
         }
+    }
+
+    /// The files a commit would take, for the commit sheet. Read on demand, since the panel may be showing another scope.
+    func uncommittedFiles(_ done: @escaping ([Diff.File]) -> Void) {
+        guard let root else { return done([]) }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let files = (try? Diff.files(in: root, .uncommitted)) ?? []
+            DispatchQueue.main.async { done(files) }
+        }
+    }
+
+    /// The branch everything is compared with, like main. A request from it into itself makes no sense.
+    var isOnBaseBranch: Bool {
+        guard let branch, let base = branches.first else { return false }
+        return base == branch || base == "origin/\(branch)"
     }
 
     func toggle(_ path: String) {
@@ -214,7 +241,14 @@ struct ReviewPanel: View {
             HStack(spacing: 8) {
                 ScopeMenu(review: review, palette: p)
                 Spacer(minLength: 0)
-                if review.uncommitted > 0, !isCommit { CommitButton(review: review, palette: p) }
+                // The slot holds the next step: commit what's there, then open the request for the branch.
+                if !isCommit {
+                    if review.uncommitted > 0 {
+                        CommitButton(review: review, palette: p)
+                    } else if !review.isOnBaseBranch {
+                        RequestButton(review: review, palette: p)
+                    }
+                }
             }
             .padding(.horizontal, 10)
             .padding(.bottom, 8)
@@ -367,61 +401,6 @@ private struct ScopeMenu: View {
     /// origin/main reads as main. The remote is an implementation detail here.
     static func name(_ branch: String) -> String {
         branch.hasPrefix("origin/") ? String(branch.dropFirst("origin/".count)) : branch
-    }
-}
-
-/// Asks for a message, then commits all the uncommitted changes, with a push if you want one.
-/// "Changes since main" offers it too, since that is where a branch's review usually sits.
-private struct CommitButton: View {
-    @ObservedObject var review: ReviewModel
-    let palette: Palette
-
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: ask) {
-            Text(review.isCommitting ? "Committing…" : "Commit")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(review.isCommitting ? palette.muted : palette.text)
-                .padding(.horizontal, 10)
-                .frame(height: 24)
-                .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised : palette.surface))
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(palette.line))
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(review.isCommitting)
-        .onClickableHover { hovering = $0 }
-        .hoverTip("Commit all uncommitted changes")
-    }
-
-    private func ask() {
-        let alert = NSAlert()
-        alert.messageText = "Commit changes" + (review.branch.map { " to \($0)" } ?? "")
-        let files = review.uncommitted
-        alert.informativeText = "\(files) \(files == 1 ? "file goes" : "files go") into one commit, staged or not."
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
-        field.placeholderString = "Commit message"
-        alert.accessoryView = field
-        alert.addButton(withTitle: "Commit")
-        alert.addButton(withTitle: "Commit and Push")
-        alert.addButton(withTitle: "Cancel")
-        alert.window.initialFirstResponder = field
-        Self.show(alert) { [review] response in
-            let message = field.stringValue.trimmingCharacters(in: .whitespaces)
-            guard response != .alertThirdButtonReturn, !message.isEmpty else { return }
-            review.commit(message, push: response == .alertSecondButtonReturn) { title, info in
-                // Git's own message, which carries what a hook printed or why the push was refused.
-                let alert = NSAlert()
-                alert.messageText = title
-                alert.informativeText = info
-                Self.show(alert) { _ in }
-            }
-        }
-    }
-
-    private static func show(_ alert: NSAlert, _ done: @escaping (NSApplication.ModalResponse) -> Void) {
-        if let window = NSApp.keyWindow { alert.beginSheetModal(for: window, completionHandler: done) } else { done(alert.runModal()) }
     }
 }
 

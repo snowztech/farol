@@ -48,7 +48,7 @@ It needs a Mac with Apple Silicon and macOS 14 or later. Releases are signed and
 
 <p align="center"><img src="site/features/files.png" width="800" alt="The files panel next to the terminal, with src/store.ts open in a pane with syntax colors and line numbers"></p>
 
-Coming next: push a branch and open a pull request from the session, and GitLab, GitHub and Jira integrations. See [ROADMAP.md](ROADMAP.md).
+Coming next: pipeline status and review comments in the sidebar, and GitLab, GitHub and Jira integrations. See [ROADMAP.md](ROADMAP.md).
 
 ## Agent status
 
