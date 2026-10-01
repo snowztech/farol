@@ -133,7 +133,10 @@ final class ReviewModel: ObservableObject {
     /// `failed` gets a title and git's own message.
     func ship(message: String?, then next: AfterCommit, failed: @escaping (String, String) -> Void) {
         guard let root, !isShipping else { return }
-        let link = next == .openRequest ? branch.flatMap { forge?.newRequest(from: $0) } : nil
+        // With the forge's tool the request is created right here. Without it, its form opens in the browser.
+        let create = next == .openRequest && canCreateRequest ? forge : nil
+        let link = next == .openRequest && create == nil ? branch.flatMap { forge?.newRequest(from: $0) } : nil
+        let branch = branch
         isShipping = true
         DispatchQueue.global(qos: .userInitiated).async {
             let failure: (String, String)? = {
@@ -144,13 +147,20 @@ final class ReviewModel: ObservableObject {
                 do { try History.push(in: root) } catch {
                     return (message == nil ? "Couldn't push" : "Committed, but couldn't push", String(describing: error))
                 }
+                guard let create, let branch else { return nil }
+                do { try create.createRequest(for: branch, in: root) } catch {
+                    return ("Pushed, but couldn't create the \(create.request)", String(describing: error))
+                }
                 return nil
             }()
+            // Read here, while the button is still busy, so it turns straight into "PR #5".
+            let created = create.flatMap { forge in branch.map { forge.request(for: $0, in: root) } }
             DispatchQueue.main.async { [weak self] in
-                self?.isShipping = false
+                guard let self else { return }
+                self.isShipping = false
                 if let failure { failed(failure.0, failure.1) } else if let link { NSWorkspace.shared.open(link) }
-                self?.refresh()
-                self?.checkRequest()
+                self.refresh()
+                if let created, self.root == root, self.branch == branch { self.request = created } else { self.checkRequest() }
             }
         }
     }
@@ -175,6 +185,9 @@ final class ReviewModel: ObservableObject {
             }
         }
     }
+
+    /// The forge's tool answered and found no request, so it can create one.
+    var canCreateRequest: Bool { request == .none && canStartRequest }
 
     /// False once the branch has a request, or on the base branch, where there is nothing to request.
     var canStartRequest: Bool {
