@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-10-01
+
+Farol gets its own themes, one for each app icon.
+
 ### Added
 
 - Farol Beam, Farol Dark, Farol Navy and Farol Light, four themes in the colors of the four app icons. They come first in Settings → Appearance.
@@ -470,7 +474,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.21.1...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.22.0...HEAD
+[0.22.0]: https://github.com/snowztech/farol/releases/tag/v0.22.0
 [0.21.1]: https://github.com/snowztech/farol/releases/tag/v0.21.1
 [0.21.0]: https://github.com/snowztech/farol/releases/tag/v0.21.0
 [0.20.2]: https://github.com/snowztech/farol/releases/tag/v0.20.2
