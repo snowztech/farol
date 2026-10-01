@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-10-01
+
+Use more than one Claude Code or Codex account.
+
 ### Added
 
 - Connect and start more than one Claude Code or Codex account. Farol finds `~/.claude-*` and `~/.codex-*` folders, lists each one in Settings → Agents, and offers each one in New task and Start with.
@@ -487,7 +491,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.23.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/snowztech/farol/releases/tag/v0.24.0
 [0.23.0]: https://github.com/snowztech/farol/releases/tag/v0.23.0
 [0.22.0]: https://github.com/snowztech/farol/releases/tag/v0.22.0
 [0.21.1]: https://github.com/snowztech/farol/releases/tag/v0.21.1
