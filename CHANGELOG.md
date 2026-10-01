@@ -4,10 +4,18 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-10-01
+
+See in Settings whether GitHub and GitLab are connected.
+
 ### Added
 
 - Settings → Integrations shows whether GitHub's `gh` and GitLab's `glab` are installed and which account they are logged in as. Install and Log In open a terminal with the command typed in.
 - GitHub's and GitLab's marks on the pull request buttons in the review panel.
+
+### Changed
+
+- In Settings → Agents, the group that connects Claude Code and Codex is now called Status, since Integrations is its own section.
 
 ## [0.18.0] - 2026-10-01
 
@@ -396,7 +404,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/snowztech/farol/releases/tag/v0.19.0
 [0.18.0]: https://github.com/snowztech/farol/releases/tag/v0.18.0
 [0.17.0]: https://github.com/snowztech/farol/releases/tag/v0.17.0
 [0.16.1]: https://github.com/snowztech/farol/releases/tag/v0.16.1
