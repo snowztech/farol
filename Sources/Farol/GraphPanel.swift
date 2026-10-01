@@ -478,7 +478,7 @@ private struct BranchList: View {
             }
         }
         Divider()
-        Button("Rebase Current Branch onto This One…") {
+        Button("Rebase \u{201C}\(menuName(here))\u{201D} onto \u{201C}\(menuName(branch))\u{201D}…") {
             confirm("Rebase \(here) onto \(branch)?",
                     "Your commits on \(here) are replayed on top of \(branch). If they conflict, git stops and the terminal shows how to go on.",
                     button: "Rebase") {
@@ -486,7 +486,7 @@ private struct BranchList: View {
             }
         }
         .disabled(current)
-        Button("Interactive Rebase onto This One…") {
+        Button("Interactive Rebase \u{201C}\(menuName(here))\u{201D} onto \u{201C}\(menuName(branch))\u{201D}…") {
             graph.rebase(onto: branch, interactive: true, failed: gitError("Couldn't rebase"))
         }
         .disabled(current)
@@ -726,9 +726,9 @@ private struct CommitRow: View {
             Button("Revert This Commit…", action: revert)
             Divider()
             // Rebasing onto the commit you're on would change nothing.
-            Button("Rebase Current Branch onto This Commit…", action: rebase)
+            Button("Rebase \u{201C}\(menuName(current ?? "HEAD"))\u{201D} onto This Commit…", action: rebase)
                 .disabled(isHead)
-            Button("Interactive Rebase from This Commit…", action: rebaseInteractively)
+            Button("Interactive Rebase \u{201C}\(menuName(current ?? "HEAD"))\u{201D} from This Commit…", action: rebaseInteractively)
                 .disabled(isHead)
             Divider()
             Button("Copy Commit Hash") { copy(row.commit.hash) }
