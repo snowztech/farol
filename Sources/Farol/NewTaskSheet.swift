@@ -1,98 +1,110 @@
 import AppKit
 import FarolCore
+import SwiftUI
 
 /// The New Task sheet: what to do, on which branch, with which agent.
-final class NewTaskSheet: NSObject, NSTextFieldDelegate {
-    private static let agentKey = "newTask.agent"
+struct NewTaskSheet: View {
+    private enum Field { case task, branch }
 
-    private let task = NSTextField()
-    private let branch = NSTextField()
-    private let agent = NSPopUpButton()
+    let repo: String
+    let base: String
+    let palette: Palette
+    /// Gets a valid branch and the command that launches the agent.
+    let start: (String, String) -> Void
+    let close: () -> Void
+
+    @AppStorage("newTask.agent") private var agent = NewTask.Agent.claude.rawValue
+    @State private var task = ""
+    @State private var branch = ""
     /// The branch follows the task until you edit it yourself.
-    private var branchEdited = false
+    @State private var branchEdited = false
+    @FocusState private var focus: Field?
 
-    /// Calls `start` with a valid branch and the command that launches the agent.
-    static func present(in window: NSWindow, directory: String, start: @escaping (String, String) -> Void) {
-        let sheet = NewTaskSheet()
-        let repo = Git.repoRoot(of: directory).map { URL(fileURLWithPath: $0).lastPathComponent } ?? "repository"
-        let base = Git.branch(of: directory) ?? "the current commit"
+    static func present(in window: NSWindow, directory: String, palette: Palette, start: @escaping (String, String) -> Void) {
+        let sheet = NSWindow(contentRect: .zero, styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: true)
+        let view = NewTaskSheet(
+            repo: Git.repoRoot(of: directory).map { URL(fileURLWithPath: $0).lastPathComponent } ?? "repository",
+            base: Git.branch(of: directory) ?? "the current commit",
+            palette: palette, start: start,
+            close: { [weak window, weak sheet] in sheet.map { window?.endSheet($0) } })
+        let host = NSHostingController(rootView: view)
+        // The sheet grows with the task as it wraps onto more lines.
+        host.sizingOptions = [.preferredContentSize]
+        sheet.contentViewController = host
+        window.beginSheet(sheet)
+    }
 
-        let alert = NSAlert()
-        alert.messageText = "New task in \(repo)"
-        alert.informativeText = "The agent starts in its own worktree, on a new branch from \(base)."
-        alert.accessoryView = sheet.form()
-        alert.addButton(withTitle: "Start")
-        alert.addButton(withTitle: "Cancel")
-        alert.window.initialFirstResponder = sheet.task
+    private var text: String { task.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var name: String? { Worktrees.branchName(from: branch) }
+    private var choice: NewTask.Agent { NewTask.Agent(rawValue: agent) ?? .claude }
 
-        alert.beginSheetModal(for: window) { response in
-            // The sheet stays alive until here, since the alert's completion holds it.
-            guard response == .alertFirstButtonReturn else { return }
-            let text = sheet.task.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty else { return }
-            guard let name = Worktrees.branchName(from: sheet.branch.stringValue) else {
-                return showError(in: window, "No branch name", "Use letters, numbers, dashes or slashes.")
+    var body: some View {
+        let p = palette
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("New task in \(repo)").font(.system(size: 15, weight: .semibold))
+                    Text("The agent starts in its own worktree, on a new branch from \(base).")
+                        .foregroundStyle(p.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                // Return starts the task. Option-Return adds a line, for longer ones.
+                TextField("What should the agent do?", text: $task, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .lineLimit(3...8)
+                    .focused($focus, equals: .task)
+                    .sheetField(p, focused: focus == .task)
+                    .onChange(of: task) { _, task in
+                        if !branchEdited { branch = NewTask.branchName(for: task) }
+                    }
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.triangle.branch").foregroundStyle(p.muted)
+                        // Only typing goes through here, so the name filled in from the task doesn't count as your edit.
+                        TextField("Branch name", text: Binding(get: { branch }, set: {
+                            branch = $0
+                            branchEdited = !$0.isEmpty
+                        }))
+                        .textFieldStyle(.plain)
+                        .focused($focus, equals: .branch)
+                    }
+                    .sheetField(p, focused: focus == .branch)
+                    if !branch.isEmpty, name == nil {
+                        Text("Use letters, numbers, dashes or slashes.").font(.system(size: 12)).foregroundStyle(p.muted)
+                    }
+                }
+                HStack(spacing: 6) {
+                    ForEach(NewTask.Agent.allCases, id: \.self) { option in
+                        SheetOption(title: option.title, selected: choice == option, palette: p) { agent = option.rawValue }
+                    }
+                }
             }
-            let choice = NewTask.Agent.allCases[sheet.agent.indexOfSelectedItem]
-            UserDefaults.standard.set(choice.rawValue, forKey: agentKey)
-            start(name, NewTask.command(choice, task: text))
+            .padding(20)
+            Rectangle().fill(p.line).frame(height: 1)
+            HStack {
+                Spacer()
+                Button("Cancel", action: close)
+                    .buttonStyle(SheetButton(palette: p, primary: false))
+                    .keyboardShortcut(.cancelAction)
+                Button("Start") {
+                    guard let name else { return }
+                    let command = NewTask.command(choice, task: text)
+                    close()
+                    // The worktree may fail and show why, which needs this sheet gone first.
+                    DispatchQueue.main.async { start(name, command) }
+                }
+                .buttonStyle(SheetButton(palette: p, primary: true))
+                .keyboardShortcut(.defaultAction)
+                .disabled(text.isEmpty || name == nil)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
         }
-    }
-
-    private func form() -> NSView {
-        task.placeholderString = "What should the agent do?"
-        task.delegate = self
-        task.lineBreakMode = .byWordWrapping
-        task.cell?.wraps = true
-        task.cell?.isScrollable = false
-        branch.placeholderString = "Branch name"
-        branch.delegate = self
-
-        agent.addItems(withTitles: NewTask.Agent.allCases.map(\.title))
-        let saved = UserDefaults.standard.string(forKey: Self.agentKey).flatMap(NewTask.Agent.init(rawValue:))
-        agent.selectItem(at: NewTask.Agent.allCases.firstIndex(of: saved ?? .claude) ?? 0)
-
-        let grid = NSGridView(views: [
-            [label("Task"), task],
-            [label("Branch"), branch],
-            [label("Agent"), agent],
-        ])
-        grid.rowSpacing = 10
-        grid.columnSpacing = 10
-        grid.column(at: 0).xPlacement = .trailing
-        grid.rowAlignment = .firstBaseline
-        grid.column(at: 1).width = 300
-        task.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
-        grid.frame = NSRect(origin: .zero, size: grid.fittingSize)
-        return grid
-    }
-
-    private func label(_ text: String) -> NSTextField {
-        let label = NSTextField(labelWithString: text)
-        label.textColor = .secondaryLabelColor
-        return label
-    }
-
-    func controlTextDidChange(_ note: Notification) {
-        guard let field = note.object as? NSTextField else { return }
-        if field === branch {
-            branchEdited = !branch.stringValue.isEmpty
-        } else if !branchEdited {
-            branch.stringValue = NewTask.branchName(for: task.stringValue)
-        }
-    }
-
-    /// Return starts the task, and Option-Return adds a line break for longer ones.
-    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-        guard control === task, selector == #selector(NSResponder.insertNewlineIgnoringFieldEditor(_:)) else { return false }
-        textView.insertNewlineIgnoringFieldEditor(nil)
-        return true
-    }
-
-    private static func showError(in window: NSWindow, _ title: String, _ detail: String) {
-        let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = detail
-        alert.beginSheetModal(for: window)
+        .font(.system(size: 13))
+        .foregroundStyle(p.text)
+        .frame(width: 460)
+        .background(p.background)
+        .ignoresSafeArea()
+        .onAppear { focus = .task }
     }
 }

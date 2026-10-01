@@ -12,7 +12,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     let store: SessionStore
     private let runtime: TerminalRuntime
-    private let state: WindowState
+    let state: WindowState
 
     private lazy var notifier = AgentNotifier(settings: agents)
     private let content = NSView()
