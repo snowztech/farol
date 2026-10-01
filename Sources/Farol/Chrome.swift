@@ -271,7 +271,8 @@ private struct SessionMenu: View {
             .padding(12)
             Rectangle().fill(p.line).frame(height: 1)
             ScrollView {
-                LazyVStack(spacing: 1) {
+                // Not lazy: a lazy stack guesses its height from its first row, and a project header is taller than a session.
+                VStack(spacing: 1) {
                     ForEach(groups, id: \.key) { group in
                         if let key = group.key {
                             RepoHeader(name: URL(fileURLWithPath: key).lastPathComponent, palette: p)

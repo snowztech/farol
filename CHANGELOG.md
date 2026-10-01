@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- The session list under the window title no longer leaves an empty gap at its end when sessions are grouped by project.
+
 ## [0.24.0] - 2026-10-01
 
 Use more than one Claude Code or Codex account.
