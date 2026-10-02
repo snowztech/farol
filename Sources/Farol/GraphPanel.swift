@@ -39,8 +39,6 @@ final class GraphModel: ObservableObject {
     func show(_ root: String?, current: String?) {
         guard root != self.root || current != self.current || (root != nil && watcher == nil) else { return }
         let rootChanged = root != self.root
-        // Opening the panel again is also when a request made in the browser may have appeared.
-        let reopened = root != nil && watcher == nil
         self.root = root
         self.current = current
         if rootChanged {
@@ -60,7 +58,7 @@ final class GraphModel: ObservableObject {
             watcher = FolderWatcher((repo as NSString).appendingPathComponent(".git")) { [weak self] in self?.changed($0) }
         }
         reload()
-        if rootChanged || reopened { loadRequests() }
+        if rootChanged { loadRequests() }
     }
 
     func show(all: Bool) {
@@ -635,7 +633,6 @@ private struct BranchRow: View {
     }
 }
 
-/// Commits to pull or push and the action that takes care of them. The action is named while the row is hovered.
 /// Opens the branch's pull request in the browser.
 private struct PullRequestButton: View {
     let request: Forge.Request
@@ -687,6 +684,7 @@ private struct PullRequestGlyph: Shape {
     }
 }
 
+/// Commits to pull or push and the action that takes care of them. The action is named while the row is hovered.
 private struct DriftButton: View {
     let symbol: String
     let count: Int
