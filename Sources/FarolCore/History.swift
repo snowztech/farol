@@ -186,6 +186,12 @@ public enum History {
         try Git.run(["rebase", base], in: directory)
     }
 
+    /// Merges `branch` into the checked out one. `noFastForward` always makes a merge commit, so the branch stays visible in the history.
+    /// On a conflict git stops and the merge view picks it up.
+    public static func merge(_ branch: String, noFastForward: Bool, in directory: String) throws {
+        try Git.run(["merge", "--no-edit"] + (noFastForward ? ["--no-ff"] : []) + [branch], in: directory)
+    }
+
     /// Needs an editor, so it runs in a terminal rather than in the background.
     public static func interactiveRebaseCommand(onto base: String) -> String {
         "git rebase --interactive '\(base.replacingOccurrences(of: "'", with: "'\\''"))'"

@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Right-click a branch to merge it into the checked out one, with a fast-forward when git can or always with a merge commit.
+
 ## [0.26.1] - 2026-10-02
 
 Push from the review panel after a commit.
