@@ -70,8 +70,15 @@ private func edges(_ pairs: (Int, Int)...) -> [History.Edge] {
     let rows = History.graph([commit("y", ["x"], refs: ["HEAD -> feat"]), commit("x", ["a"], refs: ["origin/feat"]),
                               commit("a", ["b"], refs: ["origin/main", "main", "tag: v1"]), commit("b", [], refs: [])])
     #expect(rows.map(\.column) == [0, 0, 0, 0])
-    #expect(rows.map(\.color) == [0, 0, 1, 1])
-    #expect(rows[2].colorsAbove == [0])
+    // main keeps the first color, blue, so feat takes the next one.
+    #expect(rows.map(\.color) == [1, 1, 0, 0])
+    #expect(rows[2].colorsAbove == [1])
+}
+
+@Test func mainStaysBlueWhereBranchesMeet() {
+    // feat is drawn first, so it holds the leftmost lane, but below the fork the line is main's.
+    let rows = History.graph([commit("f", ["a"], refs: ["feat"]), commit("m", ["a"], refs: ["main"]), commit("a", [], refs: [])])
+    #expect(rows.map(\.color) == [1, 0, 0])
 }
 
 @Test func twoTipsJoinAtTheirParent() {

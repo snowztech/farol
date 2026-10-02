@@ -280,7 +280,8 @@ public enum History {
         // The branch each lane's color stands for, once the lane has met one.
         var owners: [String?] = []
         var dashed: [Bool] = []
-        var next = 0
+        // The first color is blue, kept for main so it reads the same in every repo.
+        var next = commits.contains { $0.branches.contains(where: isTrunk) } ? 1 : 0
         func newColor() -> Int {
             defer { next += 1 }
             return next
@@ -299,10 +300,17 @@ public enum History {
             let dashedAbove = dashed
             let isOneSided = oneSided.contains(commit.hash)
             let branches = commit.branches
-            var color = waited.map { colors[$0] } ?? newColor()
-            var owner = waited.flatMap { owners[$0] }
-            // A branch started from another one's last commit shares its line, so the line changes color where the other one begins.
-            if let current = owner, !branches.isEmpty, !branches.contains(where: { sameBranch($0, current) }) {
+            // Where branches meet, main's line goes on below, so it stays blue down its history.
+            let from = lanes.indices.first { lanes[$0] == commit.hash && owners[$0].map(isTrunk) == true } ?? waited
+            var color = from.map { colors[$0] } ?? newColor()
+            var owner = from.flatMap { owners[$0] }
+            if let trunk = branches.first(where: isTrunk) {
+                if !(owner.map(isTrunk) ?? false) {
+                    color = 0
+                    owner = trunk
+                }
+            } else if let current = owner, !branches.isEmpty, !branches.contains(where: { sameBranch($0, current) }) {
+                // A branch started from another one's last commit shares its line, so the line changes color where the other one begins.
                 color = newColor()
                 owner = nil
             }
@@ -365,6 +373,10 @@ public enum History {
                             oneSided: isOneSided, dashedAbove: dashedAbove, dashedBelow: dashedBelow))
         }
         return rows
+    }
+
+    private static func isTrunk(_ branch: String) -> Bool {
+        ["main", "master"].contains { branch == $0 || branch.hasSuffix("/" + $0) }
     }
 
     /// A local branch and its copy on a remote, like main and origin/main, are one branch for the graph's colors.
