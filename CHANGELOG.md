@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-10-02
+
+Push from the review panel after a commit.
+
 ### Added
 
 - After a commit that wasn't pushed, the Commit button in the review panel becomes Push, until there is something new to commit. ⌥⌘P pushes too, and both buttons show their shortcut.
@@ -529,7 +533,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.26.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.26.1...HEAD
+[0.26.1]: https://github.com/snowztech/farol/releases/tag/v0.26.1
 [0.26.0]: https://github.com/snowztech/farol/releases/tag/v0.26.0
 [0.25.0]: https://github.com/snowztech/farol/releases/tag/v0.25.0
 [0.24.1]: https://github.com/snowztech/farol/releases/tag/v0.24.1
