@@ -206,7 +206,7 @@ struct SettingsPage: View {
             .fixedSize()
         }
         Row(title: "Blink", palette: p) {
-            Toggle("", isOn: $settings.cursorBlink).labelsHidden().toggleStyle(.switch).controlSize(.small)
+            toggle($settings.cursorBlink)
         }
 
         GroupTitle(title: "Keyboard and mouse", palette: p)
@@ -224,7 +224,7 @@ struct SettingsPage: View {
             .fixedSize()
         }
         Row(title: "Copy on select", detail: "Selecting text copies it to the clipboard.", palette: p) {
-            Toggle("", isOn: $settings.copyOnSelect).labelsHidden().toggleStyle(.switch).controlSize(.small)
+            toggle($settings.copyOnSelect)
         }
 
         GroupTitle(title: "Config file", palette: p)
@@ -462,8 +462,11 @@ struct SettingsPage: View {
             set: { agents.startCommand = $0 == Self.custom ? (isCustomStart ? agents.startCommand : " ") : $0 })
     }
 
+    /// Brighter than the pickers' tint, so a switch that is on can't be taken for one that is off.
     private func toggle(_ value: Binding<Bool>) -> some View {
-        Toggle("", isOn: value).labelsHidden().toggleStyle(.switch).controlSize(.small)
+        let p = state.palette
+        return Toggle("", isOn: value).labelsHidden().toggleStyle(.switch).controlSize(.small)
+            .tint(p.vivid ? p.pull : p.muted)
     }
 
     private func refreshAgents() {
@@ -764,7 +767,7 @@ private struct SetupState: View {
     var body: some View {
         HStack(spacing: 6) {
             Circle()
-                .fill(state == .connected ? Color.green : state == .outdated ? Color.yellow : palette.muted.opacity(0.5))
+                .fill(state == .connected ? palette.done : state == .outdated ? palette.waiting : palette.muted.opacity(0.5))
                 .frame(width: 6, height: 6)
             Text(state == .connected ? "Connected" : state == .outdated ? "Needs update" : "Not connected")
                 .font(.system(size: 12))
@@ -784,7 +787,7 @@ private struct AccountPill: View {
         HStack(spacing: 7) {
             Avatar(url: url, name: name, palette: palette)
                 .overlay(alignment: .bottomTrailing) {
-                    Circle().fill(Color.green)
+                    Circle().fill(palette.done)
                         .frame(width: 7, height: 7)
                         // A ring in the pill's color, so the dot reads as sitting on the picture.
                         .overlay(Circle().strokeBorder(palette.surface, lineWidth: 1.5).padding(-1.5))
@@ -844,7 +847,7 @@ private struct ToolStateLabel: View {
     var body: some View {
         HStack(spacing: 6) {
             Circle()
-                .fill(state == .missing ? palette.muted.opacity(0.5) : state == .loggedOut ? Color.yellow : Color.green)
+                .fill(state == .missing ? palette.muted.opacity(0.5) : state == .loggedOut ? palette.waiting : palette.done)
                 .frame(width: 6, height: 6)
             Text(state == .missing ? "Not installed" : state == .loggedOut ? "Not logged in" : "Connected")
                 .font(.system(size: 12))
@@ -861,6 +864,12 @@ private struct OpenConfigRow: View {
     @State private var hovering = false
 
     var body: some View {
+        Button(action: action) { label }
+            .buttonStyle(QuietPress())
+            .onClickableHover { hovering = $0 }
+    }
+
+    private var label: some View {
         HStack(spacing: 8) {
             Image(systemName: "doc.text").font(.system(size: 11.5))
             Text("Open config file").font(.system(size: 12.5))
@@ -869,10 +878,8 @@ private struct OpenConfigRow: View {
         .foregroundStyle(hovering ? palette.text : palette.muted)
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
-        .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised.opacity(0.35) : .clear))
+        .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
-        .onTapGesture(perform: action)
-        .onClickableHover { hovering = $0 }
     }
 }
 
@@ -882,7 +889,7 @@ private struct Keycap: View {
 
     var body: some View {
         Text(keys)
-            .font(.system(size: 12, weight: .medium, design: .rounded))
+            .font(.system(size: 11.5, weight: .medium, design: .monospaced))
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
             .background(palette.raised, in: RoundedRectangle(cornerRadius: 5))
@@ -900,20 +907,17 @@ private struct NavItem: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 10) {
-                Capsule()
-                    .fill(selected ? palette.accent : .clear)
-                    .frame(width: 2.5, height: 14)
                 Text(title)
                     .font(.system(size: 13, weight: selected ? .medium : .regular))
                     .foregroundStyle(selected ? palette.text : palette.muted)
                 Spacer()
             }
             .padding(.vertical, 6)
-            .padding(.trailing, 8)
-            .background(RoundedRectangle(cornerRadius: 6).fill(hovering && !selected ? palette.raised.opacity(0.6) : .clear))
+            .padding(.horizontal, 10)
+            .background(RoundedRectangle(cornerRadius: 6).fill(selected ? palette.selection : hovering ? palette.hover : .clear))
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(QuietPress())
         .onClickableHover { hovering = $0 }
     }
 }

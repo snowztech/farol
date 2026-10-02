@@ -61,6 +61,9 @@ struct Palette: Equatable {
     /// The selected row. Gray, or lit in the theme's blue in the style with color.
     let selection: Color
 
+    /// A row under the mouse. Fainter than `raised`, so it never reads as selected.
+    var hover: Color { raised.opacity(0.35) }
+
     var boxed: Bool { style != .classic }
     var vivid: Bool { style == .vivid }
 

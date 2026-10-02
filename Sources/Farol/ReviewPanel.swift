@@ -79,6 +79,8 @@ final class ReviewModel: ObservableObject {
     private var ignored: [String] = []
     private var watcher: FolderWatcher?
     private var pending: DispatchWorkItem?
+    /// Set while a new checkout's scope is being worked out. Counting with the last checkout's scope would flash the wrong numbers.
+    private var scopePending = false
     /// The next look at the checks, while some are still running.
     private var poll: DispatchWorkItem?
     /// A push starts a pipeline, but the forge takes a moment to list it. Until then, no checks doesn't mean none are coming.
@@ -118,20 +120,26 @@ final class ReviewModel: ObservableObject {
         }
         guard let root else { return }
         if rootChanged { watcher = FolderWatcher(root) { [weak self] in self?.changed($0) } }
+        scopePending = true
         DispatchQueue.global(qos: .userInitiated).async {
             let base = Diff.baseBranch(in: root)
             let local = Diff.branches(in: root)
             let branches = (base.map { [$0] } ?? []) + local.filter { base != $0 && base != "origin/\($0)" }
             let scope = Diff.defaultScope(in: root)
+            // The counts only need the scope, so they are read before the rest is known.
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.root == root else { return }
+                self.branches = branches
+                self.scope = self.chosenScope[root] ?? scope
+                self.scopePending = false
+                self.refresh()
+            }
             let ignored = Files.ignored(in: root).map { $0 + "/" }
             let forge = Forge.detect(in: root)
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root else { return }
-                self.branches = branches
                 self.forge = forge
                 self.ignored = ignored
-                self.scope = self.chosenScope[root] ?? scope
-                self.refresh()
                 self.checkRequest()
             }
         }
@@ -288,31 +296,16 @@ final class ReviewModel: ObservableObject {
     /// Reads the counts, and the whole diff when the panel is open, off the main thread.
     func refresh() {
         pending?.cancel()
-        guard let root else { return }
+        guard let root, !scopePending else { return }
         let scope = scope, withFiles = isOpen, base = branches.first, branch = branch
         let yours = showsCommit ? scopeBeforeCommit ?? .uncommitted : scope
         DispatchQueue.global(qos: .userInitiated).async {
+            // In the order you see them: the open panel's diff, the title bar's counts, then what only feeds the buttons.
             let stat = Result { try Diff.stat(in: root, scope) }
-            let changes = yours == scope ? stat : Result { try Diff.stat(in: root, yours) }
-            let ahead = base.map { History.commitsAhead(of: $0, in: root) } ?? 0
-            let unpushed = branch.map { History.unpushed($0, in: root) } ?? 0
-            let uncommitted = Set((try? Diff.uncommittedPaths(in: root)) ?? [])
-            let stopped = Merge.operation(in: root) != nil
             let files = withFiles ? Result { try Diff.files(in: root, scope) } : nil
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root, self.scope == scope else { return }
                 self.stat = (try? stat.get()) ?? Diff.Stat()
-                self.changes = (try? changes.get()) ?? Diff.Stat()
-                self.uncommittedPaths = uncommitted
-                if self.canChooseFiles == stopped { self.canChooseFiles = !stopped }
-                if let left = self.leftOut[root], !left.isSubset(of: uncommitted) { self.leftOut[root] = left.intersection(uncommitted) }
-                self.ahead = ahead
-                // A push from the terminal starts a pipeline just the same.
-                if unpushed == 0, self.unpushed > 0, self.isOpen {
-                    self.checksDue = Date() + 60
-                    self.checkRequest()
-                }
-                self.unpushed = unpushed
                 self.error = (try? files?.get()) == nil && files != nil ? "Couldn't read the changes." : nil
                 if let files = try? files?.get() {
                     let known = Set(self.files.map(\.path))
@@ -330,6 +323,28 @@ final class ReviewModel: ObservableObject {
                         self.rebuild()
                     }
                 }
+            }
+            let changes = yours == scope ? stat : Result { try Diff.stat(in: root, yours) }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.root == root, self.scope == scope else { return }
+                self.changes = (try? changes.get()) ?? Diff.Stat()
+            }
+            let ahead = base.map { History.commitsAhead(of: $0, in: root) } ?? 0
+            let unpushed = branch.map { History.unpushed($0, in: root) } ?? 0
+            let uncommitted = Set((try? Diff.uncommittedPaths(in: root)) ?? [])
+            let stopped = Merge.operation(in: root) != nil
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.root == root, self.scope == scope else { return }
+                self.uncommittedPaths = uncommitted
+                if self.canChooseFiles == stopped { self.canChooseFiles = !stopped }
+                if let left = self.leftOut[root], !left.isSubset(of: uncommitted) { self.leftOut[root] = left.intersection(uncommitted) }
+                self.ahead = ahead
+                // A push from the terminal starts a pipeline just the same.
+                if unpushed == 0, self.unpushed > 0, self.isOpen {
+                    self.checksDue = Date() + 60
+                    self.checkRequest()
+                }
+                self.unpushed = unpushed
             }
         }
     }
@@ -572,7 +587,7 @@ struct Counts: View {
             Text("+\(added)").foregroundStyle(palette.added)
             Text("−\(removed)").foregroundStyle(palette.removed)
         }
-        .monospacedDigit()
+        .font(.system(size: 11, weight: .medium, design: .monospaced))
     }
 }
 
@@ -606,7 +621,6 @@ private struct FileHeader: View {
                 .truncationMode(.head)
             if let status { Text(status).font(.system(size: 11)).foregroundStyle(palette.muted) }
             Counts(added: file.added, removed: file.removed, palette: palette)
-                .font(.system(size: 11))
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(palette.line))

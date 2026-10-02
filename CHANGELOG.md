@@ -4,6 +4,19 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- Branches, change counts and shortcuts are set in a monospaced font, so what comes from git or the keyboard reads apart from names.
+- Buttons dim while pressed and hovers ease in. The selected settings section is filled like a selected session.
+- Switches that are on are brighter, and the "Connected" dots in settings take your theme's green and yellow.
+- New task and Open config file are real buttons, so VoiceOver can reach them.
+- In the title bar's git pill, the half whose panel is open is brighter than a hovered one, and the graph icon is the size of the gear.
+
+### Fixed
+
+- The change counts in the title bar no longer wait for what only the review panel needs, so they show sooner after you switch sessions.
+- A commit opened from the git graph shows its diff sooner. The panel used to read your own counts and push state first.
+
 ## [0.27.0] - 2026-10-02
 
 Merge branches, and see pull requests and their checks.
