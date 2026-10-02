@@ -212,32 +212,42 @@ struct ShipButton: View {
 }
 
 /// The box that says whether a file goes in the next commit, in the review panel and in the commit sheet.
-/// "✦ Generate with Claude Code", and an arrow to pick another agent or account.
+/// "Generate" with a wand in the message field's corner, and an arrow to pick the agent or account.
+/// Quiet like the toolbar's icon buttons, since most people pick an agent once: its name is in the tooltip and the menu.
 private struct GenerateButton: View {
     let agent: AgentFolder
     let agents: [AgentFolder]
+    /// While the agent writes, the wand turns into a spinner and a click stops it.
+    let running: Bool
     let palette: Palette
     let generate: () -> Void
     let pick: (AgentFolder) -> Void
 
     @Environment(\.isEnabled) private var enabled
-    @State private var hovering = false
+    @State private var hoveringGenerate = false
+    @State private var hoveringPicker = false
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 1) {
             Button(action: generate) {
-                HStack(spacing: 5) {
-                    Image(systemName: "sparkle").font(.system(size: 10, weight: .semibold))
-                    Text("Generate with \(agent.label)").font(.system(size: 12, weight: .medium))
+                HStack(spacing: 4) {
+                    if running {
+                        ProgressView().controlSize(.mini).scaleEffect(0.8).frame(width: 11, height: 11)
+                    } else {
+                        Image(systemName: "wand.and.rays").font(.system(size: 10.5, weight: .medium))
+                    }
+                    Text(running ? "Stop" : "Generate").font(.system(size: 11.5, weight: .medium))
                 }
-                .padding(.horizontal, 8)
-                .frame(height: 22)
+                .padding(.horizontal, 6)
+                .frame(height: 20)
+                .foregroundStyle(hoveringGenerate && enabled ? palette.text : palette.muted)
+                .background(RoundedRectangle(cornerRadius: 6).fill(hoveringGenerate && enabled ? palette.raised : .clear))
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .hoverTip("Write the message from the changes")
-            if agents.count > 1 {
-                Rectangle().fill(palette.line).frame(width: 1, height: 12)
+            .onClickableHover { hoveringGenerate = $0 }
+            .hoverTip(running ? "Stop \(agent.label)" : "Generate with \(agent.label)")
+            if agents.count > 1, !running {
                 Menu {
                     ForEach(agents, id: \.id) { folder in
                         Button { pick(folder) } label: {
@@ -245,20 +255,23 @@ private struct GenerateButton: View {
                         }
                     }
                 } label: {
-                    Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 7, weight: .semibold))
+                        .frame(width: 14, height: 20)
+                        .foregroundStyle(hoveringPicker ? palette.text : palette.muted)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(hoveringPicker ? palette.raised : .clear))
+                        .contentShape(Rectangle())
                 }
-                .menuStyle(.borderlessButton)
+                // Plain keeps the label as drawn here. The bordered styles put AppKit's own, larger arrow in.
+                .menuStyle(.button)
+                .buttonStyle(.plain)
                 .menuIndicator(.hidden)
                 .fixedSize()
-                .padding(.horizontal, 6)
-                .frame(height: 22)
+                .onClickableHover { hoveringPicker = $0 }
                 .hoverTip("Choose the agent")
             }
         }
-        .foregroundStyle(palette.text)
-        .background(RoundedRectangle(cornerRadius: 5).fill(palette.text.opacity(hovering && enabled ? 0.12 : 0.08)))
         .opacity(enabled ? 1 : 0.4)
-        .onClickableHover { hovering = $0 }
     }
 }
 
@@ -325,13 +338,27 @@ private struct CommitSheet: View {
                 }
                 changes(p)
                 // Return confirms. Option-Return adds a line, for a body under the subject.
-                TextField("Commit message", text: $message, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .lineLimit(3...8)
-                    .focused($typing)
-                    .sheetField(p, focused: typing)
-                    .disabled(generating != nil)
-                generateRow(p)
+                VStack(alignment: .leading, spacing: 6) {
+                    TextField("Commit message", text: $message, axis: .vertical)
+                        .textFieldStyle(.plain)
+                        .lineLimit(3...8)
+                        .focused($typing)
+                        // Room under the text for the button in the corner, so a long message never runs under it.
+                        .padding(.bottom, chosenAgent == nil ? 0 : 16)
+                        .opacity(generating == nil ? 1 : 0.45)
+                        .disabled(generating != nil)
+                        .sheetField(p, focused: typing)
+                        .overlay(alignment: .bottomTrailing) {
+                            if let chosen = chosenAgent {
+                                GenerateButton(agent: chosen, agents: agents, running: generating != nil, palette: p,
+                                               generate: { generating?.terminate() ?? generate(with: chosen) },
+                                               pick: { agent = $0.id })
+                                    .disabled(generating == nil && files != nil && self.chosen.isEmpty)
+                                    .padding(4)
+                            }
+                        }
+                    hints(p)
+                }
                 VStack(spacing: 6) {
                     option(.nothing, "Commit", p)
                     option(.push, "Commit and push", p)
@@ -374,36 +401,19 @@ private struct CommitSheet: View {
 
     private var chosenAgent: AgentFolder? { AgentFolder.choice(agent, in: agents) }
 
-    /// "⌥↩ for a new line", then the agent that can write the message, with a menu to pick another.
-    private func generateRow(_ p: Palette) -> some View {
+    /// "⌥↩ for a new line", Restore after the agent wrote over a message, and what went wrong if it failed.
+    private func hints(_ p: Palette) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
-                Text("⌥↩ for a new line").font(.system(size: 11)).foregroundStyle(p.muted)
+                Text("⌥↩ for a new line")
                 if let replaced, message == generated {
                     Button("Restore") { message = replaced }
                         .buttonStyle(.plain)
-                        .font(.system(size: 11))
-                        .foregroundStyle(p.muted)
                         .hoverTip("Put back what you had typed")
                 }
-                Spacer()
-                if let chosen = chosenAgent {
-                    if generating != nil {
-                        HStack(spacing: 6) {
-                            ProgressView().controlSize(.mini)
-                            Text("Generating…").font(.system(size: 12)).foregroundStyle(p.muted)
-                            Button("Stop") { generating?.terminate() }
-                                .buttonStyle(.plain)
-                                .font(.system(size: 12, weight: .medium))
-                        }
-                        .frame(height: 22)
-                    } else {
-                        GenerateButton(agent: chosen, agents: agents, palette: p, generate: { generate(with: chosen) },
-                                       pick: { agent = $0.id })
-                            .disabled(files != nil && self.chosen.isEmpty)
-                    }
-                }
             }
+            .font(.system(size: 11))
+            .foregroundStyle(p.muted)
             if let generationError {
                 Text(generationError)
                     .font(.system(size: 11))
