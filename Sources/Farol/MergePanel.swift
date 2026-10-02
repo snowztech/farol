@@ -21,6 +21,7 @@ final class MergeEditorController: ObservableObject {
     let editor = MergeEditor()
     @Published private(set) var mode = Mode.loading
     @Published private(set) var openDecisions = 0
+    @Published private(set) var openChanges = 0
     @Published private(set) var autoCount = 0
     @Published private(set) var conflictCount = 0
     @Published private(set) var warnings: [Merge.Undeclared] = []
@@ -42,6 +43,7 @@ final class MergeEditorController: ObservableObject {
 
     private func count() {
         openDecisions = editor.openDecisions
+        openChanges = editor.openChanges
         autoCount = editor.autoCount
         conflictCount = editor.conflictCount
         warnings = editor.warnings
@@ -593,7 +595,7 @@ struct MergePanel: View {
     private func footerRow(_ p: Palette, wholeFile: Bool) -> some View {
         let left = controller.openDecisions
         return HStack(spacing: 6) {
-            Text(left == 0 ? "Everything decided" : "\(left) \(left == 1 ? "decision" : "decisions") left")
+            Text(left == 0 ? "Everything decided" : "\(controller.openChanges) \(controller.openChanges == 1 ? "change" : "changes") to decide")
                 .foregroundStyle(p.muted)
                 .lineLimit(1)
                 .padding(.trailing, 4)

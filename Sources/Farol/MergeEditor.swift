@@ -106,6 +106,7 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
     /// Runs of display blocks shared by the three columns, to keep them scrolled together.
     private var blocks: [(mine: NSRange, items: Range<Int>, other: NSRange)] = []
     private var applying = false
+    private var current: Int?
     private var syncing = false
     private var pendingHighlight: DispatchWorkItem?
     /// One per file, so each file keeps its own history.
@@ -125,6 +126,8 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
+        // A wave to a change scrolled out of view would otherwise run up over the titles above.
+        clipsToBounds = true
         for view in columns {
             addSubview(view.scroll)
             view.onFoldClick = { [weak self] in self?.unfold($0) }
@@ -158,6 +161,7 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
         mineNumbers.fillsBackground = false
         otherNumbers.fillsBackground = false
         markers.onClick = { [weak self] in self?.reveal(resultLine: $0) }
+        markers.textView = centerView
         addSubview(markers)
     }
 
@@ -230,6 +234,8 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
     func isDecided(_ index: Int) -> Bool { resolution.isDecided(index) }
 
     var openDecisions: Int { merge == nil ? 0 : resolution.openDecisions }
+    /// Changes still waiting for you. A conflict is one change, though each of its sides is a decision.
+    var openChanges: Int { merge?.chunks.indices.filter { !isDecided($0) }.count ?? 0 }
     var conflictCount: Int { merge == nil ? 0 : resolution.conflictCount }
     var autoCount: Int { resolution.autoCount }
 
@@ -635,17 +641,30 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
     private func centerStyle(_ index: Int) -> MergeBand.Style {
         guard let colors else { return MergeBand.Style(fill: .clear, edge: .clear, dashed: false) }
         let decision = decisions[index]
-        if !isDecided(index) {
-            return MergeBand.Style(fill: colors.pending.withAlphaComponent(0.09), edge: colors.pending.withAlphaComponent(0.5), dashed: false)
+        let decided = isDecided(index), nothingTaken = decision.order.isEmpty && !decision.edited
+        let color = !decided ? colors.pending : nothingTaken ? colors.foreground : colors.resolved
+        let (fill, edge): (CGFloat, CGFloat) = decided && nothingTaken ? (0.04, 0.18) : (0.09, 0.5)
+        // The change the caret is in stands out, so you can tell where ⌥↓ and ⌥↑ took you.
+        let lit = index == current
+        return MergeBand.Style(fill: color.withAlphaComponent(lit ? fill * 2 : fill), edge: color.withAlphaComponent(lit ? 1 : edge),
+                               dashed: decided && !nothingTaken && decision.auto && !decision.edited, bar: lit)
+    }
+
+    /// The shown change the caret is in. An empty one holds the caret at its start.
+    private func chunk(at caret: Int) -> Int? {
+        visibleChunks.first { index in
+            guard let range = centerRange(index) else { return false }
+            return range.length == 0 ? caret == range.location : NSLocationInRange(caret, range)
         }
-        if decision.order.isEmpty, !decision.edited {
-            return MergeBand.Style(fill: colors.foreground.withAlphaComponent(0.04), edge: colors.foreground.withAlphaComponent(0.18), dashed: false)
-        }
-        return MergeBand.Style(fill: colors.resolved.withAlphaComponent(0.09), edge: colors.resolved.withAlphaComponent(0.5),
-                               dashed: decision.auto && !decision.edited)
+    }
+
+    func textViewDidChangeSelection(_ notification: Notification) {
+        guard !applying, chunk(at: centerView.selectedRange().location) != current else { return }
+        updateBands()
     }
 
     private func updateBands() {
+        current = chunk(at: centerView.selectedRange().location)
         var mine: [MergeBand] = [], center: [MergeBand] = [], other: [MergeBand] = []
         for (index, ranges) in sideRanges {
             if let look = look(index, mine: true) { mine.append(MergeBand(range: ranges.mine, style: band(for: look, mine: true))) }
@@ -732,8 +751,7 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             let (top, _) = self.centerView.span(NSRange(location: location, length: 0))
-            self.centerView.scroll.contentView.scroll(to: NSPoint(x: self.centerView.scroll.contentView.bounds.minX, y: max(0, top - 80)))
-            self.centerView.scroll.reflectScrolledClipView(self.centerView.scroll.contentView)
+            self.scrollCenter(to: top - 80)
         }
     }
 
@@ -760,6 +778,7 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
         leftGutter.needsDisplay = true
         rightGutter.needsDisplay = true
         for numbers in [mineNumbers, centerNumbers, otherNumbers] { numbers.needsDisplay = true }
+        markers.needsDisplay = true
     }
 
     // MARK: Typing
@@ -874,9 +893,16 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             let (top, _) = self.centerView.span(range)
-            self.centerView.scroll.contentView.scroll(to: NSPoint(x: self.centerView.scroll.contentView.bounds.minX, y: max(0, top - 80)))
-            self.centerView.scroll.reflectScrolledClipView(self.centerView.scroll.contentView)
+            self.scrollCenter(to: top - 80)
         }
+    }
+
+    /// Not past the end, so nothing moves when the whole file fits in the view.
+    private func scrollCenter(to y: CGFloat) {
+        let clip = centerView.scroll.contentView
+        let limit = max(0, centerView.frame.height - clip.bounds.height)
+        clip.scroll(to: NSPoint(x: clip.bounds.minX, y: min(max(0, y), limit)))
+        centerView.scroll.reflectScrolledClipView(clip)
     }
 
     /// Keeps the other two columns level with the one you scrolled, block by block, since their lines don't match one to one.
@@ -900,7 +926,9 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
             let to1 = k + 1 < anchors.count ? value(anchors[k + 1], index) : to0 + 1
             let fraction = from1 > from0 ? (y - from0) / (from1 - from0) : 0
             // Above the first block, as in the margin at the top, the columns move together line for line.
-            let mapped = y < from0 && k == 0 ? to0 + (y - from0) : to0 + (to1 - to0) * min(max(fraction, 0), 1)
+            // So do they in the last block, which has no block after it to measure against.
+            let together = (y < from0 && k == 0) || k + 1 == anchors.count
+            let mapped = together ? to0 + (y - from0) : to0 + (to1 - to0) * min(max(fraction, 0), 1)
             let targetY = max(0, mapped)
             target.scroll.contentView.scroll(to: NSPoint(x: target.scroll.contentView.bounds.minX, y: targetY))
             target.scroll.reflectScrolledClipView(target.scroll.contentView)
@@ -949,6 +977,8 @@ struct MergeBand {
         let fill: NSColor
         let edge: NSColor
         let dashed: Bool
+        /// A thick mark on the left edge, for the change you are on.
+        var bar = false
     }
 
     let range: NSRange
@@ -1033,6 +1063,10 @@ final class MergeTextView: NSTextView {
             let area = NSRect(x: 0, y: top, width: bounds.width, height: bottom - top)
             band.style.fill.setFill()
             area.fill()
+            if band.style.bar {
+                band.style.edge.setFill()
+                NSRect(x: 0, y: top, width: 2, height: bottom - top).fill()
+            }
             band.style.edge.setStroke()
             for y in [top + 0.5, bottom - 0.5] {
                 let line = NSBezierPath()
@@ -1093,16 +1127,29 @@ final class MergeMarkers: NSView {
         let line: Int
     }
 
-    var marks: [Mark] = [] { didSet { needsDisplay = true } }
+    var marks: [Mark] = [] {
+        didSet {
+            needsDisplay = true
+            window?.invalidateCursorRects(for: self)
+        }
+    }
     var onClick: ((Int) -> Void)?
+    weak var textView: MergeTextView?
 
     override var isFlipped: Bool { true }
+
+    /// A map of the file only helps when the file is longer than the view. When it all fits, the marks would sit far from their lines.
+    private var scrolls: Bool {
+        guard let textView else { return true }
+        return textView.frame.height > textView.scroll.contentSize.height
+    }
 
     private func rect(_ mark: Mark) -> NSRect {
         NSRect(x: 2, y: 4 + mark.fraction * max(bounds.height - 12, 0), width: bounds.width - 4, height: 4)
     }
 
     override func draw(_ dirtyRect: NSRect) {
+        guard scrolls else { return }
         for mark in marks {
             let path = NSBezierPath(roundedRect: rect(mark), xRadius: 1, yRadius: 1)
             if mark.outline {
@@ -1119,9 +1166,15 @@ final class MergeMarkers: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        guard scrolls else { return }
         let point = convert(event.locationInWindow, from: nil)
         let hit = marks.min { abs(rect($0).midY - point.y) < abs(rect($1).midY - point.y) }
         if let hit, abs(rect(hit).midY - point.y) < 8 { onClick?(hit.line) }
+    }
+
+    override func resetCursorRects() {
+        guard scrolls else { return }
+        for mark in marks { addCursorRect(rect(mark).insetBy(dx: -2, dy: -6), cursor: .pointingHand) }
     }
 }
 
