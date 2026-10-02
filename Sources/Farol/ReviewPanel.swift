@@ -79,6 +79,8 @@ final class ReviewModel: ObservableObject {
     private var ignored: [String] = []
     private var watcher: FolderWatcher?
     private var pending: DispatchWorkItem?
+    /// Set while a new checkout's scope is being worked out. Counting with the last checkout's scope would flash the wrong numbers.
+    private var scopePending = false
     /// The next look at the checks, while some are still running.
     private var poll: DispatchWorkItem?
     /// A push starts a pipeline, but the forge takes a moment to list it. Until then, no checks doesn't mean none are coming.
@@ -118,20 +120,26 @@ final class ReviewModel: ObservableObject {
         }
         guard let root else { return }
         if rootChanged { watcher = FolderWatcher(root) { [weak self] in self?.changed($0) } }
+        scopePending = true
         DispatchQueue.global(qos: .userInitiated).async {
             let base = Diff.baseBranch(in: root)
             let local = Diff.branches(in: root)
             let branches = (base.map { [$0] } ?? []) + local.filter { base != $0 && base != "origin/\($0)" }
             let scope = Diff.defaultScope(in: root)
+            // The counts only need the scope, so they are read before the rest is known.
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.root == root else { return }
+                self.branches = branches
+                self.scope = self.chosenScope[root] ?? scope
+                self.scopePending = false
+                self.refresh()
+            }
             let ignored = Files.ignored(in: root).map { $0 + "/" }
             let forge = Forge.detect(in: root)
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root else { return }
-                self.branches = branches
                 self.forge = forge
                 self.ignored = ignored
-                self.scope = self.chosenScope[root] ?? scope
-                self.refresh()
                 self.checkRequest()
             }
         }
@@ -288,12 +296,17 @@ final class ReviewModel: ObservableObject {
     /// Reads the counts, and the whole diff when the panel is open, off the main thread.
     func refresh() {
         pending?.cancel()
-        guard let root else { return }
+        guard let root, !scopePending else { return }
         let scope = scope, withFiles = isOpen, base = branches.first, branch = branch
         let yours = showsCommit ? scopeBeforeCommit ?? .uncommitted : scope
         DispatchQueue.global(qos: .userInitiated).async {
             let stat = Result { try Diff.stat(in: root, scope) }
             let changes = yours == scope ? stat : Result { try Diff.stat(in: root, yours) }
+            // Shown as soon as they are known, without waiting for what only the panel needs.
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.root == root, self.scope == scope else { return }
+                self.changes = (try? changes.get()) ?? Diff.Stat()
+            }
             let ahead = base.map { History.commitsAhead(of: $0, in: root) } ?? 0
             let unpushed = branch.map { History.unpushed($0, in: root) } ?? 0
             let uncommitted = Set((try? Diff.uncommittedPaths(in: root)) ?? [])
@@ -302,7 +315,6 @@ final class ReviewModel: ObservableObject {
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root, self.scope == scope else { return }
                 self.stat = (try? stat.get()) ?? Diff.Stat()
-                self.changes = (try? changes.get()) ?? Diff.Stat()
                 self.uncommittedPaths = uncommitted
                 if self.canChooseFiles == stopped { self.canChooseFiles = !stopped }
                 if let left = self.leftOut[root], !left.isSubset(of: uncommitted) { self.leftOut[root] = left.intersection(uncommitted) }
