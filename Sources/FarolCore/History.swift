@@ -207,6 +207,15 @@ public enum History {
         try Git.run(["commit", "--message", message], in: directory)
     }
 
+    /// Commits only `paths` as they are on disk, new and deleted files included. A renamed file needs both its names.
+    /// Every other change stays as it was, staged or not.
+    public static func commit(_ message: String, only paths: [String], in directory: String) throws {
+        // Git has to know a new file before it can commit it by name. A deleted one it knows already, and can't add.
+        let onDisk = paths.filter { (try? FileManager.default.attributesOfItem(atPath: (directory as NSString).appendingPathComponent($0))) != nil }
+        if !onDisk.isEmpty { try Git.run(["--literal-pathspecs", "add", "--"] + onDisk, in: directory) }
+        try Git.run(["--literal-pathspecs", "commit", "--message", message, "--only", "--"] + paths, in: directory)
+    }
+
     /// Pushes the checked out branch under its own name and tracks it there. A branch with no remote yet goes to origin.
     public static func push(in directory: String) throws {
         try Git.run(["push", "--set-upstream", pushRemote(in: directory), "HEAD"], in: directory)

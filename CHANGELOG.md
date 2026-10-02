@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Each file with uncommitted changes has a tick in the review panel and in the commit sheet. Untick one and it stays out of the next commit, uncommitted in your working tree. ⌥⌘C opens the commit sheet from anywhere in the session.
+
 ## [0.25.0] - 2026-10-02
 
 Resolve merge conflicts in Farol, in three columns.

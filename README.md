@@ -150,6 +150,7 @@ These hooks complement the terminal-title status used by interactive Codex sessi
 | Toggle files | ⇧⌘E |
 | Save the open file | ⌘S |
 | Review changes | ⌥⌘R |
+| Commit | ⌥⌘C |
 | Git graph | ⌥⌘G |
 | Resolve conflicts | ⌥⌘M |
 | Next or previous change to decide | ⌥↓ and ⌥↑ |
