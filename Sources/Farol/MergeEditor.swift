@@ -384,7 +384,7 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
                     }
                     hiddenCenter += lineCount(resolution.texts[unit])
                 }
-                let changes = autos == 0 ? "" : ", \(autos) merged automatically"
+                let changes = autos == 0 ? "" : ", \(autos) auto-merged"
                 sideFolds.mine.append((append("⋯ \(hiddenMine) lines\n", to: mineText, foldAttributes), position))
                 sideFolds.other.append((append("⋯ \(hiddenOther) lines\n", to: otherText, foldAttributes), position))
                 let range = append("⋯ \(hiddenCenter) lines\(changes)\n", to: centerText, foldAttributes)
@@ -1182,11 +1182,15 @@ final class MergeGutter: NSView {
     let mine: Bool
     /// The flat part next to the side, holding its buttons and line numbers.
     var strip: CGFloat = 0
-    private var buttons: [(rect: NSRect, chunk: Int, take: Bool)] = []
+    private var buttons: [(rect: NSRect, chunk: Int, take: Bool, tip: String)] = []
+    /// Where the mouse is, to light the button under it like the icon buttons elsewhere.
+    private var mouse: NSPoint?
 
     init(mine: Bool) {
         self.mine = mine
         super.init(frame: .zero)
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+                                       owner: self))
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -1244,50 +1248,72 @@ final class MergeGutter: NSView {
     /// ✕ then » for yours, « then ✕ for the incoming side, so the arrow always points at the result.
     /// They sit at the outer end of the strip, by the code. Once decided, a single mark is left, and clicking it takes the decision back.
     private func drawButtons(_ index: Int, look: MergeEditor.Look, at y: CGFloat) {
-        let size: CGFloat = 18
-        let top = y - size / 2
-        let area = mine ? NSRect(x: 0, y: top, width: MergeEditor.buttonsWidth, height: size)
-            : NSRect(x: bounds.width - MergeEditor.buttonsWidth, y: top, width: MergeEditor.buttonsWidth, height: size)
-        let decision = editor?.decisions[index]
+        let size = NSSize(width: 20, height: 18)
+        let top = y - size.height / 2
+        let area = mine ? NSRect(x: 0, y: top, width: MergeEditor.buttonsWidth, height: size.height)
+            : NSRect(x: bounds.width - MergeEditor.buttonsWidth, y: top, width: MergeEditor.buttonsWidth, height: size.height)
         let tint = editor?.band(for: .waiting, mine: mine).edge.withAlphaComponent(1) ?? .labelColor
-        let muted = NSColor.secondaryLabelColor
-        let middle = NSRect(x: area.midX - size / 2, y: top, width: size, height: size)
-        if decision?.edited == true {
-            draw("✎", in: middle, color: muted)
+        let middle = NSRect(origin: NSPoint(x: area.midX - size.width / 2, y: top), size: size)
+        if editor?.decisions[index].edited == true {
+            draw("pencil", in: middle, color: .secondaryLabelColor)
             return
         }
         switch look {
         case .waiting:
-            let first = NSRect(x: area.minX + 3, y: top, width: size, height: size)
-            let second = NSRect(x: area.maxX - size - 3, y: top, width: size, height: size)
+            let first = NSRect(origin: NSPoint(x: area.minX + 1, y: top), size: size)
+            let second = NSRect(origin: NSPoint(x: area.maxX - size.width - 1, y: top), size: size)
             let (cross, arrow) = mine ? (first, second) : (second, first)
-            draw("✕", in: cross, color: muted)
-            draw(mine ? "»" : "«", in: arrow, color: tint)
-            buttons.append((cross, index, false))
-            buttons.append((arrow, index, true))
+            button(cross, "xmark", index, take: false, tip: "Leave this change out")
+            button(arrow, mine ? "chevron.right.2" : "chevron.left.2", index, take: true, tip: "Take this change into the result", color: tint)
         case .taken:
-            draw("✓", in: middle, color: muted)
-            buttons.append((middle, index, true))
+            button(middle, "checkmark", index, take: true, tip: "Taken. Click to decide again")
         case .dropped:
-            draw("✕", in: middle, color: muted)
-            buttons.append((middle, index, false))
+            button(middle, "xmark", index, take: false, tip: "Left out. Click to decide again")
         }
     }
 
+    /// Gray until the mouse is on it, unless it has a color of its own.
+    private func button(_ rect: NSRect, _ symbol: String, _ chunk: Int, take: Bool, tip: String, color: NSColor? = nil) {
+        let lit = mouse.map(rect.insetBy(dx: -2, dy: -2).contains) ?? false
+        if lit {
+            NSColor.labelColor.withAlphaComponent(0.12).setFill()
+            NSBezierPath(roundedRect: rect, xRadius: 5, yRadius: 5).fill()
+        }
+        draw(symbol, in: rect, color: color ?? (lit ? .labelColor : .secondaryLabelColor))
+        buttons.append((rect, chunk, take, tip))
+    }
+
     private func draw(_ symbol: String, in rect: NSRect, color: NSColor) {
-        let style = NSMutableParagraphStyle()
-        style.alignment = .center
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 12, weight: .bold), .foregroundColor: color, .paragraphStyle: style,
-        ]
-        let label = symbol as NSString
-        let height = label.size(withAttributes: attributes).height
-        label.draw(in: NSRect(x: rect.minX, y: rect.midY - height / 2, width: rect.width, height: height), withAttributes: attributes)
+        let look = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold).applying(.init(paletteColors: [color]))
+        guard let image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)?.withSymbolConfiguration(look) else { return }
+        let size = image.size
+        image.draw(in: NSRect(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2, width: size.width, height: size.height),
+                   from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+    }
+
+    private func button(at point: NSPoint?) -> (rect: NSRect, chunk: Int, take: Bool, tip: String)? {
+        point.flatMap { point in buttons.first { $0.rect.insetBy(dx: -2, dy: -2).contains(point) } }
+    }
+
+    override func mouseMoved(with event: NSEvent) { hover(convert(event.locationInWindow, from: nil)) }
+
+    override func mouseExited(with event: NSEvent) { hover(nil) }
+
+    private func hover(_ point: NSPoint?) {
+        let before = button(at: mouse), after = button(at: point)
+        mouse = point
+        guard before?.rect != after?.rect else { return }
+        needsDisplay = true
+        if let after, let window {
+            HoverTip.shared.show(after.tip, below: window.convertToScreen(convert(after.rect, to: nil)), in: window)
+        } else {
+            HoverTip.shared.hide()
+        }
     }
 
     override func mouseDown(with event: NSEvent) {
-        let point = convert(event.locationInWindow, from: nil)
-        guard let hit = buttons.first(where: { $0.rect.insetBy(dx: -2, dy: -2).contains(point) }) else { return }
+        guard let hit = button(at: convert(event.locationInWindow, from: nil)) else { return }
+        HoverTip.shared.hide()
         editor?.decide(hit.chunk, mine: mine, take: hit.take)
     }
 

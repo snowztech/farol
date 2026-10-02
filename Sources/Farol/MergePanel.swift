@@ -198,7 +198,6 @@ struct MergePanel: View {
 
     private func header(_ p: Palette) -> some View {
         HStack(spacing: 8) {
-            Circle().fill(merge.hasConflicts ? p.waiting : p.done).frame(width: 7, height: 7)
             Text(title).font(.system(size: 12.5, weight: .medium)).lineLimit(1)
             if let detail { Text(detail).font(.system(size: 12)).foregroundStyle(p.muted).lineLimit(1).truncationMode(.tail) }
             Spacer(minLength: 12)
@@ -295,7 +294,6 @@ struct MergePanel: View {
             }
             .padding(6)
         }
-        .background(p.surface)
     }
 
     /// The rebase's commits in order: replayed, stopped on, still to come.
