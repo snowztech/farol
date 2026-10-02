@@ -614,7 +614,7 @@ private struct BranchRow: View {
         }
         .padding(.horizontal, 10)
         .frame(height: Self.height)
-        .background(RoundedRectangle(cornerRadius: 5).fill(current ? palette.raised : hovering ? palette.raised.opacity(0.35) : .clear))
+        .background(RoundedRectangle(cornerRadius: 5).fill(current ? palette.raised : hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
         .onClickableHover {
             hovering = $0
@@ -795,7 +795,7 @@ private struct CommitRow: View {
         }
         .padding(.trailing, 6)
         .frame(maxWidth: .infinity, minHeight: Self.height, maxHeight: Self.height, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 5).fill(selected || highlighted ? palette.raised : hovering ? palette.raised.opacity(0.35) : .clear))
+        .background(RoundedRectangle(cornerRadius: 5).fill(selected || highlighted ? palette.raised : hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture(count: 2, perform: review)
@@ -1048,13 +1048,13 @@ private struct ChangedFile: View {
                 Text(note).font(.system(size: 10.5)).foregroundStyle(palette.muted).lineLimit(1)
             }
             if !file.isBinary {
-                Counts(added: file.added, removed: file.removed, palette: palette).font(.system(size: 11))
+                Counts(added: file.added, removed: file.removed, palette: palette)
             }
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 4)
         .frame(height: 22)
-        .background(RoundedRectangle(cornerRadius: 4).fill(hovering ? palette.raised.opacity(0.5) : .clear))
+        .background(RoundedRectangle(cornerRadius: 4).fill(hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
         .onClickableHover { hovering = $0 }
         .onTapGesture(perform: open)

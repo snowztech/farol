@@ -112,12 +112,12 @@ private struct SessionRow: View {
             if let branch = gitLine {
                 Label(branch, systemImage: "arrow.triangle.branch")
                     .labelStyle(BranchLabelStyle())
-                    .font(.system(size: 11))
+                    .font(.system(size: 10.5, design: .monospaced))
                     .foregroundStyle(palette.muted)
                     .truncationMode(.middle)
             } else if let location = session.location {
                 Text(location)
-                    .font(.system(size: 11))
+                    .font(.system(size: 10.5, design: .monospaced))
                     .foregroundStyle(palette.muted)
                     .truncationMode(.head)
             }
@@ -148,7 +148,7 @@ private struct SessionRow: View {
     /// Selection stays neutral, so color only ever means agent status.
     private var background: some View {
         RoundedRectangle(cornerRadius: 6)
-            .fill(selected ? palette.selection : hovering ? palette.raised.opacity(0.35) : .clear)
+            .fill(selected ? palette.selection : hovering ? palette.hover : .clear)
     }
 }
 
@@ -160,6 +160,12 @@ private struct NewTaskRow: View {
     @State private var hovering = false
 
     var body: some View {
+        Button(action: action) { label }
+            .buttonStyle(QuietPress())
+            .onClickableHover { hovering = $0 }
+    }
+
+    private var label: some View {
         HStack(spacing: 10) {
             // Same width as the status dots, so the label lines up with session names.
             Image(systemName: "plus")
@@ -170,7 +176,7 @@ private struct NewTaskRow: View {
             Spacer(minLength: 0)
             if hovering {
                 Text("⇧⌘N")
-                    .font(.system(size: 11))
+                    .font(.system(size: 10.5, design: .monospaced))
                     .foregroundStyle(palette.muted)
             }
         }
@@ -179,10 +185,8 @@ private struct NewTaskRow: View {
         .padding(.vertical, 7)
         // With color, starting a task is the one filled button in the sidebar.
         .background(RoundedRectangle(cornerRadius: 6)
-            .fill(palette.vivid ? palette.selection.opacity(hovering ? 1 : 0.6) : hovering ? palette.raised.opacity(0.5) : .clear))
+            .fill(palette.vivid ? palette.selection.opacity(hovering ? 1 : 0.6) : hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
-        .onTapGesture(perform: action)
-        .onClickableHover { hovering = $0 }
     }
 }
 

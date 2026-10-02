@@ -356,7 +356,7 @@ struct MergePanel: View {
                     .foregroundStyle(reused ? p.waiting : p.done)
                 Text(reused ? "Resolved like last time" : "Resolved").font(.system(size: 12, weight: .medium))
                 Text(file.status == .deleted ? "Deleted" : "Compared with \(headName)").font(.system(size: 12)).foregroundStyle(p.muted)
-                Counts(added: file.added, removed: file.removed, palette: p).font(.system(size: 11))
+                Counts(added: file.added, removed: file.removed, palette: p)
                 Spacer()
                 if let path = merge.selected {
                     if reused {

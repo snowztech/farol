@@ -572,7 +572,7 @@ struct Counts: View {
             Text("+\(added)").foregroundStyle(palette.added)
             Text("−\(removed)").foregroundStyle(palette.removed)
         }
-        .monospacedDigit()
+        .font(.system(size: 11, weight: .medium, design: .monospaced))
     }
 }
 
@@ -606,7 +606,6 @@ private struct FileHeader: View {
                 .truncationMode(.head)
             if let status { Text(status).font(.system(size: 11)).foregroundStyle(palette.muted) }
             Counts(added: file.added, removed: file.removed, palette: palette)
-                .font(.system(size: 11))
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(palette.line))

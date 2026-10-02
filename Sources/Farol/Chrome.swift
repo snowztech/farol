@@ -157,7 +157,7 @@ private struct UpdateBadge: View {
                 .background(palette.raised.opacity(hovering ? 1 : 0.6), in: Capsule())
                 .overlay(Capsule().strokeBorder(palette.line))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(QuietPress())
         .onClickableHover { hovering = $0 }
         .hoverTip("Farol \(version) is available. Download it.")
     }
@@ -181,7 +181,7 @@ private struct GitButton: View {
         let stopped = merge.operation != nil
         if !counts, !stopped, session.topLevel != nil || state.graphVisible {
             // Alone, the icon sits bare like the others in the title bar. A pill around it reads as switched on.
-            IconButton(symbol: "point.3.connected.trianglepath.dotted", help: "Git graph (⌥⌘G)", active: state.graphVisible,
+            IconButton(symbol: "point.3.filled.connected.trianglepath.dotted", help: "Git graph (⌥⌘G)", active: state.graphVisible,
                        palette: p, action: graph)
         } else if counts || stopped {
             HStack(spacing: 0) {
@@ -195,8 +195,8 @@ private struct GitButton: View {
                     Rectangle().fill(p.line).frame(width: 1, height: 12)
                 }
                 Half(active: state.graphVisible, help: "Git graph (⌥⌘G)", palette: p, action: graph) { color in
-                    Image(systemName: "point.3.connected.trianglepath.dotted")
-                        .font(.system(size: 11, weight: .regular))
+                    Image(systemName: "point.3.filled.connected.trianglepath.dotted")
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(color)
                 }
                 if counts {
@@ -238,7 +238,7 @@ private struct GitButton: View {
                     .background(hovering || active ? palette.raised : .clear)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(QuietPress())
             .onClickableHover { hovering = $0 }
             .hoverTip(help)
         }
@@ -275,7 +275,7 @@ private struct SessionMenu: View {
                 .fill(hovering || open ? p.selection : p.vivid ? p.raised : .clear))
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(QuietPress())
         .fixedSize()
         .onClickableHover { hovering = $0 }
         .hoverTip("Switch session (⌘P)")
@@ -296,7 +296,7 @@ private struct SessionMenu: View {
                     .onSubmit { highlighted.map(choose) }
                     .onKeyPress(.downArrow) { move(1) }
                     .onKeyPress(.upArrow) { move(-1) }
-                Text("⌘P").font(.system(size: 11.5)).foregroundStyle(p.muted)
+                Text("⌘P").font(.system(size: 11, design: .monospaced)).foregroundStyle(p.muted)
             }
             .padding(12)
             Rectangle().fill(p.line).frame(height: 1)
@@ -398,11 +398,11 @@ private struct SessionChoice: View {
                 Lamp(activity: session.activity, selected: true, palette: palette)
                 Text(session.displayName).lineLimit(1).truncationMode(.tail).layoutPriority(1)
                 if let branch = session.branch {
-                    Text(branch).font(.system(size: 11.5)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.middle)
+                    Text(branch).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.middle)
                 }
                 Spacer(minLength: 8)
                 if let shortcut {
-                    Text(shortcut).font(.system(size: 11.5)).monospacedDigit().foregroundStyle(palette.muted)
+                    Text(shortcut).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted)
                 }
             }
             .padding(.horizontal, 9)
@@ -410,7 +410,7 @@ private struct SessionChoice: View {
             .background(RoundedRectangle(cornerRadius: 6).fill(lit ? palette.selection : .clear))
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(QuietPress())
         .onClickableHover(hover)
     }
 }
@@ -418,7 +418,14 @@ private struct SessionChoice: View {
 extension View {
     /// Hover for anything clickable: runs `action` and shows the pointing hand while the mouse is over it.
     func onClickableHover(_ action: @escaping (Bool) -> Void) -> some View {
-        modifier(ClickableHover(action: action))
+        modifier(ClickableHover { inside in withAnimation(.easeOut(duration: 0.1)) { action(inside) } })
+    }
+}
+
+/// A plain button that dims while the mouse is down, so a click is felt before its panel opens.
+struct QuietPress: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.opacity(configuration.isPressed ? 0.6 : 1)
     }
 }
 
@@ -460,7 +467,7 @@ struct CloseButton: View {
                 .background(RoundedRectangle(cornerRadius: 5).fill(hovering ? palette.raised : .clear))
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(QuietPress())
         .onClickableHover { hovering = $0 }
         .hoverTip(help)
     }
@@ -484,7 +491,7 @@ struct IconButton: View {
                 .background(RoundedRectangle(cornerRadius: 6).fill(hovering || active ? palette.raised : .clear))
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(QuietPress())
         .onClickableHover { hovering = $0 }
         .hoverTip(help)
     }
