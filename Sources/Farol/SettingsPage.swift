@@ -648,11 +648,19 @@ struct SettingsPage: View {
             ("Toggle files", ["⇧⌘E"]),
             ("Review changes", ["⌥⌘R"]),
             ("Git graph", ["⌥⌘G"]),
+            ("Resolve conflicts", ["⌥⌘M"]),
             ("Save the open file", ["⌘S"]),
             ("Full screen", ["⌃⌘F", "⌘↩"]),
             ("Settings", ["⌘,"]),
             ("Reload configuration", ["⇧⌘,"]),
             ("Quit", ["⌘Q"]),
+        ]),
+        ShortcutGroup(title: "Conflicts", items: [
+            ("Next and previous change to decide", ["⌥↓", "⌥↑"]),
+            ("Accept yours or incoming for the whole file", ["⌃⌘←", "⌃⌘→"]),
+            ("Mark the file resolved", ["⌘S"]),
+            ("Continue once every file is resolved", ["⌘↩"]),
+            ("Back to the terminal", ["esc"]),
         ]),
     ]
 }
