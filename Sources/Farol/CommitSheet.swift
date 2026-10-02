@@ -67,6 +67,21 @@ struct RequestButton: View {
     }
 }
 
+/// Shown after a commit that wasn't pushed, where there is no request to create. A new change brings "Commit" back.
+struct PushButton: View {
+    @ObservedObject var review: ReviewModel
+    let palette: Palette
+
+    var body: some View {
+        let count = review.unpushed
+        ShipButton(title: review.isShipping ? "Pushing…" : "Push",
+                   help: "Push \(count) commit\(count == 1 ? "" : "s")\(review.branch.map { " on \($0)" } ?? "")",
+                   busy: review.isShipping, palette: palette) {
+            review.ship(message: nil, then: .push, failed: gitFailure)
+        }
+    }
+}
+
 /// "PR #5", once the branch has an open request. Opens it in the browser.
 struct RequestBadge: View {
     @ObservedObject var review: ReviewModel

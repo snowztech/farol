@@ -54,6 +54,8 @@ final class ReviewModel: ObservableObject {
     @Published private(set) var request = Forge.RequestState.unknown
     /// Commits on the branch that its base doesn't have. With none, there is nothing to make a request of.
     @Published private(set) var ahead = 0
+    /// Commits the branch has that its upstream doesn't, as of the last fetch. Zero for a branch that tracks nothing.
+    @Published private(set) var unpushed = 0
     /// The files a commit would take. "Changes since main" also shows work that is already committed.
     @Published private(set) var uncommittedPaths: Set<String> = []
     var uncommitted: Int { uncommittedPaths.count }
@@ -99,6 +101,7 @@ final class ReviewModel: ObservableObject {
             stat = Diff.Stat()
             uncommittedPaths = []
             ahead = 0
+            unpushed = 0
             forge = nil
             ignored = []
         }
@@ -252,10 +255,11 @@ final class ReviewModel: ObservableObject {
     func refresh() {
         pending?.cancel()
         guard let root else { return }
-        let scope = scope, withFiles = isOpen, base = branches.first
+        let scope = scope, withFiles = isOpen, base = branches.first, branch = branch
         DispatchQueue.global(qos: .userInitiated).async {
             let stat = Result { try Diff.stat(in: root, scope) }
             let ahead = base.map { History.commitsAhead(of: $0, in: root) } ?? 0
+            let unpushed = branch.flatMap { History.upstreams(in: root)[$0]?.ahead } ?? 0
             let uncommitted = Set((try? Diff.uncommittedPaths(in: root)) ?? [])
             let stopped = Merge.operation(in: root) != nil
             let files = withFiles ? Result { try Diff.files(in: root, scope) } : nil
@@ -266,6 +270,7 @@ final class ReviewModel: ObservableObject {
                 if self.canChooseFiles == stopped { self.canChooseFiles = !stopped }
                 if let left = self.leftOut[root], !left.isSubset(of: uncommitted) { self.leftOut[root] = left.intersection(uncommitted) }
                 self.ahead = ahead
+                self.unpushed = unpushed
                 self.error = (try? files?.get()) == nil && files != nil ? "Couldn't read the changes." : nil
                 if let files = try? files?.get() {
                     let known = Set(self.files.map(\.path))
@@ -333,12 +338,15 @@ struct ReviewPanel: View {
                 ScopeMenu(review: review, palette: p)
                 Spacer(minLength: 0)
                 // The slot holds the next step: commit what's there, then open the request for the branch.
+                // Where there is no request to open, as on main or once the branch has one, the next step is a push.
                 if !isCommit {
                     RequestBadge(review: review, palette: p)
                     if review.uncommitted > 0 {
                         CommitButton(review: review, palette: p)
                     } else if review.canStartRequest, review.ahead > 0 {
                         RequestButton(review: review, palette: p)
+                    } else if review.unpushed > 0 {
+                        PushButton(review: review, palette: p)
                     }
                 }
             }
