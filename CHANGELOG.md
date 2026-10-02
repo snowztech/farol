@@ -4,11 +4,16 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-10-02
+
+Resolve merge conflicts in Farol, in three columns.
+
 ### Added
 
 - When a merge, rebase, cherry-pick or revert stops on conflicts, the title bar says how many, and ⌥⌘M opens them in three columns: your version, the result and the incoming one. Each change has an arrow to take it and a cross to leave it out. Changes only one side made are taken from the start and folded away, and the result can be edited by hand. Mark each file resolved, then continue, skip or abort from the same place.
 - A session stopped on conflicts is marked in the sidebar, the menu bar and the notch, and sends a notification. While resolving, a row shows the rebase's commits, files git's rerere already resolved like last time can be used as they are, and a resolved file can be reopened until you continue. Continuing a merge, cherry-pick or revert asks for the commit message, and a rebase can edit the message of the commit it replays.
 - In the conflict view, the words that changed inside a line are highlighted, switching files keeps your decisions and undo history, and Ignore Whitespace settles conflicts that differ only in spacing. A file already edited in the terminal or by an agent is flagged, with a choice to use it as it is or start from git's versions. Symlinks, submodules, file modes, renames and `git am` are handled too.
+- Conflicts can be resolved from the keyboard: ⌥↓ and ⌥↑ move between the changes left to decide, ⌃⌘← and ⌃⌘→ take your side or the incoming one for the whole file, ⌘S marks the file resolved and ⌘↩ continues. Settings → Shortcuts lists them. Run Tests runs the checkout's test command in a pane under the terminal before you continue.
 
 ### Changed
 
@@ -512,7 +517,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.24.1...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.25.0...HEAD
+[0.25.0]: https://github.com/snowztech/farol/releases/tag/v0.25.0
 [0.24.1]: https://github.com/snowztech/farol/releases/tag/v0.24.1
 [0.24.0]: https://github.com/snowztech/farol/releases/tag/v0.24.0
 [0.23.0]: https://github.com/snowztech/farol/releases/tag/v0.23.0
