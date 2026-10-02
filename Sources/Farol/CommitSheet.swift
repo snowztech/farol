@@ -88,16 +88,80 @@ extension ReviewModel {
     }
 }
 
-/// "PR #5", once the branch has an open request. Opens it in the browser.
+/// "PR #5", once the branch has an open request. Opens it in the browser. Its checks sit before it, once it has some.
 struct RequestBadge: View {
     @ObservedObject var review: ReviewModel
     let palette: Palette
 
     var body: some View {
         if let forge = review.forge, case .open(let number, let url) = review.request {
+            if !review.checks.isEmpty { ChecksButton(checks: review.checks, palette: palette) }
             ShipButton(title: "\(forge.requestShort) #\(number)", help: "View \(forge.request) #\(number) on \(forge.name)",
                        busy: false, icon: forge.kind, palette: palette) { NSWorkspace.shared.open(url) }
         }
+    }
+}
+
+/// How the request's pipeline is doing. Click it for the steps, each opening its own page.
+private struct ChecksButton: View {
+    let checks: [Forge.Check]
+    let palette: Palette
+
+    @State private var open = false
+    @State private var hovering = false
+
+    var body: some View {
+        Button { open.toggle() } label: {
+            // They come with what needs you first, so the first says how the whole pipeline is doing.
+            CheckMark(state: checks[0].state, palette: palette)
+                .frame(width: 24, height: 24)
+                .background(RoundedRectangle(cornerRadius: 6).fill(hovering || open ? palette.raised : palette.surface))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(palette.line))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onClickableHover { hovering = $0 }
+        .hoverTip(summary)
+        .popover(isPresented: $open, arrowEdge: .bottom) {
+            VStack(spacing: 1) {
+                ForEach(Array(checks.enumerated()), id: \.offset) { _, check in
+                    SheetChoice(palette: palette) {
+                        if let url = check.url { NSWorkspace.shared.open(url) }
+                        open = false
+                    } label: {
+                        CheckMark(state: check.state, palette: palette)
+                        Text(check.name).lineLimit(1)
+                    }
+                }
+            }
+            .padding(6)
+            .frame(minWidth: 220)
+            .font(.system(size: 12))
+            .foregroundStyle(palette.text)
+            .background(palette.background)
+        }
+    }
+
+    private var summary: String {
+        let count = { (state: Forge.Check.State) in checks.filter { $0.state == state }.count }
+        if count(.failed) > 0 { return "\(count(.failed)) of \(checks.count) checks failed" }
+        if count(.running) > 0 { return "\(count(.running)) of \(checks.count) checks still running" }
+        return "Checks passed"
+    }
+}
+
+private struct CheckMark: View {
+    let state: Forge.Check.State
+    let palette: Palette
+
+    var body: some View {
+        let (symbol, color) = switch state {
+        case .failed: ("xmark.circle.fill", palette.removed)
+        case .running: ("clock.fill", palette.waiting)
+        case .passed: ("checkmark.circle.fill", palette.added)
+        case .skipped: ("minus.circle", palette.muted)
+        }
+        Image(systemName: symbol).font(.system(size: 12)).foregroundStyle(color)
     }
 }
 

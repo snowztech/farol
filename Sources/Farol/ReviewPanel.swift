@@ -55,6 +55,8 @@ final class ReviewModel: ObservableObject {
     @Published private(set) var forge: Forge?
     /// Whether the branch has an open pull request. Unknown without the forge's command line tool.
     @Published private(set) var request = Forge.RequestState.unknown
+    /// The steps of the request's pipeline. Empty when it has none, or without the forge's tool.
+    @Published private(set) var checks: [Forge.Check] = []
     /// Commits on the branch that its base doesn't have. With none, there is nothing to make a request of.
     @Published private(set) var ahead = 0
     /// Commits the branch has left to push, as of the last fetch. Zero without a remote.
@@ -77,6 +79,10 @@ final class ReviewModel: ObservableObject {
     private var ignored: [String] = []
     private var watcher: FolderWatcher?
     private var pending: DispatchWorkItem?
+    /// The next look at the checks, while some are still running.
+    private var poll: DispatchWorkItem?
+    /// A push starts a pipeline, but the forge takes a moment to list it. Until then, no checks doesn't mean none are coming.
+    private var checksDue = Date.distantPast
 
     /// Big diffs, like a lockfile, start folded so they don't bury everything else.
     private static let foldedAbove = 800
@@ -94,6 +100,7 @@ final class ReviewModel: ObservableObject {
         self.branch = branch
         guard root != self.root || branchChanged else { return refresh() }
         request = .unknown
+        checks = []
         let rootChanged = root != self.root
         self.root = root
         if rootChanged {
@@ -218,7 +225,9 @@ final class ReviewModel: ObservableObject {
                 if committed { self.leftOut[root] = nil }
                 if let failure { failed(failure.0, failure.1) } else if let link { NSWorkspace.shared.open(link) }
                 self.refresh()
-                if let created, self.root == root, self.branch == branch { self.request = created } else { self.checkRequest() }
+                if let created, self.root == root, self.branch == branch { self.request = created }
+                if next != .nothing, failure == nil { self.checksDue = Date() + 60 }
+                self.checkRequest()
             }
         }
     }
@@ -237,9 +246,18 @@ final class ReviewModel: ObservableObject {
         guard let root, let branch, let forge, !isOnBaseBranch else { return }
         DispatchQueue.global(qos: .utility).async {
             let state = forge.request(for: branch, in: root)
+            var checks: [Forge.Check] = []
+            if case .open = state { checks = forge.checks(for: branch, in: root) }
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root, self.branch == branch else { return }
                 self.request = state
+                self.checks = checks
+                // Nothing local says a pipeline moved on, so the forge is asked again until it settles.
+                self.poll?.cancel()
+                guard self.isOpen, checks.contains(where: { $0.state == .running }) || Date() < self.checksDue else { return }
+                let poll = DispatchWorkItem { [weak self] in self?.checkRequest() }
+                self.poll = poll
+                DispatchQueue.main.asyncAfter(deadline: .now() + 15, execute: poll)
             }
         }
     }
@@ -289,6 +307,11 @@ final class ReviewModel: ObservableObject {
                 if self.canChooseFiles == stopped { self.canChooseFiles = !stopped }
                 if let left = self.leftOut[root], !left.isSubset(of: uncommitted) { self.leftOut[root] = left.intersection(uncommitted) }
                 self.ahead = ahead
+                // A push from the terminal starts a pipeline just the same.
+                if unpushed == 0, self.unpushed > 0, self.isOpen {
+                    self.checksDue = Date() + 60
+                    self.checkRequest()
+                }
                 self.unpushed = unpushed
                 self.error = (try? files?.get()) == nil && files != nil ? "Couldn't read the changes." : nil
                 if let files = try? files?.get() {

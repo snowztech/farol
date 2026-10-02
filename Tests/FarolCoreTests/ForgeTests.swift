@@ -66,6 +66,24 @@ import Testing
     #expect(Forge.requests(from: "not logged in").isEmpty)
 }
 
+@Test func readsARequestsChecksFromEitherTool() {
+    let github = #"""
+    [{"statusCheckRollup":[
+      {"__typename":"CheckRun","name":"test","status":"COMPLETED","conclusion":"SUCCESS","detailsUrl":"https://github.com/o/r/actions/runs/1/job/2"},
+      {"__typename":"CheckRun","name":"lint","status":"IN_PROGRESS","conclusion":""},
+      {"__typename":"CheckRun","name":"docs","status":"COMPLETED","conclusion":"SKIPPED"},
+      {"__typename":"StatusContext","context":"deploy","state":"FAILURE","targetUrl":"https://ci.example.com/7"}]}]
+    """#
+    let checks = Forge.checks(from: github)
+    #expect(checks.map(\.name) == ["deploy", "lint", "test", "docs"])
+    #expect(checks.map(\.state) == [.failed, .running, .passed, .skipped])
+    #expect(checks[2].url?.absoluteString == "https://github.com/o/r/actions/runs/1/job/2")
+    let gitlab = #"{"id":9,"status":"running","jobs":[{"name":"build","status":"success","web_url":"https://gitlab.com/g/a/-/jobs/1"},{"name":"test","status":"pending"},{"name":"release","status":"manual"}]}"#
+    #expect(Forge.checks(from: gitlab).map(\.state) == [.running, .passed, .skipped])
+    #expect(Forge.checks(from: "[]").isEmpty)
+    #expect(Forge.checks(from: "not logged in").isEmpty)
+}
+
 @Test func readsTheAccountFromEitherToolsStatus() {
     #expect(Forge.Kind.account(from: "github.com\n  ✓ Logged in to github.com account ana (keyring)\n  - Active account: true") == "ana")
     #expect(Forge.Kind.account(from: "gitlab.com\n  ✓ Logged in to gitlab.com as ana (GITLAB_TOKEN)") == "ana")
