@@ -300,31 +300,12 @@ final class ReviewModel: ObservableObject {
         let scope = scope, withFiles = isOpen, base = branches.first, branch = branch
         let yours = showsCommit ? scopeBeforeCommit ?? .uncommitted : scope
         DispatchQueue.global(qos: .userInitiated).async {
+            // In the order you see them: the open panel's diff, the title bar's counts, then what only feeds the buttons.
             let stat = Result { try Diff.stat(in: root, scope) }
-            let changes = yours == scope ? stat : Result { try Diff.stat(in: root, yours) }
-            // Shown as soon as they are known, without waiting for what only the panel needs.
-            DispatchQueue.main.async { [weak self] in
-                guard let self, self.root == root, self.scope == scope else { return }
-                self.changes = (try? changes.get()) ?? Diff.Stat()
-            }
-            let ahead = base.map { History.commitsAhead(of: $0, in: root) } ?? 0
-            let unpushed = branch.map { History.unpushed($0, in: root) } ?? 0
-            let uncommitted = Set((try? Diff.uncommittedPaths(in: root)) ?? [])
-            let stopped = Merge.operation(in: root) != nil
             let files = withFiles ? Result { try Diff.files(in: root, scope) } : nil
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root, self.scope == scope else { return }
                 self.stat = (try? stat.get()) ?? Diff.Stat()
-                self.uncommittedPaths = uncommitted
-                if self.canChooseFiles == stopped { self.canChooseFiles = !stopped }
-                if let left = self.leftOut[root], !left.isSubset(of: uncommitted) { self.leftOut[root] = left.intersection(uncommitted) }
-                self.ahead = ahead
-                // A push from the terminal starts a pipeline just the same.
-                if unpushed == 0, self.unpushed > 0, self.isOpen {
-                    self.checksDue = Date() + 60
-                    self.checkRequest()
-                }
-                self.unpushed = unpushed
                 self.error = (try? files?.get()) == nil && files != nil ? "Couldn't read the changes." : nil
                 if let files = try? files?.get() {
                     let known = Set(self.files.map(\.path))
@@ -342,6 +323,28 @@ final class ReviewModel: ObservableObject {
                         self.rebuild()
                     }
                 }
+            }
+            let changes = yours == scope ? stat : Result { try Diff.stat(in: root, yours) }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.root == root, self.scope == scope else { return }
+                self.changes = (try? changes.get()) ?? Diff.Stat()
+            }
+            let ahead = base.map { History.commitsAhead(of: $0, in: root) } ?? 0
+            let unpushed = branch.map { History.unpushed($0, in: root) } ?? 0
+            let uncommitted = Set((try? Diff.uncommittedPaths(in: root)) ?? [])
+            let stopped = Merge.operation(in: root) != nil
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.root == root, self.scope == scope else { return }
+                self.uncommittedPaths = uncommitted
+                if self.canChooseFiles == stopped { self.canChooseFiles = !stopped }
+                if let left = self.leftOut[root], !left.isSubset(of: uncommitted) { self.leftOut[root] = left.intersection(uncommitted) }
+                self.ahead = ahead
+                // A push from the terminal starts a pipeline just the same.
+                if unpushed == 0, self.unpushed > 0, self.isOpen {
+                    self.checksDue = Date() + 60
+                    self.checkRequest()
+                }
+                self.unpushed = unpushed
             }
         }
     }

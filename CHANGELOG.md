@@ -15,6 +15,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Fixed
 
 - The change counts in the title bar no longer wait for what only the review panel needs, so they show sooner after you switch sessions.
+- A commit opened from the git graph shows its diff sooner. The panel used to read your own counts and push state first.
 
 ## [0.27.0] - 2026-10-02
 
