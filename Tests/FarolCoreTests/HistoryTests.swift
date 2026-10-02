@@ -175,6 +175,32 @@ private func edges(_ pairs: (Int, Int)...) -> [History.Edge] {
     #expect(History.interactiveRebaseCommand(onto: "it's") == "git rebase --interactive 'it'\\''s'")
 }
 
+@Test func mergesWithAndWithoutFastForward() throws {
+    let box = try Sandbox()
+    try Git.run(["config", "user.name", "Farol"], in: box.repo)
+    try Git.run(["config", "user.email", "farol@example.com"], in: box.repo)
+    let commit = { (name: String) in
+        try name.write(toFile: box.repo + "/\(name).txt", atomically: true, encoding: .utf8)
+        try Git.run(["add", "\(name).txt"], in: box.repo)
+        try Git.run(["commit", "--quiet", "-m", "add \(name)"], in: box.repo)
+    }
+    try History.createBranch("feat", from: "main", in: box.repo)
+    try commit("a")
+    try Git.run(["switch", "--quiet", "main"], in: box.repo)
+
+    // main hasn't moved, so a plain merge just moves it up to feat.
+    try History.merge("feat", noFastForward: false, in: box.repo)
+    #expect(try History.commits(in: box.repo, branch: "HEAD").map(\.subject) == ["add a", "init"])
+
+    try Git.run(["switch", "--quiet", "feat"], in: box.repo)
+    try commit("b")
+    try Git.run(["switch", "--quiet", "main"], in: box.repo)
+    try History.merge("feat", noFastForward: true, in: box.repo)
+    let head = try History.commits(in: box.repo, branch: "HEAD").first!
+    #expect(head.parents.count == 2)
+    #expect(FileManager.default.fileExists(atPath: box.repo + "/b.txt"))
+}
+
 @Test func revertsACommitWithANewOne() throws {
     let box = try Sandbox()
     try Git.run(["config", "user.name", "Farol"], in: box.repo)

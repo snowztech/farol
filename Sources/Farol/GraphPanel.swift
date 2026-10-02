@@ -124,6 +124,10 @@ final class GraphModel: ObservableObject {
         run(failed) { try History.rebase(onto: base, in: $0) }
     }
 
+    func merge(_ branch: String, noFastForward: Bool, failed: @escaping (String) -> Void) {
+        run(failed) { try History.merge(branch, noFastForward: noFastForward, in: $0) }
+    }
+
     func revert(_ commit: History.Commit, failed: @escaping (String) -> Void) {
         run(failed) { try History.revert(commit, in: $0) }
     }
@@ -477,6 +481,15 @@ private struct BranchList: View {
                 graph.createBranch(name, from: branch, failed: gitError("Couldn't create the branch"))
             }
         }
+        Divider()
+        Button("Merge \u{201C}\(menuName(branch))\u{201D} into \u{201C}\(menuName(here))\u{201D}") {
+            graph.merge(branch, noFastForward: false, failed: gitError("Merge stopped"))
+        }
+        .disabled(current)
+        Button("Merge \u{201C}\(menuName(branch))\u{201D} into \u{201C}\(menuName(here))\u{201D} (No Fast-Forward)") {
+            graph.merge(branch, noFastForward: true, failed: gitError("Merge stopped"))
+        }
+        .disabled(current)
         Divider()
         Button("Rebase \u{201C}\(menuName(here))\u{201D} onto \u{201C}\(menuName(branch))\u{201D}…") {
             confirm("Rebase \(here) onto \(branch)?",
