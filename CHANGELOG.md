@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Hovering a commit in the history lights up the branches pointing to it in the branch list, like hovering a branch already lit up its commit.
+
 ### Changed
 
 - Branches, change counts and shortcuts are set in a monospaced font, so what comes from git or the keyboard reads apart from names.

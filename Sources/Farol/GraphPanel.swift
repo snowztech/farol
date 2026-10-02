@@ -18,6 +18,8 @@ final class GraphModel: ObservableObject {
     @Published private(set) var requests: [String: Forge.Request] = [:]
     /// The branch under the mouse in the list, so the history can light up the commit it points to.
     @Published var hoveredBranch: String?
+    /// The commit under the mouse in the history, so the list can light up the branches pointing to it.
+    @Published var hoveredCommit: History.Commit?
     @Published private(set) var rows: [History.Row] = []
     @Published private(set) var error: String?
     /// The commit clicked in the history, and what it changed, for the pane under it.
@@ -240,7 +242,11 @@ struct GraphPanel: View {
                             // Lines between commits that aren't neighbors anymore would mislead, so a search shows the dots only.
                             CommitRow(row: row, lanes: lanes, showsLines: searchText.isEmpty, selected: row.commit.hash == graph.selected?.hash,
                                       highlighted: graph.hoveredBranch.map(row.commit.points) ?? false,
-                                      palette: p, current: graph.current, upstreams: graph.upstreams, select: { graph.select(row.commit) },
+                                      palette: p, current: graph.current, upstreams: graph.upstreams,
+                                      hover: { inside in
+                                          if inside { graph.hoveredCommit = row.commit } else if graph.hoveredCommit?.hash == row.commit.hash { graph.hoveredCommit = nil }
+                                      },
+                                      select: { graph.select(row.commit) },
                                       review: {
                                           // Keeps the files pane on this commit too, instead of toggling it off.
                                           if graph.selected?.hash != row.commit.hash { graph.select(row.commit) }
@@ -443,6 +449,7 @@ private struct BranchList: View {
                     ForEach(entries, id: \.name) { entry in
                         let current = !entry.remote && entry.name == graph.current
                         BranchRow(name: entry.name, remote: entry.remote, current: current,
+                                  highlighted: graph.hoveredCommit?.points(entry.name) ?? false,
                                   upstream: entry.remote ? nil : graph.upstreams[entry.name],
                                   request: graph.requests[entry.remote ? String(entry.name.drop { $0 != "/" }.dropFirst()) : entry.name],
                                   color: colors[entry.name].map { palette.lanes[$0 % palette.lanes.count] } ?? palette.muted,
@@ -569,6 +576,8 @@ private struct BranchRow: View {
     let name: String
     let remote: Bool
     let current: Bool
+    /// Set while the mouse is on the commit this branch points to.
+    var highlighted = false
     var upstream: History.Upstream?
     var request: Forge.Request?
     let color: Color
@@ -614,7 +623,9 @@ private struct BranchRow: View {
         }
         .padding(.horizontal, 10)
         .frame(height: Self.height)
-        .background(RoundedRectangle(cornerRadius: 5).fill(current ? palette.raised : hovering ? palette.hover : .clear))
+        .background(RoundedRectangle(cornerRadius: 5).fill(current || highlighted ? palette.raised : hovering ? palette.hover : .clear))
+        // The checked out branch is always raised, so a ring in the branch's color is what shows it's the one under the mouse.
+        .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(highlighted ? color : .clear, lineWidth: 1))
         .contentShape(Rectangle())
         .onClickableHover {
             hovering = $0
@@ -739,6 +750,7 @@ private struct CommitRow: View {
     /// The checked out branch, named in the cherry-pick item.
     var current: String?
     var upstreams: [String: History.Upstream] = [:]
+    var hover: (Bool) -> Void = { _ in }
     var select: () -> Void = {}
     var review: () -> Void = {}
     var cherryPick: () -> Void = {}
@@ -797,7 +809,10 @@ private struct CommitRow: View {
         .frame(maxWidth: .infinity, minHeight: Self.height, maxHeight: Self.height, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 5).fill(selected || highlighted ? palette.raised : hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
-        .onHover { hovering = $0 }
+        .onHover {
+            hovering = $0
+            hover($0)
+        }
         .onTapGesture(count: 2, perform: review)
         .onTapGesture(perform: select)
         .hoverTip(([row.commit.shortHash + "  " + row.commit.author, row.commit.subject] + refs.flatMap(\.names)
