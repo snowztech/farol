@@ -32,7 +32,10 @@ struct MergeColors: Equatable {
 /// Changes only one side made are taken from the start and folded away with the unchanged lines, so only what needs you shows.
 final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
     static let rowHeight: CGFloat = 20
-    private static let gutterWidth: CGFloat = 46
+    /// Between a side and the result, as in IntelliJ: the side's buttons and line numbers on its band, then the wave.
+    private static let waveWidth: CGFloat = 46
+    static let buttonsWidth: CGFloat = 44
+    private static var gutterWidth: CGFloat { buttonsWidth + MergeNumbers.width + waveWidth }
     /// Unchanged lines kept around each change, like a diff.
     private static let context = 3
     /// A change this close to a conflict stays in view, since it may depend on how the conflict goes.
@@ -143,6 +146,7 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
         otherView.scroll.hasVerticalScroller = false
         for gutter in [leftGutter, rightGutter] {
             gutter.editor = self
+            gutter.strip = Self.buttonsWidth + MergeNumbers.width
             addSubview(gutter)
         }
         for (numbers, view) in [(mineNumbers, mineView), (centerNumbers, centerView), (otherNumbers, otherView)] {
@@ -150,6 +154,9 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
             addSubview(numbers)
         }
         otherNumbers.alignRight = true
+        // The sides' numbers sit on the gutter, over the band of the change on their row.
+        mineNumbers.fillsBackground = false
+        otherNumbers.fillsBackground = false
         markers.onClick = { [weak self] in self?.reveal(resultLine: $0) }
         addSubview(markers)
     }
@@ -907,29 +914,26 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
 
     // MARK: Layout
 
+    /// Where yours, the result's line numbers and the incoming column start, for the titles above them.
+    static func columnStarts(width: CGFloat) -> (mine: CGFloat, center: CGFloat, other: CGFloat, column: CGFloat) {
+        let column = max(0, (width - 2 * gutterWidth - MergeNumbers.width - MergeMarkers.width) / 3)
+        return (0, column + gutterWidth, 2 * column + 2 * gutterWidth + MergeNumbers.width, column)
+    }
+
     override func layout() {
         super.layout()
         let numbers = MergeNumbers.width
-        let gutter = Self.gutterWidth
-        let column = max(0, (bounds.width - 2 * gutter - 3 * numbers - MergeMarkers.width) / 3)
-        var x: CGFloat = 0
-        mineNumbers.frame = NSRect(x: x, y: 0, width: numbers, height: bounds.height)
-        x += numbers
-        mineView.scroll.frame = NSRect(x: x, y: 0, width: column, height: bounds.height)
-        x += column
-        leftGutter.frame = NSRect(x: x, y: 0, width: gutter, height: bounds.height)
-        x += gutter
-        centerNumbers.frame = NSRect(x: x, y: 0, width: numbers, height: bounds.height)
-        x += numbers
-        centerView.scroll.frame = NSRect(x: x, y: 0, width: column, height: bounds.height)
-        x += column
-        rightGutter.frame = NSRect(x: x, y: 0, width: gutter, height: bounds.height)
-        x += gutter
-        otherView.scroll.frame = NSRect(x: x, y: 0, width: column, height: bounds.height)
-        x += column
-        otherNumbers.frame = NSRect(x: x, y: 0, width: numbers, height: bounds.height)
-        x += numbers
-        markers.frame = NSRect(x: x, y: 0, width: MergeMarkers.width, height: bounds.height)
+        let starts = Self.columnStarts(width: bounds.width), column = starts.column
+        mineView.scroll.frame = NSRect(x: starts.mine, y: 0, width: column, height: bounds.height)
+        leftGutter.frame = NSRect(x: column, y: 0, width: Self.gutterWidth, height: bounds.height)
+        mineNumbers.frame = NSRect(x: column + Self.buttonsWidth, y: 0, width: numbers, height: bounds.height)
+        centerNumbers.frame = NSRect(x: starts.center, y: 0, width: numbers, height: bounds.height)
+        centerView.scroll.frame = NSRect(x: starts.center + numbers, y: 0, width: column, height: bounds.height)
+        let right = starts.center + numbers + column
+        rightGutter.frame = NSRect(x: right, y: 0, width: Self.gutterWidth, height: bounds.height)
+        otherNumbers.frame = NSRect(x: right + Self.waveWidth, y: 0, width: numbers, height: bounds.height)
+        otherView.scroll.frame = NSRect(x: starts.other, y: 0, width: column, height: bounds.height)
+        markers.frame = NSRect(x: starts.other + column, y: 0, width: MergeMarkers.width, height: bounds.height)
         for view in columns { view.sizeToContent() }
         redrawGutters()
     }
@@ -1129,12 +1133,15 @@ final class MergeNumbers: NSView {
     var numbers: [Int?] = [] { didSet { needsDisplay = true } }
     var alignRight = false
     var colors = (background: NSColor.black, text: NSColor.gray) { didSet { needsDisplay = true } }
+    var fillsBackground = true
 
     override var isFlipped: Bool { true }
 
     override func draw(_ dirtyRect: NSRect) {
-        colors.background.setFill()
-        bounds.fill()
+        if fillsBackground {
+            colors.background.setFill()
+            bounds.fill()
+        }
         guard let textView, let layout = textView.layoutManager, let container = textView.textContainer,
               let storage = textView.textStorage, storage.length > 0 else { return }
         let visible = textView.visibleRect
@@ -1167,10 +1174,14 @@ final class MergeNumbers: NSView {
     }
 }
 
-/// The space between a side and the result: a wave from each change to its place in the result, and its two buttons.
+/// The space between a side and the result, laid out like IntelliJ's.
+/// Yours: the buttons and your line numbers on the change's band, then a wave to its place in the result.
+/// Incoming: the wave, then its line numbers and buttons. The numbers are a view on top, so they show over the band.
 final class MergeGutter: NSView {
     weak var editor: MergeEditor?
     let mine: Bool
+    /// The flat part next to the side, holding its buttons and line numbers.
+    var strip: CGFloat = 0
     private var buttons: [(rect: NSRect, chunk: Int, take: Bool)] = []
 
     init(mine: Bool) {
@@ -1186,29 +1197,42 @@ final class MergeGutter: NSView {
         guard let editor else { return }
         buttons = []
         let side = mine ? 0 : 2
+        let w = bounds.width
+        // The wave runs between `a` and `b`, the strip covers the rest.
+        let (a, b) = mine ? (strip, w) : (0, w - strip)
         for index in editor.visibleChunks {
             guard let look = editor.look(index, mine: mine), let sideRange = editor.sideRange(index, mine: mine),
                   let centerRange = editor.centerRange(index) else { continue }
             let s = editor.span(sideRange, in: side, to: self)
             let c = editor.span(centerRange, in: 1, to: self)
             guard max(s.bottom, c.bottom) >= -20, min(s.top, c.top) <= bounds.height + 20 else { continue }
-            // The side's edge is where its column is: left for yours, right for the incoming one.
+            // Left and right ends of the wave: the side's edge is where its column is.
             let (l0, l1, r0, r1) = mine ? (s.top, s.bottom, c.top, c.bottom) : (c.top, c.bottom, s.top, s.bottom)
-            let w = bounds.width, m = w / 2
+            let m = (a + b) / 2
             let style = editor.band(for: look, mine: mine)
+            let flat = mine ? NSRect(x: 0, y: s.top, width: strip, height: s.bottom - s.top)
+                : NSRect(x: w - strip, y: s.top, width: strip, height: s.bottom - s.top)
             let shape = NSBezierPath()
-            shape.move(to: NSPoint(x: 0, y: l0))
-            shape.curve(to: NSPoint(x: w, y: r0), controlPoint1: NSPoint(x: m, y: l0), controlPoint2: NSPoint(x: m, y: r0))
-            shape.line(to: NSPoint(x: w, y: r1))
-            shape.curve(to: NSPoint(x: 0, y: l1), controlPoint1: NSPoint(x: m, y: r1), controlPoint2: NSPoint(x: m, y: l1))
+            shape.move(to: NSPoint(x: a, y: l0))
+            shape.curve(to: NSPoint(x: b, y: r0), controlPoint1: NSPoint(x: m, y: l0), controlPoint2: NSPoint(x: m, y: r0))
+            shape.line(to: NSPoint(x: b, y: r1))
+            shape.curve(to: NSPoint(x: a, y: l1), controlPoint1: NSPoint(x: m, y: r1), controlPoint2: NSPoint(x: m, y: l1))
             shape.close()
             style.fill.setFill()
             shape.fill()
+            flat.fill()
             style.edge.setStroke()
-            for (a, b) in [(l0 + 0.5, r0 + 0.5), (l1 - 0.5, r1 - 0.5)] {
+            for (top, start, end) in [(true, l0 + 0.5, r0 + 0.5), (false, l1 - 0.5, r1 - 0.5)] {
                 let edge = NSBezierPath()
-                edge.move(to: NSPoint(x: 0, y: a))
-                edge.curve(to: NSPoint(x: w, y: b), controlPoint1: NSPoint(x: m, y: a), controlPoint2: NSPoint(x: m, y: b))
+                let y = top ? s.top + 0.5 : s.bottom - 0.5
+                if mine {
+                    edge.move(to: NSPoint(x: 0, y: y))
+                    edge.line(to: NSPoint(x: a, y: start))
+                } else {
+                    edge.move(to: NSPoint(x: a, y: start))
+                }
+                edge.curve(to: NSPoint(x: b, y: end), controlPoint1: NSPoint(x: m, y: start), controlPoint2: NSPoint(x: m, y: end))
+                if !mine { edge.line(to: NSPoint(x: w, y: y)) }
                 edge.lineWidth = 1
                 if style.dashed { edge.setLineDash([3, 3], count: 2, phase: 0) }
                 edge.stroke()
@@ -1218,34 +1242,36 @@ final class MergeGutter: NSView {
     }
 
     /// ✕ then » for yours, « then ✕ for the incoming side, so the arrow always points at the result.
-    /// Once decided, a single mark is left, and clicking it takes the decision back.
+    /// They sit at the outer end of the strip, by the code. Once decided, a single mark is left, and clicking it takes the decision back.
     private func drawButtons(_ index: Int, look: MergeEditor.Look, at y: CGFloat) {
         let size: CGFloat = 18
         let top = y - size / 2
+        let area = mine ? NSRect(x: 0, y: top, width: MergeEditor.buttonsWidth, height: size)
+            : NSRect(x: bounds.width - MergeEditor.buttonsWidth, y: top, width: MergeEditor.buttonsWidth, height: size)
         let decision = editor?.decisions[index]
         let tint = editor?.band(for: .waiting, mine: mine).edge.withAlphaComponent(1) ?? .labelColor
         let red = editor?.band(for: .dropped, mine: mine).edge.withAlphaComponent(1) ?? .systemRed
         let muted = NSColor.secondaryLabelColor
+        let middle = NSRect(x: area.midX - size / 2, y: top, width: size, height: size)
         if decision?.edited == true {
-            draw("✎", in: NSRect(x: (bounds.width - size) / 2, y: top, width: size, height: size), color: muted)
+            draw("✎", in: middle, color: muted)
             return
         }
         switch look {
         case .waiting:
-            let cross = NSRect(x: mine ? 3 : bounds.width - size - 3, y: top, width: size, height: size)
-            let arrow = NSRect(x: mine ? bounds.width - size - 3 : 3, y: top, width: size, height: size)
+            let first = NSRect(x: area.minX + 3, y: top, width: size, height: size)
+            let second = NSRect(x: area.maxX - size - 3, y: top, width: size, height: size)
+            let (cross, arrow) = mine ? (first, second) : (second, first)
             draw("✕", in: cross, color: red)
             draw(mine ? "»" : "«", in: arrow, color: tint)
             buttons.append((cross, index, false))
             buttons.append((arrow, index, true))
         case .taken:
-            let rect = NSRect(x: (bounds.width - size) / 2, y: top, width: size, height: size)
-            draw("✓", in: rect, color: muted)
-            buttons.append((rect, index, true))
+            draw("✓", in: middle, color: muted)
+            buttons.append((middle, index, true))
         case .dropped:
-            let rect = NSRect(x: (bounds.width - size) / 2, y: top, width: size, height: size)
-            draw("✕", in: rect, color: muted)
-            buttons.append((rect, index, false))
+            draw("✕", in: middle, color: muted)
+            buttons.append((middle, index, false))
         }
     }
 

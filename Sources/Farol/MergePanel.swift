@@ -547,13 +547,19 @@ struct MergePanel: View {
         }
     }
 
+    /// Each title over its column's code, which the editor lays out.
     private func columnTitles(_ p: Palette) -> some View {
-        HStack(spacing: 0) {
-            label(merge.operation?.mine ?? "", "yours", p.working, p)
-            Spacer().frame(width: 46)
-            label("Result", "editable", p.done, p)
-            Spacer().frame(width: 46)
-            label(merge.operation?.other ?? "", "incoming", Color(nsColor: p.code.keyword), p)
+        GeometryReader { geometry in
+            let starts = MergeEditor.columnStarts(width: geometry.size.width)
+            ZStack(alignment: .leading) {
+                label(merge.operation?.mine ?? "", "yours", p.working, p)
+                    .frame(width: starts.column, alignment: .leading).offset(x: starts.mine)
+                label("Result", "editable", p.done, p)
+                    .frame(width: starts.column, alignment: .leading).offset(x: starts.center + MergeNumbers.width)
+                label(merge.operation?.other ?? "", "incoming", Color(nsColor: p.code.keyword), p)
+                    .frame(width: starts.column, alignment: .leading).offset(x: starts.other)
+            }
+            .frame(maxHeight: .infinity)
         }
         .frame(height: 30)
     }
@@ -563,17 +569,15 @@ struct MergePanel: View {
             Text(name).font(.system(size: 12, weight: .medium)).foregroundStyle(color).lineLimit(1)
             Text(role).font(.system(size: 11)).foregroundStyle(p.muted)
         }
-        .padding(.leading, MergeNumbers.width)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.leading, 10)
     }
 
     private func footer(_ p: Palette) -> some View {
         HStack(spacing: 12) {
-            // The buttons keep their full titles. On a narrow window the hints go first, then the count of automatic changes.
+            // The buttons keep their full titles. On a narrow window the count of automatic changes goes first.
             ViewThatFits(in: .horizontal) {
-                footerInfo(p, automatic: true, hint: true)
-                footerInfo(p, automatic: true, hint: false)
-                footerInfo(p, automatic: false, hint: false)
+                footerInfo(p, automatic: true)
+                footerInfo(p, automatic: false)
             }
             Spacer(minLength: 8)
             PanelButton(title: "Accept Yours ⌃⌘←", palette: p) { controller.editor.acceptAll(mine: true) }
@@ -593,7 +597,7 @@ struct MergePanel: View {
         .frame(height: 38)
     }
 
-    private func footerInfo(_ p: Palette, automatic: Bool, hint: Bool) -> some View {
+    private func footerInfo(_ p: Palette, automatic: Bool) -> some View {
         HStack(spacing: 12) {
             if controller.openDecisions > 0 {
                 Text("\(controller.openDecisions) \(controller.openDecisions == 1 ? "decision" : "decisions") left")
@@ -601,6 +605,13 @@ struct MergePanel: View {
             } else {
                 Text("Everything decided").foregroundStyle(p.done)
             }
+            HStack(spacing: 4) {
+                PanelButton(title: "↑", palette: p) { controller.editor.jump(forward: false) }
+                    .hoverTip("Previous change to decide (⌥↑)")
+                PanelButton(title: "↓", palette: p) { controller.editor.jump(forward: true) }
+                    .hoverTip("Next change to decide (⌥↓)")
+            }
+            .disabled(controller.openDecisions == 0)
             if automatic, controller.autoCount > 0 {
                 Text("\(controller.autoCount) \(controller.autoCount == 1 ? "change" : "changes") merged automatically")
                     .foregroundStyle(p.muted)
@@ -609,7 +620,6 @@ struct MergePanel: View {
             Toggle("Ignore Whitespace", isOn: $merge.ignoreWhitespace)
                 .toggleStyle(.checkbox)
                 .hoverTip("Settle conflicts where a side only changed spacing or indentation. Your decisions are kept.")
-            if hint { Text("⌥↓ next to decide").foregroundStyle(p.muted) }
         }
         .lineLimit(1)
         .fixedSize()
