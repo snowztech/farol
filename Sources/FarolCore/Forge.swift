@@ -169,6 +169,60 @@ public struct Forge: Equatable {
         return requests
     }
 
+    /// One step of a request's pipeline: a check on GitHub, a job on GitLab.
+    public struct Check: Equatable {
+        /// In the order they are listed: what needs you comes first.
+        public enum State: Int { case failed, running, passed, skipped }
+        public let name: String
+        public let state: State
+        /// The step's own page, with its log.
+        public let url: URL?
+    }
+
+    /// The steps that ran for `branch`'s open request. Talks to the forge, so call it off the main thread.
+    /// Empty when there are none, or when the tool is missing or can't answer.
+    public func checks(for branch: String, in directory: String) -> [Check] {
+        guard let path = kind.toolPath else { return [] }
+        let arguments = switch kind {
+        case .github: ["pr", "list", "--head", branch, "--state", "open", "--json", "statusCheckRollup", "--limit", "1"]
+        case .gitlab: ["ci", "get", "--branch", branch, "--output", "json"]
+        }
+        guard let output = try? Git.run(path, arguments, in: directory) else { return [] }
+        return Self.checks(from: output)
+    }
+
+    /// Reads either tool's JSON: gh lists requests, each with its statusCheckRollup, and glab gives a pipeline with its jobs.
+    static func checks(from json: String) -> [Check] {
+        let parsed = try? JSONSerialization.jsonObject(with: Data(json.utf8))
+        let rollup = (parsed as? [[String: Any]])?.first?["statusCheckRollup"] as? [[String: Any]] ?? []
+        let jobs = (parsed as? [String: Any])?["jobs"] as? [[String: Any]] ?? []
+        let github = rollup.compactMap { item -> Check? in
+            // A check run comes from an action or an app. A status, as an older CI service sets, says context and state.
+            guard let name = (item["name"] ?? item["context"]) as? String else { return nil }
+            let status = item["status"] as? String ?? "COMPLETED"
+            let state: Check.State = switch (item["conclusion"] ?? item["state"]) as? String {
+            case _ where status != "COMPLETED": .running
+            case "SUCCESS": .passed
+            case "NEUTRAL", "SKIPPED": .skipped
+            case "PENDING", "EXPECTED": .running
+            default: .failed
+            }
+            return Check(name: name, state: state, url: ((item["detailsUrl"] ?? item["targetUrl"]) as? String).flatMap(URL.init(string:)))
+        }
+        let gitlab = jobs.compactMap { job -> Check? in
+            guard let name = job["name"] as? String else { return nil }
+            let state: Check.State = switch job["status"] as? String {
+            case "success": .passed
+            case "failed", "canceled": .failed
+            // A manual job waits for a click that may never come, so it doesn't count as running.
+            case "skipped", "manual": .skipped
+            default: .running
+            }
+            return Check(name: name, state: state, url: (job["web_url"] as? String).flatMap(URL.init(string:)))
+        }
+        return (github + gitlab).sorted { ($0.state.rawValue, $0.name) < ($1.state.rawValue, $1.name) }
+    }
+
     /// Whether this forge's issues can be listed at all, without asking it.
     public var listsIssues: Bool { kind == .github && kind.toolPath != nil }
 
