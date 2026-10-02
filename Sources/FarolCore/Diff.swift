@@ -128,6 +128,12 @@ public enum Diff {
     /// Capped so a folder full of untracked build output can't stall the panel. The rest still show in git status.
     static let untrackedLimit = 200
 
+    /// The files a commit would take: changed against HEAD or untracked. A renamed file is listed under its new name.
+    public static func uncommittedPaths(in directory: String) throws -> [String] {
+        let output = try Git.run(["-c", "core.quotePath=false", "diff", "--name-only", "--find-renames", "HEAD"], in: directory)
+        return output.split(separator: "\n").map(String.init) + untracked(in: directory)
+    }
+
     private static func untracked(in directory: String) -> [String] {
         let output = (try? Git.run(["-c", "core.quotePath=false", "ls-files", "--others", "--exclude-standard"], in: directory)) ?? ""
         return Array(output.split(separator: "\n").map(String.init).prefix(untrackedLimit))

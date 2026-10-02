@@ -218,6 +218,36 @@ private func edges(_ pairs: (Int, Int)...) -> [History.Edge] {
     #expect(try Git.run(["rev-parse", "--abbrev-ref", "feat@{upstream}"], in: box.repo) == "origin/feat")
 }
 
+@Test func commitsOnlyTheChosenFiles() throws {
+    let box = try Sandbox()
+    try Git.run(["config", "user.name", "Farol"], in: box.repo)
+    try Git.run(["config", "user.email", "farol@example.com"], in: box.repo)
+    func write(_ text: String, _ name: String) throws {
+        try text.write(toFile: box.repo + "/" + name, atomically: true, encoding: .utf8)
+    }
+    for name in ["a.txt", "b.txt", "old.txt", "gone.txt"] { try write("base \(name)\n", name) }
+    try History.commitAll("base", in: box.repo)
+
+    try write("changed\n", "a.txt")
+    try write("changed\n", "b.txt")
+    try Git.run(["add", "b.txt"], in: box.repo)
+    try Git.run(["mv", "old.txt", "new.txt"], in: box.repo)
+    try FileManager.default.removeItem(atPath: box.repo + "/gone.txt")
+    try write("new\n", "untracked.txt")
+    try write("new\n", "left out.txt")
+
+    #expect(Set(try Diff.uncommittedPaths(in: box.repo)) == ["a.txt", "b.txt", "new.txt", "gone.txt", "untracked.txt", "left out.txt"])
+    try History.commit("part", only: ["a.txt", "new.txt", "old.txt", "gone.txt", "untracked.txt"], in: box.repo)
+
+    #expect(try Git.run(["log", "-1", "--format=%s"], in: box.repo) == "part")
+    let committed = try Git.run(["ls-tree", "-r", "--name-only", "HEAD"], in: box.repo).split(separator: "\n").map(String.init)
+    #expect(committed == ["a.txt", "b.txt", "new.txt", "untracked.txt"])
+    #expect(try Git.run(["show", "HEAD:b.txt"], in: box.repo) == "base b.txt")
+    // What was left out is still there, and still staged if it was.
+    let left = try Git.run(["status", "--porcelain"], in: box.repo, trimming: false).split(separator: "\n").map(String.init)
+    #expect(left == ["M  b.txt", "?? \"left out.txt\""])
+}
+
 @Test func fetchesAndFastForwardsBranches() throws {
     let origin = try Sandbox()
     let box = try Sandbox()

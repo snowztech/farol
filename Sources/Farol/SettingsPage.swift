@@ -647,6 +647,7 @@ struct SettingsPage: View {
             ("Toggle sidebar", ["⌘B"]),
             ("Toggle files", ["⇧⌘E"]),
             ("Review changes", ["⌥⌘R"]),
+            ("Commit", ["⌥⌘C"]),
             ("Git graph", ["⌥⌘G"]),
             ("Resolve conflicts", ["⌥⌘M"]),
             ("Save the open file", ["⌘S"]),

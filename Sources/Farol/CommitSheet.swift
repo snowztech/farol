@@ -7,24 +7,43 @@ enum AfterCommit: String {
     case nothing, push, openRequest
 }
 
-/// "Commit" in the review panel. Opens the sheet, then commits all the uncommitted changes.
+/// "Commit" in the review panel. Opens the sheet, then commits the uncommitted changes you left ticked.
 /// "Changes since main" offers it too, since that is where a branch's review usually sits.
 struct CommitButton: View {
     @ObservedObject var review: ReviewModel
     let palette: Palette
 
-    @State private var asking = false
+    var body: some View {
+        let left = review.excluded.count, taken = review.uncommitted - left
+        // With every file unticked there is nothing to commit, so the button waits for a tick.
+        ShipButton(title: review.isShipping ? "Committing…" : left == 0 || taken == 0 ? "Commit" : "Commit \(taken) of \(review.uncommitted)",
+                   help: taken == 0 ? "Tick a file to commit it"
+                       : (left == 0 ? "Commit the uncommitted changes" : "Commit the files you left ticked") + " (⌥⌘C)",
+                   busy: review.isShipping || taken == 0, palette: palette) { review.askCommit() }
+    }
+}
+
+extension View {
+    /// The commit sheet, on the panel itself so ⌥⌘C opens it whatever the panel is showing.
+    func commitSheet(_ review: ReviewModel, palette: Palette) -> some View {
+        modifier(CommitSheetHost(review: review, palette: palette))
+    }
+}
+
+private struct CommitSheetHost: ViewModifier {
+    @ObservedObject var review: ReviewModel
+    let palette: Palette
+
     /// Kept here, so a commit that a hook refuses doesn't cost you the message.
     @State private var message = ""
 
-    var body: some View {
-        ShipButton(title: review.isShipping ? "Committing…" : "Commit", help: "Commit all uncommitted changes",
-                   busy: review.isShipping, palette: palette) { asking = true }
-            .sheet(isPresented: $asking) {
-                CommitSheet(review: review, palette: palette, message: $message) { next in
-                    review.ship(message: message.trimmingCharacters(in: .whitespacesAndNewlines), then: next, failed: gitFailure)
-                }
+    func body(content: Content) -> some View {
+        content.sheet(isPresented: $review.askingCommit) {
+            CommitSheet(review: review, palette: palette, message: $message) { next, paths in
+                review.ship(message: message.trimmingCharacters(in: .whitespacesAndNewlines), only: paths, then: next,
+                            failed: gitFailure)
             }
+        }
     }
 }
 
@@ -104,12 +123,30 @@ struct ShipButton: View {
     }
 }
 
+/// The box that says whether a file goes in the next commit, in the review panel and in the commit sheet.
+struct Tick: View {
+    let on: Bool
+    let palette: Palette
+
+    /// Drawn like the rest of the chrome: a soft box with a thin edge, and only the check mark in the text color.
+    var body: some View {
+        RoundedRectangle(cornerRadius: 3.5)
+            .fill(on ? palette.raised : .clear)
+            .overlay(RoundedRectangle(cornerRadius: 3.5).strokeBorder(palette.muted.opacity(on ? 0.35 : 0.6)))
+            .overlay {
+                if on { Image(systemName: "checkmark").font(.system(size: 7.5, weight: .bold)).foregroundStyle(palette.text) }
+            }
+            .frame(width: 13, height: 13)
+    }
+}
+
 /// The branch, the files that go in, the message, and how far to take it.
 private struct CommitSheet: View {
     @ObservedObject var review: ReviewModel
     let palette: Palette
     @Binding var message: String
-    let confirm: (AfterCommit) -> Void
+    /// Gets the paths to commit, or nil when every file goes in.
+    let confirm: (AfterCommit, [String]?) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage("review.afterCommit") private var remembered = AfterCommit.nothing.rawValue
@@ -122,7 +159,13 @@ private struct CommitSheet: View {
         return choice == .openRequest && !review.canStartRequest ? .push : choice
     }
 
-    private var ready: Bool { !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    /// Files unticked here or in the panel. They stay uncommitted in the working tree.
+    private var excluded: Set<String> { review.excluded }
+    private var chosen: [Diff.File] { (files ?? []).filter { !excluded.contains($0.path) } }
+
+    private var ready: Bool {
+        !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && (files == nil || !chosen.isEmpty)
+    }
 
     var body: some View {
         let p = palette
@@ -158,8 +201,10 @@ private struct CommitSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button(confirmTitle) {
                     let next = next
+                    // A renamed file is two paths to git: the one it left and the one it has now.
+                    let paths = excluded.isEmpty ? nil : chosen.flatMap { [$0.oldPath, $0.path].compactMap { $0 } }
                     dismiss()
-                    confirm(next)
+                    confirm(next, paths)
                 }
                 .buttonStyle(SheetButton(palette: p, primary: true))
                 .keyboardShortcut(.defaultAction)
@@ -186,36 +231,55 @@ private struct CommitSheet: View {
         }
     }
 
-    /// "5 files +821 −61", then each file. They all go in, staged or not.
+    /// "5 files +821 −61", then each file. The ticked ones go in, staged or not, and they all start ticked.
     private func changes(_ p: Palette) -> some View {
-        let files = files ?? []
+        let files = files ?? [], chosen = chosen
         return VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                Text("\(review.uncommitted) \(review.uncommitted == 1 ? "file" : "files")")
-                if self.files != nil {
-                    Counts(added: files.reduce(0) { $0 + $1.added }, removed: files.reduce(0) { $0 + $1.removed }, palette: p)
+            Button {
+                review.excludeAll(excluded.isEmpty)
+            } label: {
+                HStack(spacing: 8) {
+                    if self.files != nil, review.canChooseFiles { Tick(on: excluded.isEmpty, palette: p) }
+                    Text(excluded.isEmpty ? "\(review.uncommitted) \(review.uncommitted == 1 ? "file" : "files")"
+                         : "\(chosen.count) of \(files.count) files")
+                    if self.files != nil {
+                        Counts(added: chosen.reduce(0) { $0 + $1.added }, removed: chosen.reduce(0) { $0 + $1.removed }, palette: p)
+                    }
+                    Spacer()
                 }
-                Spacer()
+                .font(.system(size: 12, weight: .medium))
+                .padding(.horizontal, 12)
+                .frame(height: 32)
+                .contentShape(Rectangle())
             }
-            .font(.system(size: 12, weight: .medium))
-            .padding(.horizontal, 12)
-            .frame(height: 32)
+            .buttonStyle(.plain)
+            .hoverTip(excluded.isEmpty ? "Leave every file out" : "Take every file")
+            .allowsHitTesting(review.canChooseFiles)
             if !files.isEmpty {
                 Rectangle().fill(p.line).frame(height: 1)
                 ScrollView {
                     VStack(spacing: 0) {
                         ForEach(files, id: \.path) { file in
-                            HStack(spacing: 6) {
-                                (Text((file.path as NSString).lastPathComponent)
-                                    + Text("  " + (file.path as NSString).deletingLastPathComponent).foregroundColor(p.muted))
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
-                                Spacer(minLength: 8)
-                                Counts(added: file.added, removed: file.removed, palette: p)
+                            let taken = !excluded.contains(file.path)
+                            Button {
+                                review.toggleExcluded(file.path)
+                            } label: {
+                                HStack(spacing: 8) {
+                                    if review.canChooseFiles { Tick(on: taken, palette: p) }
+                                    (Text((file.path as NSString).lastPathComponent).foregroundColor(taken ? p.text : p.muted)
+                                        + Text("  " + (file.path as NSString).deletingLastPathComponent).foregroundColor(p.muted))
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                    Spacer(minLength: 8)
+                                    Counts(added: file.added, removed: file.removed, palette: p).opacity(taken ? 1 : 0.4)
+                                }
+                                .font(.system(size: 12))
+                                .padding(.horizontal, 12)
+                                .frame(height: 24)
+                                .contentShape(Rectangle())
                             }
-                            .font(.system(size: 12))
-                            .padding(.horizontal, 12)
-                            .frame(height: 24)
+                            .buttonStyle(.plain)
+                            .allowsHitTesting(review.canChooseFiles)
                         }
                     }
                     .padding(.vertical, 4)

@@ -46,14 +46,23 @@ final class ReviewModel: ObservableObject {
     @Published private(set) var commitSubject: String?
     /// While a commit or a push runs.
     @Published private(set) var isShipping = false
+    /// The commit sheet is open, from the Commit button or ⌥⌘C.
+    @Published var askingCommit = false
     /// Where the branch is pushed, when that is GitHub or GitLab, to offer opening a pull request there.
     @Published private(set) var forge: Forge?
     /// Whether the branch has an open pull request. Unknown without the forge's command line tool.
     @Published private(set) var request = Forge.RequestState.unknown
     /// Commits on the branch that its base doesn't have. With none, there is nothing to make a request of.
     @Published private(set) var ahead = 0
-    /// How many files a commit would take. "Changes since main" also counts work that is already committed.
-    @Published private(set) var uncommitted = 0
+    /// The files a commit would take. "Changes since main" also shows work that is already committed.
+    @Published private(set) var uncommittedPaths: Set<String> = []
+    var uncommitted: Int { uncommittedPaths.count }
+    /// Uncommitted files you unticked, per checkout. They stay out of the next commit.
+    @Published private var leftOut: [String: Set<String>] = [:]
+    var excluded: Set<String> { canChooseFiles ? root.flatMap { leftOut[$0] } ?? [] : [] }
+    /// False while git is stopped on a merge, a rebase or a cherry-pick, where it only takes a commit of everything.
+    /// The ticks are hidden then, so nobody is led into git's refusal.
+    @Published private(set) var canChooseFiles = true
     private var scopeBeforeCommit: Diff.Scope?
 
     private var files: [Diff.File] = []
@@ -88,7 +97,7 @@ final class ReviewModel: ObservableObject {
             collapsed = []
             rows = []
             stat = Diff.Stat()
-            uncommitted = 0
+            uncommittedPaths = []
             ahead = 0
             forge = nil
             ignored = []
@@ -132,9 +141,33 @@ final class ReviewModel: ObservableObject {
         refresh()
     }
 
-    /// Commits every uncommitted file when there is a message, then goes as far as `next` says.
+    /// Opens the commit sheet when there is something to commit.
+    func askCommit() {
+        guard root != nil, uncommitted > 0, !isShipping else { return NSSound.beep() }
+        askingCommit = true
+    }
+
+    /// Takes a file out of the next commit, or back in.
+    func toggleExcluded(_ path: String) {
+        guard let root else { return }
+        if leftOut[root, default: []].remove(path) == nil { leftOut[root, default: []].insert(path) }
+    }
+
+    /// Unticks every uncommitted file, or ticks them all again.
+    func excludeAll(_ all: Bool) {
+        guard let root else { return }
+        leftOut[root] = all ? uncommittedPaths : []
+    }
+
+    /// Whether a file shown in the panel has a tick: only a file with uncommitted changes can go in a commit.
+    func isTicked(_ path: String) -> Bool? {
+        if case .commit = scope { return nil }
+        return canChooseFiles && uncommittedPaths.contains(path) ? !excluded.contains(path) : nil
+    }
+
+    /// Commits when there is a message, every uncommitted file or only `paths`, then goes as far as `next` says.
     /// `failed` gets a title and git's own message.
-    func ship(message: String?, then next: AfterCommit, failed: @escaping (String, String) -> Void) {
+    func ship(message: String?, only paths: [String]? = nil, then next: AfterCommit, failed: @escaping (String, String) -> Void) {
         guard let root, !isShipping else { return }
         // With the forge's tool the request is created right here. Without it, its form opens in the browser.
         let create = next == .openRequest && canCreateRequest ? forge : nil
@@ -142,9 +175,13 @@ final class ReviewModel: ObservableObject {
         let branch = branch
         isShipping = true
         DispatchQueue.global(qos: .userInitiated).async {
+            var committed = false
             let failure: (String, String)? = {
                 if let message {
-                    do { try History.commitAll(message, in: root) } catch { return ("Couldn't commit", String(describing: error)) }
+                    do {
+                        if let paths { try History.commit(message, only: paths, in: root) } else { try History.commitAll(message, in: root) }
+                        committed = true
+                    } catch { return ("Couldn't commit", String(describing: error)) }
                 }
                 guard next != .nothing else { return nil }
                 do { try History.push(in: root) } catch {
@@ -161,6 +198,8 @@ final class ReviewModel: ObservableObject {
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 self.isShipping = false
+                // What was left out of this commit is the next one's to decide.
+                if committed { self.leftOut[root] = nil }
                 if let failure { failed(failure.0, failure.1) } else if let link { NSWorkspace.shared.open(link) }
                 self.refresh()
                 if let created, self.root == root, self.branch == branch { self.request = created } else { self.checkRequest() }
@@ -217,12 +256,15 @@ final class ReviewModel: ObservableObject {
         DispatchQueue.global(qos: .userInitiated).async {
             let stat = Result { try Diff.stat(in: root, scope) }
             let ahead = base.map { History.commitsAhead(of: $0, in: root) } ?? 0
-            let uncommitted = scope == .uncommitted ? stat : Result { try Diff.stat(in: root, .uncommitted) }
+            let uncommitted = Set((try? Diff.uncommittedPaths(in: root)) ?? [])
+            let stopped = Merge.operation(in: root) != nil
             let files = withFiles ? Result { try Diff.files(in: root, scope) } : nil
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root, self.scope == scope else { return }
                 self.stat = (try? stat.get()) ?? Diff.Stat()
-                self.uncommitted = (try? uncommitted.get())?.files ?? 0
+                self.uncommittedPaths = uncommitted
+                if self.canChooseFiles == stopped { self.canChooseFiles = !stopped }
+                if let left = self.leftOut[root], !left.isSubset(of: uncommitted) { self.leftOut[root] = left.intersection(uncommitted) }
                 self.ahead = ahead
                 self.error = (try? files?.get()) == nil && files != nil ? "Couldn't read the changes." : nil
                 if let files = try? files?.get() {
@@ -325,6 +367,7 @@ struct ReviewPanel: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(p.background)
         .overlay(alignment: .leading) { edge(p) }
+        .commitSheet(review, palette: p)
     }
 
     /// Looking at one commit, the working tree plays no part, so there is nothing to offer a commit for.
@@ -354,7 +397,8 @@ struct ReviewPanel: View {
     @ViewBuilder private func row(for row: ReviewModel.Row, _ p: Palette) -> some View {
         switch row {
         case .header(let file, let collapsed):
-            FileHeader(file: file, collapsed: collapsed, palette: p,
+            FileHeader(file: file, collapsed: collapsed, ticked: review.isTicked(file.path), palette: p,
+                       tick: { review.toggleExcluded(file.path) },
                        toggle: { review.toggle(file.path) },
                        open: { review.root.map { open(($0 as NSString).appendingPathComponent(file.path), file.firstChange) } })
         case .body(let file):
@@ -487,7 +531,10 @@ struct Counts: View {
 private struct FileHeader: View {
     let file: Diff.File
     let collapsed: Bool
+    /// Whether the file goes in the next commit. Nil when it has nothing to commit.
+    let ticked: Bool?
     let palette: Palette
+    let tick: () -> Void
     let toggle: () -> Void
     let open: () -> Void
 
@@ -500,7 +547,12 @@ private struct FileHeader: View {
                 .rotationEffect(.degrees(collapsed ? 0 : 90))
                 .foregroundStyle(palette.muted)
                 .frame(width: 12)
-            (Text(folder).foregroundColor(palette.muted) + Text(name).foregroundColor(palette.text))
+            if let ticked {
+                Button(action: tick) { Tick(on: ticked, palette: palette).frame(height: 34).contentShape(Rectangle()) }
+                    .buttonStyle(.plain)
+                    .hoverTip(ticked ? "In the next commit. Click to leave it out" : "Left out of the next commit. Click to take it")
+            }
+            (Text(folder).foregroundColor(palette.muted) + Text(name).foregroundColor(ticked == false ? palette.muted : palette.text))
                 .font(.system(size: 12.5))
                 .lineLimit(1)
                 .truncationMode(.head)
