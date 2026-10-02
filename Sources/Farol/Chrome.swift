@@ -177,7 +177,7 @@ private struct GitButton: View {
 
     var body: some View {
         let p = state.palette
-        let counts = !review.stat.isEmpty || review.isOpen
+        let counts = !review.changes.isEmpty || review.isOpen
         let stopped = merge.operation != nil
         if !counts, !stopped, session.topLevel != nil || state.graphVisible {
             // Alone, the icon sits bare like the others in the title bar. A pill around it reads as switched on.
@@ -201,8 +201,9 @@ private struct GitButton: View {
                 }
                 if counts {
                     Rectangle().fill(p.line).frame(width: 1, height: 12)
-                    Half(active: review.isOpen, help: "Review changes (⌥⌘R)", palette: p, action: changes) { _ in
-                        Counts(added: review.stat.added, removed: review.stat.removed, palette: p)
+                    // Over a commit it isn't lit: a click there brings your changes back.
+                    Half(active: review.isOpen && !review.showsCommit, help: "Review changes (⌥⌘R)", palette: p, action: changes) { _ in
+                        Counts(added: review.changes.added, removed: review.changes.removed, palette: p)
                     }
                 }
             }

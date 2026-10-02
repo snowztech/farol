@@ -106,7 +106,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let reviewPanel = hosting(ReviewPanel(
             review: review, state: state,
             open: { [weak self] in self?.open($0, line: $1) },
-            close: { [weak self] in self?.toggleReview() },
+            close: { [weak self] in self?.toggleReview(closing: true) },
             resize: { [weak self] in self?.setReviewWidth($0) }))
         reviewPanel.clipsToBounds = true
         state.filesVisible = UserDefaults.standard.bool(forKey: Self.filesVisibleKey)
@@ -387,7 +387,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// Opens or closes the review panel at the width you last gave it.
-    func toggleReview() {
+    func toggleReview(closing: Bool = false) {
+        // Over a commit, "Review changes" brings your changes back. Closing the panel there would hide what you asked for.
+        if !closing, review.leaveCommit() { return graph.select(nil) }
         review.isOpen.toggle()
         let saved = UserDefaults.standard.double(forKey: Self.reviewWidthKey)
         let width = review.isOpen ? clampedReviewWidth(saved > 0 ? saved : ReviewPanel.defaultWidth) : 0

@@ -25,6 +25,9 @@ final class ReviewModel: ObservableObject {
     /// Branches to compare with, the base one first.
     @Published private(set) var branches: [String] = []
     @Published private(set) var stat = Diff.Stat()
+    /// What the title bar counts: your changes, even while the panel shows a commit.
+    @Published private(set) var changes = Diff.Stat()
+    var showsCommit: Bool { if case .commit = scope { true } else { false } }
     @Published private(set) var rows: [Row] = []
     @Published private(set) var error: String?
     @Published var isOpen = false {
@@ -99,6 +102,7 @@ final class ReviewModel: ObservableObject {
             collapsed = []
             rows = []
             stat = Diff.Stat()
+            changes = Diff.Stat()
             uncommittedPaths = []
             ahead = 0
             unpushed = 0
@@ -135,6 +139,15 @@ final class ReviewModel: ObservableObject {
         chosenScope[root] = .commit(hash)
         scope = .commit(hash)
         refresh()
+    }
+
+    /// Goes back from a commit to the changes shown before it. False when no commit is shown.
+    func leaveCommit() -> Bool {
+        guard isOpen, case .commit = scope, let root else { return false }
+        chosenScope[root] = scopeBeforeCommit
+        scope = scopeBeforeCommit ?? .uncommitted
+        refresh()
+        return true
     }
 
     func choose(_ scope: Diff.Scope) {
@@ -259,8 +272,10 @@ final class ReviewModel: ObservableObject {
         pending?.cancel()
         guard let root else { return }
         let scope = scope, withFiles = isOpen, base = branches.first, branch = branch
+        let yours = showsCommit ? scopeBeforeCommit ?? .uncommitted : scope
         DispatchQueue.global(qos: .userInitiated).async {
             let stat = Result { try Diff.stat(in: root, scope) }
+            let changes = yours == scope ? stat : Result { try Diff.stat(in: root, yours) }
             let ahead = base.map { History.commitsAhead(of: $0, in: root) } ?? 0
             let unpushed = branch.map { History.unpushed($0, in: root) } ?? 0
             let uncommitted = Set((try? Diff.uncommittedPaths(in: root)) ?? [])
@@ -269,6 +284,7 @@ final class ReviewModel: ObservableObject {
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root, self.scope == scope else { return }
                 self.stat = (try? stat.get()) ?? Diff.Stat()
+                self.changes = (try? changes.get()) ?? Diff.Stat()
                 self.uncommittedPaths = uncommitted
                 if self.canChooseFiles == stopped { self.canChooseFiles = !stopped }
                 if let left = self.leftOut[root], !left.isSubset(of: uncommitted) { self.leftOut[root] = left.intersection(uncommitted) }
@@ -382,9 +398,7 @@ struct ReviewPanel: View {
     }
 
     /// Looking at one commit, the working tree plays no part, so there is nothing to offer a commit for.
-    private var isCommit: Bool {
-        if case .commit = review.scope { true } else { false }
-    }
+    private var isCommit: Bool { review.showsCommit }
 
     private func header(_ p: Palette) -> some View {
         HStack(spacing: 8) {
