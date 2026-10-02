@@ -67,7 +67,9 @@ struct TopBar: View {
             .padding(.horizontal, 120)
             .frame(maxWidth: .infinity)
             .padding(.leading, p.boxed ? 0 : leftPanels)
-            .padding(.trailing, p.boxed ? 0 : state.reviewWidth + state.graphWidth)
+            .padding(.trailing, p.boxed ? 0 : reviewWidth + graphWidth)
+            // On a window too narrow for all of this, only the title gives way. The buttons stay where they are.
+            .frame(minWidth: 0)
 
             HStack(spacing: 2) {
                 // Room for the traffic lights.
@@ -102,8 +104,13 @@ struct TopBar: View {
 
     /// Width of the side panels open on the left, which the title stays clear of.
     private var leftPanels: CGFloat {
-        (state.sidebarVisible ? SidebarView.width : 0) + (state.filesVisible ? FilesPanel.width : 0)
+        (state.sidebarVisible ? SidebarView.width : 0) + (filesVisible ? FilesPanel.width : 0)
     }
+
+    // The merge view covers every panel but the sidebar, so the bar is laid out as if they were closed.
+    private var filesVisible: Bool { state.filesVisible && !state.showingMerge }
+    private var reviewWidth: CGFloat { state.showingMerge ? 0 : state.reviewWidth }
+    private var graphWidth: CGFloat { state.showingMerge ? 0 : state.graphWidth }
 
     /// Every panel runs up into the bar in its own color, like Mac apps with a sidebar, and the terminal's part matches the terminal.
     @ViewBuilder private func columns(_ p: Palette) -> some View {
@@ -119,13 +126,13 @@ struct TopBar: View {
         HStack(spacing: 0) {
             Rectangle().fill(p.surface).frame(width: state.sidebarVisible ? SidebarView.width - 1 : 0)
             Rectangle().fill(p.line).frame(width: state.sidebarVisible ? 1 : 0)
-            Rectangle().fill(p.surface).frame(width: state.filesVisible ? FilesPanel.width - 1 : 0)
-            Rectangle().fill(p.line).frame(width: state.filesVisible ? 1 : 0)
+            Rectangle().fill(p.surface).frame(width: filesVisible ? FilesPanel.width - 1 : 0)
+            Rectangle().fill(p.line).frame(width: filesVisible ? 1 : 0)
             Rectangle().fill(p.background)
-            Rectangle().fill(p.line).frame(width: state.reviewWidth > 0 ? 1 : 0)
-            Rectangle().fill(p.background).frame(width: max(state.reviewWidth - 1, 0))
-            Rectangle().fill(p.line).frame(width: state.graphWidth > 0 ? 1 : 0)
-            Rectangle().fill(p.surface).frame(width: max(state.graphWidth - 1, 0))
+            Rectangle().fill(p.line).frame(width: reviewWidth > 0 ? 1 : 0)
+            Rectangle().fill(p.background).frame(width: max(reviewWidth - 1, 0))
+            Rectangle().fill(p.line).frame(width: graphWidth > 0 ? 1 : 0)
+            Rectangle().fill(p.surface).frame(width: max(graphWidth - 1, 0))
         }
     }
 
