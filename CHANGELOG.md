@@ -10,6 +10,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - A branch with an open pull request, or merge request, shows its number next to it in the branch list. Click it to open the request in the browser. Needs gh or glab.
 - A pull request's checks show before its button in the review panel, or a merge request's pipeline jobs: green, red, or a clock while they run. Click for the list, and a step to open its log. Needs gh or glab.
 
+### Fixed
+
+- "Review changes" in the title bar, while the panel shows a commit, brings your changes back. It used to close the panel. The counts next to it stay those of your changes.
+
 ## [0.26.1] - 2026-10-02
 
 Push from the review panel after a commit.
