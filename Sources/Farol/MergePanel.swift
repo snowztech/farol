@@ -157,6 +157,8 @@ struct MergePanel: View {
 
     @State private var writing = false
     @State private var commitMessage = ""
+    @State private var choosingTest = false
+    @State private var testCommand = ""
 
     var body: some View {
         let p = state.palette
@@ -185,6 +187,11 @@ struct MergePanel: View {
         .sheet(isPresented: $writing) {
             ContinueSheet(merge: merge, palette: p, message: $commitMessage) {
                 merge.proceed(message: commitMessage.trimmingCharacters(in: .whitespacesAndNewlines), failed: showGitError)
+            }
+        }
+        .sheet(isPresented: $choosingTest) {
+            TestCommandSheet(palette: p, command: $testCommand) {
+                merge.setTestCommand(testCommand.trimmingCharacters(in: .whitespacesAndNewlines))
             }
         }
         .foregroundStyle(p.text)
@@ -276,7 +283,9 @@ struct MergePanel: View {
     private func fileList(_ p: Palette) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(merge.conflicts.count) in conflict" + (merge.reused.isEmpty ? "" : ", \(merge.reused.count) resolved like last time"))
+                Text(merge.hasConflicts
+                     ? "\(merge.conflicts.count) in conflict" + (merge.reused.isEmpty ? "" : ", \(merge.reused.count) resolved like last time")
+                     : "\(merge.resolved.count) resolved")
                     .font(.system(size: 11, weight: .medium)).foregroundStyle(p.muted)
                     .padding(.horizontal, 10).padding(.vertical, 8)
                 ForEach(merge.conflicts, id: \.path) { conflict in
@@ -482,20 +491,27 @@ struct MergePanel: View {
         let reused = summaries.values.filter(\.reused).count
         let onDisk = summaries.values.filter(\.onDisk).count
         let warnings = summaries.sorted { $0.key < $1.key }.flatMap { path, summary in summary.warnings.map { (path, $0) } }
+        let details = [decided > 0 ? "\(decided) by hand" : nil, automatic > 0 ? "\(automatic) auto-merged" : nil,
+                       reused > 0 ? "\(reused) like last time" : nil, onDisk > 0 ? "\(onDisk) as edited on disk" : nil]
+            .compactMap { $0 }.map { " · " + $0 }.joined()
+        // Changes taken on their own can still clash, so the way to check sits next to the count.
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(p.done)
-                Text("\(files) \(files == 1 ? "file" : "files") resolved").font(.system(size: 12.5, weight: .medium))
-                if decided > 0 { Text("· \(decided) \(decided == 1 ? "conflict" : "conflicts") decided by hand").foregroundStyle(p.muted) }
-                if automatic > 0 {
-                    Text("· \(automatic) \(automatic == 1 ? "change" : "changes") merged automatically").foregroundStyle(p.muted)
-                    PanelButton(title: "Review", palette: p) {
-                        merge.selected = summaries.first { $0.value.automatic > 0 }?.key ?? merge.resolved.first
-                    }
+                Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(p.done)
+                (Text("\(files) \(files == 1 ? "file" : "files") resolved").fontWeight(.medium)
+                    + Text(details).foregroundColor(p.muted))
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                if let command = merge.testCommand {
+                    PanelButton(title: "Run \(command)", palette: p) { runInPane(command) }
+                        .hoverTip("Run the tests in a new pane under the terminal before you continue")
+                    IconButton(symbol: "pencil", help: "Change the test command", palette: p, action: askTestCommand)
+                } else {
+                    PanelButton(title: "Run Tests…", palette: p) { askTestCommand() }
+                        .hoverTip("Choose the command that runs this checkout's tests")
                 }
-                if reused > 0 { Text("· \(reused) resolved like last time").foregroundStyle(p.muted) }
-                if onDisk > 0 { Text("· \(onDisk) taken as edited on disk").foregroundStyle(p.muted) }
-                Spacer()
+                PanelButton(title: "Ask an Agent…", palette: p) { askAgent(agentPrompt) }
+                    .hoverTip("Hand the check to an agent running in this session, or start one on it")
             }
             ForEach(warnings.indices, id: \.self) { index in
                 let (path, warning) = warnings[index]
@@ -506,23 +522,10 @@ struct MergePanel: View {
                 }
                 .foregroundStyle(p.waiting)
             }
-            HStack(spacing: 8) {
-                Text("Changes taken on their own can still clash. Before you continue:").foregroundStyle(p.muted)
-                if let command = merge.testCommand {
-                    PanelButton(title: "Run \(command)", palette: p) { runInPane(command) }
-                    PanelButton(title: "Change…", palette: p) { askTestCommand() }
-                } else {
-                    PanelButton(title: "Choose a Test Command…", palette: p) { askTestCommand() }
-                }
-                PanelButton(title: "Ask an Agent to Check…", palette: p) { askAgent(agentPrompt) }
-                    .hoverTip("Hand the check to an agent running in this session, or start one on it")
-                Spacer()
-            }
         }
         .font(.system(size: 12))
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(p.surface)
+        .padding(.vertical, 7)
         .overlay(alignment: .bottom) { Rectangle().fill(p.line).frame(height: 1) }
     }
 
@@ -536,20 +539,8 @@ struct MergePanel: View {
     }
 
     private func askTestCommand() {
-        guard let window = NSApp.keyWindow else { return }
-        let alert = NSAlert()
-        alert.messageText = "Test command for this checkout"
-        alert.informativeText = "It runs in a new pane under the terminal. Farol remembers it for this checkout."
-        let field = NSTextField(string: merge.testCommand ?? "")
-        field.placeholderString = "make test"
-        field.frame = NSRect(x: 0, y: 0, width: 300, height: 22)
-        alert.accessoryView = field
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Cancel")
-        alert.window.initialFirstResponder = field
-        alert.beginSheetModal(for: window) { response in
-            if response == .alertFirstButtonReturn { merge.setTestCommand(field.stringValue) }
-        }
+        testCommand = merge.testCommand ?? ""
+        choosingTest = true
     }
 
     /// Each title over its column's code, which the editor lays out.
@@ -919,6 +910,58 @@ private func showGitError(_ title: String, _ message: String) {
     alert.messageText = title
     alert.informativeText = message
     if let window = NSApp.keyWindow { alert.beginSheetModal(for: window) } else { alert.runModal() }
+}
+
+/// The command that runs this checkout's tests. Farol remembers it per checkout.
+private struct TestCommandSheet: View {
+    let palette: Palette
+    @Binding var command: String
+    let save: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var typing: Bool
+
+    private var ready: Bool { !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    var body: some View {
+        let p = palette
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Test command").font(.system(size: 15, weight: .semibold))
+                    Text("It runs in a new pane under the terminal. Farol remembers it for this checkout.")
+                        .foregroundStyle(p.muted)
+                }
+                TextField("make test", text: $command)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13, design: .monospaced))
+                    .focused($typing)
+                    .sheetField(p, focused: typing)
+            }
+            .padding(20)
+            Rectangle().fill(p.line).frame(height: 1)
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                    .buttonStyle(SheetButton(palette: p, primary: false))
+                    .keyboardShortcut(.cancelAction)
+                Button("Save") {
+                    dismiss()
+                    save()
+                }
+                .buttonStyle(SheetButton(palette: p, primary: true))
+                .keyboardShortcut(.defaultAction)
+                .disabled(!ready)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+        }
+        .font(.system(size: 13))
+        .foregroundStyle(p.text)
+        .frame(width: 460)
+        .background(p.background)
+        .onAppear { typing = true }
+    }
 }
 
 /// The message of the commit Continue makes, starting from the one git prepared.
