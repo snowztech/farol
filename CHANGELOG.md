@@ -23,6 +23,10 @@ Merge branches, and see pull requests and their checks.
 
 ### Added
 
+- The commit sheet can have Claude Code or Codex write the message from the files you ticked. The arrow next to the button picks the agent or account, and Restore puts back what you had typed.
+
+### Added
+
 - Right-click a branch to merge it into the checked out one, with a fast-forward when git can or always with a merge commit.
 - A branch with an open pull request, or merge request, shows its number next to it in the branch list. Click it to open the request in the browser. Needs gh or glab.
 - A pull request's checks show before its button in the review panel, or a merge request's pipeline jobs: green, red, or a clock while they run. Click for the list, and a step to open its log. Needs gh or glab.
