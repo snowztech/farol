@@ -184,7 +184,8 @@ private struct GitButton: View {
             IconButton(symbol: "point.3.filled.connected.trianglepath.dotted", help: "Git graph (⌥⌘G)", active: state.graphVisible,
                        palette: p, action: graph)
         } else if counts || stopped {
-            HStack(spacing: 0) {
+            // The gap between the halves is the divider, so a lit half ends cleanly against it.
+            HStack(spacing: 1) {
                 if stopped {
                     Half(active: state.showingMerge, help: "Resolve conflicts (⌥⌘M)", palette: p, action: conflicts) { color in
                         HStack(spacing: 6) {
@@ -192,15 +193,14 @@ private struct GitButton: View {
                             Text(conflictLabel).foregroundStyle(color)
                         }
                     }
-                    Rectangle().fill(p.line).frame(width: 1, height: 12)
                 }
                 Half(active: state.graphVisible, help: "Git graph (⌥⌘G)", palette: p, action: graph) { color in
+                    // The size of the gear next to it.
                     Image(systemName: "point.3.filled.connected.trianglepath.dotted")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 12.5, weight: .medium))
                         .foregroundStyle(color)
                 }
                 if counts {
-                    Rectangle().fill(p.line).frame(width: 1, height: 12)
                     // Over a commit it isn't lit: a click there brings your changes back.
                     Half(active: review.isOpen && !review.showsCommit, help: "Review changes (⌥⌘R)", palette: p, action: changes) { _ in
                         Counts(added: review.changes.added, removed: review.changes.removed, palette: p)
@@ -208,7 +208,6 @@ private struct GitButton: View {
                 }
             }
             .font(.system(size: 11, weight: .medium))
-            .background(p.raised.opacity(0.6), in: Capsule())
             .clipShape(Capsule())
             .overlay(Capsule().strokeBorder(p.line))
             .padding(.trailing, 6)
@@ -220,7 +219,7 @@ private struct GitButton: View {
         return count == 0 ? "Ready to continue" : "\(count) \(count == 1 ? "conflict" : "conflicts")"
     }
 
-    /// One clickable side of the pill, lit while hovered or while its panel is open.
+    /// One clickable side of the pill, lit while hovered and brighter while its panel is open.
     private struct Half<Label: View>: View {
         let active: Bool
         let help: String
@@ -235,7 +234,7 @@ private struct GitButton: View {
                 label(active ? palette.accent : hovering ? palette.text : palette.muted)
                     .padding(.horizontal, 8)
                     .frame(height: 20)
-                    .background(hovering || active ? palette.raised : .clear)
+                    .background(active ? palette.muted.opacity(0.3) : palette.raised.opacity(hovering ? 1 : 0.6))
                     .contentShape(Rectangle())
             }
             .buttonStyle(QuietPress())
