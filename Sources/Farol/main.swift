@@ -58,6 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func toggleReview(_ sender: Any?) { windowController.toggleReview() }
     @objc func toggleMerge(_ sender: Any?) { windowController.toggleMerge() }
     @objc func commit(_ sender: Any?) { windowController.commit() }
+    @objc func push(_ sender: Any?) { windowController.push() }
     @objc func reloadConfig(_ sender: Any?) {
         settings.reload()
         windowController.handle(.reloadConfig)
@@ -135,6 +136,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         view.addItem(withTitle: "Review Changes", action: #selector(toggleReview), keyEquivalent: "r")
             .keyEquivalentModifierMask = [.command, .option]
         view.addItem(withTitle: "Commit…", action: #selector(commit), keyEquivalent: "c")
+            .keyEquivalentModifierMask = [.command, .option]
+        view.addItem(withTitle: "Push", action: #selector(push), keyEquivalent: "p")
             .keyEquivalentModifierMask = [.command, .option]
         view.addItem(withTitle: "Resolve Conflicts", action: #selector(toggleMerge), keyEquivalent: "m")
             .keyEquivalentModifierMask = [.command, .option]

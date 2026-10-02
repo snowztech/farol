@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- After a commit that wasn't pushed, the Commit button in the review panel becomes Push, until there is something new to commit. ⌥⌘P pushes too, and both buttons show their shortcut.
+
 ## [0.26.0] - 2026-10-02
 
 Choose which files go in a commit.

@@ -497,6 +497,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// Opens or closes the three column merge view in place of the terminal.
     func commit() { review.askCommit() }
 
+    func push() { review.push() }
+
     func toggleMerge() {
         guard state.showingMerge || merge.operation != nil else { return }
         state.showingSettings = false

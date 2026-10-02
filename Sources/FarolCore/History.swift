@@ -226,6 +226,14 @@ public enum History {
         (try? Git.run(["rev-list", "--count", "\(base)..HEAD"], in: directory)).flatMap(Int.init) ?? 0
     }
 
+    /// How many commits `branch`, the checked out one, has left to push. A branch that tracks nothing counts those no remote has.
+    /// Zero without a remote, where there is nowhere to push.
+    public static func unpushed(_ branch: String, in directory: String) -> Int {
+        if let upstream = upstreams(in: directory)[branch] { return upstream.ahead }
+        guard let remotes = try? Git.run(["remote"], in: directory), !remotes.isEmpty else { return 0 }
+        return (try? Git.run(["rev-list", "--count", "HEAD", "--not", "--remotes"], in: directory)).flatMap(Int.init) ?? 0
+    }
+
     static func pushRemote(in directory: String) -> String {
         let configured = Git.branch(of: directory).flatMap { try? Git.run(["config", "branch.\($0).remote"], in: directory) }
         // "." means the branch tracks a local one, which is no place to push to.
