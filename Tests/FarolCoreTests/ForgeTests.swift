@@ -54,6 +54,18 @@ import Testing
     #expect(Forge.request(from: #"[{"title":"x"}]"#) == .unknown)
 }
 
+@Test func listsOpenRequestsByBranchFromEitherTool() {
+    let github = #"""
+    [{"number":97,"url":"https://github.com/snowztech/farol/pull/97","title":"Merge","headRefName":"feat/branch-merge","baseRefName":"main"},
+     {"number":3,"url":"https://github.com/snowztech/farol/pull/3","title":"Fork","headRefName":"main","baseRefName":"main"}]
+    """#
+    #expect(Forge.requests(from: github) == ["feat/branch-merge": Forge.Request(
+        number: 97, url: URL(string: "https://github.com/snowztech/farol/pull/97")!, title: "Merge")])
+    let gitlab = #"[{"iid":12,"web_url":"https://gitlab.com/group/app/-/merge_requests/12","title":"x","source_branch":"fix","target_branch":"main"}]"#
+    #expect(Forge.requests(from: gitlab)["fix"]?.number == 12)
+    #expect(Forge.requests(from: "not logged in").isEmpty)
+}
+
 @Test func readsTheAccountFromEitherToolsStatus() {
     #expect(Forge.Kind.account(from: "github.com\n  ✓ Logged in to github.com account ana (keyring)\n  - Active account: true") == "ana")
     #expect(Forge.Kind.account(from: "gitlab.com\n  ✓ Logged in to gitlab.com as ana (GITLAB_TOKEN)") == "ana")
