@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-10-02
+
+Merge branches, and see pull requests and their checks.
+
 ### Added
 
 - Right-click a branch to merge it into the checked out one, with a fast-forward when git can or always with a merge commit.
@@ -543,7 +547,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.26.1...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.27.0...HEAD
+[0.27.0]: https://github.com/snowztech/farol/releases/tag/v0.27.0
 [0.26.1]: https://github.com/snowztech/farol/releases/tag/v0.26.1
 [0.26.0]: https://github.com/snowztech/farol/releases/tag/v0.26.0
 [0.25.0]: https://github.com/snowztech/farol/releases/tag/v0.25.0
