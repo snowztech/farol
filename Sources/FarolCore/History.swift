@@ -14,6 +14,15 @@ public enum History {
 
         public var shortHash: String { String(hash.prefix(7)) }
 
+        /// The branches pointing here, local or remote, without tags or HEAD.
+        var branches: [String] {
+            refs.compactMap { ref in
+                guard !ref.hasPrefix("tag: ") else { return nil }
+                let name = ref.components(separatedBy: " -> ").last!
+                return name == "HEAD" || name.hasSuffix("/HEAD") ? nil : name
+            }
+        }
+
         /// Whether `branch`, local like main or remote like origin/main, points here.
         public func points(_ branch: String) -> Bool {
             refs.contains { $0 == branch || $0 == "HEAD -> " + branch }
@@ -268,6 +277,8 @@ public enum History {
         // What each lane waits for: the hash of the next commit it leads to, or nil when the lane is free.
         var lanes: [String?] = []
         var colors: [Int] = []
+        // The branch each lane's color stands for, once the lane has met one.
+        var owners: [String?] = []
         var dashed: [Bool] = []
         var next = 0
         func newColor() -> Int {
@@ -281,12 +292,21 @@ public enum History {
             if column == lanes.count {
                 lanes.append(nil)
                 colors.append(0)
+                owners.append(nil)
                 dashed.append(false)
             }
             let colorsAbove = colors
             let dashedAbove = dashed
             let isOneSided = oneSided.contains(commit.hash)
-            let color = waited.map { colors[$0] } ?? newColor()
+            let branches = commit.branches
+            var color = waited.map { colors[$0] } ?? newColor()
+            var owner = waited.flatMap { owners[$0] }
+            // A branch started from another one's last commit shares its line, so the line changes color where the other one begins.
+            if let current = owner, !branches.isEmpty, !branches.contains(where: { sameBranch($0, current) }) {
+                color = newColor()
+                owner = nil
+            }
+            owner = owner ?? branches.first
 
             var top: [Edge] = []
             var passing: Set<Int> = []
@@ -307,6 +327,7 @@ public enum History {
                     // Each branch keeps its own lane down to where it forked, even when another lane waits for the same parent.
                     lanes[column] = parent
                     colors[column] = color
+                    owners[column] = owner
                     dashed[column] = isOneSided
                     fromCommit.insert(column)
                 } else if let lane = lanes.firstIndex(of: parent) {
@@ -317,10 +338,12 @@ public enum History {
                     if lane == lanes.count {
                         lanes.append(nil)
                         colors.append(0)
+                        owners.append(nil)
                         dashed.append(false)
                     }
                     lanes[lane] = parent
                     colors[lane] = newColor()
+                    owners[lane] = nil
                     dashed[lane] = isOneSided
                     fromCommit.insert(lane)
                 }
@@ -333,6 +356,7 @@ public enum History {
             while lanes.last == .some(nil) {
                 lanes.removeLast()
                 colors.removeLast()
+                owners.removeLast()
                 dashed.removeLast()
             }
 
@@ -341,5 +365,10 @@ public enum History {
                             oneSided: isOneSided, dashedAbove: dashedAbove, dashedBelow: dashedBelow))
         }
         return rows
+    }
+
+    /// A local branch and its copy on a remote, like main and origin/main, are one branch for the graph's colors.
+    private static func sameBranch(_ a: String, _ b: String) -> Bool {
+        a == b || a.hasSuffix("/" + b) || b.hasSuffix("/" + a)
     }
 }
