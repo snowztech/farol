@@ -14,6 +14,8 @@ final class GraphModel: ObservableObject {
     /// Each local branch's upstream, for the Update item.
     @Published private(set) var upstreams: [String: History.Upstream] = [:]
     @Published private(set) var fetching = false
+    /// The open pull requests, by branch, for the button next to each. Empty without gh or glab.
+    @Published private(set) var requests: [String: Forge.Request] = [:]
     /// The branch under the mouse in the list, so the history can light up the commit it points to.
     @Published var hoveredBranch: String?
     @Published private(set) var rows: [History.Row] = []
@@ -45,6 +47,7 @@ final class GraphModel: ObservableObject {
             error = nil
             selected = nil
             selectedFiles = nil
+            requests = [:]
         }
         guard let root else {
             watcher = nil
@@ -55,6 +58,7 @@ final class GraphModel: ObservableObject {
             watcher = FolderWatcher((repo as NSString).appendingPathComponent(".git")) { [weak self] in self?.changed($0) }
         }
         reload()
+        if rootChanged { loadRequests() }
     }
 
     func show(all: Bool) {
@@ -107,7 +111,10 @@ final class GraphModel: ObservableObject {
     func fetch(failed: @escaping (String) -> Void) {
         guard !fetching else { return }
         fetching = true
-        run(failed, then: { [weak self] in self?.fetching = false }) { try History.fetch(in: $0) }
+        run(failed, then: { [weak self] in
+            self?.fetching = false
+            self?.loadRequests()
+        }) { try History.fetch(in: $0) }
     }
 
     func update(_ branch: String, failed: @escaping (String) -> Void) {
@@ -116,7 +123,19 @@ final class GraphModel: ObservableObject {
     }
 
     func push(_ branch: String, failed: @escaping (String) -> Void) {
-        run(failed) { try History.push(branch, in: $0) }
+        run(failed, then: { [weak self] in self?.loadRequests() }) { try History.push(branch, in: $0) }
+    }
+
+    /// Asks the forge, so only when a request may have changed: another checkout, the panel reopened, a fetch or a push.
+    private func loadRequests() {
+        guard let root else { return }
+        DispatchQueue.global(qos: .utility).async {
+            let requests = Forge.detect(in: root)?.openRequests(in: root) ?? [:]
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.root == root else { return }
+                self.requests = requests
+            }
+        }
     }
 
     func rebase(onto base: String, interactive: Bool, failed: @escaping (String) -> Void) {
@@ -425,6 +444,7 @@ private struct BranchList: View {
                         let current = !entry.remote && entry.name == graph.current
                         BranchRow(name: entry.name, remote: entry.remote, current: current,
                                   upstream: entry.remote ? nil : graph.upstreams[entry.name],
+                                  request: graph.requests[entry.remote ? String(entry.name.drop { $0 != "/" }.dropFirst()) : entry.name],
                                   color: colors[entry.name].map { palette.lanes[$0 % palette.lanes.count] } ?? palette.muted,
                                   palette: palette,
                                   update: { graph.update(entry.name, failed: gitError("Couldn't update \(entry.name)")) },
@@ -550,6 +570,7 @@ private struct BranchRow: View {
     let remote: Bool
     let current: Bool
     var upstream: History.Upstream?
+    var request: Forge.Request?
     let color: Color
     let palette: Palette
     var update: () -> Void = {}
@@ -584,6 +605,9 @@ private struct BranchRow: View {
                     }
                 }
             }
+            if let request {
+                PullRequestButton(request: request, palette: palette)
+            }
             if current {
                 Image(systemName: "checkmark").font(.system(size: 10, weight: .semibold)).foregroundStyle(palette.text)
             }
@@ -606,6 +630,57 @@ private struct BranchRow: View {
         guard let upstream else { return [] }
         return [upstream.behind > 0 ? "\(upstream.behind) to pull from \(upstream.name)" : nil,
                 upstream.ahead > 0 ? "\(upstream.ahead) to push to \(upstream.name)" : nil].compactMap { $0 }
+    }
+}
+
+/// Opens the branch's pull request in the browser.
+private struct PullRequestButton: View {
+    let request: Forge.Request
+    let palette: Palette
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button { NSWorkspace.shared.open(request.url) } label: {
+            HStack(spacing: 3) {
+                PullRequestGlyph()
+                    .stroke(style: StrokeStyle(lineWidth: 1.15, lineCap: .round, lineJoin: .round))
+                    .frame(width: 10, height: 10)
+                Text("#\(request.number)").font(.system(size: 10.5, weight: .semibold).monospacedDigit())
+            }
+            .foregroundStyle(hovering ? palette.text : palette.muted)
+            .padding(.horizontal, 5)
+            .frame(height: 18)
+            .background(RoundedRectangle(cornerRadius: 4).fill(hovering ? palette.text.opacity(0.12) : .clear))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onClickableHover { hovering = $0 }
+        .hoverTip("#\(request.number) \(request.title)\nOpen in the browser")
+    }
+}
+
+/// A pull request's mark: two commits on a branch, and a line from a third coming back into it.
+private struct PullRequestGlyph: Shape {
+    func path(in rect: CGRect) -> Path {
+        // Drawn on a 16 point grid, then scaled to the frame.
+        let scale = min(rect.width, rect.height) / 16
+        let point = { (x: CGFloat, y: CGFloat) in CGPoint(x: rect.minX + x * scale, y: rect.minY + y * scale) }
+        var path = Path()
+        for (x, y) in [(4.0, 3.5), (4.0, 12.5), (12.0, 12.5)] {
+            path.addEllipse(in: CGRect(x: rect.minX + (x - 1.8) * scale, y: rect.minY + (y - 1.8) * scale,
+                                       width: 3.6 * scale, height: 3.6 * scale))
+        }
+        path.move(to: point(4, 5.3))
+        path.addLine(to: point(4, 10.7))
+        path.move(to: point(12, 10.7))
+        path.addLine(to: point(12, 6.5))
+        path.addQuadCurve(to: point(10, 4.5), control: point(12, 4.5))
+        path.addLine(to: point(7.5, 4.5))
+        path.move(to: point(9, 3))
+        path.addLine(to: point(7.5, 4.5))
+        path.addLine(to: point(9, 6))
+        return path
     }
 }
 

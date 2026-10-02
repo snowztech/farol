@@ -135,6 +135,40 @@ public struct Forge: Equatable {
         return Self.request(from: output)
     }
 
+    /// An open pull request, or merge request.
+    public struct Request: Equatable {
+        public let number: Int
+        public let url: URL
+        public let title: String
+    }
+
+    /// Every open request, by the branch it comes from. Talks to the forge, so call it off the main thread.
+    /// Empty when the tool is missing or can't answer, so nothing shows rather than something wrong.
+    public func openRequests(in directory: String) -> [String: Request] {
+        guard let path = kind.toolPath else { return [:] }
+        let arguments = switch kind {
+        case .github: ["pr", "list", "--state", "open", "--json", "number,url,title,headRefName,baseRefName", "--limit", "100"]
+        case .gitlab: ["mr", "list", "--output", "json", "--per-page", "100"]
+        }
+        guard let output = try? Git.run(path, arguments, in: directory) else { return [:] }
+        return Self.requests(from: output)
+    }
+
+    /// Reads either tool's JSON list: gh says headRefName and baseRefName, glab says source_branch and target_branch.
+    static func requests(from json: String) -> [String: Request] {
+        let list = (try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]]) ?? []
+        var requests: [String: Request] = [:]
+        for item in list {
+            guard let number = (item["number"] ?? item["iid"]) as? Int,
+                  let url = ((item["url"] ?? item["web_url"]) as? String).flatMap(URL.init(string:)),
+                  let head = (item["headRefName"] ?? item["source_branch"]) as? String else { continue }
+            // A fork's main asking to go into main says nothing about our own main.
+            guard head != (item["baseRefName"] ?? item["target_branch"]) as? String else { continue }
+            requests[head] = requests[head] ?? Request(number: number, url: url, title: item["title"] as? String ?? "")
+        }
+        return requests
+    }
+
     /// Whether this forge's issues can be listed at all, without asking it.
     public var listsIssues: Bool { kind == .github && kind.toolPath != nil }
 
