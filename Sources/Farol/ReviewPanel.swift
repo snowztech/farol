@@ -54,7 +54,7 @@ final class ReviewModel: ObservableObject {
     @Published private(set) var request = Forge.RequestState.unknown
     /// Commits on the branch that its base doesn't have. With none, there is nothing to make a request of.
     @Published private(set) var ahead = 0
-    /// Commits the branch has that its upstream doesn't, as of the last fetch. Zero for a branch that tracks nothing.
+    /// Commits the branch has left to push, as of the last fetch. Zero without a remote.
     @Published private(set) var unpushed = 0
     /// The files a commit would take. "Changes since main" also shows work that is already committed.
     @Published private(set) var uncommittedPaths: Set<String> = []
@@ -240,6 +240,9 @@ final class ReviewModel: ObservableObject {
         return forge != nil && branch != nil && !isOnBaseBranch
     }
 
+    /// True once everything is committed and there is no request to open, so a push is the next step.
+    var canPush: Bool { uncommitted == 0 && unpushed > 0 && !(canStartRequest && ahead > 0) }
+
     /// The branch everything is compared with, like main. A request from it into itself makes no sense.
     var isOnBaseBranch: Bool {
         guard let branch, let base = branches.first else { return false }
@@ -259,7 +262,7 @@ final class ReviewModel: ObservableObject {
         DispatchQueue.global(qos: .userInitiated).async {
             let stat = Result { try Diff.stat(in: root, scope) }
             let ahead = base.map { History.commitsAhead(of: $0, in: root) } ?? 0
-            let unpushed = branch.flatMap { History.upstreams(in: root)[$0]?.ahead } ?? 0
+            let unpushed = branch.map { History.unpushed($0, in: root) } ?? 0
             let uncommitted = Set((try? Diff.uncommittedPaths(in: root)) ?? [])
             let stopped = Merge.operation(in: root) != nil
             let files = withFiles ? Result { try Diff.files(in: root, scope) } : nil
@@ -345,7 +348,7 @@ struct ReviewPanel: View {
                         CommitButton(review: review, palette: p)
                     } else if review.canStartRequest, review.ahead > 0 {
                         RequestButton(review: review, palette: p)
-                    } else if review.unpushed > 0 {
+                    } else if review.canPush {
                         PushButton(review: review, palette: p)
                     }
                 }

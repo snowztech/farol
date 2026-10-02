@@ -19,7 +19,7 @@ struct CommitButton: View {
         ShipButton(title: review.isShipping ? "Committing…" : left == 0 || taken == 0 ? "Commit" : "Commit \(taken) of \(review.uncommitted)",
                    help: taken == 0 ? "Tick a file to commit it"
                        : (left == 0 ? "Commit the uncommitted changes" : "Commit the files you left ticked") + " (⌥⌘C)",
-                   busy: review.isShipping || taken == 0, palette: palette) { review.askCommit() }
+                   busy: review.isShipping || taken == 0, keys: "⌥⌘C", palette: palette) { review.askCommit() }
     }
 }
 
@@ -75,10 +75,16 @@ struct PushButton: View {
     var body: some View {
         let count = review.unpushed
         ShipButton(title: review.isShipping ? "Pushing…" : "Push",
-                   help: "Push \(count) commit\(count == 1 ? "" : "s")\(review.branch.map { " on \($0)" } ?? "")",
-                   busy: review.isShipping, palette: palette) {
-            review.ship(message: nil, then: .push, failed: gitFailure)
-        }
+                   help: "Push \(count) commit\(count == 1 ? "" : "s")\(review.branch.map { " on \($0)" } ?? "") (⌥⌘P)",
+                   busy: review.isShipping, keys: "⌥⌘P", palette: palette) { review.push() }
+    }
+}
+
+extension ReviewModel {
+    /// Pushes while the Push button is the next step, from the button or ⌥⌘P.
+    func push() {
+        guard canPush, !isShipping else { return NSSound.beep() }
+        ship(message: nil, then: .push, failed: gitFailure)
     }
 }
 
@@ -110,6 +116,8 @@ struct ShipButton: View {
     let busy: Bool
     /// The forge's mark before the title, on the buttons that send you there.
     var icon: Forge.Kind? = nil
+    /// The shortcut that does the same, shown after the title.
+    var keys: String? = nil
     let palette: Palette
     let action: () -> Void
 
@@ -124,6 +132,7 @@ struct ShipButton: View {
             HStack(spacing: 6) {
                 if let icon { ForgeIcon(kind: icon) }
                 Text(title).font(.system(size: 12, weight: .medium))
+                if let keys { Text(keys).font(.system(size: 11)).foregroundStyle(palette.muted) }
             }
             .foregroundStyle(busy ? palette.muted : palette.text)
             .padding(.horizontal, 10)

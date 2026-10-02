@@ -295,6 +295,32 @@ private func edges(_ pairs: (Int, Int)...) -> [History.Edge] {
     #expect(try History.commits(in: origin.repo, branch: "main").first?.subject == "local work")
 }
 
+@Test func countsWhatIsLeftToPush() throws {
+    let origin = try Sandbox()
+    let box = try Sandbox()
+    let commit = { (message: String) in
+        try Git.run(["-c", "user.name=Farol", "-c", "user.email=farol@example.com", "commit", "--quiet", "--allow-empty",
+                     "-m", message], in: box.repo)
+    }
+    // With no remote there is nowhere to push.
+    try commit("local work")
+    #expect(History.unpushed("main", in: box.repo) == 0)
+
+    // A branch that tracks nothing counts the commits no remote has.
+    try Git.run(["remote", "add", "origin", origin.repo], in: box.repo)
+    try History.fetch(in: box.repo)
+    try Git.run(["switch", "--quiet", "-c", "feat", "origin/main", "--no-track"], in: box.repo)
+    #expect(History.unpushed("feat", in: box.repo) == 0)
+    try commit("feature")
+    #expect(History.unpushed("feat", in: box.repo) == 1)
+
+    // Once pushed it tracks its own branch, and counts against that.
+    try History.push(in: box.repo)
+    #expect(History.unpushed("feat", in: box.repo) == 0)
+    try commit("more")
+    #expect(History.unpushed("feat", in: box.repo) == 1)
+}
+
 @Test func dashesLanesLeadingDownFromOneSidedCommits() {
     // x and y are only on the local branch, a is on both.
     let rows = History.graph([commit("x", "y"), commit("y", "a"), commit("a")], oneSided: ["x", "y"])
