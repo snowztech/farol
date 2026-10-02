@@ -109,7 +109,15 @@ private struct SessionRow: View {
                     .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
             }
-            if let branch = session.branch {
+            if let stopped = session.stopped {
+                Label(session.conflicts > 0
+                      ? "\(stopped.kind.command) stopped · \(session.conflicts) \(session.conflicts == 1 ? "conflict" : "conflicts")"
+                      : "\(stopped.kind.command) stopped · ready to continue",
+                      systemImage: "exclamationmark.triangle.fill")
+                    .labelStyle(BranchLabelStyle())
+                    .font(.system(size: 11))
+                    .foregroundStyle(palette.removed)
+            } else if let branch = session.branch {
                 Label(branch, systemImage: "arrow.triangle.branch")
                     .labelStyle(BranchLabelStyle())
                     .font(.system(size: 11))
@@ -236,6 +244,9 @@ struct Lamp: View {
                 if !selected { Ripple(color: palette.waiting) }
                 Circle().fill(palette.waiting)
             case .done: Circle().fill(palette.done)
+            case .stopped:
+                if !selected { Ripple(color: palette.removed) }
+                Circle().fill(palette.removed)
             }
         }
         .frame(width: 7, height: 7)
@@ -248,6 +259,7 @@ struct Lamp: View {
         case .working: "Working"
         case .waiting: "Waiting for your approval or an answer"
         case .done: "Done. Your turn"
+        case .stopped: "Git stopped. Resolve and continue (⌥⌘M)"
         }
     }
 }

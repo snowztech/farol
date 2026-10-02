@@ -51,6 +51,7 @@ extension Palette {
         case .working: NSColor(working)
         case .waiting: NSColor(waiting)
         case .done: NSColor(done)
+        case .stopped: NSColor(removed)
         case .idle: nil
         }
     }

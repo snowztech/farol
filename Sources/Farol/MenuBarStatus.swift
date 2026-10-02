@@ -40,7 +40,8 @@ final class MenuBarStatus: NSObject, NSMenuDelegate {
     func refresh() {
         guard let button = item?.button else { return }
         let activities = store.sessions.map(\.activity)
-        let top: Session.Activity = activities.contains(.waiting) ? .waiting
+        let top: Session.Activity = activities.contains(.stopped) ? .stopped
+            : activities.contains(.waiting) ? .waiting
             : activities.contains(.working) ? .working
             : activities.contains(.done) ? .done : .idle
         button.image = lighthouse(top)
@@ -57,7 +58,7 @@ final class MenuBarStatus: NSObject, NSMenuDelegate {
             item.target = self
             item.representedObject = session
             item.image = lamp(session.activity, size: 8)
-            if let state = label(session.activity) {
+            if let state = session.stopped != nil ? stoppedLabel(session) : label(session.activity) {
                 let title = NSMutableAttributedString(string: session.displayName + "   ")
                 title.append(NSAttributedString(string: state, attributes: [.foregroundColor: NSColor.secondaryLabelColor]))
                 item.attributedTitle = title
@@ -107,8 +108,13 @@ final class MenuBarStatus: NSObject, NSMenuDelegate {
         return image
     }
 
+    private func stoppedLabel(_ session: Session) -> String {
+        session.conflicts > 0 ? "\(session.conflicts) \(session.conflicts == 1 ? "conflict" : "conflicts")" : "Ready to continue"
+    }
+
     private func label(_ activity: Session.Activity) -> String? {
         switch activity {
+        case .stopped: "Git stopped"
         case .working: "Working"
         case .waiting: "Waiting for you"
         case .done: "Done"
@@ -117,7 +123,7 @@ final class MenuBarStatus: NSObject, NSMenuDelegate {
     }
 
     private func summary(_ activities: [Session.Activity]) -> String {
-        let parts = [(Session.Activity.waiting, "waiting"), (.working, "working"), (.done, "done")].compactMap { activity, word in
+        let parts = [(Session.Activity.stopped, "stopped on conflicts"), (.waiting, "waiting"), (.working, "working"), (.done, "done")].compactMap { activity, word in
             let count = activities.filter { $0 == activity }.count
             return count > 0 ? "\(count) \(word)" : nil
         }

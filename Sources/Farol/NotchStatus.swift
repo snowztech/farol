@@ -215,7 +215,8 @@ private final class NotchModel: ObservableObject {
     /// The most urgent state across sessions, like the menu bar lamp.
     var top: Session.Activity {
         let activities = rows.map(\.activity)
-        return activities.contains(.waiting) ? .waiting
+        return activities.contains(.stopped) ? .stopped
+            : activities.contains(.waiting) ? .waiting
             : activities.contains(.working) ? .working
             : activities.contains(.done) ? .done : .idle
     }
@@ -380,6 +381,7 @@ private struct NotchRow: View {
         case .working: "Working"
         case .waiting: "Waiting for you"
         case .done: "Done"
+        case .stopped: "Conflicts"
         case .idle: ""
         }
     }

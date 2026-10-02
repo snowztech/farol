@@ -35,6 +35,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var reviewFollow: AnyCancellable?
     private static let reviewWidthKey = "review.width"
     private var settingsView: NSView!
+    private let merge = MergeModel()
+    private let mergeEditor = MergeEditorController()
+    private var mergeView: NSView!
+    /// Follows the selected session's checkout, so the title bar shows when git stops on conflicts.
+    private var mergeFollow: AnyCancellable?
+    private var mergeDone: AnyCancellable?
+    private var mergeCount: AnyCancellable?
 
     let agents: AgentSettings
     let worktreeSettings: WorktreeSettings
@@ -83,10 +90,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             toggleGraph: { [weak self] in self?.toggleGraph() },
             toggleReview: { [weak self] in self?.toggleReview() },
             toggleSettings: { [weak self] in self?.toggleSettings() },
+            toggleMerge: { [weak self] in self?.toggleMerge() },
             titleBarDoubleClick: { [weak self] in self?.titleBarDoubleClicked() })
 
         let root = NSView()
-        let topBar = hosting(TopBar(state: state, store: store, updates: updates, review: review, commands: commands))
+        let topBar = hosting(TopBar(state: state, store: store, updates: updates, review: review, merge: merge, commands: commands))
         let sidebar = hosting(SidebarView(store: store, state: state, commands: commands))
         sidebar.clipsToBounds = true
         let filesPanel = hosting(FilesPanel(tree: files, state: state) { [weak self] path in
@@ -112,11 +120,20 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             }))
         settingsView.isHidden = true
         settingsView.wantsLayer = true
+        mergeView = hosting(MergePanel(
+            merge: merge, controller: mergeEditor, state: state,
+            close: { [weak self] in self?.toggleMerge() },
+            runInPane: { [weak self] in self?.runAfterMerge($0) },
+            askAgent: { [weak self] in self?.askAgent($0) }))
+        mergeView.isHidden = true
+        mergeView.wantsLayer = true
 
         content.wantsLayer = true
         for v in [topBar, sidebar, filesPanel, graphPanel, content, reviewPanel] { root.addSubview(v) }
         for v in [terminalContainer, settingsView!] { content.addSubview(v) }
-        for v in [topBar, sidebar, filesPanel, graphPanel, content, reviewPanel, terminalContainer, settingsView!] {
+        // Over the side panels too: three columns of code need the whole width.
+        root.addSubview(mergeView)
+        for v in [topBar, sidebar, filesPanel, graphPanel, content, reviewPanel, terminalContainer, settingsView!, mergeView!] {
             v.translatesAutoresizingMaskIntoConstraints = false
         }
 
@@ -165,6 +182,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             settingsView.leadingAnchor.constraint(equalTo: content.leadingAnchor),
             settingsView.trailingAnchor.constraint(equalTo: content.trailingAnchor),
             settingsView.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+
+            mergeView.topAnchor.constraint(equalTo: content.topAnchor),
+            mergeView.leadingAnchor.constraint(equalTo: filesPanel.leadingAnchor),
+            mergeView.trailingAnchor.constraint(equalTo: graphPanel.trailingAnchor),
+            mergeView.bottomAnchor.constraint(equalTo: content.bottomAnchor),
         ])
 
         window.contentView = root
@@ -223,7 +245,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
         store.onSelectionChange = { [weak self] in
             self?.state.showingSettings = false
+            self?.state.showingMerge = false
             self?.show($0)
+        }
+        // Once git goes on past the last conflict, there is nothing left to show, so the terminal comes back.
+        mergeDone = merge.$operation.sink { [weak self] operation in
+            guard let self, operation == nil, state.showingMerge else { return }
+            DispatchQueue.main.async { self.toggleMerge() }
         }
     }
 
@@ -426,6 +454,53 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         show(store.selected)
     }
 
+    /// Back to the terminal, with the tests running in a new pane under it. The title bar brings the merge view back.
+    private func runAfterMerge(_ command: String) {
+        guard let session = store.selected else { return }
+        if state.showingMerge { toggleMerge() }
+        store.split(session, .down, run: command)
+    }
+
+    /// Hands the prompt to an agent. One already running in the session gets it typed in and not sent.
+    /// Otherwise a new one starts on it in a pane below. With more than one to pick from, a menu asks which.
+    private func askAgent(_ prompt: String) {
+        guard let session = store.selected else { return }
+        // A pane that once reported is only an agent while something still runs there.
+        let running = session.panes.terminals.filter { session.agents[$0.id] != nil && $0.hasRunningProcess }
+        var choices: [(title: String, run: () -> Void)] = running.enumerated().map { index, terminal in
+            let name = AgentTitle.withoutStatus(terminal.title)
+            let title = (name.isEmpty ? "Agent" : name) + (running.count > 1 ? " (pane \(index + 1))" : "")
+            return (title, { [weak self] in
+                if self?.state.showingMerge == true { self?.toggleMerge() }
+                session.panes.focus(terminal)
+                terminal.pasteText(prompt)
+            })
+        }
+        choices += AgentFolder.find().map { folder in
+            ("Start \(folder.label)", { [weak self] in self?.runAfterMerge(folder.command(task: prompt)) })
+        }
+        if choices.count == 1 { return choices[0].run() }
+        let menu = NSMenu()
+        if choices.isEmpty {
+            menu.addItem(NSMenuItem(title: "No agent running here, and neither Claude Code nor Codex is set up", action: nil, keyEquivalent: ""))
+        } else {
+            if !running.isEmpty { menu.addItem(.sectionHeader(title: "Running in this session")) }
+            for (index, choice) in choices.enumerated() {
+                if index == running.count { menu.addItem(.sectionHeader(title: "Start a new one")) }
+                menu.addItem(ActionMenuItem(title: choice.title, handler: choice.run))
+            }
+        }
+        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+    }
+
+    /// Opens or closes the three column merge view in place of the terminal.
+    func toggleMerge() {
+        guard state.showingMerge || merge.operation != nil else { return }
+        state.showingSettings = false
+        state.showingMerge.toggle()
+        show(store.selected)
+    }
+
     /// Settings hide the session's title, which the list opens under.
     func switchSession() {
         if state.showingSettings { toggleSettings() }
@@ -472,6 +547,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         // Settings fills the terminal's card to its edges, so it is cut to the same corners.
         settingsView.layer?.cornerRadius = palette.style.radius
         settingsView.layer?.masksToBounds = palette.boxed
+        mergeView.layer?.cornerRadius = palette.style.radius
+        mergeView.layer?.masksToBounds = palette.boxed
         layoutGaps()
     }
 
@@ -489,7 +566,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var theme: (background: NSColor, foreground: NSColor) { (runtime.backgroundColor, runtime.foregroundColor) }
 
     private func refreshBadge(enabled: Bool) {
-        notifier.updateBadge(waiting: enabled ? store.sessions.filter { $0.activity == .waiting }.count : 0)
+        notifier.updateBadge(waiting: enabled ? store.sessions.filter { [.waiting, .stopped].contains($0.activity) }.count : 0)
     }
 
     // MARK: Find
@@ -501,9 +578,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         return panes.file
     }
 
-    var canSaveFile: Bool { focusedFile != nil }
+    var canSaveFile: Bool { state.showingMerge ? mergeEditor.mode == .text : focusedFile != nil }
 
     func saveFile() {
+        if state.showingMerge { return mergeEditor.markResolved(merge) }
         guard let file = focusedFile, let window else { return }
         do {
             try file.save()
@@ -568,14 +646,31 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// Only the terminal on screen renders. Settings replaces it and pauses it too.
     private func show(_ session: Session?) {
         let settings = state.showingSettings
+        let resolving = state.showingMerge && !settings
         settingsView.isHidden = !settings
-        terminalContainer.isHidden = settings
+        mergeView.isHidden = !resolving
+        terminalContainer.isHidden = settings || resolving
         for s in store.sessions {
-            s.panes.setVisible(!settings && s.id == session?.id)
+            s.panes.setVisible(!settings && !resolving && s.id == session?.id)
         }
-        if !settings, let session { window?.makeFirstResponder(session.panes.focusTarget) }
+        if resolving {
+            window?.makeFirstResponder(mergeEditor.editor.textView)
+        } else if !settings, let session {
+            window?.makeFirstResponder(session.panes.focusTarget)
+        }
         followFiles(session)
         followReview(session)
         followGraph(session)
+        followMerge(session)
+    }
+
+    private func followMerge(_ session: Session?) {
+        guard let session else {
+            mergeFollow = nil
+            return merge.follow(nil)
+        }
+        mergeFollow = session.$topLevel.sink { [weak self] in self?.merge.follow($0) }
+        // Resolving here changes what the sidebar says about the session, so it reads git again.
+        mergeCount = merge.$conflicts.dropFirst().sink { [weak session] _ in session?.refreshGit() }
     }
 }

@@ -5,6 +5,8 @@ import SwiftUI
 final class WindowState: ObservableObject {
     @Published var palette: Palette
     @Published var showingSettings = false
+    /// The three column merge view replaces the terminal while git is stopped on conflicts.
+    @Published var showingMerge = false
     /// The session list under the title is open, from a click or ⌘P.
     @Published var switchingSession = false
     /// Mirrors the sidebar and the files panel, so the top bar can match the columns below it.
@@ -35,6 +37,7 @@ struct Commands {
     let toggleGraph: () -> Void
     let toggleReview: () -> Void
     let toggleSettings: () -> Void
+    let toggleMerge: () -> Void
     let titleBarDoubleClick: () -> Void
 }
 
@@ -43,6 +46,7 @@ struct TopBar: View {
     @ObservedObject var store: SessionStore
     @ObservedObject var updates: UpdateChecker
     @ObservedObject var review: ReviewModel
+    @ObservedObject var merge: MergeModel
     let commands: Commands
 
     var body: some View {
@@ -74,6 +78,9 @@ struct TopBar: View {
                            palette: p, action: commands.toggleFiles)
                 newSessionButton(p)
                 Spacer()
+                if merge.operation != nil {
+                    ConflictButton(merge: merge, active: state.showingMerge, palette: p, action: commands.toggleMerge)
+                }
                 if let session = store.selected {
                     GitButton(session: session, state: state, review: review,
                               graph: commands.toggleGraph, changes: commands.toggleReview)
@@ -154,6 +161,41 @@ private struct UpdateBadge: View {
 
 /// "⛬ +821 −61": the graph icon opens the graph, the counts open the review.
 /// Only in a git repo, or while a panel is open so it can still be closed. The counts, and the pill around both, only when there are changes.
+/// "3 conflicts" while git is stopped on a merge or a rebase. It opens the three column view.
+private struct ConflictButton: View {
+    @ObservedObject var merge: MergeModel
+    let active: Bool
+    let palette: Palette
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 9.5))
+                Text(label).font(.system(size: 11, weight: .medium))
+            }
+            .foregroundStyle(merge.hasConflicts ? palette.waiting : palette.done)
+            .padding(.horizontal, 8)
+            .frame(height: 20)
+            .background(Capsule().fill(hovering || active ? palette.raised : palette.raised.opacity(0.6)))
+            .overlay(Capsule().strokeBorder(palette.line))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onClickableHover { hovering = $0 }
+        .hoverTip("Resolve conflicts (⌥⌘M)")
+        .padding(.trailing, 6)
+    }
+
+    private var label: String {
+        let count = merge.conflicts.count
+        if count > 0 { return "\(count) \(count == 1 ? "conflict" : "conflicts")" }
+        return "Ready to continue"
+    }
+}
+
 private struct GitButton: View {
     @ObservedObject var session: Session
     @ObservedObject var state: WindowState

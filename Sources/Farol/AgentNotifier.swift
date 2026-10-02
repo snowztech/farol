@@ -23,6 +23,12 @@ final class AgentNotifier: NSObject, UNUserNotificationCenterDelegate {
             let body = session.agentIsWaiting
                 ? "It needs your approval or an answer to continue." : "Open it to see what it needs."
             post(session, title: "\(session.displayName) is waiting for you", body: body)
+        case .stopped where settings.notifyWaiting:
+            let operation = session.stopped?.kind.command ?? "git"
+            let body = session.conflicts > 0
+                ? "\(session.conflicts) \(session.conflicts == 1 ? "file is" : "files are") in conflict. Open it to resolve them."
+                : "Open it to continue."
+            post(session, title: "\(session.displayName): \(operation) stopped", body: body)
         case .done where before == .working && settings.notifyDone:
             post(session, title: "\(session.displayName) is done", body: "Check the result or send the next prompt.")
         default:
