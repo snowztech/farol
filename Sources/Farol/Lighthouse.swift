@@ -49,7 +49,7 @@ extension Palette {
     func color(_ activity: Session.Activity) -> NSColor? {
         switch activity {
         case .working: NSColor(working)
-        case .waiting: NSColor(waiting)
+        case .waiting, .stopped: NSColor(waiting)
         case .done: NSColor(done)
         case .idle: nil
         }

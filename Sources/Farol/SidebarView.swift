@@ -109,7 +109,7 @@ private struct SessionRow: View {
                     .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
             }
-            if let branch = session.branch {
+            if let branch = gitLine {
                 Label(branch, systemImage: "arrow.triangle.branch")
                     .labelStyle(BranchLabelStyle())
                     .font(.system(size: 11))
@@ -122,6 +122,14 @@ private struct SessionRow: View {
                     .truncationMode(.head)
             }
         }
+    }
+
+    /// The branch, and what is left to do while git is stopped. In the row's usual gray, since the lamp already asks for you.
+    private var gitLine: String? {
+        guard session.stopped != nil else { return session.branch }
+        let left = session.conflicts == 0 ? "ready to continue"
+            : "\(session.conflicts) \(session.conflicts == 1 ? "conflict" : "conflicts")"
+        return [session.branch, left].compactMap { $0 }.joined(separator: " · ")
     }
 
     private func startEditing() {
@@ -231,7 +239,7 @@ struct Lamp: View {
             switch activity {
             case .idle: Circle().strokeBorder(palette.muted.opacity(0.5), lineWidth: 1.2)
             case .working: Breathing(color: palette.working)
-            case .waiting:
+            case .waiting, .stopped:
                 // A ripple asks for attention, which a working dot never does.
                 if !selected { Ripple(color: palette.waiting) }
                 Circle().fill(palette.waiting)
@@ -248,6 +256,7 @@ struct Lamp: View {
         case .working: "Working"
         case .waiting: "Waiting for your approval or an answer"
         case .done: "Done. Your turn"
+        case .stopped: "Git stopped. Resolve and continue (⌥⌘M)"
         }
     }
 }

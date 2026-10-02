@@ -209,6 +209,12 @@ public final class TerminalView: NSView {
         setFrameSize(frame.size)
     }
 
+    /// Types text in as one paste, like a drop, so an agent's prompt gets it whole and waits for you to press Return.
+    public func pasteText(_ text: String) {
+        guard let surface, !text.isEmpty else { return }
+        ghostty_surface_text(surface, text, UInt(text.utf8.count))
+    }
+
     // MARK: Drops
 
     public override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {

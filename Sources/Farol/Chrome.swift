@@ -5,6 +5,8 @@ import SwiftUI
 final class WindowState: ObservableObject {
     @Published var palette: Palette
     @Published var showingSettings = false
+    /// The three column merge view replaces the terminal while git is stopped on conflicts.
+    @Published var showingMerge = false
     /// The session list under the title is open, from a click or ⌘P.
     @Published var switchingSession = false
     /// Mirrors the sidebar and the files panel, so the top bar can match the columns below it.
@@ -35,6 +37,7 @@ struct Commands {
     let toggleGraph: () -> Void
     let toggleReview: () -> Void
     let toggleSettings: () -> Void
+    let toggleMerge: () -> Void
     let titleBarDoubleClick: () -> Void
 }
 
@@ -43,6 +46,7 @@ struct TopBar: View {
     @ObservedObject var store: SessionStore
     @ObservedObject var updates: UpdateChecker
     @ObservedObject var review: ReviewModel
+    @ObservedObject var merge: MergeModel
     let commands: Commands
 
     var body: some View {
@@ -63,7 +67,9 @@ struct TopBar: View {
             .padding(.horizontal, 120)
             .frame(maxWidth: .infinity)
             .padding(.leading, p.boxed ? 0 : leftPanels)
-            .padding(.trailing, p.boxed ? 0 : state.reviewWidth + state.graphWidth)
+            .padding(.trailing, p.boxed ? 0 : reviewWidth + graphWidth)
+            // On a window too narrow for all of this, only the title gives way. The buttons stay where they are.
+            .frame(minWidth: 0)
 
             HStack(spacing: 2) {
                 // Room for the traffic lights.
@@ -75,8 +81,8 @@ struct TopBar: View {
                 newSessionButton(p)
                 Spacer()
                 if let session = store.selected {
-                    GitButton(session: session, state: state, review: review,
-                              graph: commands.toggleGraph, changes: commands.toggleReview)
+                    GitButton(session: session, state: state, review: review, merge: merge,
+                              graph: commands.toggleGraph, changes: commands.toggleReview, conflicts: commands.toggleMerge)
                 }
                 if let version = updates.available {
                     UpdateBadge(version: version, palette: p, action: updates.install)
@@ -95,8 +101,13 @@ struct TopBar: View {
 
     /// Width of the side panels open on the left, which the title stays clear of.
     private var leftPanels: CGFloat {
-        (state.sidebarVisible ? SidebarView.width : 0) + (state.filesVisible ? FilesPanel.width : 0)
+        (state.sidebarVisible ? SidebarView.width : 0) + (filesVisible ? FilesPanel.width : 0)
     }
+
+    // The merge view covers every panel but the sidebar, so the bar is laid out as if they were closed.
+    private var filesVisible: Bool { state.filesVisible && !state.showingMerge }
+    private var reviewWidth: CGFloat { state.showingMerge ? 0 : state.reviewWidth }
+    private var graphWidth: CGFloat { state.showingMerge ? 0 : state.graphWidth }
 
     /// Every panel runs up into the bar in its own color, like Mac apps with a sidebar, and the terminal's part matches the terminal.
     @ViewBuilder private func columns(_ p: Palette) -> some View {
@@ -112,13 +123,13 @@ struct TopBar: View {
         HStack(spacing: 0) {
             Rectangle().fill(p.surface).frame(width: state.sidebarVisible ? SidebarView.width - 1 : 0)
             Rectangle().fill(p.line).frame(width: state.sidebarVisible ? 1 : 0)
-            Rectangle().fill(p.surface).frame(width: state.filesVisible ? FilesPanel.width - 1 : 0)
-            Rectangle().fill(p.line).frame(width: state.filesVisible ? 1 : 0)
+            Rectangle().fill(p.surface).frame(width: filesVisible ? FilesPanel.width - 1 : 0)
+            Rectangle().fill(p.line).frame(width: filesVisible ? 1 : 0)
             Rectangle().fill(p.background)
-            Rectangle().fill(p.line).frame(width: state.reviewWidth > 0 ? 1 : 0)
-            Rectangle().fill(p.background).frame(width: max(state.reviewWidth - 1, 0))
-            Rectangle().fill(p.line).frame(width: state.graphWidth > 0 ? 1 : 0)
-            Rectangle().fill(p.surface).frame(width: max(state.graphWidth - 1, 0))
+            Rectangle().fill(p.line).frame(width: reviewWidth > 0 ? 1 : 0)
+            Rectangle().fill(p.background).frame(width: max(reviewWidth - 1, 0))
+            Rectangle().fill(p.line).frame(width: graphWidth > 0 ? 1 : 0)
+            Rectangle().fill(p.surface).frame(width: max(graphWidth - 1, 0))
         }
     }
 
@@ -154,22 +165,35 @@ private struct UpdateBadge: View {
 
 /// "⛬ +821 −61": the graph icon opens the graph, the counts open the review.
 /// Only in a git repo, or while a panel is open so it can still be closed. The counts, and the pill around both, only when there are changes.
+/// While git is stopped on a merge or a rebase, "3 conflicts" comes first and opens the three column view.
 private struct GitButton: View {
     @ObservedObject var session: Session
     @ObservedObject var state: WindowState
     @ObservedObject var review: ReviewModel
+    @ObservedObject var merge: MergeModel
     let graph: () -> Void
     let changes: () -> Void
+    let conflicts: () -> Void
 
     var body: some View {
         let p = state.palette
         let counts = !review.stat.isEmpty || review.isOpen
-        if !counts, session.topLevel != nil || state.graphVisible {
+        let stopped = merge.operation != nil
+        if !counts, !stopped, session.topLevel != nil || state.graphVisible {
             // Alone, the icon sits bare like the others in the title bar. A pill around it reads as switched on.
             IconButton(symbol: "point.3.connected.trianglepath.dotted", help: "Git graph (⌥⌘G)", active: state.graphVisible,
                        palette: p, action: graph)
-        } else if counts {
+        } else if counts || stopped {
             HStack(spacing: 0) {
+                if stopped {
+                    Half(active: state.showingMerge, help: "Resolve conflicts (⌥⌘M)", palette: p, action: conflicts) { color in
+                        HStack(spacing: 6) {
+                            Circle().fill(merge.hasConflicts ? p.waiting : p.done).frame(width: 6, height: 6)
+                            Text(conflictLabel).foregroundStyle(color)
+                        }
+                    }
+                    Rectangle().fill(p.line).frame(width: 1, height: 12)
+                }
                 Half(active: state.graphVisible, help: "Git graph (⌥⌘G)", palette: p, action: graph) { color in
                     Image(systemName: "point.3.connected.trianglepath.dotted")
                         .font(.system(size: 11, weight: .regular))
@@ -188,6 +212,11 @@ private struct GitButton: View {
             .overlay(Capsule().strokeBorder(p.line))
             .padding(.trailing, 6)
         }
+    }
+
+    private var conflictLabel: String {
+        let count = merge.conflicts.count
+        return count == 0 ? "Ready to continue" : "\(count) \(count == 1 ? "conflict" : "conflicts")"
     }
 
     /// One clickable side of the pill, lit while hovered or while its panel is open.

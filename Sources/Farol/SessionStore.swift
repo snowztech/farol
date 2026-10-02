@@ -3,8 +3,8 @@ import FarolCore
 import GhosttyTerminal
 
 final class Session: ObservableObject, Identifiable {
-    /// What the sidebar lamp shows.
-    enum Activity { case idle, working, waiting, done }
+    /// What the sidebar lamp shows. Stopped is git, not the agent: a merge or rebase waiting on you, which outranks the rest.
+    enum Activity { case idle, working, waiting, done, stopped }
 
     let id = UUID()
     let panes: PaneContainer
@@ -22,8 +22,14 @@ final class Session: ObservableObject, Identifiable {
     @Published private(set) var repoRoot: String?
     /// The top of the checkout the session is in, a worktree's own folder for worktrees. The files panel starts there.
     @Published private(set) var topLevel: String?
+    /// A merge, rebase, cherry-pick or revert git stopped on in this checkout, often one an agent started.
+    @Published private(set) var stopped: Merge.Operation?
+    /// Files still in conflict while stopped.
+    @Published private(set) var conflicts = 0
     /// Lets the store regroup the sidebar when a session turns out to be in another repo.
     var onRepoChange: (() -> Void)?
+    /// Git stopping or going on changes the activity, which the store reports like an agent's. Gets the activity before.
+    var onGitStateChange: ((Activity) -> Void)?
     /// Set when the session runs in one of Farol's worktrees, even after `cd` into a subfolder.
     let worktree: String?
 
@@ -47,6 +53,7 @@ final class Session: ObservableObject, Identifiable {
     var activity: Activity {
         let live = Set(panes.terminals.map(\.id))
         let statuses = agents.filter { live.contains($0.key) }.values.compactMap(\.status)
+        if stopped != nil { return .stopped }
         if bellRang || statuses.contains(.waiting) { return .waiting }
         if statuses.contains(.working) { return .working }
         if statuses.contains(.done) { return .done }
@@ -73,8 +80,14 @@ final class Session: ObservableObject, Identifiable {
             let branch = Git.branch(of: directory)
             let root = Git.repoRoot(of: directory)
             let topLevel = Git.topLevel(of: directory)
+            let operation = topLevel.flatMap { Merge.operation(in: $0) }
+            let conflicts = topLevel.flatMap { top in operation.map { Merge.conflicts(in: top, $0.kind).count } } ?? 0
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.directory == directory else { return }
+                let before = self.activity
+                if self.stopped != operation { self.stopped = operation }
+                if self.conflicts != conflicts { self.conflicts = conflicts }
+                if self.activity != before { self.onGitStateChange?(before) }
                 self.branch = branch
                 if self.topLevel != topLevel { self.topLevel = topLevel }
                 self.repoName = root.map { URL(fileURLWithPath: $0).lastPathComponent }
@@ -166,6 +179,8 @@ final class SessionStore: ObservableObject {
               let session = sessions.first(where: { $0.panes.terminals.contains { $0.id == pane } }) else { return }
         let before = session.activity
         session.apply(message.event, pane: pane)
+        // An agent's turn can end on a rebase it started and git stopped, so its checkout is looked at again.
+        session.refreshGit()
         // A "done" you are already looking at needs no light.
         if session.id == selectedID && NSApp.isActive { session.acknowledge() }
         report(session, from: before)
@@ -222,6 +237,10 @@ final class SessionStore: ObservableObject {
         }
         panes.onLayoutChange = { [weak self] in self?.save() }
         session.onRepoChange = { [weak self] in self?.objectWillChange.send() }
+        session.onGitStateChange = { [weak self, weak session] before in
+            guard let self, let session else { return }
+            self.report(session, from: before)
+        }
 
         sessions.append(session)
         onSessionCreated?(session)

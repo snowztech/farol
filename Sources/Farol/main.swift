@@ -56,6 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func toggleFiles(_ sender: Any?) { windowController.toggleFiles() }
     @objc func toggleGraph(_ sender: Any?) { windowController.toggleGraph() }
     @objc func toggleReview(_ sender: Any?) { windowController.toggleReview() }
+    @objc func toggleMerge(_ sender: Any?) { windowController.toggleMerge() }
     @objc func reloadConfig(_ sender: Any?) {
         settings.reload()
         windowController.handle(.reloadConfig)
@@ -131,6 +132,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         view.addItem(withTitle: "Toggle Git Graph", action: #selector(toggleGraph), keyEquivalent: "g")
             .keyEquivalentModifierMask = [.command, .option]
         view.addItem(withTitle: "Review Changes", action: #selector(toggleReview), keyEquivalent: "r")
+            .keyEquivalentModifierMask = [.command, .option]
+        view.addItem(withTitle: "Resolve Conflicts", action: #selector(toggleMerge), keyEquivalent: "m")
             .keyEquivalentModifierMask = [.command, .option]
         main.addItem(submenu: view, title: "View")
 

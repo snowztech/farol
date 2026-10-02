@@ -225,6 +225,18 @@
             <li><strong>Git graph:</strong> Press <kbd>⌥⌘G</kbd> to inspect branches and commits, then check out, create, rebase, delete, cherry-pick or revert.</li>
             <li><strong>Ship:</strong> Commit, push and open a pull request on GitHub or GitLab from the review panel.</li>
           </ul>
+
+          <h3>Resolve conflicts</h3>
+          <p>When a merge, rebase, cherry-pick or revert stops on conflicts, the title bar and the session's row show how many, even when an agent started it in the background. Press <kbd>⌥⌘M</kbd> to see the files in three columns: your version, the result and the incoming one.</p>
+          <ul>
+            <li><strong>Decide each change:</strong> the arrow takes a change into the result and the cross leaves it out. A conflict is resolved once both sides are decided. The ↓ and ↑ buttons, or <kbd>⌥↓</kbd> and <kbd>⌥↑</kbd>, go to the next and previous change to decide.</li>
+            <li><strong>Only the differences:</strong> changes only one side made are taken from the start and folded away with unchanged lines. Click a fold to open it.</li>
+            <li><strong>Like last time:</strong> when git's rerere is on and has seen a conflict before, the file shows as already resolved. <strong>Use It</strong> keeps that resolution and <strong>Decide Again</strong> opens both sides. During a rebase, a row above the files shows each commit, replayed or still to come.</li>
+            <li><strong>Edited elsewhere:</strong> if the file changed on disk after git stopped, a bar offers <strong>Use the File on Disk</strong> once no markers are left, or <strong>Start From Git's Versions</strong>. <strong>Ignore Whitespace</strong>, in the ⋯ menu, settles conflicts that only differ in spacing.</li>
+            <li><strong>Edit by hand:</strong> the result is a normal editor, and <kbd>⌘Z</kbd> undoes both typing and decisions.</li>
+            <li><strong>Whole files:</strong> <kbd>⌃⌘←</kbd> fills the result with your side and <kbd>⌃⌘→</kbd> with the incoming one, which you can still edit or undo before <strong>Mark Resolved</strong>. For a file deleted on one side, that means keeping or deleting it, and each option shows the file it leaves before you apply it.</li>
+            <li><strong>Finish:</strong> <kbd>⌘S</kbd> marks the file resolved, and <strong>Reopen</strong> puts it back in conflict until you continue. Once every file is, run the tests or ask the agent to check, then continue, skip or abort. Continuing a merge, cherry-pick or revert asks for the commit message, starting from the one git prepared. A rebase keeps each commit's message unless you choose <strong>Edit Message</strong>. <kbd>Esc</kbd> goes back to the terminal.</li>
+          </ul>
           <img class="doc-shot" src="screenshot-review.png" width="2400" height="1520" alt="Farol showing agent sessions, a terminal and the review panel with the branch changes">
         </section>
 
@@ -261,6 +273,11 @@ font-size = 14</code></pre>
               <tr><td>Toggle files</td><td><kbd>⇧⌘E</kbd></td></tr>
               <tr><td>Review changes</td><td><kbd>⌥⌘R</kbd></td></tr>
               <tr><td>Git graph</td><td><kbd>⌥⌘G</kbd></td></tr>
+              <tr><td>Resolve conflicts</td><td><kbd>⌥⌘M</kbd></td></tr>
+              <tr><td>Next or previous change to decide</td><td><kbd>⌥↓</kbd> or <kbd>⌥↑</kbd></td></tr>
+              <tr><td>Mark the file resolved</td><td><kbd>⌘S</kbd></td></tr>
+              <tr><td>Accept yours or the incoming side, for the whole file</td><td><kbd>⌃⌘←</kbd> or <kbd>⌃⌘→</kbd></td></tr>
+              <tr><td>Continue once every file is resolved</td><td><kbd>⌘↩</kbd></td></tr>
               <tr><td>Find in the focused pane</td><td><kbd>⌘F</kbd></td></tr>
               <tr><td>Settings</td><td><kbd>⌘,</kbd></td></tr>
             </tbody>
