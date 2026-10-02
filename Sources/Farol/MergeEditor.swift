@@ -33,7 +33,7 @@ struct MergeColors: Equatable {
 final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
     static let rowHeight: CGFloat = 20
     /// Between a side and the result, as in IntelliJ: the side's buttons and line numbers on its band, then the wave.
-    private static let waveWidth: CGFloat = 46
+    private static let waveWidth: CGFloat = 30
     static let buttonsWidth: CGFloat = 44
     private static var gutterWidth: CGFloat { buttonsWidth + MergeNumbers.width + waveWidth }
     /// Unchanged lines kept around each change, like a diff.
@@ -384,7 +384,7 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
                     }
                     hiddenCenter += lineCount(resolution.texts[unit])
                 }
-                let changes = autos == 0 ? "" : ", \(autos) \(autos == 1 ? "change" : "changes") merged automatically"
+                let changes = autos == 0 ? "" : ", \(autos) merged automatically"
                 sideFolds.mine.append((append("⋯ \(hiddenMine) lines\n", to: mineText, foldAttributes), position))
                 sideFolds.other.append((append("⋯ \(hiddenOther) lines\n", to: otherText, foldAttributes), position))
                 let range = append("⋯ \(hiddenCenter) lines\(changes)\n", to: centerText, foldAttributes)
@@ -1250,7 +1250,6 @@ final class MergeGutter: NSView {
             : NSRect(x: bounds.width - MergeEditor.buttonsWidth, y: top, width: MergeEditor.buttonsWidth, height: size)
         let decision = editor?.decisions[index]
         let tint = editor?.band(for: .waiting, mine: mine).edge.withAlphaComponent(1) ?? .labelColor
-        let red = editor?.band(for: .dropped, mine: mine).edge.withAlphaComponent(1) ?? .systemRed
         let muted = NSColor.secondaryLabelColor
         let middle = NSRect(x: area.midX - size / 2, y: top, width: size, height: size)
         if decision?.edited == true {
@@ -1262,7 +1261,7 @@ final class MergeGutter: NSView {
             let first = NSRect(x: area.minX + 3, y: top, width: size, height: size)
             let second = NSRect(x: area.maxX - size - 3, y: top, width: size, height: size)
             let (cross, arrow) = mine ? (first, second) : (second, first)
-            draw("✕", in: cross, color: red)
+            draw("✕", in: cross, color: muted)
             draw(mine ? "»" : "«", in: arrow, color: tint)
             buttons.append((cross, index, false))
             buttons.append((arrow, index, true))

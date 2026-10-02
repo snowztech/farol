@@ -127,6 +127,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             askAgent: { [weak self] in self?.askAgent($0) }))
         mergeView.isHidden = true
         mergeView.wantsLayer = true
+        mergeView.clipsToBounds = true
 
         content.wantsLayer = true
         for v in [topBar, sidebar, filesPanel, graphPanel, content, reviewPanel] { root.addSubview(v) }

@@ -172,11 +172,11 @@ private struct ConflictButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 5) {
-                Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 9.5))
+            HStack(spacing: 6) {
+                Circle().fill(merge.hasConflicts ? palette.waiting : palette.done).frame(width: 6, height: 6)
                 Text(label).font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(active ? palette.accent : hovering ? palette.text : palette.muted)
             }
-            .foregroundStyle(merge.hasConflicts ? palette.waiting : palette.done)
             .padding(.horizontal, 8)
             .frame(height: 20)
             .background(Capsule().fill(hovering || active ? palette.raised : palette.raised.opacity(0.6)))

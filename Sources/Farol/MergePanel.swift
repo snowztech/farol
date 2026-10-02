@@ -171,13 +171,16 @@ struct MergePanel: View {
                 message("Git isn't stopped on a merge or a rebase here.", p)
             } else {
                 HStack(spacing: 0) {
-                    fileList(p).frame(width: 230)
-                    Rectangle().fill(p.line).frame(width: 1)
+                    if listsFiles {
+                        fileList(p).frame(width: 200)
+                        Rectangle().fill(p.line).frame(width: 1)
+                    }
                     content(p).frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // A view wider than its window is centered and spills on both sides. This one can shrink, and stays put on the left.
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
         .background(p.background)
         .sheet(isPresented: $writing) {
             ContinueSheet(merge: merge, palette: p, message: $commitMessage) {
@@ -207,10 +210,10 @@ struct MergePanel: View {
                 if [.rebase, .am].contains(operation.kind), !merge.hasConflicts {
                     PanelButton(title: "Edit Message…", palette: p) { writeMessage() }.disabled(merge.isBusy)
                 }
-                PanelButton(title: merge.hasConflicts ? "Continue · \(merge.conflicts.count) left" : continueTitle + " ⌘↩",
-                            primary: !merge.hasConflicts, palette: p) { proceed() }
+                PanelButton(title: continueTitle, primary: !merge.hasConflicts, palette: p) { proceed() }
                     .keyboardShortcut(.return, modifiers: .command)
                     .disabled(merge.hasConflicts || merge.isBusy)
+                    .hoverTip(merge.hasConflicts ? "Resolve every file first" : "Continue (⌘↩)")
             }
             CloseButton(help: "Back to the terminal (esc)", palette: p, action: close)
         }
@@ -248,7 +251,8 @@ struct MergePanel: View {
         guard let operation = merge.operation else { return nil }
         let step = operation.step.flatMap { step in operation.total.map { "commit \(step) of \($0)" } }
         let subject = operation.subject.map { "\u{201C}\($0)\u{201D}" }
-        let parts = [step, subject].compactMap { $0 }
+        let file = listsFiles ? nil : merge.selected.map { ($0 as NSString).lastPathComponent }
+        let parts = [file, step, subject].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
@@ -266,6 +270,9 @@ struct MergePanel: View {
     }
 
     // MARK: Files
+
+    /// With a single file there is nothing to pick, so the columns get the list's room and the header names the file.
+    private var listsFiles: Bool { Set(merge.conflicts.map(\.path)).union(merge.resolved).count > 1 }
 
     private func fileList(_ p: Palette) -> some View {
         ScrollView {
@@ -346,9 +353,9 @@ struct MergePanel: View {
                     if reused {
                         PanelButton(title: "Decide Again", palette: p) { controller.decideAgain(merge) }
                             .hoverTip("Open both sides in the three columns, as git first saw them")
-                        PanelButton(title: "Use It ⌘S", primary: true, palette: p) { merge.useReused(path, failed: showGitError) }
+                        PanelButton(title: "Use It", primary: true, palette: p) { merge.useReused(path, failed: showGitError) }
                             .disabled(merge.isBusy)
-                            .hoverTip("Git's rerere remembered how you resolved this conflict before. Mark the file resolved this way.")
+                            .hoverTip("Git's rerere remembered how you resolved this conflict before. Mark the file resolved this way (⌘S).")
                     } else {
                         PanelButton(title: "Reopen", palette: p) { merge.reopen(path, failed: showGitError) }
                             .disabled(merge.isBusy)
@@ -554,7 +561,7 @@ struct MergePanel: View {
             ZStack(alignment: .leading) {
                 label(merge.operation?.mine ?? "", "yours", p.working, p)
                     .frame(width: starts.column, alignment: .leading).offset(x: starts.mine)
-                label("Result", "editable", p.done, p)
+                label("Result", "editable", nil, p)
                     .frame(width: starts.column, alignment: .leading).offset(x: starts.center + MergeNumbers.width)
                 label(merge.operation?.other ?? "", "incoming", Color(nsColor: p.code.keyword), p)
                     .frame(width: starts.column, alignment: .leading).offset(x: starts.other)
@@ -564,65 +571,86 @@ struct MergePanel: View {
         .frame(height: 30)
     }
 
-    private func label(_ name: String, _ role: String, _ color: Color, _ p: Palette) -> some View {
+    /// The dot is the color of the side's bands in the code below.
+    private func label(_ name: String, _ role: String, _ color: Color?, _ p: Palette) -> some View {
         HStack(spacing: 6) {
-            Text(name).font(.system(size: 12, weight: .medium)).foregroundStyle(color).lineLimit(1)
-            Text(role).font(.system(size: 11)).foregroundStyle(p.muted)
+            if let color { Circle().fill(color).frame(width: 6, height: 6) }
+            Text(name).font(.system(size: 12, weight: .medium)).lineLimit(1)
+            Text(role).font(.system(size: 11)).foregroundStyle(p.muted).lineLimit(1)
         }
         .padding(.leading, 10)
     }
 
     private func footer(_ p: Palette) -> some View {
-        HStack(spacing: 12) {
-            // The buttons keep their full titles. On a narrow window the count of automatic changes goes first.
-            ViewThatFits(in: .horizontal) {
-                footerInfo(p, automatic: true)
-                footerInfo(p, automatic: false)
-            }
-            Spacer(minLength: 8)
-            PanelButton(title: "Accept Yours ⌃⌘←", palette: p) { controller.editor.acceptAll(mine: true) }
-                .keyboardShortcut(.leftArrow, modifiers: [.control, .command])
-                .fixedSize()
-            PanelButton(title: "Accept Incoming ⌃⌘→", palette: p) { controller.editor.acceptAll(mine: false) }
-                .keyboardShortcut(.rightArrow, modifiers: [.control, .command])
-                .fixedSize()
-            PanelButton(title: "Mark Resolved ⌘S", primary: controller.openDecisions == 0, palette: p) {
-                controller.markResolved(merge)
-            }
-            .disabled(controller.openDecisions > 0 || merge.isBusy)
-            .fixedSize()
+        // On a narrow window the two whole-file buttons go first. They stay in the menu and on their shortcuts.
+        ViewThatFits(in: .horizontal) {
+            footerRow(p, wholeFile: true)
+            footerRow(p, wholeFile: false)
         }
         .font(.system(size: 12))
         .padding(.horizontal, 12)
         .frame(height: 38)
+        .background {
+            Group {
+                Button("") { controller.editor.acceptAll(mine: true) }
+                    .keyboardShortcut(.leftArrow, modifiers: [.control, .command])
+                Button("") { controller.editor.acceptAll(mine: false) }
+                    .keyboardShortcut(.rightArrow, modifiers: [.control, .command])
+            }
+            .opacity(0)
+        }
     }
 
-    private func footerInfo(_ p: Palette, automatic: Bool) -> some View {
-        HStack(spacing: 12) {
-            if controller.openDecisions > 0 {
-                Text("\(controller.openDecisions) \(controller.openDecisions == 1 ? "decision" : "decisions") left")
-                    .foregroundStyle(p.waiting)
-            } else {
-                Text("Everything decided").foregroundStyle(p.done)
+    private func footerRow(_ p: Palette, wholeFile: Bool) -> some View {
+        let left = controller.openDecisions
+        return HStack(spacing: 6) {
+            Text(left == 0 ? "Everything decided" : "\(left) \(left == 1 ? "decision" : "decisions") left")
+                .foregroundStyle(p.muted)
+                .lineLimit(1)
+                .padding(.trailing, 4)
+            Group {
+                IconButton(symbol: "chevron.up", help: "Previous change to decide (⌥↑)", palette: p) {
+                    controller.editor.jump(forward: false)
+                }
+                IconButton(symbol: "chevron.down", help: "Next change to decide (⌥↓)", palette: p) {
+                    controller.editor.jump(forward: true)
+                }
             }
-            HStack(spacing: 4) {
-                PanelButton(title: "↑", palette: p) { controller.editor.jump(forward: false) }
-                    .hoverTip("Previous change to decide (⌥↑)")
-                PanelButton(title: "↓", palette: p) { controller.editor.jump(forward: true) }
-                    .hoverTip("Next change to decide (⌥↓)")
+            .disabled(left == 0)
+            .opacity(left == 0 ? 0.45 : 1)
+            Spacer(minLength: 8)
+            if wholeFile {
+                PanelButton(title: "Accept Yours", palette: p) { controller.editor.acceptAll(mine: true) }
+                    .hoverTip("Fill the result with your side (⌃⌘←)")
+                PanelButton(title: "Accept Incoming", palette: p) { controller.editor.acceptAll(mine: false) }
+                    .hoverTip("Fill the result with the incoming side (⌃⌘→)")
             }
-            .disabled(controller.openDecisions == 0)
-            if automatic, controller.autoCount > 0 {
-                Text("\(controller.autoCount) \(controller.autoCount == 1 ? "change" : "changes") merged automatically")
-                    .foregroundStyle(p.muted)
-            }
-            PanelButton(title: controller.showAll ? "Only Differences" : "Show All Lines", palette: p) { controller.showAll.toggle() }
-            Toggle("Ignore Whitespace", isOn: $merge.ignoreWhitespace)
-                .toggleStyle(.checkbox)
-                .hoverTip("Settle conflicts where a side only changed spacing or indentation. Your decisions are kept.")
+            IconButton(symbol: "ellipsis", help: "More", active: controller.showAll || merge.ignoreWhitespace, palette: p,
+                       action: showOptions)
+            PanelButton(title: "Mark Resolved", primary: left == 0, palette: p) { controller.markResolved(merge) }
+                .disabled(left > 0 || merge.isBusy)
+                .hoverTip(left > 0 ? "Decide every change first" : "Mark the file resolved (⌘S)")
         }
-        .lineLimit(1)
-        .fixedSize()
+    }
+
+    private func showOptions() {
+        let menu = NSMenu()
+        func add(_ title: String, on: Bool = false, arrow: Int? = nil, _ run: @escaping () -> Void) {
+            let item = ActionMenuItem(title: title, handler: run)
+            item.state = on ? .on : .off
+            if let arrow, let key = UnicodeScalar(arrow) {
+                item.keyEquivalent = String(key)
+                item.keyEquivalentModifierMask = [.control, .command]
+            }
+            menu.addItem(item)
+        }
+        add("Accept Yours for the Whole File", arrow: NSLeftArrowFunctionKey) { controller.editor.acceptAll(mine: true) }
+        add("Accept Incoming for the Whole File", arrow: NSRightArrowFunctionKey) { controller.editor.acceptAll(mine: false) }
+        menu.addItem(.separator())
+        add("Show All Lines", on: controller.showAll) { controller.showAll.toggle() }
+        // Settles conflicts where a side only changed spacing or indentation. Decisions are kept.
+        add("Ignore Whitespace", on: merge.ignoreWhitespace) { merge.ignoreWhitespace.toggle() }
+        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
     }
 
     private func choice(_ status: Merge.Conflict.Status, binary: Bool, _ p: Palette) -> some View {
@@ -871,6 +899,7 @@ private struct PanelButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .fixedSize()
         .onClickableHover { hovering = $0 }
     }
 }
