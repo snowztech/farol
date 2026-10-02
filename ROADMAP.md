@@ -65,6 +65,15 @@ Work comes from a ticket and goes out as a merge request, on the services teams 
 
 Everything talks to your servers directly. Nothing goes through a Farol service.
 
+## Speed and upkeep
+
+Speed is the first rule, and every git feature adds calls. These keep the window quick as they pile up, and make changes safer to make.
+
+- [ ] One git call for a session's state. `git status --porcelain=v2 --branch` gives the branch, what is left to push, and the changed and untracked files together. Today a refresh runs about a dozen git commands one after another, and each session runs a few more at every prompt
+- [ ] One refresh per event. Opening a commit with the review panel closed starts two
+- [ ] The review panel's state in `FarolCore`, where it has tests. It lives in the window code today, so its scope and refresh order are checked by hand
+- [ ] Timing for git refreshes: each one logs how long it took, so a slow one can be found and measured
+
 ## Hardening
 
 - [ ] Checksum for the prebuilt libghostty, checked before every release
