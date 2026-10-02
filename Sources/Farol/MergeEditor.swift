@@ -892,7 +892,9 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
             let from1 = k + 1 < anchors.count ? value(anchors[k + 1], column) : from0 + 1
             let to1 = k + 1 < anchors.count ? value(anchors[k + 1], index) : to0 + 1
             let fraction = from1 > from0 ? (y - from0) / (from1 - from0) : 0
-            let targetY = max(0, to0 + (to1 - to0) * min(max(fraction, 0), 1))
+            // Above the first block, as in the margin at the top, the columns move together line for line.
+            let mapped = y < from0 && k == 0 ? to0 + (y - from0) : to0 + (to1 - to0) * min(max(fraction, 0), 1)
+            let targetY = max(0, mapped)
             target.scroll.contentView.scroll(to: NSPoint(x: target.scroll.contentView.bounds.minX, y: targetY))
             target.scroll.reflectScrolledClipView(target.scroll.contentView)
         }

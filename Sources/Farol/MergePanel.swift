@@ -569,13 +569,39 @@ struct MergePanel: View {
 
     private func footer(_ p: Palette) -> some View {
         HStack(spacing: 12) {
+            // The buttons keep their full titles. On a narrow window the hints go first, then the count of automatic changes.
+            ViewThatFits(in: .horizontal) {
+                footerInfo(p, automatic: true, hint: true)
+                footerInfo(p, automatic: true, hint: false)
+                footerInfo(p, automatic: false, hint: false)
+            }
+            Spacer(minLength: 8)
+            PanelButton(title: "Accept Yours ⌃⌘←", palette: p) { controller.editor.acceptAll(mine: true) }
+                .keyboardShortcut(.leftArrow, modifiers: [.control, .command])
+                .fixedSize()
+            PanelButton(title: "Accept Incoming ⌃⌘→", palette: p) { controller.editor.acceptAll(mine: false) }
+                .keyboardShortcut(.rightArrow, modifiers: [.control, .command])
+                .fixedSize()
+            PanelButton(title: "Mark Resolved ⌘S", primary: controller.openDecisions == 0, palette: p) {
+                controller.markResolved(merge)
+            }
+            .disabled(controller.openDecisions > 0 || merge.isBusy)
+            .fixedSize()
+        }
+        .font(.system(size: 12))
+        .padding(.horizontal, 12)
+        .frame(height: 38)
+    }
+
+    private func footerInfo(_ p: Palette, automatic: Bool, hint: Bool) -> some View {
+        HStack(spacing: 12) {
             if controller.openDecisions > 0 {
                 Text("\(controller.openDecisions) \(controller.openDecisions == 1 ? "decision" : "decisions") left")
                     .foregroundStyle(p.waiting)
             } else {
                 Text("Everything decided").foregroundStyle(p.done)
             }
-            if controller.autoCount > 0 {
+            if automatic, controller.autoCount > 0 {
                 Text("\(controller.autoCount) \(controller.autoCount == 1 ? "change" : "changes") merged automatically")
                     .foregroundStyle(p.muted)
             }
@@ -583,20 +609,10 @@ struct MergePanel: View {
             Toggle("Ignore Whitespace", isOn: $merge.ignoreWhitespace)
                 .toggleStyle(.checkbox)
                 .hoverTip("Settle conflicts where a side only changed spacing or indentation. Your decisions are kept.")
-            Text("⌥↓ next to decide").foregroundStyle(p.muted)
-            Spacer()
-            PanelButton(title: "Accept Yours ⌃⌘←", palette: p) { controller.editor.acceptAll(mine: true) }
-                .keyboardShortcut(.leftArrow, modifiers: [.control, .command])
-            PanelButton(title: "Accept Incoming ⌃⌘→", palette: p) { controller.editor.acceptAll(mine: false) }
-                .keyboardShortcut(.rightArrow, modifiers: [.control, .command])
-            PanelButton(title: "Mark Resolved ⌘S", primary: controller.openDecisions == 0, palette: p) {
-                controller.markResolved(merge)
-            }
-            .disabled(controller.openDecisions > 0 || merge.isBusy)
+            if hint { Text("⌥↓ next to decide").foregroundStyle(p.muted) }
         }
-        .font(.system(size: 12))
-        .padding(.horizontal, 12)
-        .frame(height: 38)
+        .lineLimit(1)
+        .fixedSize()
     }
 
     private func choice(_ status: Merge.Conflict.Status, binary: Bool, _ p: Palette) -> some View {
