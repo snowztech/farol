@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-10-04
+
+Walk the git graph with the arrow keys, and each branch keeps its own color.
+
 ### Added
 
 - With a commit selected in the history, the up and down arrows move to the next one and Return opens its changes.
@@ -577,7 +581,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.28.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.29.0...HEAD
+[0.29.0]: https://github.com/snowztech/farol/releases/tag/v0.29.0
 [0.28.0]: https://github.com/snowztech/farol/releases/tag/v0.28.0
 [0.27.0]: https://github.com/snowztech/farol/releases/tag/v0.27.0
 [0.26.1]: https://github.com/snowztech/farol/releases/tag/v0.26.1
