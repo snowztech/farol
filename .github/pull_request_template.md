@@ -1,8 +1,12 @@
 <!-- A reviewer should get this in 20 seconds. Delete what doesn't apply. -->
 
-## What and why
+## What
 
-<!-- Two sentences at most: what changes for the user, then the problem it solves. Link the issue if there is one. -->
+<!-- One sentence: what changes for the user. -->
+
+## Why
+
+<!-- One sentence: the problem it solves. Link the issue if there is one. -->
 
 ## Worth knowing
 
