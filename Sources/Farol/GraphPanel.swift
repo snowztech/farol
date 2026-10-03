@@ -244,7 +244,12 @@ struct GraphPanel: View {
                                       highlighted: graph.hoveredBranch.map(row.commit.points) ?? false,
                                       palette: p, current: graph.current, upstreams: graph.upstreams,
                                       hover: { inside in
-                                          if inside { graph.hoveredCommit = row.commit } else if graph.hoveredCommit?.hash == row.commit.hash { graph.hoveredCommit = nil }
+                                          // Most commits have no branch on them, and each change here redraws the panel, so those are left out.
+                                          if inside, !row.commit.refs.isEmpty {
+                                              graph.hoveredCommit = row.commit
+                                          } else if graph.hoveredCommit?.hash == row.commit.hash {
+                                              graph.hoveredCommit = nil
+                                          }
                                       },
                                       select: { graph.select(row.commit) },
                                       review: {
