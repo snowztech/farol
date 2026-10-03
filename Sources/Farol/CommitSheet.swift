@@ -350,13 +350,15 @@ private struct CommitSheet: View {
                 changes(p)
                 // Return confirms. Option-Return adds a line, for a body under the subject.
                 VStack(alignment: .leading, spacing: 6) {
-                    TextField("Commit message", text: $message, axis: .vertical)
+                    TextField(generating == nil ? "Commit message" : "\(chosenAgent?.label ?? "The agent") is writing…",
+                              text: $message, axis: .vertical)
                         .textFieldStyle(.plain)
                         .lineLimit(3...8)
                         .focused($typing)
                         // Room under the text for the button in the corner, so a long message never runs under it.
                         .padding(.bottom, chosenAgent == nil ? 0 : 16)
-                        .opacity(generating == nil ? 1 : 0.45)
+                        // Only a message being replaced dims. The empty field says who is writing, and that should read.
+                        .opacity(generating == nil || message.isEmpty ? 1 : 0.45)
                         .disabled(generating != nil)
                         .sheetField(p, focused: typing)
                         .overlay(alignment: .bottomTrailing) {
