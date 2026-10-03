@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- In a narrow git graph the commit subject stays readable: the author goes first, then the hash, and the row is no longer cut at both ends.
+
 ## [0.28.0] - 2026-10-03
 
 Let Claude Code or Codex write the commit message.
