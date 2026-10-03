@@ -1,4 +1,4 @@
-<!-- A reviewer should get this in 20 seconds. No paragraphs. Delete what doesn't apply. -->
+<!-- A reviewer should get this in 20 seconds. Delete what doesn't apply. -->
 
 ## What and why
 
