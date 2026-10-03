@@ -8,6 +8,14 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - Hovering a commit in the history lights up the branches pointing to it in the branch list, like hovering a branch already lit up its commit.
 
+## [0.28.0] - 2026-10-03
+
+Let Claude Code or Codex write the commit message.
+
+### Added
+
+- The commit sheet can have Claude Code or Codex write the message from the files you ticked. The arrow next to the button picks the agent or account, and Restore puts back what you had typed.
+
 ### Changed
 
 - Branches, change counts and shortcuts are set in a monospaced font, so what comes from git or the keyboard reads apart from names.
@@ -564,7 +572,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.27.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.28.0...HEAD
+[0.28.0]: https://github.com/snowztech/farol/releases/tag/v0.28.0
 [0.27.0]: https://github.com/snowztech/farol/releases/tag/v0.27.0
 [0.26.1]: https://github.com/snowztech/farol/releases/tag/v0.26.1
 [0.26.0]: https://github.com/snowztech/farol/releases/tag/v0.26.0
