@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- With a commit selected in the history, the up and down arrows move to the next one and Return opens its changes.
+
 ### Fixed
 
 - In a narrow git graph the commit subject stays readable: the author goes first, then the hash, and the row is no longer cut at both ends.

@@ -212,6 +212,8 @@ struct GraphPanel: View {
     @State private var dragStart: CGFloat?
     /// One search for both lists: branches by name, commits by message, author, hash or branch.
     @State private var query = ""
+    /// Set once a commit is clicked, so the arrow keys go to the history.
+    @FocusState private var walking: Bool
 
     var body: some View {
         let p = state.palette
@@ -229,44 +231,62 @@ struct GraphPanel: View {
                 let lanes = min(graph.rows.map(\.width).max() ?? 1, CommitRow.maxLanes)
                 let rows = matchingRows
                 GeometryReader { geometry in
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            if rows.isEmpty {
-                                Text("No commit matches.")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(p.muted)
-                                    .frame(maxWidth: .infinity, minHeight: 40)
-                            }
-                            ForEach(rows, id: \.commit.hash) { row in
-                                // Lines between commits that aren't neighbors anymore would mislead, so a search shows the dots only.
-                                CommitRow(row: row, lanes: lanes, width: geometry.size.width - 12,
-                                          showsLines: searchText.isEmpty, selected: row.commit.hash == graph.selected?.hash,
-                                          highlighted: graph.hoveredBranch.map(row.commit.points) ?? false,
-                                          palette: p, current: graph.current, upstreams: graph.upstreams, select: { graph.select(row.commit) },
-                                          review: {
-                                              // Keeps the files pane on this commit too, instead of toggling it off.
-                                              if graph.selected?.hash != row.commit.hash { graph.select(row.commit) }
-                                              graph.onShowInReview?(row.commit, nil)
-                                          },
-                                          cherryPick: { graph.cherryPick(row.commit, failed: gitError("Cherry-pick stopped")) },
-                                          revert: { revert(row.commit) },
-                                          rebase: { rebase(onto: row.commit) },
-                                          rebaseInteractively: {
-                                              graph.rebase(onto: row.commit.hash, interactive: true, failed: gitError("Couldn't rebase"))
-                                          },
-                                          newBranch: {
-                                              askBranchName(from: row.commit.shortHash, suggested: "") { name in
-                                                  graph.createBranch(name, from: row.commit.hash, failed: gitError("Couldn't create the branch"))
-                                              }
-                                          }) {
-                                    graph.checkout(row.commit, failed: gitError("Couldn't check out"))
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            LazyVStack(spacing: 0) {
+                                if rows.isEmpty {
+                                    Text("No commit matches.")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(p.muted)
+                                        .frame(maxWidth: .infinity, minHeight: 40)
+                                }
+                                ForEach(rows, id: \.commit.hash) { row in
+                                    // Lines between commits that aren't neighbors anymore would mislead, so a search shows the dots only.
+                                    CommitRow(row: row, lanes: lanes, width: geometry.size.width - 12,
+                                              showsLines: searchText.isEmpty, selected: row.commit.hash == graph.selected?.hash,
+                                              highlighted: graph.hoveredBranch.map(row.commit.points) ?? false,
+                                              palette: p, current: graph.current, upstreams: graph.upstreams,
+                                              select: {
+                                                  graph.select(row.commit)
+                                                  walking = true
+                                              },
+                                              review: {
+                                                  // Keeps the files pane on this commit too, instead of toggling it off.
+                                                  if graph.selected?.hash != row.commit.hash { graph.select(row.commit) }
+                                                  graph.onShowInReview?(row.commit, nil)
+                                              },
+                                              cherryPick: { graph.cherryPick(row.commit, failed: gitError("Cherry-pick stopped")) },
+                                              revert: { revert(row.commit) },
+                                              rebase: { rebase(onto: row.commit) },
+                                              rebaseInteractively: {
+                                                  graph.rebase(onto: row.commit.hash, interactive: true, failed: gitError("Couldn't rebase"))
+                                              },
+                                              newBranch: {
+                                                  askBranchName(from: row.commit.shortHash, suggested: "") { name in
+                                                      graph.createBranch(name, from: row.commit.hash, failed: gitError("Couldn't create the branch"))
+                                                  }
+                                              }) {
+                                        graph.checkout(row.commit, failed: gitError("Couldn't check out"))
+                                    }
                                 }
                             }
+                            .padding(.horizontal, 6)
+                            .padding(.bottom, 4)
                         }
-                        .padding(.horizontal, 6)
-                        .padding(.bottom, 4)
+                        .scrollIndicators(.hidden)
+                        // Arrows walk the history from the selected commit, and Return opens its changes.
+                        // Takes the keyboard like a text field does, on a click, so the terminal keeps it until then.
+                        .focusable(interactions: .edit)
+                        .focusEffectDisabled()
+                        .focused($walking)
+                        .onKeyPress(.downArrow) { move(1, in: rows, proxy) }
+                        .onKeyPress(.upArrow) { move(-1, in: rows, proxy) }
+                        .onKeyPress(.return) {
+                            guard let commit = graph.selected else { return .ignored }
+                            graph.onShowInReview?(commit, nil)
+                            return .handled
+                        }
                     }
-                    .scrollIndicators(.hidden)
                 }
                 if let commit = graph.selected {
                     Rectangle().fill(p.line).frame(height: 1)
@@ -301,6 +321,16 @@ struct GraphPanel: View {
     }
 
     private var searchText: String { query.trimmingCharacters(in: .whitespaces) }
+
+    /// Selects the commit above or below the selected one and keeps it in view.
+    private func move(_ step: Int, in rows: [History.Row], _ proxy: ScrollViewProxy) -> KeyPress.Result {
+        guard let index = rows.firstIndex(where: { $0.commit.hash == graph.selected?.hash }),
+              rows.indices.contains(index + step) else { return .ignored }
+        let commit = rows[index + step].commit
+        graph.select(commit)
+        proxy.scrollTo(commit.hash)
+        return .handled
+    }
 
     private var matchingRows: [History.Row] {
         let text = searchText
