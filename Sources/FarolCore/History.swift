@@ -309,8 +309,9 @@ public enum History {
                     color = 0
                     owner = trunk
                 }
-            } else if let current = owner, !branches.isEmpty, !branches.contains(where: { sameBranch($0, current) }) {
+            } else if let current = owner, !isTrunk(current), !branches.isEmpty, !branches.contains(where: { sameBranch($0, current) }) {
                 // A branch started from another one's last commit shares its line, so the line changes color where the other one begins.
+                // Not on main's line: a branch left behind there, like a task with no commit yet, would take main's history with it.
                 color = newColor()
                 owner = nil
             }
@@ -375,6 +376,8 @@ public enum History {
         return rows
     }
 
+    // ponytail: goes by the end of the name, so a local feat/main reads as main's copy on a remote called feat.
+    // Telling them apart needs the remotes' names passed in.
     private static func isTrunk(_ branch: String) -> Bool {
         ["main", "master"].contains { branch == $0 || branch.hasSuffix("/" + $0) }
     }

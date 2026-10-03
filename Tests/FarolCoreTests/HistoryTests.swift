@@ -81,6 +81,13 @@ private func edges(_ pairs: (Int, Int)...) -> [History.Edge] {
     #expect(rows.map(\.color) == [1, 0, 0])
 }
 
+@Test func mainStaysBlueBelowABranchLeftBehindOnItsLine() {
+    // task has no commit of its own yet and main moved on, so task sits on main's line.
+    let rows = History.graph([commit("m2", ["m1"], refs: ["HEAD -> main", "origin/main"]), commit("m1", ["m0"], refs: ["task"]),
+                              commit("m0", [], refs: [])])
+    #expect(rows.map(\.color) == [0, 0, 0])
+}
+
 @Test func twoTipsJoinAtTheirParent() {
     let rows = History.graph([commit("x", "a"), commit("y", "a"), commit("a")])
     #expect(rows.map(\.column) == [0, 1, 0])

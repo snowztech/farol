@@ -7,6 +7,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Fixed
 
 - In a narrow git graph the commit subject stays readable: the author goes first, then the hash, and the row is no longer cut at both ends.
+- A branch started from another one's last commit gets its own color in the history, instead of taking the color of the branch it started from. main is always blue.
 
 ## [0.28.0] - 2026-10-03
 
@@ -28,7 +29,6 @@ Let Claude Code or Codex write the commit message.
 
 - The change counts in the title bar no longer wait for what only the review panel needs, so they show sooner after you switch sessions.
 - A commit opened from the git graph shows its diff sooner. The panel used to read your own counts and push state first.
-- A branch started from another one's last commit gets its own color in the history, instead of taking the color of the branch it started from. main is always blue.
 
 ## [0.27.0] - 2026-10-02
 
