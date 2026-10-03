@@ -6,7 +6,7 @@ public enum CommitMessage {
     static let diffLimit = 60_000
 
     /// Runs `agent` on the diff of `paths`, or of every uncommitted file when nil, and returns its message.
-    /// The agent gets no tools, so it can only answer. Takes seconds, so call it off the main thread.
+    /// The agent gets no tools, hooks or MCP servers, so it can only answer. Takes seconds, so call it off the main thread.
     /// `started` gets the process, to stop it when the sheet closes.
     public static func generate(with agent: AgentFolder, paths: [String]?, in directory: String,
                                 started: (Process) -> Void = { _ in }) throws -> String {
@@ -53,16 +53,19 @@ public enum CommitMessage {
 
     /// Takes off what models add around a message despite being asked not to: a lead-in line, a code block, quotes.
     static func cleaned(_ reply: String) -> String {
+        let blank = { (line: Substring?) in line?.allSatisfy(\.isWhitespace) == true }
+        // Only the end of a line is trimmed, so an indented list in the body keeps its shape.
         var lines = reply.split(separator: "\n", omittingEmptySubsequences: false)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.hasPrefix("```") }
-        while lines.first?.isEmpty == true { lines.removeFirst() }
-        if lines.count > 1, lines[0].hasSuffix(":") { lines.removeFirst() }
-        while lines.first?.isEmpty == true { lines.removeFirst() }
-        while lines.last?.isEmpty == true { lines.removeLast() }
-        var message = lines.joined(separator: "\n")
+            .filter { !$0.drop(while: \.isWhitespace).hasPrefix("```") }
+        while blank(lines.first) { lines.removeFirst() }
+        if lines.count > 1, lines[0].trimmingCharacters(in: .whitespaces).hasSuffix(":") { lines.removeFirst() }
+        while blank(lines.first) { lines.removeFirst() }
+        while blank(lines.last) { lines.removeLast() }
+        var message = lines.joined(separator: "\n").trimmingCharacters(in: .whitespaces)
         for quote in ["\"", "'", "`"] where message.count > 1 && message.hasPrefix(quote) && message.hasSuffix(quote) {
-            message = String(message.dropFirst().dropLast())
+            let inside = message.dropFirst().dropLast()
+            // "`a` replaces `b`" starts and ends with a quote too, and those belong to the message.
+            if !inside.contains(quote) { message = String(inside) }
         }
         return message
     }
@@ -70,7 +73,9 @@ public enum CommitMessage {
     static func arguments(for kind: AgentFolder.Kind) -> [String] {
         switch kind {
         // The prompt comes on stdin. No tools and no saved session: one answer, nothing left behind.
-        case .claude: ["-p", "--tools", "", "--no-session-persistence", "--output-format", "text"]
+        // Hooks and MCP servers are off too, yours and the repo's, while CLAUDE.md is still read.
+        case .claude: ["-p", "--tools", "", "--settings", #"{"disableAllHooks":true}"#, "--strict-mcp-config",
+                       "--no-session-persistence", "--output-format", "text"]
         // ponytail: not tried against a real Codex yet. "-" reads the prompt from stdin, read-only keeps it from editing.
         case .codex: ["exec", "--sandbox", "read-only", "--skip-git-repo-check", "-"]
         }
@@ -90,7 +95,7 @@ public enum CommitMessage {
         return environment
     }
 
-    private static func run(_ executable: String, _ arguments: [String], input: String, environment: [String: String],
+    static func run(_ executable: String, _ arguments: [String], input: String, environment: [String: String],
                             in directory: String, started: (Process) -> Void) throws -> String {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
@@ -103,16 +108,21 @@ public enum CommitMessage {
         process.standardError = stderr
         try process.run()
         started(process)
+        // An agent that quits before reading would otherwise kill the app with SIGPIPE. This way the write just fails.
+        _ = fcntl(stdin.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
         // Written from another thread, so a prompt bigger than the pipe can't wait on output nobody reads yet.
         DispatchQueue.global(qos: .userInitiated).async {
             try? stdin.fileHandleForWriting.write(contentsOf: Data(input.utf8))
             try? stdin.fileHandleForWriting.close()
         }
+        // Read apart for the same reason: Codex logs its progress there, enough to fill the pipe.
+        var err = Data()
+        let errors = DispatchGroup()
+        DispatchQueue.global(qos: .userInitiated).async(group: errors) { err = stderr.fileHandleForReading.readDataToEndOfFile() }
         let out = stdout.fileHandleForReading.readDataToEndOfFile()
-        let err = stderr.fileHandleForReading.readDataToEndOfFile()
+        errors.wait()
         process.waitUntilExit()
-        guard process.terminationReason == .exit else { throw CancellationError() }
-        guard process.terminationStatus == 0 else {
+        guard process.terminationReason == .exit, process.terminationStatus == 0 else {
             let message = String(decoding: err.isEmpty ? out : err, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
             throw GitError(description: message.isEmpty ? "\(URL(fileURLWithPath: executable).lastPathComponent) failed" : message)
         }

@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- The commit sheet can have Claude Code or Codex write the message from the files you ticked. The arrow next to the button picks the agent or account, and Restore puts back what you had typed.
+
 ### Changed
 
 - Branches, change counts and shortcuts are set in a monospaced font, so what comes from git or the keyboard reads apart from names.
@@ -20,10 +24,6 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ## [0.27.0] - 2026-10-02
 
 Merge branches, and see pull requests and their checks.
-
-### Added
-
-- The commit sheet can have Claude Code or Codex write the message from the files you ticked. The arrow next to the button picks the agent or account, and Restore puts back what you had typed.
 
 ### Added
 

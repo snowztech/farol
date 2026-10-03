@@ -211,7 +211,17 @@ struct ShipButton: View {
     }
 }
 
-/// The box that says whether a file goes in the next commit, in the review panel and in the commit sheet.
+/// One run of the agent, kept from the click so it can be stopped before its process has started.
+private final class Generation {
+    var process: Process? { didSet { if stopped { process?.terminate() } } }
+    private(set) var stopped = false
+
+    func stop() {
+        stopped = true
+        process?.terminate()
+    }
+}
+
 /// "Generate" with a wand in the message field's corner, and an arrow to pick the agent or account.
 /// Quiet like the toolbar's icon buttons, since most people pick an agent once: its name is in the tooltip and the menu.
 private struct GenerateButton: View {
@@ -275,6 +285,7 @@ private struct GenerateButton: View {
     }
 }
 
+/// The box that says whether a file goes in the next commit, in the review panel and in the commit sheet.
 struct Tick: View {
     let on: Bool
     let palette: Palette
@@ -306,7 +317,7 @@ private struct CommitSheet: View {
     @AppStorage("commit.agent") private var agent = ""
     @State private var agents = AgentFolder.find()
     /// The agent writing the message, to stop it when the sheet closes.
-    @State private var generating: Process?
+    @State private var generating: Generation?
     @State private var generationError: String?
     /// What you had typed before the agent wrote over it, until you type again.
     @State private var replaced: String?
@@ -351,7 +362,7 @@ private struct CommitSheet: View {
                         .overlay(alignment: .bottomTrailing) {
                             if let chosen = chosenAgent {
                                 GenerateButton(agent: chosen, agents: agents, running: generating != nil, palette: p,
-                                               generate: { generating?.terminate() ?? generate(with: chosen) },
+                                               generate: { generating == nil ? generate(with: chosen) : stop() },
                                                pick: { agent = $0.id })
                                     .disabled(generating == nil && files != nil && self.chosen.isEmpty)
                                     .padding(4)
@@ -396,7 +407,7 @@ private struct CommitSheet: View {
             typing = true
             review.uncommittedFiles { files = $0 }
         }
-        .onDisappear { generating?.terminate() }
+        .onDisappear { stop() }
     }
 
     private var chosenAgent: AgentFolder? { AgentFolder.choice(agent, in: agents) }
@@ -430,10 +441,15 @@ private struct CommitSheet: View {
         let paths = excluded.isEmpty ? nil : self.chosen.flatMap { [$0.oldPath, $0.path].compactMap { $0 } }
         let before = message
         generationError = nil
-        let started = { (process: Process) in DispatchQueue.main.async { generating = process } }
+        // Set on the click, not once the process runs, so a second click can't start a second agent.
+        let run = Generation()
+        generating = run
+        let started = { (process: Process) in DispatchQueue.main.async { run.process = process } }
         DispatchQueue.global(qos: .userInitiated).async {
             let result = Result { try CommitMessage.generate(with: chosen, paths: paths, in: root, started: started) }
             DispatchQueue.main.async {
+                // Stopped on purpose, or the sheet is gone: nothing to show, and the message isn't its to write anymore.
+                guard !run.stopped else { return }
                 generating = nil
                 switch result {
                 case .success(let text):
@@ -442,11 +458,15 @@ private struct CommitSheet: View {
                     message = text
                     typing = true
                 case .failure(let error):
-                    // Stopping it on purpose is no failure.
-                    if !(error is CancellationError) { generationError = String(describing: error) }
+                    generationError = String(describing: error)
                 }
             }
         }
+    }
+
+    private func stop() {
+        generating?.stop()
+        generating = nil
     }
 
     private var confirmTitle: String {

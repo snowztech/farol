@@ -43,9 +43,27 @@ import Testing
     // A body stays, with its blank line after the subject.
     #expect(CommitMessage.cleaned("feat: add x\n\nBecause y.") == "feat: add x\n\nBecause y.")
     #expect(CommitMessage.cleaned("  \n") == "")
+    // An indented list keeps its shape, and quotes that are part of the message stay.
+    #expect(CommitMessage.cleaned("feat: add x\n\n- one\n  - two\n") == "feat: add x\n\n- one\n  - two")
+    #expect(CommitMessage.cleaned("`foo` replaces `bar`") == "`foo` replaces `bar`")
 }
 
 @Test func theAgentRunsWithoutTools() {
-    #expect(CommitMessage.arguments(for: .claude).contains("--tools"))
+    let claude = CommitMessage.arguments(for: .claude)
+    #expect(claude.contains("--tools"))
+    #expect(claude.contains("--strict-mcp-config"))
+    #expect(claude.contains { $0.contains("disableAllHooks") })
     #expect(CommitMessage.arguments(for: .codex).contains("read-only"))
+}
+
+@Test func anAgentThatQuitsWithoutReadingDoesNotKillTheApp() throws {
+    // Bigger than the pipe, so the write is still going when the reader is gone. Unhandled, that's a SIGPIPE.
+    let prompt = String(repeating: "x", count: 200_000)
+    #expect(try CommitMessage.run("/usr/bin/true", [], input: prompt, environment: [:], in: NSTemporaryDirectory()) { _ in } == "")
+}
+
+@Test func whatTheAgentLogsOnStderrDoesNotStallIt() throws {
+    // More than the pipe holds on stderr before anything on stdout.
+    let script = "head -c 200000 /dev/zero | tr '\\0' e >&2 && cat >/dev/null && echo done"
+    #expect(try CommitMessage.run("/bin/sh", ["-c", script], input: "hi", environment: [:], in: NSTemporaryDirectory()) { _ in } == "done\n")
 }
