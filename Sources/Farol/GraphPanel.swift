@@ -228,43 +228,46 @@ struct GraphPanel: View {
             } else {
                 let lanes = min(graph.rows.map(\.width).max() ?? 1, CommitRow.maxLanes)
                 let rows = matchingRows
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        if rows.isEmpty {
-                            Text("No commit matches.")
-                                .font(.system(size: 12))
-                                .foregroundStyle(p.muted)
-                                .frame(maxWidth: .infinity, minHeight: 40)
-                        }
-                        ForEach(rows, id: \.commit.hash) { row in
-                            // Lines between commits that aren't neighbors anymore would mislead, so a search shows the dots only.
-                            CommitRow(row: row, lanes: lanes, showsLines: searchText.isEmpty, selected: row.commit.hash == graph.selected?.hash,
-                                      highlighted: graph.hoveredBranch.map(row.commit.points) ?? false,
-                                      palette: p, current: graph.current, upstreams: graph.upstreams, select: { graph.select(row.commit) },
-                                      review: {
-                                          // Keeps the files pane on this commit too, instead of toggling it off.
-                                          if graph.selected?.hash != row.commit.hash { graph.select(row.commit) }
-                                          graph.onShowInReview?(row.commit, nil)
-                                      },
-                                      cherryPick: { graph.cherryPick(row.commit, failed: gitError("Cherry-pick stopped")) },
-                                      revert: { revert(row.commit) },
-                                      rebase: { rebase(onto: row.commit) },
-                                      rebaseInteractively: {
-                                          graph.rebase(onto: row.commit.hash, interactive: true, failed: gitError("Couldn't rebase"))
-                                      },
-                                      newBranch: {
-                                          askBranchName(from: row.commit.shortHash, suggested: "") { name in
-                                              graph.createBranch(name, from: row.commit.hash, failed: gitError("Couldn't create the branch"))
-                                          }
-                                      }) {
-                                graph.checkout(row.commit, failed: gitError("Couldn't check out"))
+                GeometryReader { geometry in
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            if rows.isEmpty {
+                                Text("No commit matches.")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(p.muted)
+                                    .frame(maxWidth: .infinity, minHeight: 40)
+                            }
+                            ForEach(rows, id: \.commit.hash) { row in
+                                // Lines between commits that aren't neighbors anymore would mislead, so a search shows the dots only.
+                                CommitRow(row: row, lanes: lanes, width: geometry.size.width - 12,
+                                          showsLines: searchText.isEmpty, selected: row.commit.hash == graph.selected?.hash,
+                                          highlighted: graph.hoveredBranch.map(row.commit.points) ?? false,
+                                          palette: p, current: graph.current, upstreams: graph.upstreams, select: { graph.select(row.commit) },
+                                          review: {
+                                              // Keeps the files pane on this commit too, instead of toggling it off.
+                                              if graph.selected?.hash != row.commit.hash { graph.select(row.commit) }
+                                              graph.onShowInReview?(row.commit, nil)
+                                          },
+                                          cherryPick: { graph.cherryPick(row.commit, failed: gitError("Cherry-pick stopped")) },
+                                          revert: { revert(row.commit) },
+                                          rebase: { rebase(onto: row.commit) },
+                                          rebaseInteractively: {
+                                              graph.rebase(onto: row.commit.hash, interactive: true, failed: gitError("Couldn't rebase"))
+                                          },
+                                          newBranch: {
+                                              askBranchName(from: row.commit.shortHash, suggested: "") { name in
+                                                  graph.createBranch(name, from: row.commit.hash, failed: gitError("Couldn't create the branch"))
+                                              }
+                                          }) {
+                                    graph.checkout(row.commit, failed: gitError("Couldn't check out"))
+                                }
                             }
                         }
+                        .padding(.horizontal, 6)
+                        .padding(.bottom, 4)
                     }
-                    .padding(.horizontal, 6)
-                    .padding(.bottom, 4)
+                    .scrollIndicators(.hidden)
                 }
-                .scrollIndicators(.hidden)
                 if let commit = graph.selected {
                     Rectangle().fill(p.line).frame(height: 1)
                     CommitPane(commit: commit, files: graph.selectedFiles, palette: p,
@@ -726,11 +729,15 @@ private struct CommitRow: View {
     static let authorWidth: CGFloat = 90
     static let hashWidth: CGFloat = 52
     static let dateWidth: CGFloat = 64
+    /// What the subject keeps in a narrow panel. Under it the author goes, then the hash. Both stay in the row's tooltip.
+    static let subjectWidth: CGFloat = 140
 
     static func graphWidth(_ lanes: Int) -> CGFloat { CGFloat(lanes) * laneWidth + 4 }
 
     let row: History.Row
     let lanes: Int
+    /// The width the row has, to drop columns that no longer fit.
+    let width: CGFloat
     var showsLines = true
     var selected = false
     /// Set while the mouse is on a branch that points here.
@@ -752,6 +759,11 @@ private struct CommitRow: View {
     @State private var hoveringHash = false
     @State private var copied = false
 
+    /// What is left for the author and the hash once the graph, the subject and the date have theirs.
+    private var room: CGFloat {
+        width - Self.graphWidth(lanes) - Self.subjectWidth - Self.dateWidth - 3 * Self.spacing - 10
+    }
+
     var body: some View {
         HStack(spacing: Self.spacing) {
             lines
@@ -770,23 +782,27 @@ private struct CommitRow: View {
                     .fixedSize()
             }
             Spacer(minLength: 4)
-            Text(row.commit.author)
-                .font(.system(size: 11))
-                .foregroundStyle(palette.muted)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(width: Self.authorWidth, alignment: .leading)
-                .hoverTip(row.commit.email.isEmpty ? row.commit.author : "\(row.commit.author) <\(row.commit.email)>")
-            Text(copied ? "Copied" : row.commit.shortHash)
-                .font(.system(size: 10.5, design: .monospaced))
-                .foregroundStyle(copied ? palette.text : hoveringHash ? palette.text : palette.muted.opacity(0.8))
-                .underline(hoveringHash && !copied)
-                .lineLimit(1)
-                .frame(width: Self.hashWidth, alignment: .leading)
-                .contentShape(Rectangle())
-                .onClickableHover { hoveringHash = $0 }
-                .onTapGesture(perform: copyHash)
-                .hoverTip("Copy \(row.commit.hash)")
+            if room >= Self.authorWidth + Self.hashWidth + 2 * Self.spacing {
+                Text(row.commit.author)
+                    .font(.system(size: 11))
+                    .foregroundStyle(palette.muted)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(width: Self.authorWidth, alignment: .leading)
+                    .hoverTip(row.commit.email.isEmpty ? row.commit.author : "\(row.commit.author) <\(row.commit.email)>")
+            }
+            if room >= Self.hashWidth + Self.spacing {
+                Text(copied ? "Copied" : row.commit.shortHash)
+                    .font(.system(size: 10.5, design: .monospaced))
+                    .foregroundStyle(copied ? palette.text : hoveringHash ? palette.text : palette.muted.opacity(0.8))
+                    .underline(hoveringHash && !copied)
+                    .lineLimit(1)
+                    .frame(width: Self.hashWidth, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onClickableHover { hoveringHash = $0 }
+                    .onTapGesture(perform: copyHash)
+                    .hoverTip("Copy \(row.commit.hash)")
+            }
             Text(Self.age.localizedString(for: row.commit.date, relativeTo: Date()))
                 .font(.system(size: 11))
                 .foregroundStyle(palette.muted)
