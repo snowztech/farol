@@ -30,7 +30,6 @@ make lint
 Farol's docs, comments and PRs are short and plain. `make lint` checks part of it.
 
 - Say what changed and why, in a few sentences. Skip summaries of the diff, headings for one line of text, and lists of every file touched.
-- In a PR, what and why take two sentences at most. The rest is short bullets, and what you could not test gets its own section so it isn't missed.
 - Comments explain why, not what the code does.
 - Plain words. No em dashes.
 
