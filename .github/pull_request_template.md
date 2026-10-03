@@ -1,11 +1,19 @@
-<!-- Keep it short: a few sentences per section is plenty. Delete what doesn't apply. -->
+<!-- A reviewer should get this in 20 seconds. Delete what doesn't apply. -->
 
 ## What and why
 
-<!-- The change and the reason for it. Link the issue if there is one. -->
+<!-- Two or three sentences: what changes for the user, and the problem it solves. Link the issue if there is one. -->
 
-## How you checked it
+## Worth knowing
 
-<!-- What you ran or tried. `make test` and `make lint` pass. Screenshot for UI changes. -->
+<!-- Up to 4 bullets: decisions, trade-offs, where to look first. -->
+
+## Checked
+
+<!-- Bullets: what you ran or tried. `make test` and `make lint` pass. Screenshot for UI changes. -->
+
+## Not checked
+
+<!-- What you could not test. -->
 
 - [ ] Line under Unreleased in `CHANGELOG.md`, if users would notice
