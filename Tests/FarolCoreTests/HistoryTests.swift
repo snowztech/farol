@@ -6,6 +6,10 @@ private func commit(_ hash: String, _ parents: String...) -> History.Commit {
     History.Commit(hash: hash, parents: parents, author: "Farol", date: Date(timeIntervalSince1970: 0), refs: [], subject: hash)
 }
 
+private func commit(_ hash: String, _ parents: [String], refs: [String]) -> History.Commit {
+    History.Commit(hash: hash, parents: parents, author: "Farol", date: Date(timeIntervalSince1970: 0), refs: refs, subject: hash)
+}
+
 private func edges(_ pairs: (Int, Int)...) -> [History.Edge] {
     pairs.map { History.Edge(from: $0.0, to: $0.1) }
 }
@@ -59,6 +63,29 @@ private func edges(_ pairs: (Int, Int)...) -> [History.Edge] {
     #expect(rows.map(\.column) == [0, 1, 0, 1, 0])
     #expect(rows.map(\.color) == [0, 1, 0, 2, 0])
     #expect(rows[3].colorsBelow == [0, 2])
+}
+
+@Test func aBranchStartedFromAnotherOnesTipGetsItsOwnColor() {
+    // feat starts at main's last commit, so both share one line. main's part of it changes color.
+    let rows = History.graph([commit("y", ["x"], refs: ["HEAD -> feat"]), commit("x", ["a"], refs: ["origin/feat"]),
+                              commit("a", ["b"], refs: ["origin/main", "main", "tag: v1"]), commit("b", [], refs: [])])
+    #expect(rows.map(\.column) == [0, 0, 0, 0])
+    // main keeps the first color, blue, so feat takes the next one.
+    #expect(rows.map(\.color) == [1, 1, 0, 0])
+    #expect(rows[2].colorsAbove == [1])
+}
+
+@Test func mainStaysBlueWhereBranchesMeet() {
+    // feat is drawn first, so it holds the leftmost lane, but below the fork the line is main's.
+    let rows = History.graph([commit("f", ["a"], refs: ["feat"]), commit("m", ["a"], refs: ["main"]), commit("a", [], refs: [])])
+    #expect(rows.map(\.color) == [1, 0, 0])
+}
+
+@Test func mainStaysBlueBelowABranchLeftBehindOnItsLine() {
+    // task has no commit of its own yet and main moved on, so task sits on main's line.
+    let rows = History.graph([commit("m2", ["m1"], refs: ["HEAD -> main", "origin/main"]), commit("m1", ["m0"], refs: ["task"]),
+                              commit("m0", [], refs: [])])
+    #expect(rows.map(\.color) == [0, 0, 0])
 }
 
 @Test func twoTipsJoinAtTheirParent() {

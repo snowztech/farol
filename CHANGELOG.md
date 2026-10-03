@@ -7,6 +7,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Fixed
 
 - In a narrow git graph the commit subject stays readable: the author goes first, then the hash, and the row is no longer cut at both ends.
+- A branch started from another one's last commit gets its own color in the history, instead of taking the color of the branch it started from. main is always blue.
 
 ## [0.28.0] - 2026-10-03
 
