@@ -211,6 +211,80 @@ struct ShipButton: View {
     }
 }
 
+/// One run of the agent, kept from the click so it can be stopped before its process has started.
+private final class Generation {
+    var process: Process? { didSet { if stopped { process?.terminate() } } }
+    private(set) var stopped = false
+
+    func stop() {
+        stopped = true
+        process?.terminate()
+    }
+}
+
+/// "Generate" with a wand in the message field's corner, and an arrow to pick the agent or account.
+/// Quiet like the toolbar's icon buttons, since most people pick an agent once: its name is in the tooltip and the menu.
+private struct GenerateButton: View {
+    let agent: AgentFolder
+    let agents: [AgentFolder]
+    /// While the agent writes, the wand turns into a spinner and a click stops it.
+    let running: Bool
+    let palette: Palette
+    let generate: () -> Void
+    let pick: (AgentFolder) -> Void
+
+    @Environment(\.isEnabled) private var enabled
+    @State private var hoveringGenerate = false
+    @State private var hoveringPicker = false
+
+    var body: some View {
+        HStack(spacing: 1) {
+            Button(action: generate) {
+                HStack(spacing: 4) {
+                    if running {
+                        ProgressView().controlSize(.mini).scaleEffect(0.8).frame(width: 11, height: 11)
+                    } else {
+                        Image(systemName: "wand.and.rays").font(.system(size: 10.5, weight: .medium))
+                    }
+                    Text(running ? "Stop" : "Generate").font(.system(size: 11.5, weight: .medium))
+                }
+                .padding(.horizontal, 6)
+                .frame(height: 20)
+                .foregroundStyle(hoveringGenerate && enabled ? palette.text : palette.muted)
+                .background(RoundedRectangle(cornerRadius: 6).fill(hoveringGenerate && enabled ? palette.raised : .clear))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .onClickableHover { hoveringGenerate = $0 }
+            .hoverTip(running ? "Stop \(agent.label)" : "Generate with \(agent.label)")
+            if agents.count > 1, !running {
+                Menu {
+                    ForEach(agents, id: \.id) { folder in
+                        Button { pick(folder) } label: {
+                            if folder == agent { Label(folder.label, systemImage: "checkmark") } else { Text(folder.label) }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 7, weight: .semibold))
+                        .frame(width: 14, height: 20)
+                        .foregroundStyle(hoveringPicker ? palette.text : palette.muted)
+                        .background(RoundedRectangle(cornerRadius: 6).fill(hoveringPicker ? palette.raised : .clear))
+                        .contentShape(Rectangle())
+                }
+                // Plain keeps the label as drawn here. The bordered styles put AppKit's own, larger arrow in.
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .onClickableHover { hoveringPicker = $0 }
+                .hoverTip("Choose the agent")
+            }
+        }
+        .opacity(enabled ? 1 : 0.4)
+    }
+}
+
 /// The box that says whether a file goes in the next commit, in the review panel and in the commit sheet.
 struct Tick: View {
     let on: Bool
@@ -240,6 +314,14 @@ private struct CommitSheet: View {
     @AppStorage("review.afterCommit") private var remembered = AfterCommit.nothing.rawValue
     @State private var files: [Diff.File]?
     @FocusState private var typing: Bool
+    @AppStorage("commit.agent") private var agent = ""
+    @State private var agents = AgentFolder.find()
+    /// The agent writing the message, to stop it when the sheet closes.
+    @State private var generating: Generation?
+    @State private var generationError: String?
+    /// What you had typed before the agent wrote over it, until you type again.
+    @State private var replaced: String?
+    @State private var generated: String?
 
     /// The remembered choice, unless it makes no sense here, as when the branch already has a pull request.
     private var next: AfterCommit {
@@ -267,11 +349,27 @@ private struct CommitSheet: View {
                 }
                 changes(p)
                 // Return confirms. Option-Return adds a line, for a body under the subject.
-                TextField("Commit message", text: $message, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .lineLimit(3...8)
-                    .focused($typing)
-                    .sheetField(p, focused: typing)
+                VStack(alignment: .leading, spacing: 6) {
+                    TextField("Commit message", text: $message, axis: .vertical)
+                        .textFieldStyle(.plain)
+                        .lineLimit(3...8)
+                        .focused($typing)
+                        // Room under the text for the button in the corner, so a long message never runs under it.
+                        .padding(.bottom, chosenAgent == nil ? 0 : 16)
+                        .opacity(generating == nil ? 1 : 0.45)
+                        .disabled(generating != nil)
+                        .sheetField(p, focused: typing)
+                        .overlay(alignment: .bottomTrailing) {
+                            if let chosen = chosenAgent {
+                                GenerateButton(agent: chosen, agents: agents, running: generating != nil, palette: p,
+                                               generate: { generating == nil ? generate(with: chosen) : stop() },
+                                               pick: { agent = $0.id })
+                                    .disabled(generating == nil && files != nil && self.chosen.isEmpty)
+                                    .padding(4)
+                            }
+                        }
+                    hints(p)
+                }
                 VStack(spacing: 6) {
                     option(.nothing, "Commit", p)
                     option(.push, "Commit and push", p)
@@ -309,6 +407,66 @@ private struct CommitSheet: View {
             typing = true
             review.uncommittedFiles { files = $0 }
         }
+        .onDisappear { stop() }
+    }
+
+    private var chosenAgent: AgentFolder? { AgentFolder.choice(agent, in: agents) }
+
+    /// "⌥↩ for a new line", Restore after the agent wrote over a message, and what went wrong if it failed.
+    private func hints(_ p: Palette) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Text("⌥↩ for a new line")
+                if let replaced, message == generated {
+                    Button("Restore") { message = replaced }
+                        .buttonStyle(.plain)
+                        .hoverTip("Put back what you had typed")
+                }
+            }
+            .font(.system(size: 11))
+            .foregroundStyle(p.muted)
+            if let generationError {
+                Text(generationError)
+                    .font(.system(size: 11))
+                    .foregroundStyle(p.removed)
+                    .lineLimit(2)
+                    .hoverTip(generationError)
+            }
+        }
+    }
+
+    /// Describes the ticked files, or every file when none is left out, like the commit itself.
+    private func generate(with chosen: AgentFolder) {
+        guard let root = review.root else { return }
+        let paths = excluded.isEmpty ? nil : self.chosen.flatMap { [$0.oldPath, $0.path].compactMap { $0 } }
+        let before = message
+        generationError = nil
+        // Set on the click, not once the process runs, so a second click can't start a second agent.
+        let run = Generation()
+        generating = run
+        let started = { (process: Process) in DispatchQueue.main.async { run.process = process } }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = Result { try CommitMessage.generate(with: chosen, paths: paths, in: root, started: started) }
+            DispatchQueue.main.async {
+                // Stopped on purpose, or the sheet is gone: nothing to show, and the message isn't its to write anymore.
+                guard !run.stopped else { return }
+                generating = nil
+                switch result {
+                case .success(let text):
+                    replaced = before.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : before
+                    generated = text
+                    message = text
+                    typing = true
+                case .failure(let error):
+                    generationError = String(describing: error)
+                }
+            }
+        }
+    }
+
+    private func stop() {
+        generating?.stop()
+        generating = nil
     }
 
     private var confirmTitle: String {
