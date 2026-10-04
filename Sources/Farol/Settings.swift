@@ -96,13 +96,13 @@ final class Settings: ObservableObject {
         guard !loading else { return }
         var lines = Self.read()
         if lines.isEmpty { lines = Self.template }
-        let index = lines.firstIndex { Self.key(of: $0) == key }
-        switch (index, value.isEmpty) {
-        case let (i?, true): lines.remove(at: i)
-        case let (i?, false): lines[i] = "\(key) = \(value)"
-        case (nil, false): lines.append("\(key) = \(value)")
-        case (nil, true): return
+        // The terminal reads the last line for a key, so that one is changed and earlier ones are dropped.
+        var stale = lines.indices.filter { Self.key(of: lines[$0]) == key }
+        if stale.isEmpty, value.isEmpty { return }
+        if !value.isEmpty {
+            if let last = stale.popLast() { lines[last] = "\(key) = \(value)" } else { lines.append("\(key) = \(value)") }
         }
+        for i in stale.reversed() { lines.remove(at: i) }
         save(lines)
         onChange?()
     }
