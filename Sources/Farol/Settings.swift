@@ -25,6 +25,7 @@ final class Settings: ObservableObject {
     /// What Farol last wrote, to tell its own saves from yours.
     private var lastWritten: String?
     private var watcher: DispatchSourceFileSystemObject?
+    private var fileWatcher: DispatchSourceFileSystemObject?
 
     init() {
         reload()
@@ -37,7 +38,7 @@ final class Settings: ObservableObject {
         return lines
     }
 
-    /// Reads the file again. Also runs on Reload Configuration, for editors that save in place.
+    /// Reads the file again. Also runs on Reload Configuration.
     func reload() {
         loading = true
         defer { loading = false }
@@ -51,24 +52,40 @@ final class Settings: ObservableObject {
         copyOnSelect = values["copy-on-select"] == "clipboard"
     }
 
-    /// Editors save by replacing the file, so this watches the folder rather than the file.
+    /// Editors save by replacing the file, which only the folder reports.
+    /// Tools like cp and >> write into the file in place, which only the file reports. So both are watched.
     private func watch() {
         let folder = Self.fileURL.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let fd = open(folder.path, O_EVTONLY)
-        guard fd >= 0 else { return }
-        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: .write, queue: .main)
-        source.setEventHandler { [weak self] in
-            guard let self else { return }
-            let text = try? String(contentsOf: Self.fileURL, encoding: .utf8)
-            guard text != self.lastWritten else { return }
-            self.lastWritten = text
-            self.reload()
-            self.onChange?()
+        watcher = source(for: folder.path) { [weak self] in
+            // A replaced file is a new file, so the old watch no longer sees it.
+            self?.watchFile()
+            self?.fileChanged()
         }
+        watchFile()
+    }
+
+    private func watchFile() {
+        fileWatcher?.cancel()
+        fileWatcher = source(for: Self.fileURL.path) { [weak self] in self?.fileChanged() }
+    }
+
+    private func source(for path: String, handler: @escaping () -> Void) -> DispatchSourceFileSystemObject? {
+        let fd = open(path, O_EVTONLY)
+        guard fd >= 0 else { return nil }
+        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: .write, queue: .main)
+        source.setEventHandler(handler: handler)
         source.setCancelHandler { close(fd) }
         source.resume()
-        watcher = source
+        return source
+    }
+
+    private func fileChanged() {
+        let text = try? String(contentsOf: Self.fileURL, encoding: .utf8)
+        guard text != lastWritten else { return }
+        lastWritten = text
+        reload()
+        onChange?()
     }
 
     /// Changes one line and keeps everything else in the file as you wrote it. An empty value removes the key.
