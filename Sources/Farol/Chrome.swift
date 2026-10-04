@@ -38,6 +38,7 @@ struct Commands {
     let toggleReview: () -> Void
     let toggleSettings: () -> Void
     let toggleMerge: () -> Void
+    let openFile: (String) -> Void
     let titleBarDoubleClick: () -> Void
 }
 
@@ -56,7 +57,7 @@ struct TopBar: View {
                 if state.showingSettings {
                     Text("Settings")
                 } else if let session = store.selected {
-                    SessionMenu(session: session, store: store, state: state)
+                    SessionMenu(session: session, store: store, state: state, openFile: commands.openFile)
                 }
             }
             .font(.system(size: 12, weight: .medium))
@@ -245,15 +246,26 @@ private struct GitButton: View {
 }
 
 /// The title opens a searchable list of every session, grouped like the sidebar, so you can switch with the sidebar closed.
+/// Typing also finds files in the checkout you are in.
 private struct SessionMenu: View {
+    private enum Choice: Hashable {
+        case session(UUID)
+        case file(String)
+    }
+
     @ObservedObject var session: Session
     @ObservedObject var store: SessionStore
     @ObservedObject var state: WindowState
+    let openFile: (String) -> Void
 
     @State private var hovering = false
     @State private var query = ""
     /// The row the arrows or the mouse are on. Without one, Return goes to the first match.
-    @State private var active: UUID?
+    @State private var active: Choice?
+    /// The checkout's files, listed each time the list opens, and the ones that match what is typed.
+    @State private var files: (root: String, paths: [String]) = ("", [])
+    @State private var hits: [String] = []
+    @State private var listHeight: CGFloat = 0
     @FocusState private var searching: Bool
 
     private var palette: Palette { state.palette }
@@ -279,8 +291,22 @@ private struct SessionMenu: View {
         .onClickableHover { hovering = $0 }
         .hoverTip("Switch session (⌘P)")
         .popover(isPresented: $state.switchingSession, arrowEdge: .bottom) { list(p) }
-        .onChange(of: state.switchingSession) { _, open in if !open { (query, active) = ("", nil) } }
-        .onChange(of: query) { _, _ in active = nil }
+        .onChange(of: state.switchingSession) { _, open in
+            if open { listFiles() } else { (query, active, files, hits) = ("", nil, ("", []), []) }
+        }
+        .onChange(of: query) { _, query in (active, hits) = (nil, Files.search(files.paths, query)) }
+    }
+
+    /// Only in a git checkout, where git knows what to leave out.
+    private func listFiles() {
+        guard let root = session.topLevel else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let paths = Files.tracked(in: root)
+            DispatchQueue.main.async {
+                guard open else { return }
+                (files, hits) = ((root, paths), Files.search(paths, query))
+            }
+        }
     }
 
     private func list(_ p: Palette) -> some View {
@@ -289,7 +315,7 @@ private struct SessionMenu: View {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(p.muted)
                 // Return takes the first match, so a session is a few letters away.
-                TextField("Search \(store.sessions.count) sessions", text: $query)
+                TextField(session.topLevel == nil ? "Search \(store.sessions.count) sessions" : "Search sessions and files", text: $query)
                     .textFieldStyle(.plain)
                     .focused($searching)
                     .onSubmit { highlighted.map(choose) }
@@ -299,34 +325,56 @@ private struct SessionMenu: View {
             }
             .padding(12)
             Rectangle().fill(p.line).frame(height: 1)
-            ScrollView {
-                // Not lazy: a lazy stack guesses its height from its first row, and a project header is taller than a session.
-                VStack(spacing: 1) {
-                    ForEach(groups, id: \.key) { group in
-                        if let key = group.key {
-                            RepoHeader(name: URL(fileURLWithPath: key).lastPathComponent, palette: p)
+            ScrollViewReader { scroll in
+                ScrollView {
+                    // Not lazy: a lazy stack guesses its height from its first row, and a project header is taller than a session.
+                    VStack(spacing: 1) {
+                        ForEach(groups, id: \.key) { group in
+                            if let key = group.key {
+                                RepoHeader(name: URL(fileURLWithPath: key).lastPathComponent, palette: p)
+                            }
+                            ForEach(group.items) { item in
+                                SessionChoice(
+                                    session: item,
+                                    current: item.id == store.selectedID,
+                                    lit: highlighted == .session(item.id),
+                                    shortcut: shortcut(for: item),
+                                    palette: p,
+                                    // Leaving a row hands Return back to the session you are in, as a menu would.
+                                    hover: { inside in
+                                        if inside { active = .session(item.id) } else if active == .session(item.id) { active = nil }
+                                    },
+                                    choose: { choose(.session(item.id)) })
+                                .id(Choice.session(item.id))
+                            }
                         }
-                        ForEach(group.items) { item in
-                            SessionChoice(
-                                session: item,
-                                current: item.id == store.selectedID,
-                                lit: item.id == highlighted?.id,
-                                shortcut: shortcut(for: item),
+                        // The file icons say what these rows are, so a line is enough to part them from the sessions.
+                        if !hits.isEmpty && !groups.isEmpty {
+                            Rectangle().fill(p.line).frame(height: 1).padding(.horizontal, 9).padding(.vertical, 5)
+                        }
+                        ForEach(hits, id: \.self) { path in
+                            FileChoice(
+                                path: path,
+                                lit: highlighted == .file(path),
                                 palette: p,
-                                // Leaving a row hands Return back to the session you are in, as a menu would.
                                 hover: { inside in
-                                    if inside { active = item.id } else if active == item.id { active = nil }
+                                    if inside { active = .file(path) } else if active == .file(path) { active = nil }
                                 },
-                                choose: { choose(item) })
+                                choose: { choose(.file(path)) })
+                            .id(Choice.file(path))
+                        }
+                        if groups.isEmpty && hits.isEmpty {
+                            Text("Nothing matches.").foregroundStyle(p.muted).padding(.vertical, 12)
                         }
                     }
-                    if groups.isEmpty {
-                        Text("No session matches.").foregroundStyle(p.muted).padding(.vertical, 12)
-                    }
+                    .padding(6)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
                 }
-                .padding(6)
+                // An exact height, since the popover only follows its rows when it has no other choice.
+                .frame(height: min(listHeight, 320))
+                // The arrows can go past the rows in view.
+                .onChange(of: active) { _, row in if let row { scroll.scrollTo(row) } }
             }
-            .frame(maxHeight: 320)
         }
         .frame(width: 340)
         .font(.system(size: 13))
@@ -350,19 +398,20 @@ private struct SessionMenu: View {
         }
     }
 
-    private var shown: [Session] { matches.flatMap(\.items) }
+    private var shown: [Choice] { matches.flatMap(\.items).map { .session($0.id) } + hits.map(Choice.file) }
 
     /// The row Return opens: the one the arrows or the mouse are on, else where you are, else the first match.
-    private var highlighted: Session? {
+    private var highlighted: Choice? {
         let shown = shown
-        return shown.first { $0.id == active } ?? shown.first { $0.id == store.selectedID && query.isEmpty } ?? shown.first
+        let current = query.isEmpty ? store.selectedID.map(Choice.session) : nil
+        return shown.first { $0 == active } ?? shown.first { $0 == current } ?? shown.first
     }
 
     private func move(_ step: Int) -> KeyPress.Result {
         let shown = shown
         guard !shown.isEmpty else { return .handled }
-        let index = shown.firstIndex { $0.id == highlighted?.id } ?? 0
-        active = shown[(index + step + shown.count) % shown.count].id
+        let index = highlighted.flatMap(shown.firstIndex) ?? 0
+        active = shown[(index + step + shown.count) % shown.count]
         return .handled
     }
 
@@ -372,9 +421,46 @@ private struct SessionMenu: View {
         return "⌘\(index + 1)"
     }
 
-    private func choose(_ item: Session) {
+    private func choose(_ choice: Choice) {
+        // Read before the list closes, which forgets the files.
+        let root = files.root
         state.switchingSession = false
-        if item.id != store.selectedID { store.select(item) }
+        switch choice {
+        case .session(let id):
+            if id != store.selectedID, let item = store.sessions.first(where: { $0.id == id }) { store.select(item) }
+        case .file(let path):
+            openFile(root + "/" + path)
+        }
+    }
+}
+
+/// A file in the title's list: its name, then the folder it is in.
+private struct FileChoice: View {
+    let path: String
+    /// Under the arrows or the mouse.
+    let lit: Bool
+    let palette: Palette
+    let hover: (Bool) -> Void
+    let choose: () -> Void
+
+    var body: some View {
+        Button(action: choose) {
+            HStack(spacing: 9) {
+                // The room of a session's check and lamp, so every name starts at the same place.
+                Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).hidden()
+                Image(systemName: "doc").font(.system(size: 11)).foregroundStyle(palette.muted).frame(width: 7)
+                Text((path as NSString).lastPathComponent).lineLimit(1).truncationMode(.middle).layoutPriority(1)
+                Text((path as NSString).deletingLastPathComponent)
+                    .font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.head)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 9)
+            .frame(height: 28)
+            .background(RoundedRectangle(cornerRadius: 6).fill(lit ? palette.selection : .clear))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(QuietPress())
+        .onClickableHover(hover)
     }
 }
 

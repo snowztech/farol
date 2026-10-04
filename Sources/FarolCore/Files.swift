@@ -36,6 +36,33 @@ public enum Files {
         })
     }
 
+    /// Every file in the checkout at `root` that git tracks or would add, relative to it. Empty outside a repo.
+    public static func tracked(in root: String) -> [String] {
+        // -z, since git quotes a name with an accent or a space otherwise.
+        guard let output = try? Git.run(["ls-files", "-z", "--cached", "--others", "--exclude-standard"], in: root)
+        else { return [] }
+        return output.split(separator: "\0").map(String.init)
+    }
+
+    /// The paths that have every word typed, with a match in the file's name before one in its folders, then the shorter path.
+    /// Nothing typed finds nothing.
+    public static func search(_ paths: [String], _ query: String, limit: Int = 30) -> [String] {
+        let words = query.lowercased().split(separator: " ")
+        guard !words.isEmpty else { return [] }
+        // Every path is lowercased again on each key, which is quick enough until a repo has hundreds of thousands of files.
+        let found = paths.compactMap { path -> (path: String, inName: Bool)? in
+            let lower = path.lowercased()
+            guard words.allSatisfy(lower.contains) else { return nil }
+            let name = lower[(lower.lastIndex(of: "/").map(lower.index(after:)) ?? lower.startIndex)...]
+            return (path, words.allSatisfy(name.contains))
+        }
+        return found
+            .sorted { a, b in
+                a.inName != b.inName ? a.inName : a.path.count != b.path.count ? a.path.count < b.path.count : a.path < b.path
+            }
+            .prefix(limit).map(\.path)
+    }
+
     public enum Content: Equatable {
         case text(String)
         case binary

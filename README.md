@@ -36,7 +36,7 @@ It needs a Mac with Apple Silicon and macOS 14 or later. Releases are signed and
 - **Agent status.** Each session shows whether its agent is working, waiting for you or done, with a notification when it waits in the background. See [Agent status](#agent-status).
 - **Agents from any app.** Farol's lighthouse in the menu bar lights up while agents work, wait or finish, and its menu opens any session. Or pick a small status panel at the notch or on the screen edge, which you can drag anywhere along the side.
 - **Worktree sessions.** ⇧⌘T asks for a branch and opens a session in its own git worktree, so parallel agents never touch each other's files. Closing it offers to remove the worktree and always keeps the branch.
-- **Sessions in a sidebar.** Open as many as you like. Hidden sessions keep running but stop rendering, so twenty background agents cost no GPU time. Each row shows its git branch, and Settings → Appearance can group sessions under each project's name. Double-click to rename, drag to reorder. Click the window title or press ⌘P to search every session and switch, even with the sidebar closed.
+- **Sessions in a sidebar.** Open as many as you like. Hidden sessions keep running but stop rendering, so twenty background agents cost no GPU time. Each row shows its git branch, and Settings → Appearance can group sessions under each project's name. Double-click to rename, drag to reorder. Click the window title or press ⌘P to search every session and switch, even with the sidebar closed. Keep typing to find a file in the repo you are in and open it next to the terminal.
 - **Files next to the terminal.** ⇧⌘E opens the session's project as a tree, with ignored files dimmed. Click a file to open it in a pane beside the terminal, with syntax colors from your theme, line numbers and ⌘F, and make a quick fix with ⌘S to save. When an agent changes the file you have open, it reloads, or asks first if you have unsaved edits. The tree updates as agents add files, and costs nothing while it is closed.
 - **Review what the agent did.** The title bar shows what the session changed, like `± +821 −61`, and only while there is something to see. Click it, or ⌥⌘R, for every changed file as one scrolling diff, uncommitted work or everything since the branch left main or any other branch. Open a file from there to land on its first change and fix it. Then commit, push and open a pull request on GitHub or a merge request on GitLab, without leaving the panel.
 - **Git graph.** ⌥⌘G, or the icon next to the change count, shows the session's branches and commits as a colored graph. Click a branch to check it out. Right-click to create, rebase or delete a branch, or to cherry-pick or revert a commit. Fetch, update and push branches from there too.
@@ -137,7 +137,7 @@ These hooks complement the terminal-title status used by interactive Codex sessi
 | Close pane or session | ⌘W |
 | Next or previous session | ⇧⌘] and ⇧⌘[ |
 | Go to session 1 to 9 | ⌘1 to ⌘9 |
-| Search sessions | ⌘P |
+| Search sessions and files | ⌘P |
 | Split right or down | ⌘D and ⇧⌘D |
 | Move between panes | ⌘[ and ⌘], or ⌘⌥ with arrows |
 | Resize the focused pane | ⌘⌃ with arrows |
