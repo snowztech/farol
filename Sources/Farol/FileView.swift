@@ -126,6 +126,11 @@ final class FileView: NSView {
 
     var textView: NSTextView { text }
 
+    /// A click on the header or the line numbers picks this pane too, so ⌘W closes the file and not a terminal.
+    override func mouseDown(with event: NSEvent) {
+        window?.makeFirstResponder(text)
+    }
+
     /// Loads another file into the same pane. Callers check `isDirty` first, see confirmClose.
     func show(_ path: String) {
         self.path = path
