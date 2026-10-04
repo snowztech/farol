@@ -65,7 +65,7 @@ public struct AgentSkill {
     - Farol sets `$FAROL_PANE`, `$FAROL_CLI` and `$GHOSTTY_RESOURCES_DIR` in every shell it starts. Outside Farol they are unset.
     - The dot next to a session is its agent's status: working, waiting for the user or done. Farol's hooks report it with `"$FAROL_CLI" status working|waiting|done|clear`.
     - Shortcuts: ⇧⌘N new task, ⇧⌘T worktree session, ⌘P switch session, ⌘D split pane, ⇧⌘E files, ⌥⌘R review changes, ⌥⌘G git graph, ⌥⌘M resolve conflicts.
-    - For anything else, read https://github.com/snowztech/farol#readme.
+    - The README at https://github.com/snowztech/farol#readme covers the rest. Read it when the user asks for something this file leaves out.
 
     """
 }
