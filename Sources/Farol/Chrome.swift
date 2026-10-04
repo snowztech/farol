@@ -265,6 +265,7 @@ private struct SessionMenu: View {
     /// The checkout's files, listed each time the list opens, and the ones that match what is typed.
     @State private var files: (root: String, paths: [String]) = ("", [])
     @State private var hits: [String] = []
+    @State private var listHeight: CGFloat = 0
     @FocusState private var searching: Bool
 
     private var palette: Palette { state.palette }
@@ -314,7 +315,7 @@ private struct SessionMenu: View {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(p.muted)
                 // Return takes the first match, so a session is a few letters away.
-                TextField("Search \(store.sessions.count) sessions\(session.topLevel == nil ? "" : " and files")", text: $query)
+                TextField(session.topLevel == nil ? "Search \(store.sessions.count) sessions" : "Search sessions and files", text: $query)
                     .textFieldStyle(.plain)
                     .focused($searching)
                     .onSubmit { highlighted.map(choose) }
@@ -347,7 +348,10 @@ private struct SessionMenu: View {
                                 .id(Choice.session(item.id))
                             }
                         }
-                        if !hits.isEmpty { RepoHeader(name: "Files", palette: p) }
+                        // The file icons say what these rows are, so a line is enough to part them from the sessions.
+                        if !hits.isEmpty && !groups.isEmpty {
+                            Rectangle().fill(p.line).frame(height: 1).padding(.horizontal, 9).padding(.vertical, 5)
+                        }
                         ForEach(hits, id: \.self) { path in
                             FileChoice(
                                 path: path,
@@ -364,8 +368,10 @@ private struct SessionMenu: View {
                         }
                     }
                     .padding(6)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
                 }
-                .frame(maxHeight: 320)
+                // An exact height, since the popover only follows its rows when it has no other choice.
+                .frame(height: min(listHeight, 320))
                 // The arrows can go past the rows in view.
                 .onChange(of: active) { _, row in if let row { scroll.scrollTo(row) } }
             }
@@ -440,7 +446,9 @@ private struct FileChoice: View {
     var body: some View {
         Button(action: choose) {
             HStack(spacing: 9) {
-                Image(systemName: "doc").font(.system(size: 11)).foregroundStyle(palette.muted)
+                // The room of a session's check and lamp, so every name starts at the same place.
+                Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).hidden()
+                Image(systemName: "doc").font(.system(size: 11)).foregroundStyle(palette.muted).frame(width: 7)
                 Text((path as NSString).lastPathComponent).lineLimit(1).truncationMode(.middle).layoutPriority(1)
                 Text((path as NSString).deletingLastPathComponent)
                     .font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.head)
