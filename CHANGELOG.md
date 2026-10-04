@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- Shift-right-click opens the pane's menu even when the program in the terminal uses the mouse, like Claude Code or vim. Before, the click went to the program and there was no way to name or close the pane from the menu.
+
 ## [0.30.0] - 2026-10-04
 
 Find files and folders from the session switcher, and ask your agent to change Farol's settings.
