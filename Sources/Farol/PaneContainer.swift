@@ -184,7 +184,8 @@ final class PaneContainer: NSView {
         if searchBar?.terminal === terminal { hideSearch() }
         labels.removeValue(forKey: terminal.id)?.removeFromSuperview()
         terminal.removeFromSuperview()
-        if terminal === focused { focus(parent.leaves[0]) }
+        // The sibling that took the space can be the file pane, which holds no terminal.
+        if terminal === focused { focus(parent.leaves.first ?? terminals[0]) }
         onLayoutChange?()
         return true
     }
