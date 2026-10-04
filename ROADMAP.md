@@ -70,9 +70,8 @@ Everything talks to your servers directly. Nothing goes through a Farol service.
 An agent running in Farol can change Farol when you ask, so you stay in the conversation.
 
 - [x] A skill for Claude Code and Codex, installed with Connect, that tells the agent where the config is and what it can change
-- [ ] App settings in the config file: panel style, app icon, grouping by project, the menu bar and notch panel, worktree options. They are in the app's preferences today, where an agent cannot reach them
-- [ ] Config errors shown in Farol. A misspelled key is ignored in silence today
-- [ ] Farol's own shortcuts rebindable in the config file, like the terminal ones
+- [x] Config errors shown in Farol, when the file is saved and in Settings
+- [ ] A `settings` file for Farol's own preferences and shortcuts, next to `config`, which stays libghostty's. One table in `FarolCore` defines every setting, and the settings page, the menu, the errors and the skill all read from it. Worth doing once the preferences outgrow a handful, or someone asks to rebind Farol's shortcuts
 - [ ] `farol sessions`: the sessions with their branch, folder and status, so an agent can tell which one is waiting
 - [ ] `farol task`: a task started in a new worktree session from the command line, so one agent can hand work to another
 - [ ] The `farol` command working from Codex, which runs its commands without Farol's environment

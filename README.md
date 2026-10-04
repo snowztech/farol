@@ -177,6 +177,8 @@ font-size = 14
 
 The file uses Ghostty's format, so every terminal option in the [Ghostty docs](https://ghostty.org/docs/config) works: fonts, colors, cursor, padding, keybinds. Options for Ghostty's own window, tabs and quick terminal do nothing, since Farol draws its own window. If you also use Ghostty, your Ghostty config loads first and Farol's file wins.
 
+When you save a key or a value Farol cannot read, it tells you which one, and Settings → Terminal keeps the list until it is fixed.
+
 ### Custom themes
 
 Drop a theme file in `~/.config/farol/themes` and it shows up in Settings → Appearance, right after Farol's own. Settings has a **Themes folder** button that opens it. A theme file is a few lines of Ghostty config:

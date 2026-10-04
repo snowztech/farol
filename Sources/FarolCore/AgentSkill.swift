@@ -46,7 +46,7 @@ public struct AgentSkill {
 
     Every terminal option at https://ghostty.org/docs/config works: fonts, colors, cursor, padding, scrollback, keybinds. Options for Ghostty's own window, tabs and quick terminal do nothing, since Farol draws its own window.
 
-    Farol watches the file, so a saved edit is live in every session, with no restart. It reports no config errors: a misspelled key or value is ignored in silence, so take both from the docs. Deleting a line brings back the value from the user's Ghostty config, or the default.
+    Farol watches the file, so a saved edit is live in every session, with no restart. Farol shows the user an error for a key or value it cannot read. You will not see that error, so take both from the docs. Deleting a line brings back the value from the user's Ghostty config, or the default.
 
     Keep one line per key: when the key is already in the file, edit that line. The settings page rewrites the first line it finds for a key, and the last one wins.
 
