@@ -65,6 +65,18 @@ Work comes from a ticket and goes out as a merge request, on the services teams 
 
 Everything talks to your servers directly. Nothing goes through a Farol service.
 
+## After that: agents that know Farol
+
+An agent running in Farol can change Farol when you ask, so you stay in the conversation.
+
+- [x] A skill for Claude Code and Codex, installed with Connect, that tells the agent where the config is and what it can change
+- [ ] App settings in the config file: panel style, app icon, grouping by project, the menu bar and notch panel, worktree options. They are in the app's preferences today, where an agent cannot reach them
+- [ ] Config errors shown in Farol. A misspelled key is ignored in silence today
+- [ ] Farol's own shortcuts rebindable in the config file, like the terminal ones
+- [ ] `farol sessions`: the sessions with their branch, folder and status, so an agent can tell which one is waiting
+- [ ] `farol task`: a task started in a new worktree session from the command line, so one agent can hand work to another
+- [ ] The `farol` command working from Codex, which runs its commands without Farol's environment
+
 ## Speed and upkeep
 
 Speed is the first rule, and every git feature adds calls. These keep the window quick as they pile up, and make changes safer to make.

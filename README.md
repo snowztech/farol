@@ -175,7 +175,7 @@ font-family = JetBrains Mono
 font-size = 14
 ```
 
-The file uses Ghostty's format, so every option in the [Ghostty docs](https://ghostty.org/docs/config) works. If you also use Ghostty, your Ghostty config loads first and Farol's file wins.
+The file uses Ghostty's format, so every terminal option in the [Ghostty docs](https://ghostty.org/docs/config) works: fonts, colors, cursor, padding, keybinds. Options for Ghostty's own window, tabs and quick terminal do nothing, since Farol draws its own window. If you also use Ghostty, your Ghostty config loads first and Farol's file wins.
 
 ### Custom themes
 

@@ -527,7 +527,7 @@ struct SettingsPage: View {
                 }
             }
         }
-        Text("Rebind any of them in the config file, for example keybind = cmd+shift+enter=toggle_split_zoom.")
+        Text("Rebind the terminal, pane and session ones in the config file, for example keybind = cmd+shift+enter=toggle_split_zoom. Farol's own, like New Task and the panels, are fixed.")
             .font(.system(size: 12))
             .foregroundStyle(p.muted)
             .padding(.top, 20)
