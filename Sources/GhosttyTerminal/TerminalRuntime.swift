@@ -92,10 +92,12 @@ public final class TerminalRuntime {
         onConfigChange?()
     }
 
+    /// libghostty gives no file or line, so the same mistake on two lines reads the same and is listed once.
     private static func errors(in config: ghostty_config_t) -> [String] {
-        (0..<ghostty_config_diagnostics_count(config)).map {
-            String(cString: ghostty_config_get_diagnostic(config, $0).message).replacingOccurrences(of: NSHomeDirectory(), with: "~")
-        }
+        var seen = Set<String>()
+        return (0..<ghostty_config_diagnostics_count(config))
+            .map { String(cString: ghostty_config_get_diagnostic(config, $0).message).replacingOccurrences(of: NSHomeDirectory(), with: "~") }
+            .filter { seen.insert($0).inserted }
     }
 
     /// Theme colors, so window chrome can match the terminal.
