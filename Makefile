@@ -1,7 +1,7 @@
 APP := build/Farol.app
 GHOSTTY := vendor/GhosttyKit.xcframework
 
-.PHONY: help build release run install uninstall dist test lint lint-swift icon clean
+.PHONY: help build release run install uninstall dist test lint icon clean
 
 help:
 	@echo "make build      debug build into $(APP)"
@@ -11,8 +11,7 @@ help:
 	@echo "make uninstall  remove /Applications/Farol.app"
 	@echo "make dist       signed and notarized zip for sharing (see scripts/dist.sh)"
 	@echo "make test       run the FarolCore tests"
-	@echo "make lint       style check for comments and docs"
-	@echo "make lint-swift swift-format's rules on the Swift code (see .swift-format)"
+	@echo "make lint       style check for comments and docs, and swift-format's rules"
 	@echo "make icon       regenerate the app icon from assets/icon-source.png"
 	@echo "make clean      remove build output (keeps libghostty)"
 
@@ -47,10 +46,8 @@ test: $(GHOSTTY)
 
 lint:
 	python3 scripts/check-style.py
-
-# Only the rules. The code is not laid out by swift-format, so its whitespace findings are left out.
-lint-swift:
-	@swift format lint -r -p Sources Tests 2>&1 | grep -vE '\[(Indentation|AddLines|RemoveLine|LineLength|Spacing|TrailingWhitespace)\]' || true
+	@# Only the rules in .swift-format. The code is not laid out by swift-format, so what it says about layout is left out.
+	@! swift format lint -r -p Sources Tests 2>&1 | grep -vE '\[(Indentation|AddLines|RemoveLine|LineLength|Spacing|TrailingWhitespace|TrailingComma)\]'
 
 icon:
 	swift scripts/make-icon.swift

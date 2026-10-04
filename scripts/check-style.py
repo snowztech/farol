@@ -15,7 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CHECKED = {".swift", ".sh", ".md", ".py"}
-SKIPPED_DIRS = {".build", ".ghostty-src", "vendor", "build", ".git"}
+SKIPPED_DIRS = {".build", ".ghostty-src", ".scratch", "vendor", "build", ".git"}
 MAX_COMMENT_LINES = 3
 EM_DASH = chr(0x2014)
 

@@ -33,6 +33,8 @@ final class UpdateChecker: ObservableObject {
     }
 
     private struct Release: Decodable {
+        // GitHub's own name for the field.
+        // swift-format-ignore: AlwaysUseLowerCamelCase
         let tag_name: String
     }
 }

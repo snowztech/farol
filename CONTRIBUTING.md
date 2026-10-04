@@ -27,7 +27,7 @@ make lint
 
 ## Writing
 
-Farol's docs, comments and PRs are short and plain. `make lint` checks part of it.
+Farol's docs, comments and PRs are short and plain. `make lint` checks part of it. It also runs swift-format's rules on the Swift code, from `.swift-format`.
 
 - Say what changed and why, in a few sentences. Skip summaries of the diff, headings for one line of text, and lists of every file touched.
 - Comments explain why, not what the code does.
