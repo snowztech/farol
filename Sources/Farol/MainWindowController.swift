@@ -536,7 +536,16 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let errors = runtime.configErrors
         defer { settings.configErrors = errors }
         guard !errors.isEmpty, errors != settings.configErrors else { return }
-        showError("Farol could not read part of your config", errors.joined(separator: "\n"))
+        guard let window else { return }
+        let alert = NSAlert()
+        alert.messageText = "Farol skipped part of your config"
+        alert.informativeText = errors.joined(separator: "\n")
+            + "\n\nThe rest of the file applies. What was skipped stays in the file until you fix or remove it."
+        alert.addButton(withTitle: "Open Config")
+        alert.addButton(withTitle: "Later")
+        alert.beginSheetModal(for: window) { [settings] response in
+            if response == .alertFirstButtonReturn { settings.openFile() }
+        }
     }
 
     private func applyTheme(style: UIStyle? = nil) {
