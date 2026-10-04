@@ -6,7 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Fixed
 
-- A setting changed on the settings page applies when `~/.config/farol/config` has the same key on more than one line. Before, the page changed the first line while the terminal read the last, so nothing happened. The page now keeps one line per key it writes.
+- A setting changed on the settings page applies when `~/.config/farol/config` has the same key on more than one line. Before, the page changed the first line while the terminal read the last, so nothing happened. The page now keeps one line per key it writes, except `font-family`, where later lines are fallback fonts and stay.
 
 ## [0.30.0] - 2026-10-04
 
