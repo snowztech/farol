@@ -15,6 +15,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - A session keeps its folder or project name while a command runs. Before, it took the name of the command, so running `make test` renamed the session "make test". Programs that set a title of their own, like Claude Code or vim, still name the session until they exit.
 - A change written into `~/.config/farol/config` in place, as `cp`, `>>` and some agents do, applies right away. Before, only a save that replaced the file did.
+- Closing the terminal next to an open file no longer crashes Farol. A click on the file pane's header or line numbers also selects it, so ⌘W closes the file.
 
 ## [0.29.0] - 2026-10-04
 
