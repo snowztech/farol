@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-10-04
+
+Find files and folders from the session switcher, and ask your agent to change Farol's settings.
+
 ### Added
 
 - A key or a value Farol cannot read in the config file is reported when you save, and listed in Settings → Terminal until it is fixed. Before, it was ignored in silence.
@@ -594,7 +598,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.29.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.30.0...HEAD
+[0.30.0]: https://github.com/snowztech/farol/releases/tag/v0.30.0
 [0.29.0]: https://github.com/snowztech/farol/releases/tag/v0.29.0
 [0.28.0]: https://github.com/snowztech/farol/releases/tag/v0.28.0
 [0.27.0]: https://github.com/snowztech/farol/releases/tag/v0.27.0
