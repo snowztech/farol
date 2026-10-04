@@ -46,19 +46,23 @@ public struct AgentSkill {
 
     Every option at https://ghostty.org/docs/config works. Farol watches the file, so a saved edit is live in every session, with no restart. Deleting a line brings back its default.
 
+    Keep one line per key: when the key is already in the file, edit that line. The settings page rewrites the first line it finds for a key, and the last one wins.
+
+    The settings page shows `theme`, `font-family`, `font-size`, `cursor-style`, `cursor-style-blink`, `macos-option-as-alt` and `copy-on-select`. It reads `font-size` as a whole number, blinking as off only for `cursor-style-blink = false`, and copy on select as on only for `copy-on-select = clipboard`.
+
     `~/.config/ghostty/config` loads first when it exists and Farol's file wins, so make every change in Farol's file.
 
     Everything else is kept by the app, where only the user can change it, in Settings (⌘,): the app icon, panel style and grouping by project under Appearance, the agent connections and the menu bar or notch panel under Agents, and the `gh`, `glab` and jira-cli accounts under Integrations. For these, tell the user where to click.
 
     ## Themes
 
-    `theme` takes the exact name of a bundled theme. Each one is a file in `"$(dirname "$FAROL_CLI")/../ghostty/themes"`, or in `/Applications/Farol.app/Contents/Resources/ghostty/themes` when `$FAROL_CLI` is unset, so list that folder to find the name. Farol's own are `Farol Beam` (the default), `Farol Dark`, `Farol Navy` and `Farol Light`.
+    `theme` takes the exact name of a bundled theme. Each one is a file in `$GHOSTTY_RESOURCES_DIR/themes`, so list that folder to find the name. Farol's own are `Farol Beam` (the default), `Farol Dark`, `Farol Navy` and `Farol Light`.
 
     A custom theme is a file of Ghostty config in `~/.config/farol/themes`, with `background`, `foreground`, `cursor-color` and `palette = 0=#45475a` through 15. Set it by its full path, starting at `/`: `theme = /Users/name/.config/farol/themes/mine`.
 
     ## How Farol works
 
-    - Farol sets `$FAROL_PANE` and `$FAROL_CLI` in every shell it starts. Outside Farol they are unset.
+    - Farol sets `$FAROL_PANE`, `$FAROL_CLI` and `$GHOSTTY_RESOURCES_DIR` in every shell it starts. Outside Farol they are unset.
     - The dot next to a session is its agent's status: working, waiting for the user or done. Farol's hooks report it with `"$FAROL_CLI" status working|waiting|done|clear`.
     - Shortcuts: ⇧⌘N new task, ⇧⌘T worktree session, ⌘P switch session, ⌘D split pane, ⇧⌘E files, ⌥⌘R review changes, ⌥⌘G git graph, ⌥⌘M resolve conflicts.
     - For anything else, read https://github.com/snowztech/farol#readme.
