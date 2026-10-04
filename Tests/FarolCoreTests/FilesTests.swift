@@ -51,3 +51,16 @@ private func folder(_ files: [String: String]) throws -> String {
     #expect(Files.search(paths, "store", limit: 1) == ["Tests/StoreTests.swift"])
     #expect(Files.search(paths, " ").isEmpty)
 }
+
+@Test func searchableAddsTheFoldersOfACheckout() throws {
+    let root = try folder([".gitignore": "build/\n", "build/out.o": "", "src/app/main.swift": "", "README.md": ""])
+    try Git.run(["init", "--quiet"], in: root)
+    #expect(Files.searchable(in: root) == ["src/", "src/app/", ".gitignore", "README.md", "src/app/main.swift"])
+    #expect(Files.search(Files.searchable(in: root), "app") == ["src/app/", "src/app/main.swift"])
+}
+
+@Test func searchableWalksAFolderOutsideGit() throws {
+    let root = try folder(["a.txt": "", ".env": "", "one/b.txt": "", "one/two/c.txt": "", "one/two/three/d.txt": ""])
+    #expect(Files.searchable(in: root) == ["one/", "a.txt", "one/two/", "one/b.txt", "one/two/three/", "one/two/c.txt"])
+    #expect(Files.walk(root, limit: 2) == ["one/", "a.txt"])
+}

@@ -44,7 +44,41 @@ public enum Files {
         return output.split(separator: "\0").map(String.init)
     }
 
-    /// The paths that have every word typed, with a match in the file's name before one in its folders, then the shorter path.
+    /// What can be searched under `root`, relative to it, with a slash after each folder.
+    /// In a git checkout that is what git tracks or would add. Anywhere else it is what a short walk finds.
+    public static func searchable(in root: String) -> [String] {
+        let tracked = tracked(in: root)
+        guard !tracked.isEmpty else { return walk(root) }
+        var folders = Set<String>()
+        for path in tracked {
+            var rest = Substring(path)
+            // Stops at the first folder already seen, since its parents were added with it.
+            while let slash = rest.lastIndex(of: "/"), folders.insert(String(rest[...slash])).inserted { rest = rest[..<slash] }
+        }
+        return folders.sorted() + tracked
+    }
+
+    /// The files and folders under `root`, nearest first and without the hidden ones.
+    /// There is no .gitignore to say what to skip, so the depth and the count are capped to keep a session in your home folder quick.
+    static func walk(_ root: String, depth: Int = 3, limit: Int = 5000) -> [String] {
+        var found: [String] = []
+        var level = [""]
+        for _ in 0..<depth {
+            var next: [String] = []
+            for folder in level {
+                for entry in list(root + "/" + folder) where !entry.isHidden {
+                    guard found.count < limit else { return found }
+                    let path = folder + entry.name + (entry.isDirectory ? "/" : "")
+                    found.append(path)
+                    if entry.isDirectory { next.append(path) }
+                }
+            }
+            level = next
+        }
+        return found
+    }
+
+    /// The paths that have every word typed, with a match in the name before one in the folders above, then the shorter path.
     /// Nothing typed finds nothing.
     public static func search(_ paths: [String], _ query: String, limit: Int = 30) -> [String] {
         let words = query.lowercased().split(separator: " ")
@@ -53,7 +87,9 @@ public enum Files {
         let found = paths.compactMap { path -> (path: String, inName: Bool)? in
             let lower = path.lowercased()
             guard words.allSatisfy(lower.contains) else { return nil }
-            let name = lower[(lower.lastIndex(of: "/").map(lower.index(after:)) ?? lower.startIndex)...]
+            // A folder ends in a slash, which is not part of its name.
+            let trimmed = lower.hasSuffix("/") ? lower.dropLast() : Substring(lower)
+            let name = trimmed[(trimmed.lastIndex(of: "/").map(trimmed.index(after:)) ?? trimmed.startIndex)...]
             return (path, words.allSatisfy(name.contains))
         }
         return found

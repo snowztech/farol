@@ -39,6 +39,7 @@ struct Commands {
     let toggleSettings: () -> Void
     let toggleMerge: () -> Void
     let openFile: (String) -> Void
+    let newSessionIn: (String) -> Void
     let titleBarDoubleClick: () -> Void
 }
 
@@ -57,7 +58,7 @@ struct TopBar: View {
                 if state.showingSettings {
                     Text("Settings")
                 } else if let session = store.selected {
-                    SessionMenu(session: session, store: store, state: state, openFile: commands.openFile)
+                    SessionMenu(session: session, store: store, state: state, commands: commands)
                 }
             }
             .font(.system(size: 12, weight: .medium))
@@ -246,7 +247,7 @@ private struct GitButton: View {
 }
 
 /// The title opens a searchable list of every session, grouped like the sidebar, so you can switch with the sidebar closed.
-/// Typing also finds files in the checkout you are in.
+/// Typing also finds the files and folders of the checkout or the folder you are in.
 private struct SessionMenu: View {
     private enum Choice: Hashable {
         case session(UUID)
@@ -256,13 +257,13 @@ private struct SessionMenu: View {
     @ObservedObject var session: Session
     @ObservedObject var store: SessionStore
     @ObservedObject var state: WindowState
-    let openFile: (String) -> Void
+    let commands: Commands
 
     @State private var hovering = false
     @State private var query = ""
     /// The row the arrows or the mouse are on. Without one, Return goes to the first match.
     @State private var active: Choice?
-    /// The checkout's files, listed each time the list opens, and the ones that match what is typed.
+    /// The files and folders around you, listed each time the list opens, and the ones that match what is typed.
     @State private var files: (root: String, paths: [String]) = ("", [])
     @State private var hits: [String] = []
     @State private var listHeight: CGFloat = 0
@@ -297,11 +298,10 @@ private struct SessionMenu: View {
         .onChange(of: query) { _, query in (active, hits) = (nil, Files.search(files.paths, query)) }
     }
 
-    /// Only in a git checkout, where git knows what to leave out.
     private func listFiles() {
-        guard let root = session.topLevel else { return }
+        let root = session.topLevel ?? session.directory
         DispatchQueue.global(qos: .userInitiated).async {
-            let paths = Files.tracked(in: root)
+            let paths = Files.searchable(in: root)
             DispatchQueue.main.async {
                 guard open else { return }
                 (files, hits) = ((root, paths), Files.search(paths, query))
@@ -315,7 +315,7 @@ private struct SessionMenu: View {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(p.muted)
                 // Return takes the first match, so a session is a few letters away.
-                TextField(session.topLevel == nil ? "Search \(store.sessions.count) sessions" : "Search sessions and files", text: $query)
+                TextField("Search sessions, files and folders", text: $query)
                     .textFieldStyle(.plain)
                     .focused($searching)
                     .onSubmit { highlighted.map(choose) }
@@ -429,12 +429,13 @@ private struct SessionMenu: View {
         case .session(let id):
             if id != store.selectedID, let item = store.sessions.first(where: { $0.id == id }) { store.select(item) }
         case .file(let path):
-            openFile(root + "/" + path)
+            // A folder has nothing to show in a pane, so it opens as a session of its own.
+            if path.hasSuffix("/") { commands.newSessionIn(root + "/" + path.dropLast()) } else { commands.openFile(root + "/" + path) }
         }
     }
 }
 
-/// A file in the title's list: its name, then the folder it is in.
+/// A file or a folder in the title's list: its name, then the folder it is in.
 private struct FileChoice: View {
     let path: String
     /// Under the arrows or the mouse.
@@ -448,11 +449,15 @@ private struct FileChoice: View {
             HStack(spacing: 9) {
                 // The room of a session's check and lamp, so every name starts at the same place.
                 Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).hidden()
-                Image(systemName: "doc").font(.system(size: 11)).foregroundStyle(palette.muted).frame(width: 7)
+                Image(systemName: path.hasSuffix("/") ? "folder" : "doc").font(.system(size: 11)).foregroundStyle(palette.muted).frame(width: 7)
                 Text((path as NSString).lastPathComponent).lineLimit(1).truncationMode(.middle).layoutPriority(1)
                 Text((path as NSString).deletingLastPathComponent)
                     .font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.head)
-                Spacer(minLength: 0)
+                Spacer(minLength: 8)
+                // A folder opening a session is not what a file list leads you to expect, so the row says it.
+                if lit && path.hasSuffix("/") {
+                    Text("New session").font(.system(size: 11)).foregroundStyle(palette.muted).fixedSize()
+                }
             }
             .padding(.horizontal, 9)
             .frame(height: 28)

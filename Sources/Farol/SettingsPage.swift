@@ -624,7 +624,7 @@ struct SettingsPage: View {
             ("Close pane or session", ["⌘W"]),
             ("Next and previous session", ["⇧⌘]", "⇧⌘["]),
             ("Go to session 1 to 9", ["⌘1…⌘9"]),
-            ("Search sessions and files", ["⌘P"]),
+            ("Search sessions, files and folders", ["⌘P"]),
         ]),
         ShortcutGroup(title: "Panes", items: [
             ("Split right", ["⌘D"]),
