@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- A change written into `~/.config/farol/config` in place, as `cp`, `>>` and some agents do, applies right away. Before, only a save that replaced the file did.
+
 ## [0.29.0] - 2026-10-04
 
 Walk the git graph with the arrow keys, and each branch keeps its own color.
