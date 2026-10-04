@@ -16,6 +16,9 @@ public final class TerminalRuntime {
     /// True while any terminal runs a program that quitting would kill.
     public var hasRunningProcesses: Bool { ghostty_app_needs_confirm_quit(app) }
 
+    /// What libghostty could not read in the config files, one message per problem. Empty when all of it was read.
+    public private(set) var configErrors: [String] = []
+
     /// Called on the main thread after reloadConfig() applied new settings.
     public var onConfigChange: (() -> Void)?
 
@@ -31,6 +34,7 @@ public final class TerminalRuntime {
         }
         self.overrideFiles = overrideFiles
         config = Self.loadConfig(overrideFiles)
+        configErrors = Self.errors(in: config)
 
         let base = Self.loadConfig([])
         let plain = Self.loadConfig([], ghosttyFiles: false)
@@ -82,9 +86,16 @@ public final class TerminalRuntime {
     public func reloadConfig() {
         let old = config
         config = Self.loadConfig(overrideFiles)
+        configErrors = Self.errors(in: config)
         ghostty_app_update_config(app, config)
         ghostty_config_free(old)
         onConfigChange?()
+    }
+
+    private static func errors(in config: ghostty_config_t) -> [String] {
+        (0..<ghostty_config_diagnostics_count(config)).map {
+            String(cString: ghostty_config_get_diagnostic(config, $0).message).replacingOccurrences(of: NSHomeDirectory(), with: "~")
+        }
     }
 
     /// Theme colors, so window chrome can match the terminal.

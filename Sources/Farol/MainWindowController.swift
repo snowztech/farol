@@ -12,6 +12,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     let store: SessionStore
     private let runtime: TerminalRuntime
+    private let settings: Settings
     let state: WindowState
 
     private lazy var notifier = AgentNotifier(settings: agents)
@@ -65,6 +66,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         self.worktreeSettings = worktrees
         self.store = store
         self.runtime = runtime
+        self.settings = settings
         self.state = WindowState(
             palette: Palette(runtime, style: UIStyle.saved),
             ghosttyConfigPreview: runtime.ghosttyConfigColors.map { ThemeColors(background: $0.background, foreground: $0.foreground) })
@@ -196,7 +198,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         if !window.setFrameUsingName("FarolMain") { window.center() }
 
         applyTheme()
-        runtime.onConfigChange = { [weak self] in self?.applyTheme() }
+        settings.configErrors = runtime.configErrors
+        runtime.onConfigChange = { [weak self] in
+            self?.applyTheme()
+            self?.reportConfigErrors()
+        }
         graph.onGitChange = { [weak self] in self?.store.selected?.refreshGit() }
         graph.onShowInReview = { [weak self] commit, file in
             guard let self else { return }
@@ -523,6 +529,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         // The window draws under its title bar, and SwiftUI would otherwise pad for it.
         host.safeAreaRegions = []
         return host
+    }
+
+    /// Asks once per set of problems, so saving again with the same typo stays quiet.
+    private func reportConfigErrors() {
+        let errors = runtime.configErrors
+        defer { settings.configErrors = errors }
+        guard !errors.isEmpty, errors != settings.configErrors else { return }
+        showError("Farol could not read part of your config", errors.joined(separator: "\n"))
     }
 
     private func applyTheme(style: UIStyle? = nil) {

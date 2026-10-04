@@ -233,6 +233,13 @@ struct SettingsPage: View {
             palette: p) {
             ShipButton(title: "Open", busy: false, palette: p, action: settings.openFile)
         }
+        ForEach(settings.configErrors, id: \.self) { error in
+            Text(error)
+                .font(.system(size: 12))
+                .foregroundStyle(p.waiting)
+                .textSelection(.enabled)
+                .padding(.top, 6)
+        }
     }
 
     @ViewBuilder private func agentsSection(_ p: Palette) -> some View {

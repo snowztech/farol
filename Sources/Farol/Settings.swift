@@ -17,6 +17,9 @@ final class Settings: ObservableObject {
     /// Selecting text copies it to the clipboard right away.
     @Published var copyOnSelect = false { didSet { write("copy-on-select", copyOnSelect ? "clipboard" : "") } }
 
+    /// What the terminal could not read in the file after the last reload, for the settings page to show.
+    @Published var configErrors: [String] = []
+
     /// Called after every change, from the page or from the file, so the terminal can reload.
     var onChange: (() -> Void)?
 
