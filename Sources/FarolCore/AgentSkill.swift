@@ -33,7 +33,7 @@ public struct AgentSkill {
 
     # Farol
 
-    Farol is a macOS terminal for coding agents, built on libghostty. This session runs inside Farol when `$FAROL_PANE` is set. If it is not set, say so before changing anything.
+    Farol is a macOS terminal for coding agents, built on libghostty. This session runs inside Farol when `$FAROL_PANE` is set.
 
     ## Settings file
 
