@@ -74,9 +74,9 @@ When an agent waits or finishes while Farol is in the background, you get a noti
   <img src="site/features/edge-open.png" width="300" alt="The status panel on the right screen edge, opened on hover, listing the sessions and their state">
 </p>
 
-**Claude Code:** open Settings → Agents and click **Connect**. Farol adds its hooks to `~/.claude/settings.json`, leaves everything else in the file alone and keeps a backup. If you have more than one account, in folders like `~/.claude-work`, each one gets its own row. **Disconnect** removes only Farol's hooks, and Claude Code keeps working as before.
+**Claude Code:** open Settings → Agents and click **Connect**. Farol adds its hooks to `~/.claude/settings.json`, leaves everything else in the file alone and keeps a backup. It also adds a skill in `~/.claude/skills/farol`, so you can ask Claude Code to change a Farol setting, like the theme or the font, and it edits `~/.config/farol/config` for you. If you have more than one account, in folders like `~/.claude-work`, each one gets its own row. **Disconnect** removes only Farol's hooks and its skill, and Claude Code keeps working as before.
 
-**Codex:** interactive sessions work automatically through Codex's terminal titles. Keep Codex's terminal-title setting enabled. To cover non-interactive runs and background agents too, click **Connect**. Farol adds hooks to `~/.codex/hooks.json`, leaves other hooks alone and keeps a backup. Restart open Codex sessions, then review and trust the hooks with `/hooks`. **Disconnect** removes only Farol's hooks. Interactive status keeps working.
+**Codex:** interactive sessions work automatically through Codex's terminal titles. Keep Codex's terminal-title setting enabled. To cover non-interactive runs and background agents too, click **Connect**. Farol adds hooks to `~/.codex/hooks.json`, leaves other hooks alone and keeps a backup. Restart open Codex sessions, then review and trust the hooks with `/hooks`. Connecting adds the same skill in `~/.codex/skills/farol`. **Disconnect** removes only Farol's hooks and its skill. Interactive status keeps working.
 
 **Other agents** can report with `"$FAROL_CLI" status working|waiting|done|clear`, which Farol makes available in every session. Agents that ring the terminal bell show as waiting without any setup.
 
@@ -175,7 +175,7 @@ font-family = JetBrains Mono
 font-size = 14
 ```
 
-The file uses Ghostty's format, so every option in the [Ghostty docs](https://ghostty.org/docs/config) works. If you also use Ghostty, your Ghostty config loads first and Farol's file wins.
+The file uses Ghostty's format, so every terminal option in the [Ghostty docs](https://ghostty.org/docs/config) works: fonts, colors, cursor, padding, keybinds. Options for Ghostty's own window, tabs and quick terminal do nothing, since Farol draws its own window. If you also use Ghostty, your Ghostty config loads first and Farol's file wins.
 
 ### Custom themes
 

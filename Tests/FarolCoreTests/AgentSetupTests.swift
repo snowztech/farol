@@ -19,6 +19,25 @@ private func hooks(_ agent: AgentHooks, at url: URL) -> AgentHooks {
     #expect(setup.state() == .disconnected)
 }
 
+@Test(arguments: [AgentFolder.Kind.claude, .codex])
+func skillFollowsTheConnection(kind: AgentFolder.Kind) throws {
+    let settings = tempFile("hooks.json")
+    let skill = AgentSkill(nextTo: settings)
+    let setup = kind == .claude
+        ? AgentSetup.claude(hooks: hooks(.claude, at: settings))
+        : AgentSetup.codex(config: tempFile("config.toml"), hooks: hooks(.codex, at: settings))
+    AgentSetup.refreshSkills(of: [setup])
+    #expect(!skill.isCurrent)
+    try setup.connect()
+    #expect(skill.isCurrent)
+    try "from an older Farol".write(to: skill.file, atomically: true, encoding: .utf8)
+    #expect(setup.state() == .connected)
+    AgentSetup.refreshSkills(of: [setup])
+    #expect(skill.isCurrent)
+    try setup.disconnect()
+    #expect(!FileManager.default.fileExists(atPath: skill.file.deletingLastPathComponent().path))
+}
+
 @Test func claudeNeedsUpdateWithOldHooks() throws {
     let old = hooks(.claude, at: tempFile("settings.json"))
     try old.write(["hooks": ["Stop": [["hooks": [["type": "command", "command": "\"$FAROL_CLI\" status done"]]]]]])
