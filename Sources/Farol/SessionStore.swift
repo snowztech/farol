@@ -73,7 +73,7 @@ final class Session: ObservableObject, Identifiable {
         for pane in agents.keys { agents[pane]?.acknowledge() }
     }
 
-    /// Looks up the branch off the main thread. The shell retitles at every prompt, so a `git checkout` shows up too.
+    /// Looks up the branch off the main thread. The shell reports its folder at every prompt, so a `git checkout` shows up too.
     func refreshGit() {
         let directory = directory
         DispatchQueue.global(qos: .userInitiated).async {
@@ -120,8 +120,9 @@ final class Session: ObservableObject, Identifiable {
 
     /// Shells title the window with the folder, sometimes shortened to "…/dev/project" or "dev/project".
     /// A path has a slash and no spaces, while a program title like "vim src/main.swift" has spaces.
+    /// Until a program sets a title, Ghostty uses the full folder path, which can have spaces.
     private var hasProgramTitle: Bool {
-        let looksLikePath = title.contains("/") && !title.contains(" ")
+        let looksLikePath = title.hasPrefix("/") || title.contains("/") && !title.contains(" ")
         return !(title.isEmpty || title.contains("@") || title.hasPrefix("~") || looksLikePath)
     }
 
@@ -267,7 +268,7 @@ final class SessionStore: ObservableObject {
             previousTitle = $0
             guard terminal === session.panes.focused else { return }
             // Agents animate a glyph in the title many times a second, and those frames are not worth a git lookup.
-            // A shell re-sends the same title at each prompt, which is how a `git checkout` gets noticed.
+            // The title is cleared when a command ends, which is one way a `git checkout` gets noticed.
             let glyphOnly = $0 != AgentTitle.withoutStatus($0) && AgentTitle.withoutStatus($0) == AgentTitle.withoutStatus(session.title)
             session.title = $0
             if !glyphOnly { session.refreshGit() }

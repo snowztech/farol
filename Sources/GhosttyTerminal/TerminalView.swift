@@ -110,6 +110,10 @@ public final class TerminalView: NSView {
             guard let title = action.action.set_title.title else { return false }
             self.title = String(cString: title)
             onTitleChange?(self.title)
+        case GHOSTTY_ACTION_COMMAND_FINISHED:
+            // The shell no longer retitles at its prompt, so a title the program left behind would stay for good.
+            title = ""
+            onTitleChange?(title)
         case GHOSTTY_ACTION_PWD:
             guard let pwd = action.action.pwd.pwd else { return false }
             workingDirectory = String(cString: pwd)
