@@ -47,9 +47,8 @@ test: $(GHOSTTY)
 lint:
 	python3 scripts/check-style.py
 	@# Only the rules in .swift-format. The code is not laid out by swift-format, so what it says about layout is left out.
-	@# The files come from git, so what it ignores is not checked.
 	@echo "swift format lint"
-	@! git ls-files -z --cached --others --exclude-standard -- 'Sources/*.swift' 'Tests/*.swift' | xargs -0 swift format lint -p 2>&1 | grep -vE '\[(Indentation|AddLines|RemoveLine|LineLength|Spacing|TrailingWhitespace|TrailingComma)\]'
+	@! swift format lint -r -p Sources Tests 2>&1 | grep -vE '\[(Indentation|AddLines|RemoveLine|LineLength|Spacing|TrailingWhitespace|TrailingComma)\]'
 
 icon:
 	swift scripts/make-icon.swift
