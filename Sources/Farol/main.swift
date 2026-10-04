@@ -1,4 +1,5 @@
 import AppKit
+import FarolCore
 import GhosttyTerminal
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
@@ -30,6 +31,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         windowController.showWindow(nil)
         store.restore()
         NSApp.activate(ignoringOtherApps: true)
+        // Reads each agent's config, so it stays off the main thread and out of the launch.
+        DispatchQueue.global(qos: .utility).async { AgentSetup.refreshSkills() }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
