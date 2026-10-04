@@ -8,6 +8,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - A key or a value Farol cannot read in the config file is reported when you save, and listed in Settings → Terminal until it is fixed. Before, it was ignored in silence.
 - Connecting Claude Code or Codex also adds a skill that tells the agent how Farol is configured, so you can ask it to change the theme, the font or any other terminal setting. Already connected? Farol adds it the next time it opens.
+- The session switcher (⌘P) also matches the folder a session is in, so a session outside a git repo can be found by its path.
 
 ### Fixed
 
