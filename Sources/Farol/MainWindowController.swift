@@ -94,6 +94,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             toggleSettings: { [weak self] in self?.toggleSettings() },
             toggleMerge: { [weak self] in self?.toggleMerge() },
             openFile: { [weak self] in self?.open($0) },
+            newSessionIn: { [weak self] in self?.newSession(in: $0) },
             titleBarDoubleClick: { [weak self] in self?.titleBarDoubleClicked() })
 
         let root = NSView()
@@ -313,8 +314,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// Opens where you are: the focused pane's folder, or home when there is no session yet.
-    func newSession() {
-        store.create(directory: store.selected?.panes.focused.workingDirectory ?? NSHomeDirectory(), run: agents.startCommand)
+    func newSession(in directory: String? = nil) {
+        store.create(directory: directory ?? store.selected?.panes.focused.workingDirectory ?? NSHomeDirectory(), run: agents.startCommand)
     }
 
     func toggleSidebar() {
