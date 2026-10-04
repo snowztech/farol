@@ -93,6 +93,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             toggleReview: { [weak self] in self?.toggleReview() },
             toggleSettings: { [weak self] in self?.toggleSettings() },
             toggleMerge: { [weak self] in self?.toggleMerge() },
+            openFile: { [weak self] in self?.open($0) },
             titleBarDoubleClick: { [weak self] in self?.titleBarDoubleClicked() })
 
         let root = NSView()
