@@ -336,12 +336,14 @@ private struct SessionMenu: View {
         .onAppear { searching = true }
     }
 
-    /// The sidebar's groups, keeping only the sessions whose name, repo or branch has every word typed.
+    /// The sidebar's groups, keeping only the sessions whose name, repo, branch or folder has every word typed.
     private var matches: [Grouping.Group<Session>] {
         let words = query.lowercased().split(separator: " ")
         return store.groups.compactMap { group in
             let items = group.items.filter { item in
-                let text = [item.displayName, item.repoName ?? "", item.branch ?? ""].joined(separator: " ").lowercased()
+                // With the home folder as ~, so your user name does not match every session.
+                let folder = (item.directory as NSString).abbreviatingWithTildeInPath
+                let text = [item.displayName, item.repoName ?? "", item.branch ?? "", folder].joined(separator: " ").lowercased()
                 return words.allSatisfy(text.contains)
             }
             return items.isEmpty ? nil : Grouping.Group(key: group.key, items: items)
