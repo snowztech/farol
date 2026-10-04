@@ -34,6 +34,14 @@ public struct AgentSetup {
     }
 
     /// Hooks report working, waiting and done.
+    /// Rewrites the skill of every connected agent when Farol's text has changed, so a reworded skill needs no click.
+    public static func refreshSkills(of setups: [AgentSetup] = all()) {
+        for setup in setups where setup.state() != .disconnected {
+            let skill = AgentSkill(nextTo: setup.file)
+            if !skill.isCurrent { try? skill.install() }
+        }
+    }
+
     static func claude(hooks: AgentHooks = .claude) -> AgentSetup {
         let skill = AgentSkill(nextTo: hooks.file)
         return AgentSetup(
@@ -46,7 +54,7 @@ public struct AgentSetup {
             disconnectMessage: "The sidebar stops showing when Claude Code is working, waiting or done, and Farol stops notifying you. Claude Code keeps working as before. Farol removes only its own hooks from \(tilde(hooks.file)) and keeps a backup, and removes its skill.",
             state: {
                 guard let settings = try? hooks.read() else { return .disconnected }
-                if hooks.isInstalled(in: settings), skill.isCurrent { return .connected }
+                if hooks.isInstalled(in: settings) { return .connected }
                 return hooks.hasAnyFarolHook(in: settings) ? .outdated : .disconnected
             },
             connect: {
@@ -80,7 +88,7 @@ public struct AgentSetup {
             disconnectMessage: "Interactive Codex sessions keep showing status through their terminal title, but non-interactive runs and background agents stop reporting. Farol removes only its own hooks from \(tilde(hooks.file)) and keeps a backup, and removes its skill.",
             state: {
                 guard let settings = try? hooks.read() else { return .disconnected }
-                if hooks.isInstalled(in: settings), skill.isCurrent, !hasLegacyNotifications() { return .connected }
+                if hooks.isInstalled(in: settings), !hasLegacyNotifications() { return .connected }
                 return hooks.hasAnyFarolHook(in: settings) || hasLegacyNotifications() ? .outdated : .disconnected
             },
             connect: {

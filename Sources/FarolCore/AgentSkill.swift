@@ -60,12 +60,7 @@ public struct AgentSkill {
 
     A custom theme is a file of Ghostty config in `~/.config/farol/themes`, with `background`, `foreground`, `cursor-color` and `palette = 0=#45475a` through 15. Set it by its full path, starting at `/`: `theme = /Users/name/.config/farol/themes/mine`.
 
-    ## How Farol works
-
-    - Farol sets `$FAROL_PANE` and `$FAROL_CLI` in every shell it starts. Outside Farol they are unset.
-    - The dot next to a session is its agent's status: working, waiting for the user or done. Farol's hooks report it with `"$FAROL_CLI" status working|waiting|done|clear`.
-    - Shortcuts: ⇧⌘N new task, ⇧⌘T worktree session, ⌘P switch session, ⌘D split pane, ⇧⌘E files, ⌥⌘R review changes, ⌥⌘G git graph, ⌥⌘M resolve conflicts.
-    - The README at https://github.com/snowztech/farol#readme covers the rest. Read it when the user asks for something this file leaves out.
+    The README at https://github.com/snowztech/farol#readme covers how the rest of Farol works. Read it when the user asks for something this file leaves out.
 
     """
 }

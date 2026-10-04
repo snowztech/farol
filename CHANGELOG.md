@@ -6,7 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
-- Connecting Claude Code or Codex also adds a skill that tells the agent how Farol is configured, so you can ask it to change the theme, the font or any other terminal setting. Already connected? Settings → Agents shows **Update**.
+- Connecting Claude Code or Codex also adds a skill that tells the agent how Farol is configured, so you can ask it to change the theme, the font or any other terminal setting. Already connected? Farol adds it the next time it opens.
 
 ## [0.29.0] - 2026-10-04
 
