@@ -135,10 +135,10 @@ public final class TerminalRuntime {
         Bundle.main.resourceURL?.appendingPathComponent("ghostty/themes")
     }
 
-    /// Farol Beam is the theme until a config names another.
     /// Shell integration sets a bar cursor at every prompt, which hides the cursor-style setting.
-    /// Loaded first, so the user's Ghostty config and the override files can still change both.
-    private static let defaults = "theme = Farol Beam\nshell-integration-features = no-cursor\n"
+    /// It also titles the terminal with each command you run, which would name the session "make test".
+    /// Loaded first, so the user's Ghostty config and the override files can still change these.
+    private static let defaults = "theme = Farol Beam\nshell-integration-features = no-cursor,no-title\n"
 
     private static func loadConfig(_ overrides: [URL], ghosttyFiles: Bool = true) -> ghostty_config_t {
         let config = ghostty_config_new()!
