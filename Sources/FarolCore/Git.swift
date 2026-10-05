@@ -27,8 +27,16 @@ public enum Git {
         process.standardError = errors
 
         try process.run()
+        // Read apart, so a command that fills one pipe can't wait forever on the other being read.
+        // A thread of its own, since the shared pool can run out while many of these wait.
+        var err = Data()
+        let read = DispatchSemaphore(value: 0)
+        Thread.detachNewThread {
+            err = errors.fileHandleForReading.readDataToEndOfFile()
+            read.signal()
+        }
         let out = output.fileHandleForReading.readDataToEndOfFile()
-        let err = errors.fileHandleForReading.readDataToEndOfFile()
+        read.wait()
         process.waitUntilExit()
 
         guard process.terminationStatus == 0 else {
