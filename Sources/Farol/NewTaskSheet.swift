@@ -38,19 +38,25 @@ struct NewTaskSheet: View {
     @FocusState private var searching: Bool
 
     static func present(in window: NSWindow, directory: String, palette: Palette, start: @escaping (String, String) -> Void) {
-        let sheet = NSWindow(contentRect: .zero, styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: true)
-        let view = NewTaskSheet(
-            directory: directory,
-            repo: Git.repoRoot(of: directory).map { URL(fileURLWithPath: $0).lastPathComponent } ?? "repository",
-            base: Git.branch(of: directory) ?? "the current commit",
-            expectsTickets: Jira.isSetUp || Forge.detect(in: directory)?.listsIssues == true,
-            palette: palette, start: start,
-            close: { [weak window, weak sheet] in sheet.map { window?.endSheet($0) } })
-        let host = NSHostingController(rootView: view)
-        // The sheet grows with the task as it wraps onto more lines.
-        host.sizingOptions = [.preferredContentSize]
-        sheet.contentViewController = host
-        window.beginSheet(sheet)
+        // Git is asked off the main thread, so a slow repo can't freeze the window before the sheet shows.
+        DispatchQueue.global(qos: .userInitiated).async {
+            let repo = Git.repoRoot(of: directory).map { URL(fileURLWithPath: $0).lastPathComponent } ?? "repository"
+            let base = Git.branch(of: directory) ?? "the current commit"
+            let expectsTickets = Jira.isSetUp || Forge.detect(in: directory)?.listsIssues == true
+            DispatchQueue.main.async { [weak window] in
+                guard let window else { return }
+                let sheet = NSWindow(contentRect: .zero, styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: true)
+                let view = NewTaskSheet(
+                    directory: directory, repo: repo, base: base, expectsTickets: expectsTickets,
+                    palette: palette, start: start,
+                    close: { [weak window, weak sheet] in sheet.map { window?.endSheet($0) } })
+                let host = NSHostingController(rootView: view)
+                // The sheet grows with the task as it wraps onto more lines.
+                host.sizingOptions = [.preferredContentSize]
+                sheet.contentViewController = host
+                window.beginSheet(sheet)
+            }
+        }
     }
 
     private var text: String { task.trimmingCharacters(in: .whitespacesAndNewlines) }
