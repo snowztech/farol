@@ -20,7 +20,7 @@ public enum Git {
         process.arguments = arguments
         process.currentDirectoryURL = URL(fileURLWithPath: directory)
         // There's no terminal to type a password into, so git fails right away instead of waiting forever.
-        process.environment = ProcessInfo.processInfo.environment.merging(["GIT_TERMINAL_PROMPT": "0"]) { $1 }
+        process.environment = ProcessInfo.processInfo.environment.merging(["GIT_TERMINAL_PROMPT": "0", "PATH": shellPath]) { $1 }
         let output = Pipe()
         let errors = Pipe()
         process.standardOutput = output
@@ -48,6 +48,31 @@ public enum Git {
         // A diff's leading spaces are context lines, so it can't be trimmed.
         return trimming ? text.trimmingCharacters(in: .whitespacesAndNewlines) : text
     }
+
+    /// An app opened from the Dock gets a bare PATH, so a repo's hooks can't find tools like pnpm or npx.
+    /// The PATH comes from your shell instead, as it would in a terminal. It's read once, since starting a shell is slow.
+    static let shellPath: String = {
+        let fallback = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
+        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: shell)
+        // The marker keeps whatever the startup files print out of the PATH.
+        process.arguments = ["-ilc", #"printf '\n__FAROL_PATH__%s' "$PATH""#]
+        process.currentDirectoryURL = URL(fileURLWithPath: NSHomeDirectory())
+        let output = Pipe()
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+        guard (try? process.run()) != nil else { return fallback }
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        let text = String(decoding: data, as: UTF8.self)
+        guard process.terminationStatus == 0, let range = text.range(of: "__FAROL_PATH__", options: .backwards) else {
+            return fallback
+        }
+        let path = text[range.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
+        return path.isEmpty ? fallback : path
+    }()
 
     /// The main checkout of the repo that contains `directory`, even when called from inside a worktree.
     public static func repoRoot(of directory: String) -> String? {
