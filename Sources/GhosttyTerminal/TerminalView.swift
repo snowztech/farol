@@ -363,10 +363,18 @@ public final class TerminalView: NSView {
     public override func mouseDown(with event: NSEvent) { mouseButton(event, GHOSTTY_MOUSE_PRESS, GHOSTTY_MOUSE_LEFT) }
     public override func mouseUp(with event: NSEvent) { mouseButton(event, GHOSTTY_MOUSE_RELEASE, GHOSTTY_MOUSE_LEFT) }
     /// A program that uses the mouse gets the click. Otherwise AppKit asks menu(for:) for the context menu.
+    /// Shift keeps the click from the program, as in Ghostty, so the menu stays reachable in Claude Code or vim.
     public override func rightMouseDown(with event: NSEvent) {
-        if !mouseButton(event, GHOSTTY_MOUSE_PRESS, GHOSTTY_MOUSE_RIGHT) { super.rightMouseDown(with: event) }
+        if event.modifierFlags.contains(.shift) {
+            window?.makeFirstResponder(self)
+            super.rightMouseDown(with: event)
+        } else if !mouseButton(event, GHOSTTY_MOUSE_PRESS, GHOSTTY_MOUSE_RIGHT) {
+            super.rightMouseDown(with: event)
+        }
     }
-    public override func rightMouseUp(with event: NSEvent) { mouseButton(event, GHOSTTY_MOUSE_RELEASE, GHOSTTY_MOUSE_RIGHT) }
+    public override func rightMouseUp(with event: NSEvent) {
+        if !event.modifierFlags.contains(.shift) { mouseButton(event, GHOSTTY_MOUSE_RELEASE, GHOSTTY_MOUSE_RIGHT) }
+    }
     public override func mouseMoved(with event: NSEvent) { mousePos(event) }
     public override func mouseDragged(with event: NSEvent) { mousePos(event) }
 
@@ -397,7 +405,8 @@ public final class TerminalView: NSView {
     public var onContextMenu: ((NSMenu) -> Void)?
 
     public override func menu(for event: NSEvent) -> NSMenu? {
-        guard event.type == .rightMouseDown, let surface, !ghostty_surface_mouse_captured(surface) else { return nil }
+        guard event.type == .rightMouseDown, let surface,
+              event.modifierFlags.contains(.shift) || !ghostty_surface_mouse_captured(surface) else { return nil }
         let menu = NSMenu()
         let copy = menu.addItem(withTitle: "Copy", action: #selector(copy(_:)), keyEquivalent: "")
         copy.target = self
