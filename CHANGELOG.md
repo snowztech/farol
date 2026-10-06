@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.30.1] - 2026-10-06
+
+Reach the pane menu in Claude Code and vim, and the settings page works with a repeated key.
+
 ### Fixed
 
 - Shift-right-click opens the pane's menu even when the program in the terminal uses the mouse, like Claude Code or vim. Before, the click went to the program and there was no way to name or close the pane from the menu.
@@ -603,7 +607,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.30.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.30.1...HEAD
+[0.30.1]: https://github.com/snowztech/farol/releases/tag/v0.30.1
 [0.30.0]: https://github.com/snowztech/farol/releases/tag/v0.30.0
 [0.29.0]: https://github.com/snowztech/farol/releases/tag/v0.29.0
 [0.28.0]: https://github.com/snowztech/farol/releases/tag/v0.28.0
