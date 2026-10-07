@@ -3,16 +3,40 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Farol: a macOS terminal for coding agents</title>
-  <meta name="description" content="A fast macOS terminal for working with coding agents like Claude Code and Codex. Built on libghostty.">
+  <title>Farol: a macOS terminal for Claude Code and coding agents</title>
+  <meta name="description" content="Farol is a free, open source macOS terminal for running Claude Code and Codex agents in parallel, each in its own git worktree. Built on libghostty.">
   <link rel="canonical" href="https://farol.sh/">
-  <meta property="og:title" content="Farol">
-  <meta property="og:description" content="A fast macOS terminal for working with coding agents.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Farol">
+  <meta property="og:url" content="https://farol.sh/">
+  <meta property="og:title" content="Farol: a macOS terminal for Claude Code and coding agents">
+  <meta property="og:description" content="Run Claude Code and Codex agents in parallel, each in its own git worktree, and see which one needs you.">
   <meta property="og:image" content="https://farol.sh/og.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="icon.png">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Farol",
+    "description": "A macOS terminal for running coding agents like Claude Code and Codex in parallel, each in its own git worktree. Built on libghostty.",
+    "url": "https://farol.sh/",
+    "image": "https://farol.sh/og.png",
+    "screenshot": "https://farol.sh/screenshot-review.png",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "macOS 14 or later",
+    "processorRequirements": "Apple silicon",
+    "downloadUrl": "https://github.com/snowztech/farol/releases/latest/download/Farol.dmg",
+    "releaseNotes": "https://github.com/snowztech/farol/blob/main/CHANGELOG.md",
+    "license": "https://opensource.org/licenses/MIT",
+    "isAccessibleForFree": true,
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "author": { "@type": "Person", "name": "Lucas Neves Pereira" },
+    "sameAs": ["https://github.com/snowztech/farol"]
+  }
+  </script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.2/dist/snowztech-ui.min.css">
   <script>
     if (matchMedia("(prefers-color-scheme: light)").matches) document.documentElement.dataset.theme = "light";
@@ -33,13 +57,14 @@
     .hero { text-align: center; padding-top: 60px; }
     .hero img { width: 80px; height: 80px; }
     h1 { font-size: 30px; font-weight: 600; margin: 14px 0 6px; letter-spacing: -0.02em; }
-    .tagline { color: var(--sn-fg-muted); margin: 0 0 30px; font-size: var(--sn-text-md); }
+    .tagline { display: block; color: var(--sn-fg-muted); margin: 6px 0 30px; font-size: var(--sn-text-md); font-weight: 400; letter-spacing: 0; }
     .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
     .actions .sn-btn { text-decoration: none; transition: opacity var(--sn-base) var(--sn-ease), border-color var(--sn-base) var(--sn-ease); }
     /* ui-css colors every a:hover with the accent, which wins over the button's own text color. */
     .actions a.sn-btn--primary:hover { color: var(--sn-fg-inverse); background: var(--sn-fg); border-color: var(--sn-fg); opacity: 0.85; }
     .actions a.sn-btn--secondary:hover { color: var(--sn-fg); }
     .fine { color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); margin: 14px 0 0; }
+    .fine code { font-family: inherit; color: var(--sn-fg-muted); }
     .docs-link { margin: 7px 0 0; font-size: var(--sn-text-xs); }
     .docs-link a { color: var(--sn-fg); cursor: pointer; font-weight: 500; text-decoration-thickness: 1px; text-underline-offset: 3px; }
     .docs-link a:hover { color: var(--sn-fg-muted); }
@@ -60,8 +85,12 @@
     .features { list-style: none; margin: 0 auto; display: grid; gap: 28px; }
     @media (min-width: 760px) { .features { grid-template-columns: repeat(2, 1fr); } }
     @media (min-width: 980px) { .features { grid-template-columns: repeat(3, 1fr); } }
-    .features b { display: block; font-weight: 500; margin-bottom: 6px; }
-    .features span { color: var(--sn-fg-muted); font-size: var(--sn-text-sm); }
+    .features h2 { font-size: inherit; font-weight: 500; margin: 0 0 6px; }
+    .features p { color: var(--sn-fg-muted); font-size: var(--sn-text-sm); margin: 0; }
+    .faq { margin-top: 96px; }
+    .faq h2 { font-size: 20px; font-weight: 500; margin: 0 0 20px; letter-spacing: -0.01em; text-align: center; }
+    .faq h3 { font-size: inherit; font-weight: 500; margin: 28px 0 6px; }
+    .faq p { color: var(--sn-fg-muted); font-size: var(--sn-text-sm); margin: 0; }
 
     .reel { margin: 96px auto 0; text-align: center; }
     .reel h2 { font-size: 20px; font-weight: 500; margin: 0 0 20px; letter-spacing: -0.01em; }
@@ -91,28 +120,31 @@
   <main>
     <section class="hero column">
       <img src="icon.png" alt="Farol icon">
-      <h1>Farol</h1>
-      <p class="tagline">A fast macOS terminal for working with coding agents.</p>
+      <h1>Farol <span class="tagline">A fast macOS terminal for Claude Code, Codex and other coding agents.</span></h1>
       <div class="actions">
         <a class="sn-btn sn-btn--primary sn-btn--lg" href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Download for Mac</a>
         <a class="sn-btn sn-btn--secondary sn-btn--lg" href="https://github.com/snowztech/farol">GitHub</a>
       </div>
       <p class="fine">Apple silicon, macOS 14+. Free and open source.</p>
+      <p class="fine">Or <code>brew install --cask snowztech/tap/farol</code></p>
       <p class="docs-link"><a href="docs">Read the docs →</a></p>
     </section>
 
     <div class="showcase wide">
-      <img class="shot" src="screenshot-review.png" width="2400" height="1520"
-           alt="Farol with agent sessions in the sidebar, one working, one waiting for you and one done, Claude Code in the terminal and the review panel showing the branch's changes since main">
+      <picture>
+        <source srcset="screenshot-review.avif" type="image/avif">
+        <img class="shot" src="screenshot-review.png" width="2400" height="1520" fetchpriority="high"
+             alt="Farol with agent sessions in the sidebar, one working, one waiting for you and one done, Claude Code in the terminal and the review panel showing the branch's changes since main">
+      </picture>
     </div>
 
     <ul class="features wide">
-      <li><b>Every agent at a glance</b><span>The sidebar shows which agent is working, which one needs you and which one is done.</span></li>
-      <li><b>From any app</b><span>The lighthouse in the menu bar, or a panel at the notch, keeps you posted while you work elsewhere.</span></li>
-      <li><b>Review and ship</b><span>Every changed file as a diff. Commit, push and open a pull request from there, on GitHub or GitLab.</span></li>
-      <li><b>Files and git graph</b><span>The project as a tree, a light editor for quick fixes, and a graph of every branch and commit.</span></li>
-      <li><b>A task in one step</b><span>Describe it and pick an agent. Farol opens a worktree on a new branch and starts the agent on it.</span></li>
-      <li><b>Built on libghostty</b><span>Ghostty's speed, themes and config, in a native Mac app.</span></li>
+      <li><h2>Every agent at a glance</h2><p>Run Claude Code and Codex sessions side by side. The sidebar shows which agent is working, which one needs you and which one is done.</p></li>
+      <li><h2>From any app</h2><p>The lighthouse in the menu bar, or a panel at the notch, keeps you posted while you work elsewhere.</p></li>
+      <li><h2>Review and ship</h2><p>Every changed file as a diff. Commit, push and open a pull request from there, on GitHub or GitLab.</p></li>
+      <li><h2>Files and git graph</h2><p>The project as a tree, a light editor for quick fixes, and a graph of every branch and commit.</p></li>
+      <li><h2>A task in one step</h2><p>Describe it and pick an agent. Farol opens a git worktree on a new branch and starts the agent on it, so parallel agents never touch each other's files.</p></li>
+      <li><h2>Built on libghostty</h2><p>Ghostty's speed, themes and config, in a native Mac app.</p></li>
     </ul>
 
     <section class="reel wide" aria-labelledby="reel-title">
@@ -124,6 +156,28 @@
           <a href="farol-reel.mp4">Watch the Farol tour</a>
         </video>
       </div>
+    </section>
+
+    <section class="faq column" aria-labelledby="faq-title">
+      <h2 id="faq-title">Questions</h2>
+
+      <h3>What is Farol?</h3>
+      <p>Farol is a free, open source terminal for macOS made for working with coding agents. Each agent runs in its own session, and Farol shows which one is working, which one is waiting for you and which one is done.</p>
+
+      <h3>How do I run several Claude Code agents in parallel?</h3>
+      <p>Press ⇧⌘N, describe the task and pick an agent. Farol creates a git worktree on a new branch and starts Claude Code or Codex there, so each agent works on its own copy of the repo. Open as many as you like.</p>
+
+      <h3>Which coding agents does Farol work with?</h3>
+      <p>Claude Code and Codex report their status once connected in Settings → Agents. Any other agent that runs in a terminal works too, and can report its status through Farol's CLI or the terminal bell.</p>
+
+      <h3>Is Farol a fork of Ghostty?</h3>
+      <p>No. Farol is its own native Mac app that embeds libghostty, the engine behind Ghostty. You get the same rendering and speed, and Farol reads your Ghostty config and themes.</p>
+
+      <h3>How do I know when an agent needs me?</h3>
+      <p>The session's dot turns yellow, macOS sends a notification and the Dock icon counts the sessions that are waiting. The menu bar item or the notch panel shows the same from any app.</p>
+
+      <h3>Is Farol free?</h3>
+      <p>Yes. Farol is open source under the MIT license. It needs a Mac with Apple silicon and macOS 14 or later.</p>
     </section>
   </main>
 
