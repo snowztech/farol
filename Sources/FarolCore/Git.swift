@@ -52,27 +52,35 @@ public enum Git {
     /// An app opened from the Dock gets a bare PATH, so a repo's hooks can't find tools like pnpm or npx.
     /// The PATH comes from your shell instead, as it would in a terminal. It's read once, since starting a shell is slow.
     static let shellPath: String = {
-        let fallback = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        return path(from: shell) ?? ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
+    }()
+
+    /// The PATH `shell` ends up with after its startup files, or nil if it fails or takes longer than `timeout`.
+    static func path(from shell: String, timeout: TimeInterval = 5) -> String? {
+        // A file, since a pipe stays open for as long as anything the startup files left running holds it.
+        // It also keeps whatever those files print out of the PATH.
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("farol-path-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: file) }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: shell)
-        // The marker keeps whatever the startup files print out of the PATH.
-        process.arguments = ["-ilc", #"printf '\n__FAROL_PATH__%s' "$PATH""#]
+        process.arguments = ["-ilc", #"printf %s "$PATH" > "# + NewTask.shellQuoted(file.path)]
         process.currentDirectoryURL = URL(fileURLWithPath: NSHomeDirectory())
-        let output = Pipe()
         process.standardInput = FileHandle.nullDevice
-        process.standardOutput = output
+        process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
-        guard (try? process.run()) != nil else { return fallback }
-        let data = output.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        let text = String(decoding: data, as: UTF8.self)
-        guard process.terminationStatus == 0, let range = text.range(of: "__FAROL_PATH__", options: .backwards) else {
-            return fallback
+        let exited = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in exited.signal() }
+        guard (try? process.run()) != nil else { return nil }
+        // Every git call waits on this, so a startup file that hangs can't be allowed to hold them all.
+        guard exited.wait(timeout: .now() + timeout) == .success else {
+            // An interactive shell ignores the polite signal.
+            kill(process.processIdentifier, SIGKILL)
+            return nil
         }
-        let path = text[range.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
-        return path.isEmpty ? fallback : path
-    }()
+        guard process.terminationStatus == 0, let path = try? String(contentsOf: file, encoding: .utf8) else { return nil }
+        return path.isEmpty ? nil : path
+    }
 
     /// The main checkout of the repo that contains `directory`, even when called from inside a worktree.
     public static func repoRoot(of directory: String) -> String? {
