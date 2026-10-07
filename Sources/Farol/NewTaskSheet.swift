@@ -44,7 +44,8 @@ struct NewTaskSheet: View {
             let base = Git.branch(of: directory) ?? "the current commit"
             let expectsTickets = Jira.isSetUp || Forge.detect(in: directory)?.listsIssues == true
             DispatchQueue.main.async { [weak window] in
-                guard let window else { return }
+                // Checked here too: a second press can arrive while git is still answering the first.
+                guard let window, window.attachedSheet == nil else { return }
                 let sheet = NSWindow(contentRect: .zero, styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: true)
                 let view = NewTaskSheet(
                     directory: directory, repo: repo, base: base, expectsTickets: expectsTickets,
