@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.30.4] - 2026-10-07
+
+Searching with ⌘P finds the right file sooner, and Return always takes you somewhere.
+
 ### Changed
 
 - Searching with ⌘P lists the files and folders whose name starts with what you typed first.
@@ -640,7 +644,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.30.3...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.30.4...HEAD
+[0.30.4]: https://github.com/snowztech/farol/releases/tag/v0.30.4
 [0.30.3]: https://github.com/snowztech/farol/releases/tag/v0.30.3
 [0.30.2]: https://github.com/snowztech/farol/releases/tag/v0.30.2
 [0.30.1]: https://github.com/snowztech/farol/releases/tag/v0.30.1
