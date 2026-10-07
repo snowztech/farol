@@ -4,6 +4,17 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- Searching with ⌘P lists the files and folders whose name starts with what you typed first.
+- Searching with ⌘P starts on the first match that is not the session you are in, so Return always takes you somewhere.
+- The ⌘P list is wider, and a folder's "New session" hint shows the Return key.
+- Outside a git repo, ⌘P no longer lists what is inside `node_modules`, `Pods`, `DerivedData` and `__pycache__`.
+
+### Fixed
+
+- In the ⌘P list, a session with a long name no longer shows its branch and its shortcut as "…".
+
 ## [0.30.3] - 2026-10-07
 
 Commits and pushes work in repos whose git hooks need pnpm or npx.
