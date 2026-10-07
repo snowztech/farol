@@ -13,6 +13,7 @@ public enum Git {
 
     /// Runs any command line tool the same way, as for the forges' own tools.
     /// Some tools report on stderr even when all is well, and `mergingErrors` returns that with the output.
+    @discardableResult
     static func run(_ executable: String, _ arguments: [String], in directory: String, trimming: Bool = true,
                     mergingErrors: Bool = false) throws -> String {
         let process = Process()
