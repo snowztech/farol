@@ -28,6 +28,12 @@ Farol is early. It works as a daily terminal, but expect rough edges. Questions 
 2. Open it and drag Farol to Applications.
 3. Open Farol from Applications or Spotlight.
 
+Or with Homebrew:
+
+```sh
+brew install --cask snowztech/tap/farol
+```
+
 It needs a Mac with Apple Silicon and macOS 14 or later. Releases are signed and notarized, so macOS opens Farol without warnings. To build from source instead, see [Build from source](#build-from-source).
 
 ## Features
