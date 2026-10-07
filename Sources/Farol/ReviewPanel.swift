@@ -422,7 +422,7 @@ struct ReviewPanel: View {
                         }
                         .padding(.bottom, 12)
                     }
-                    .onChange(of: review.focus?.id) { _ in
+                    .onChange(of: review.focus?.id) {
                         guard let path = review.focus?.path else { return }
                         withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(path, anchor: .top) }
                     }

@@ -98,7 +98,7 @@ private func edges(_ pairs: (Int, Int)...) -> [History.Edge] {
 @Test func readsARealRepo() throws {
     let box = try Sandbox()
     let git = { (args: [String]) in
-        try Git.run(["-c", "user.name=Farol", "-c", "user.email=farol@example.com"] + args, in: box.repo)
+        _ = try Git.run(["-c", "user.name=Farol", "-c", "user.email=farol@example.com"] + args, in: box.repo)
     }
     try git(["switch", "--quiet", "-c", "feat"])
     try git(["commit", "--quiet", "--allow-empty", "-m", "feature work"])
@@ -165,7 +165,7 @@ private func edges(_ pairs: (Int, Int)...) -> [History.Edge] {
 @Test func createsDeletesRebasesAndCherryPicks() throws {
     let box = try Sandbox()
     let git = { (args: [String]) in
-        try Git.run(["-c", "user.name=Farol", "-c", "user.email=farol@example.com"] + args, in: box.repo)
+        _ = try Git.run(["-c", "user.name=Farol", "-c", "user.email=farol@example.com"] + args, in: box.repo)
     }
     try History.createBranch("feat", from: "main", in: box.repo)
     #expect(Git.branch(of: box.repo) == "feat")
@@ -209,7 +209,7 @@ private func edges(_ pairs: (Int, Int)...) -> [History.Edge] {
     let commit = { (name: String) in
         try name.write(toFile: box.repo + "/\(name).txt", atomically: true, encoding: .utf8)
         try Git.run(["add", "\(name).txt"], in: box.repo)
-        try Git.run(["commit", "--quiet", "-m", "add \(name)"], in: box.repo)
+        _ = try Git.run(["commit", "--quiet", "-m", "add \(name)"], in: box.repo)
     }
     try History.createBranch("feat", from: "main", in: box.repo)
     try commit("a")
@@ -305,7 +305,7 @@ private func edges(_ pairs: (Int, Int)...) -> [History.Edge] {
     let origin = try Sandbox()
     let box = try Sandbox()
     let commit = { (message: String, repo: String) in
-        try Git.run(["-c", "user.name=Farol", "-c", "user.email=farol@example.com", "commit", "--quiet", "--allow-empty",
+        _ = try Git.run(["-c", "user.name=Farol", "-c", "user.email=farol@example.com", "commit", "--quiet", "--allow-empty",
                      "-m", message], in: repo)
     }
     try Git.run(["remote", "add", "origin", origin.repo], in: box.repo)
@@ -352,7 +352,7 @@ private func edges(_ pairs: (Int, Int)...) -> [History.Edge] {
     let origin = try Sandbox()
     let box = try Sandbox()
     let commit = { (message: String) in
-        try Git.run(["-c", "user.name=Farol", "-c", "user.email=farol@example.com", "commit", "--quiet", "--allow-empty",
+        _ = try Git.run(["-c", "user.name=Farol", "-c", "user.email=farol@example.com", "commit", "--quiet", "--allow-empty",
                      "-m", message], in: box.repo)
     }
     // With no remote there is nowhere to push.
