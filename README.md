@@ -8,8 +8,8 @@
 
 <p align="center">
     <a href="https://github.com/snowztech/farol/releases/latest"><img src="https://img.shields.io/github/v/release/snowztech/farol?style=flat&logo=github&label=release" alt="Latest release"></a>
-    <a href="https://github.com/snowztech/farol/stargazers"><img src="https://img.shields.io/github/stars/snowztech/farol?style=flat&logo=github" alt="Stars"></a>
-    <a href="https://github.com/snowztech/farol/network/members"><img src="https://img.shields.io/github/forks/snowztech/farol?style=flat&logo=github" alt="Forks"></a>
+    <!-- <a href="https://github.com/snowztech/farol/stargazers"><img src="https://img.shields.io/github/stars/snowztech/farol?style=flat&logo=github" alt="Stars"></a> -->
+    <!-- <a href="https://github.com/snowztech/farol/network/members"><img src="https://img.shields.io/github/forks/snowztech/farol?style=flat&logo=github" alt="Forks"></a> -->
     <a href="https://github.com/snowztech/farol/issues"><img src="https://img.shields.io/github/issues/snowztech/farol?style=flat&logo=github" alt="Issues"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License"></a>
     <a href="https://discord.gg/XGY4jHU29d"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=flat&logo=discord&logoColor=white" alt="Discord"></a>
