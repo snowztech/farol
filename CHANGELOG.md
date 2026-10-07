@@ -4,6 +4,19 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Farol installs with Homebrew: `brew install --cask snowztech/tap/farol`.
+
+## [0.30.1] - 2026-10-06
+
+Reach the pane menu in Claude Code and vim, and the settings page works with a repeated key.
+
+### Fixed
+
+- Shift-right-click opens the pane's menu even when the program in the terminal uses the mouse, like Claude Code or vim. Before, the click went to the program and there was no way to name or close the pane from the menu.
+- A setting changed on the settings page applies when `~/.config/farol/config` has the same key on more than one line. Before, the page changed the first line while the terminal read the last, so nothing happened. The page now keeps one line per key it writes, except `font-family`, where later lines are fallback fonts and stay.
+
 ## [0.30.0] - 2026-10-04
 
 Find files and folders from the session switcher, and ask your agent to change Farol's settings.
@@ -598,7 +611,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.30.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.30.1...HEAD
+[0.30.1]: https://github.com/snowztech/farol/releases/tag/v0.30.1
 [0.30.0]: https://github.com/snowztech/farol/releases/tag/v0.30.0
 [0.29.0]: https://github.com/snowztech/farol/releases/tag/v0.29.0
 [0.28.0]: https://github.com/snowztech/farol/releases/tag/v0.28.0

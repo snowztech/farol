@@ -96,13 +96,20 @@ final class Settings: ObservableObject {
         guard !loading else { return }
         var lines = Self.read()
         if lines.isEmpty { lines = Self.template }
-        let index = lines.firstIndex { Self.key(of: $0) == key }
-        switch (index, value.isEmpty) {
-        case let (i?, true): lines.remove(at: i)
-        case let (i?, false): lines[i] = "\(key) = \(value)"
-        case (nil, false): lines.append("\(key) = \(value)")
-        case (nil, true): return
+        // The terminal reads the last line for a key, so that one is changed and earlier ones are dropped.
+        // font-family is the exception: the first line is the font and later ones are fallbacks to keep.
+        var stale = lines.indices.filter { Self.key(of: lines[$0]) == key }
+        if stale.isEmpty, value.isEmpty { return }
+        if !value.isEmpty {
+            let fallbacks = key == "font-family"
+            if let i = fallbacks ? stale.first : stale.last {
+                lines[i] = "\(key) = \(value)"
+                stale = fallbacks ? [] : stale.dropLast()
+            } else {
+                lines.append("\(key) = \(value)")
+            }
         }
+        for i in stale.reversed() { lines.remove(at: i) }
         save(lines)
         onChange?()
     }
@@ -135,6 +142,8 @@ final class Settings: ObservableObject {
         var values: [String: String] = [:]
         for line in lines {
             guard let key = key(of: line), let eq = line.firstIndex(of: "=") else { continue }
+            // Later font-family lines are fallbacks, not the font.
+            if key == "font-family", values[key] != nil { continue }
             values[key] = line[line.index(after: eq)...]
                 .trimmingCharacters(in: .whitespaces)
                 .trimmingCharacters(in: CharacterSet(charactersIn: "\""))
