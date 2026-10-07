@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.30.3] - 2026-10-07
+
+Commits and pushes work in repos whose git hooks need pnpm or npx.
+
 ### Fixed
 
 - Committing and pushing work in a repo whose git hooks call tools like pnpm or npx, when Farol was opened from the Dock or the Finder. Before, the hook could not find the tool and the commit failed.
@@ -625,7 +629,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.30.2...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.30.3...HEAD
+[0.30.3]: https://github.com/snowztech/farol/releases/tag/v0.30.3
 [0.30.2]: https://github.com/snowztech/farol/releases/tag/v0.30.2
 [0.30.1]: https://github.com/snowztech/farol/releases/tag/v0.30.1
 [0.30.0]: https://github.com/snowztech/farol/releases/tag/v0.30.0
