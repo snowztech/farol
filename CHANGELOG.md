@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- Committing and pushing work in a repo whose git hooks call tools like pnpm or npx, when Farol was opened from the Dock or the Finder. Before, the hook could not find the tool and the commit failed.
+
 ## [0.30.2] - 2026-10-07
 
 Install with Homebrew, and git can no longer hang a panel or freeze the new task sheet.
