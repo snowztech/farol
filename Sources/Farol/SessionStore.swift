@@ -32,6 +32,8 @@ final class Session: ObservableObject, Identifiable {
     var onGitStateChange: ((Activity) -> Void)?
     /// Set when the session runs in one of Farol's worktrees, even after `cd` into a subfolder.
     let worktree: String?
+    private var refreshingGit = false
+    private var refreshGitAgain = false
 
     init(panes: PaneContainer, directory: String) {
         self.panes = panes
@@ -75,6 +77,9 @@ final class Session: ObservableObject, Identifiable {
 
     /// Looks up the branch off the main thread. The shell reports its folder at every prompt, so a `git checkout` shows up too.
     func refreshGit() {
+        // One lookup at a time: prompts can come faster than git answers, and answers must land in order.
+        guard !refreshingGit else { return refreshGitAgain = true }
+        refreshingGit = true
         let directory = directory
         DispatchQueue.global(qos: .userInitiated).async {
             let branch = Git.branch(of: directory)
@@ -83,7 +88,13 @@ final class Session: ObservableObject, Identifiable {
             let operation = topLevel.flatMap { Merge.operation(in: $0) }
             let conflicts = topLevel.flatMap { top in operation.map { Merge.conflicts(in: top, $0.kind).count } } ?? 0
             DispatchQueue.main.async { [weak self] in
-                guard let self, self.directory == directory else { return }
+                guard let self else { return }
+                self.refreshingGit = false
+                if self.refreshGitAgain {
+                    self.refreshGitAgain = false
+                    self.refreshGit()
+                }
+                guard self.directory == directory else { return }
                 let before = self.activity
                 if self.stopped != operation { self.stopped = operation }
                 if self.conflicts != conflicts { self.conflicts = conflicts }

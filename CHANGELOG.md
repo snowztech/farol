@@ -8,6 +8,12 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - Farol installs with Homebrew: `brew install --cask snowztech/tap/farol`.
 
+### Fixed
+
+- A git command that prints a lot of warnings or progress no longer hangs the panel waiting on it, like the review panel or the git graph.
+- New Task and New Worktree Session no longer freeze the window on a slow repository. Pressing the shortcut again while one is open no longer queues a second sheet behind it.
+- A session's branch in the sidebar stays right when prompts come faster than git answers.
+
 ## [0.30.1] - 2026-10-06
 
 Reach the pane menu in Claude Code and vim, and the settings page works with a repeated key.

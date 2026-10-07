@@ -20,7 +20,8 @@ extension MainWindowController {
 
     /// The current session's repo, or one the user picks when the current session isn't in a repo.
     private func withRepo(purpose: String, then: @escaping (String) -> Void) {
-        guard let window else { return }
+        // With a sheet already up, a second one would queue behind it and show once the first closes.
+        guard let window, window.attachedSheet == nil else { return }
         if let directory = store.selected?.directory, Git.repoRoot(of: directory) != nil {
             return then(directory)
         }
@@ -40,10 +41,17 @@ extension MainWindowController {
     }
 
     private func askForBranch(from directory: String) {
-        guard let window else { return }
-        let repo = Git.repoRoot(of: directory).map { URL(fileURLWithPath: $0).lastPathComponent } ?? "repository"
-        let base = Git.branch(of: directory) ?? "the current commit"
+        // Git is asked off the main thread, so a slow repo can't freeze the window before the sheet shows.
+        DispatchQueue.global(qos: .userInitiated).async {
+            let repo = Git.repoRoot(of: directory).map { URL(fileURLWithPath: $0).lastPathComponent } ?? "repository"
+            let base = Git.branch(of: directory) ?? "the current commit"
+            DispatchQueue.main.async { [weak self] in self?.askForBranch(from: directory, repo: repo, base: base) }
+        }
+    }
 
+    private func askForBranch(from directory: String, repo: String, base: String) {
+        // Checked here too: a second press can arrive while git is still answering the first.
+        guard let window, window.attachedSheet == nil else { return }
         let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
         field.placeholderString = "Branch name"
         let alert = NSAlert()
