@@ -52,6 +52,11 @@ private func folder(_ files: [String: String]) throws -> String {
     #expect(Files.search(paths, " ").isEmpty)
 }
 
+@Test func searchPutsNamesThatStartWithTheWordFirst() {
+    let paths = [".claude/", "README.md", "site/docs.html", "scripts/dist.sh"]
+    #expect(Files.search(paths, "d") == ["site/docs.html", "scripts/dist.sh", ".claude/", "README.md"])
+}
+
 @Test func searchableAddsTheFoldersOfACheckout() throws {
     let root = try folder([".gitignore": "build/\n", "build/out.o": "", "src/app/main.swift": "", "README.md": ""])
     try Git.run(["init", "--quiet"], in: root)
@@ -63,4 +68,9 @@ private func folder(_ files: [String: String]) throws -> String {
     let root = try folder(["a.txt": "", ".env": "", "one/b.txt": "", "one/two/c.txt": "", "one/two/three/d.txt": ""])
     #expect(Files.searchable(in: root) == ["one/", "a.txt", "one/two/", "one/b.txt", "one/two/three/", "one/two/c.txt"])
     #expect(Files.walk(root, limit: 2) == ["one/", "a.txt"])
+}
+
+@Test func walkSkipsInstalledDependencies() throws {
+    let root = try folder(["index.js": "", "node_modules/left-pad/index.js": "", "src/__pycache__/a.pyc": "", "src/a.py": ""])
+    #expect(Files.walk(root) == ["src/", "index.js", "src/a.py"])
 }

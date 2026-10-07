@@ -376,7 +376,7 @@ private struct SessionMenu: View {
                 .onChange(of: active) { _, row in if let row { scroll.scrollTo(row) } }
             }
         }
-        .frame(width: 340)
+        .frame(width: 420)
         .font(.system(size: 13))
         .foregroundStyle(p.text)
         // Boxed, the list is one more panel, in the color of the panels around the terminal.
@@ -400,11 +400,12 @@ private struct SessionMenu: View {
 
     private var shown: [Choice] { matches.flatMap(\.items).map { .session($0.id) } + hits.map(Choice.file) }
 
-    /// The row Return opens: the one the arrows or the mouse are on, else where you are, else the first match.
+    /// The row Return opens: the one the arrows or the mouse are on, else where you are.
+    /// A search is for going somewhere else, so it starts on the first match that is not where you are.
     private var highlighted: Choice? {
         let shown = shown
-        let current = query.isEmpty ? store.selectedID.map(Choice.session) : nil
-        return shown.first { $0 == active } ?? shown.first { $0 == current } ?? shown.first
+        let current = store.selectedID.map(Choice.session)
+        return shown.first { $0 == active } ?? shown.first { query.isEmpty ? $0 == current : $0 != current } ?? shown.first
     }
 
     private func move(_ step: Int) -> KeyPress.Result {
@@ -454,9 +455,11 @@ private struct FileChoice: View {
                 Text((path as NSString).deletingLastPathComponent)
                     .font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.head)
                 Spacer(minLength: 8)
-                // A folder opening a session is not what a file list leads you to expect, so the row says it.
+                // A folder opening a session is not what a file list leads you to expect, so the row says what Return does.
+                // The key is drawn smaller than the words, since at their size it outweighs them.
                 if lit && path.hasSuffix("/") {
-                    Text("New session").font(.system(size: 11)).foregroundStyle(palette.muted).fixedSize()
+                    Text("New session \(Text(Image(systemName: "return")).font(.system(size: 9)))")
+                        .font(.system(size: 11)).foregroundStyle(palette.muted).fixedSize()
                 }
             }
             .padding(.horizontal, 9)
@@ -490,11 +493,15 @@ private struct SessionChoice: View {
                 Lamp(activity: session.activity, selected: true, palette: palette)
                 Text(session.displayName).lineLimit(1).truncationMode(.tail).layoutPriority(1)
                 if let branch = session.branch {
-                    Text(branch).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.middle)
+                    // A long name leaves the branch room for a lone "…", so it shows whole or not at all.
+                    ViewThatFits(in: .horizontal) {
+                        Text(branch).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).fixedSize()
+                        EmptyView()
+                    }
                 }
                 Spacer(minLength: 8)
                 if let shortcut {
-                    Text(shortcut).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted)
+                    Text(shortcut).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).fixedSize()
                 }
             }
             .padding(.horizontal, 9)

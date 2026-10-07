@@ -13,6 +13,9 @@ public enum Files {
     /// Git's own folder and Finder's metadata are never what you are looking for.
     static let skipped: Set<String> = [".git", ".DS_Store"]
 
+    /// Installed dependencies, which a search outside git would otherwise fill up with. Names a source folder never has.
+    static let dependencies: Set<String> = ["node_modules", "Pods", "DerivedData", "__pycache__"]
+
     /// A folder's entries, folders first, then by name the way Finder sorts them.
     public static func list(_ directory: String) -> [Entry] {
         let url = URL(fileURLWithPath: directory)
@@ -66,7 +69,7 @@ public enum Files {
         for _ in 0..<depth {
             var next: [String] = []
             for folder in level {
-                for entry in list(root + "/" + folder) where !entry.isHidden {
+                for entry in list(root + "/" + folder) where !entry.isHidden && !dependencies.contains(entry.name) {
                     guard found.count < limit else { return found }
                     let path = folder + entry.name + (entry.isDirectory ? "/" : "")
                     found.append(path)
@@ -78,23 +81,24 @@ public enum Files {
         return found
     }
 
-    /// The paths that have every word typed, with a match in the name before one in the folders above, then the shorter path.
+    /// The paths that have every word typed, best first, and the shorter path first among equals.
+    /// A name that starts with a word beats a match elsewhere in the name, which beats one in the folders above.
     /// Nothing typed finds nothing.
     public static func search(_ paths: [String], _ query: String, limit: Int = 30) -> [String] {
         let words = query.lowercased().split(separator: " ")
         guard !words.isEmpty else { return [] }
         // Every path is lowercased again on each key, which is quick enough until a repo has hundreds of thousands of files.
-        let found = paths.compactMap { path -> (path: String, inName: Bool)? in
+        let found = paths.compactMap { path -> (path: String, rank: Int)? in
             let lower = path.lowercased()
             guard words.allSatisfy(lower.contains) else { return nil }
             // A folder ends in a slash, which is not part of its name.
             let trimmed = lower.hasSuffix("/") ? lower.dropLast() : Substring(lower)
             let name = trimmed[(trimmed.lastIndex(of: "/").map(trimmed.index(after:)) ?? trimmed.startIndex)...]
-            return (path, words.allSatisfy(name.contains))
+            return (path, !words.allSatisfy(name.contains) ? 2 : words.contains(where: name.hasPrefix) ? 0 : 1)
         }
         return found
             .sorted { a, b in
-                a.inName != b.inName ? a.inName : a.path.count != b.path.count ? a.path.count < b.path.count : a.path < b.path
+                a.rank != b.rank ? a.rank < b.rank : a.path.count != b.path.count ? a.path.count < b.path.count : a.path < b.path
             }
             .prefix(limit).map(\.path)
     }
