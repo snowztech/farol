@@ -1,0 +1,8 @@
+# Farol
+
+> Farol is a free, open source macOS terminal for working with coding agents like Claude Code and Codex. Each agent runs in its own session and git worktree, and Farol shows which one is working, which one is waiting and which one is done. Built on libghostty, the engine behind Ghostty. Apple silicon, macOS 14 or later, MIT license.
+
+- [Home](https://farol.sh/): what Farol does, download and common questions
+- [Docs](https://farol.sh/docs): install, connect agents, tasks and worktrees, agent status, review, configuration, shortcuts
+- [Source](https://github.com/snowztech/farol): README, roadmap and releases
+- [Changelog](https://github.com/snowztech/farol/blob/main/CHANGELOG.md)
