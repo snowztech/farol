@@ -21,7 +21,7 @@ Run several coding agents side by side, each in its own session, and Farol shows
 
 Underneath is [libghostty](https://github.com/ghostty-org/ghostty), the engine behind Ghostty, so it is as fast as Ghostty and reads your Ghostty config.
 
-Farol is early. It works as a daily terminal, but expect rough edges.
+Farol is early. It works as a daily terminal, but expect rough edges. Questions and ideas are welcome on [Discord](https://discord.gg/XGY4jHU29d).
 
 ## Install
 
