@@ -66,3 +66,10 @@ jobs:
           cp build/Farol-"$version".zip build/Farol.zip
           gh release create "$GITHUB_REF_NAME" build/Farol.dmg build/Farol.zip \
             --title "Farol $version" --notes-file "$RUNNER_TEMP/notes.md" $prerelease
+
+      # Pre-releases stay out of the tap, so brew only offers stable versions.
+      - name: Update the Homebrew cask
+        if: ${{ !contains(github.ref_name, '-') }}
+        env:
+          TAP_DEPLOY_KEY: ${{ secrets.TAP_DEPLOY_KEY }}
+        run: ./scripts/bump-cask.sh "${GITHUB_REF_NAME#v}" build/Farol.dmg
