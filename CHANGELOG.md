@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Farol installs with Homebrew: `brew install --cask snowztech/tap/farol`.
+
 ## [0.30.1] - 2026-10-06
 
 Reach the pane menu in Claude Code and vim, and the settings page works with a repeated key.
