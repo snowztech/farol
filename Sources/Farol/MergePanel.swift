@@ -198,9 +198,9 @@ struct MergePanel: View {
         }
         .foregroundStyle(p.text)
         .onAppear { controller.load(merge) }
-        .onChange(of: merge.selected) { _ in controller.load(merge) }
-        .onChange(of: merge.conflicts) { _ in controller.load(merge) }
-        .onChange(of: merge.ignoreWhitespace) { _ in controller.reload(merge) }
+        .onChange(of: merge.selected) { controller.load(merge) }
+        .onChange(of: merge.conflicts) { controller.load(merge) }
+        .onChange(of: merge.ignoreWhitespace) { controller.reload(merge) }
     }
 
     // MARK: Header
@@ -336,7 +336,7 @@ struct MergePanel: View {
             }
             .frame(height: 30)
             .onAppear { scrollToCurrent(proxy) }
-            .onChange(of: merge.steps) { _ in scrollToCurrent(proxy) }
+            .onChange(of: merge.steps) { scrollToCurrent(proxy) }
         }
     }
 
@@ -650,10 +650,12 @@ struct MergePanel: View {
         let other = merge.operation?.other ?? "the other side"
         // Same rule as the columns: yours on the left with ⌃⌘←, the incoming side on the right with ⌃⌘→.
         func accept(mine: Bool, keeps: Bool) -> ChoiceView.Option {
-            .init(title: mine ? "Accept Yours" : "Accept Incoming", effect: keeps ? "Keeps the file" : "Deletes the file",
-                  result: keeps ? (mine ? versions.mine : versions.other) ?? versions.mine ?? versions.other : nil,
-                  shortcut: mine ? .leftArrow : .rightArrow,
-                  apply: keeps ? { merge.keep(path, failed: showGitError) } : { merge.delete(path, failed: showGitError) })
+            // The side taken, or the other one when that side deleted the file.
+            let kept = mine ? versions.mine ?? versions.other : versions.other ?? versions.mine
+            return .init(title: mine ? "Accept Yours" : "Accept Incoming", effect: keeps ? "Keeps the file" : "Deletes the file",
+                         result: keeps ? kept : nil,
+                         shortcut: mine ? .leftArrow : .rightArrow,
+                         apply: keeps ? { merge.keep(path, failed: showGitError) } : { merge.delete(path, failed: showGitError) })
         }
         let text: String
         var options: [ChoiceView.Option] = []

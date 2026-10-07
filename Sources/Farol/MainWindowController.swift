@@ -211,8 +211,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             review.show(commit: commit.hash, subject: commit.subject, file: file)
             if !review.isOpen { toggleReview() }
         }
-        graph.onRunInTerminal = { [weak self] command in
-            guard let self, let session = store.selected else { return }
+        graph.onRunInTerminal = { command in
+            guard let session = store.selected else { return }
             store.split(session, .down, run: command)
         }
         store.onSessionCreated = { [weak self] in self?.host($0) }
