@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CHECKED = {".swift", ".sh", ".md", ".py"}
-SKIPPED_DIRS = {".build", ".ghostty-src", "vendor", "build", ".git"}
 MAX_COMMENT_LINES = 3
 EM_DASH = chr(0x2014)
 
@@ -92,11 +92,14 @@ def check(path: Path) -> list[str]:
     return problems
 
 
+def git(*args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True)
+
+
 def repo_files() -> list[Path]:
-    return [
-        p for p in ROOT.rglob("*")
-        if p.is_file() and p.suffix in CHECKED and not SKIPPED_DIRS & set(p.relative_to(ROOT).parts)
-    ]
+    # What git tracks or would add, so anything git ignores is left alone.
+    listed = git("ls-files", "-z", "--cached", "--others", "--exclude-standard").stdout.split("\0")
+    return [p for p in (ROOT / name for name in listed if name) if p.is_file() and p.suffix in CHECKED]
 
 
 def main() -> int:
@@ -105,7 +108,7 @@ def main() -> int:
         payload = json.load(sys.stdin)
         target = payload.get("tool_input", {}).get("file_path", "")
         path = Path(target).resolve()
-        if path.suffix not in CHECKED or ROOT not in path.parents or SKIPPED_DIRS & set(path.relative_to(ROOT).parts):
+        if path.suffix not in CHECKED or ROOT not in path.parents or git("check-ignore", "-q", str(path)).returncode == 0:
             return 0
         files = [path]
     else:
