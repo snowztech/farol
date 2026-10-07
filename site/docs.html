@@ -85,6 +85,7 @@
       background: var(--sn-bg-raised); color: var(--sn-fg-muted);
     }
     pre code { padding: 0; border: 0; background: none; }
+    pre.command { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 10px 10px 18px; color: var(--sn-fg); }
     .note {
       margin: 22px 0; padding: 15px 17px; border: 1px solid var(--sn-border-subtle);
       border-left: 3px solid var(--sn-accent); border-radius: 8px; background: var(--sn-bg-raised);
@@ -169,7 +170,8 @@
             <li>Open it and drag Farol to Applications.</li>
             <li>Open Farol from Applications or Spotlight.</li>
           </ol>
-          <p>Or with Homebrew: <code>brew install --cask snowztech/tap/farol</code></p>
+          <p>Or with Homebrew:</p>
+          <pre class="command"><code>brew install --cask snowztech/tap/farol</code><button class="sn-copy-btn" type="button" aria-label="Copy the command"><svg class="sn-icon sn-copy-btn__idle" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><svg class="sn-icon sn-copy-btn__copied" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg></button></pre>
           <p>Farol needs Apple Silicon and macOS 14 or later. Releases are signed and notarized.</p>
           <div class="note"><p><strong>Already use Ghostty?</strong> Farol reads your Ghostty configuration first, then applies anything in its own configuration file.</p></div>
         </section>
@@ -311,5 +313,14 @@ font-size = 14</code></pre>
     <span>© 2026 Lucas Neves Pereira, <a href="https://github.com/snowztech">snowztech</a></span>
     <span><a href="./">Home</a> · <a href="https://discord.gg/XGY4jHU29d">Discord</a> · <a href="https://github.com/snowztech/farol/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://github.com/snowztech/farol/blob/main/LICENSE">MIT</a></span>
   </footer>
+  <script>
+    for (const button of document.querySelectorAll(".sn-copy-btn")) {
+      button.addEventListener("click", async () => {
+        await navigator.clipboard.writeText(button.previousElementSibling.textContent);
+        button.dataset.copied = "true";
+        setTimeout(() => delete button.dataset.copied, 1500);
+      });
+    }
+  </script>
 </body>
 </html>
