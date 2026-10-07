@@ -8,11 +8,11 @@
 
 <p align="center">
     <a href="https://github.com/snowztech/farol/releases/latest"><img src="https://img.shields.io/github/v/release/snowztech/farol?style=flat&logo=github&label=release" alt="Latest release"></a>
-    <a href="#install"><img src="https://img.shields.io/badge/macOS-14%2B%20%C2%B7%20Apple%20Silicon-lightgrey?style=flat&logo=apple" alt="macOS 14 or later, Apple Silicon"></a>
     <a href="https://github.com/snowztech/farol/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/snowztech/farol/ci.yml?branch=main&style=flat&logo=github&label=CI" alt="CI"></a>
+    <a href="https://github.com/snowztech/farol/issues"><img src="https://img.shields.io/github/issues/snowztech/farol?style=flat&logo=github" alt="Issues"></a>
+    <a href="#install"><img src="https://img.shields.io/badge/macOS%2014%2B-Apple%20Silicon-007ec6?style=flat&logo=apple" alt="macOS 14 or later, Apple Silicon"></a>
     <!-- <a href="https://github.com/snowztech/farol/stargazers"><img src="https://img.shields.io/github/stars/snowztech/farol?style=flat&logo=github" alt="Stars"></a> -->
     <!-- <a href="https://github.com/snowztech/farol/network/members"><img src="https://img.shields.io/github/forks/snowztech/farol?style=flat&logo=github" alt="Forks"></a> -->
-    <!-- <a href="https://github.com/snowztech/farol/issues"><img src="https://img.shields.io/github/issues/snowztech/farol?style=flat&logo=github" alt="Issues"></a> -->
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License"></a>
     <a href="https://discord.gg/XGY4jHU29d"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=flat&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
