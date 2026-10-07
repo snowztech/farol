@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Farol: a macOS terminal for Claude Code and coding agents</title>
-  <meta name="description" content="Farol is a free, open source macOS terminal for running Claude Code and Codex agents in parallel, each in its own git worktree. Built on libghostty.">
+  <title>Farol: macOS terminal for Claude Code and AI coding agents</title>
+  <meta name="description" content="Farol is a free, open source macOS terminal app for AI coding agents. Run Claude Code and Codex in parallel, each in its own git worktree. Built on libghostty.">
   <link rel="canonical" href="https://farol.sh/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Farol">
   <meta property="og:url" content="https://farol.sh/">
-  <meta property="og:title" content="Farol: a macOS terminal for Claude Code and coding agents">
+  <meta property="og:title" content="Farol: macOS terminal for Claude Code and AI coding agents">
   <meta property="og:description" content="Run Claude Code and Codex agents in parallel, each in its own git worktree, and see which one needs you.">
   <meta property="og:image" content="https://farol.sh/og.png">
   <meta property="og:image:width" content="1200">
@@ -21,7 +21,7 @@
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "Farol",
-    "description": "A macOS terminal for running coding agents like Claude Code and Codex in parallel, each in its own git worktree. Built on libghostty.",
+    "description": "A macOS terminal app for running AI coding agents like Claude Code and Codex in parallel, each in its own git worktree. Built on libghostty.",
     "url": "https://farol.sh/",
     "image": "https://farol.sh/og.png",
     "screenshot": "https://farol.sh/screenshot-review.png",
@@ -119,7 +119,7 @@
   <main>
     <section class="hero column">
       <img src="icon.png" alt="Farol icon">
-      <h1>Farol <span class="tagline">A fast macOS terminal for Claude Code, Codex and other coding agents.</span></h1>
+      <h1>Farol <span class="tagline">A fast macOS terminal for Claude Code, Codex and other AI coding agents.</span></h1>
       <div class="actions">
         <a class="sn-btn sn-btn--primary sn-btn--lg" href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Download for Mac</a>
         <a class="sn-btn sn-btn--secondary sn-btn--lg" href="https://github.com/snowztech/farol">GitHub</a>
@@ -160,7 +160,10 @@
       <h2 id="faq-title">Questions</h2>
 
       <h3>What is Farol?</h3>
-      <p>Farol is a free, open source terminal for macOS made for working with coding agents. Each agent runs in its own session, and Farol shows which one is working, which one is waiting for you and which one is done.</p>
+      <p>Farol is a free, open source terminal app for macOS made for agentic coding, where AI coding agents write the code and you supervise. Each agent runs in its own session, and Farol shows which one is working, which one is waiting for you and which one is done.</p>
+
+      <h3>What is an agentic terminal?</h3>
+      <p>A terminal built for AI coding agents as well as for typing commands. Agents like Claude Code and Codex already run in a terminal. An agentic terminal app such as Farol adds what you need to supervise several at once: a session per agent, live status, notifications and a review step before you ship.</p>
 
       <h3>How do I run several Claude Code agents in parallel?</h3>
       <p>Press ⇧⌘N, describe the task and pick an agent. Farol creates a git worktree on a new branch and starts Claude Code or Codex there, so each agent works on its own copy of the repo. Open as many as you like.</p>
