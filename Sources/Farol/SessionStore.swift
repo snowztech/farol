@@ -128,9 +128,7 @@ final class Session: ObservableObject, Identifiable {
     }
 
     /// The second line over ssh, where the local branch says nothing about the machine you are on.
-    var remoteLocation: String? {
-        remote.map { [$0.user, $0.path].filter { !$0.isEmpty }.joined(separator: " · ") }
-    }
+    var remoteLocation: String? { remote?.path }
 
     private var remote: RemoteTitle? { RemoteTitle(title) }
 
