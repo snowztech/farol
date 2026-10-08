@@ -8,6 +8,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - About Farol in the Farol menu, which opens the About page in settings.
 
+### Changed
+
+- Over ssh, the files, review and git graph panels are empty, where they used to show the repo on your Mac.
+
 ### Fixed
 
 - Over ssh, a session still shows the host when a program like vim or an agent sets its own title, under the program's name.

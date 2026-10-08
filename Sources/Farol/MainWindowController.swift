@@ -426,10 +426,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private func followReview(_ session: Session?) {
         guard let session else {
             reviewFollow = nil
+            state.remote = false
             return review.follow(nil, branch: nil)
         }
-        reviewFollow = session.$topLevel.combineLatest(session.$branch)
-            .sink { [weak self] topLevel, branch in self?.review.follow(topLevel, branch: branch) }
+        // Over ssh the panels would show the repo on this Mac, so they get no folder, as outside a git repo.
+        reviewFollow = session.$topLevel.combineLatest(session.$branch, session.$isRemote)
+            .sink { [weak self] topLevel, branch, remote in
+                self?.state.remote = remote
+                self?.review.follow(remote ? nil : topLevel, branch: remote ? nil : branch)
+            }
     }
 
     private func followFiles(_ session: Session?) {
@@ -438,8 +443,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             files.show(nil)
             return
         }
-        filesRoot = session.$topLevel.combineLatest(session.$directory)
-            .sink { [weak self] topLevel, directory in self?.files.show(topLevel ?? directory) }
+        filesRoot = session.$topLevel.combineLatest(session.$directory, session.$isRemote)
+            .sink { [weak self] topLevel, directory, remote in self?.files.show(remote ? nil : topLevel ?? directory) }
     }
 
     private func followGraph(_ session: Session?) {
@@ -447,8 +452,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             graphFollow = nil
             return graph.show(nil, current: nil)
         }
-        graphFollow = session.$topLevel.combineLatest(session.$branch)
-            .sink { [weak self] topLevel, branch in self?.graph.show(topLevel, current: branch) }
+        graphFollow = session.$topLevel.combineLatest(session.$branch, session.$isRemote)
+            .sink { [weak self] topLevel, branch, remote in self?.graph.show(remote ? nil : topLevel, current: remote ? nil : branch) }
     }
 
     /// Does what the user chose in System Settings for a title bar double-click: zoom, minimize or nothing.
