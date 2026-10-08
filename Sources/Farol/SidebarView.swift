@@ -115,7 +115,7 @@ private struct SessionRow: View {
                     .font(.system(size: 10.5, design: .monospaced))
                     .foregroundStyle(palette.muted)
                     .truncationMode(.middle)
-            } else if let location = session.location {
+            } else if let location = session.remoteLocation ?? session.location {
                 Text(location)
                     .font(.system(size: 10.5, design: .monospaced))
                     .foregroundStyle(palette.muted)
@@ -126,7 +126,7 @@ private struct SessionRow: View {
 
     /// The branch, and what is left to do while git is stopped. In the row's usual gray, since the lamp already asks for you.
     private var gitLine: String? {
-        guard session.stopped != nil else { return session.branch }
+        guard session.stopped != nil else { return session.remoteLocation == nil ? session.branch : nil }
         let left = session.conflicts == 0 ? "ready to continue"
             : "\(session.conflicts) \(session.conflicts == 1 ? "conflict" : "conflicts")"
         return [session.branch, left].compactMap { $0 }.joined(separator: " · ")

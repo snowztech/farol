@@ -492,7 +492,7 @@ private struct SessionChoice: View {
                     .opacity(current ? 1 : 0)
                 Lamp(activity: session.activity, selected: true, palette: palette)
                 Text(session.displayName).lineLimit(1).truncationMode(.tail).layoutPriority(1)
-                if let branch = session.branch {
+                if let branch = session.remoteLocation ?? session.branch {
                     // A long name leaves the branch room for a lone "…", so it shows whole or not at all.
                     ViewThatFits(in: .horizontal) {
                         Text(branch).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).fixedSize()
