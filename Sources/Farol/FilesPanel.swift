@@ -98,7 +98,7 @@ struct FilesPanel: View {
     var body: some View {
         let p = state.palette
         VStack(alignment: .leading, spacing: 0) {
-            Text(tree.root.map { ($0 as NSString).lastPathComponent } ?? "")
+            Text(tree.root.map { ($0 as NSString).lastPathComponent } ?? (state.remote ? "Not available over ssh" : ""))
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(p.muted)
                 .lineLimit(1)

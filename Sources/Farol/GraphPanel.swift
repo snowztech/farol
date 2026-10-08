@@ -226,7 +226,7 @@ struct GraphPanel: View {
             if let error = graph.error {
                 message(error, p)
             } else if graph.rows.isEmpty {
-                message(graph.root == nil ? "Not a git repository." : "No commits.", p)
+                message(graph.root == nil ? state.noRepoMessage : "No commits.", p)
             } else {
                 let lanes = min(graph.rows.map(\.width).max() ?? 1, CommitRow.maxLanes)
                 let rows = matchingRows

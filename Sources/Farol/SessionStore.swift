@@ -18,6 +18,8 @@ final class Session: ObservableObject, Identifiable {
     @Published var bellRang = false
     /// The host each pane is on over ssh, kept apart from the title so it outlives a program retitling the pane.
     @Published private var remotes: [UUID: RemoteTitle] = [:]
+    /// The focused pane is on another machine, where the local folder and its git state don't apply.
+    @Published private(set) var isRemote = false
     @Published private(set) var branch: String?
     @Published private(set) var repoName: String?
     /// The main checkout's path, the same for every worktree of a repo. Sessions are grouped by it.
@@ -47,6 +49,7 @@ final class Session: ObservableObject, Identifiable {
     /// The name, folder and branch follow whichever pane has focus.
     func show(_ terminal: TerminalView) {
         title = terminal.title
+        syncRemote()
         if let folder = terminal.workingDirectory { directory = folder }
         refreshGit()
     }
@@ -138,6 +141,11 @@ final class Session: ObservableObject, Identifiable {
     func noteTitle(_ title: String, pane: UUID) {
         let remote = RemoteTitle.after(title, was: remotes[pane])
         if remotes[pane] != remote { remotes[pane] = remote }
+        syncRemote()
+    }
+
+    private func syncRemote() {
+        if isRemote != (remote != nil) { isRemote = remote != nil }
     }
 
     /// Agents put their status in the title, like Claude Code's ✳. The sidebar dot already shows it.

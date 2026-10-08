@@ -413,7 +413,7 @@ struct ReviewPanel: View {
             if let error = review.error {
                 message(error, p)
             } else if review.rows.isEmpty {
-                message(review.root == nil ? "Not a git repository." : "No changes.", p)
+                message(review.root == nil ? state.noRepoMessage : "No changes.", p)
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
