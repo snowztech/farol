@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.30.6] - 2026-10-08
+
+Over ssh, Farol keeps showing the host and stops showing the repo on your Mac.
+
 ### Added
 
 - About Farol in the Farol menu, which opens the About page in settings.
@@ -664,7 +668,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.30.5...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.30.6...HEAD
+[0.30.6]: https://github.com/snowztech/farol/releases/tag/v0.30.6
 [0.30.5]: https://github.com/snowztech/farol/releases/tag/v0.30.5
 [0.30.4]: https://github.com/snowztech/farol/releases/tag/v0.30.4
 [0.30.3]: https://github.com/snowztech/farol/releases/tag/v0.30.3
