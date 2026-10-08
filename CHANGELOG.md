@@ -8,6 +8,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - About Farol in the Farol menu, which opens the About page in settings.
 
+### Fixed
+
+- Over ssh, a session keeps the host's name when a program like vim or an agent sets its own title.
+
 ## [0.30.5] - 2026-10-08
 
 A session over ssh says which machine you are on.

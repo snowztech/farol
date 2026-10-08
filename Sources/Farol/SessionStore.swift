@@ -16,6 +16,8 @@ final class Session: ObservableObject, Identifiable {
     @Published private(set) var agents: [UUID: AgentActivity] = [:]
     /// The program rang the bell or sent a notification while you were elsewhere. Covers agents without hooks.
     @Published var bellRang = false
+    /// The host each pane is on over ssh, kept apart from the title so it outlives a program retitling the pane.
+    @Published private var remotes: [UUID: RemoteTitle] = [:]
     @Published private(set) var branch: String?
     @Published private(set) var repoName: String?
     /// The main checkout's path, the same for every worktree of a repo. Sessions are grouped by it.
@@ -130,7 +132,12 @@ final class Session: ObservableObject, Identifiable {
     /// The second line over ssh, where the local branch says nothing about the machine you are on.
     var remoteLocation: String? { remote?.path }
 
-    private var remote: RemoteTitle? { RemoteTitle(title) }
+    private var remote: RemoteTitle? { remotes[panes.focused.id] }
+
+    func noteTitle(_ title: String, pane: UUID) {
+        let remote = RemoteTitle.after(title, was: remotes[pane])
+        if remotes[pane] != remote { remotes[pane] = remote }
+    }
 
     /// Agents put their status in the title, like Claude Code's ✳. The sidebar dot already shows it.
     private var programTitle: String { AgentTitle.withoutStatus(title) }
@@ -283,6 +290,7 @@ final class SessionStore: ObservableObject {
                 receive(StatusMessage(pane: terminal.id.uuidString, event: event))
             }
             previousTitle = $0
+            session.noteTitle($0, pane: terminal.id)
             guard terminal === session.panes.focused else { return }
             // Agents animate a glyph in the title many times a second, and those frames are not worth a git lookup.
             // The title is cleared when a command ends, which is one way a `git checkout` gets noticed.

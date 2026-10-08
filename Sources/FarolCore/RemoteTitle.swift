@@ -18,6 +18,15 @@ public struct RemoteTitle: Equatable {
         self.path = String(match.3)
     }
 
+    /// A program on the remote, like vim, retitles the terminal, and the host has to outlive that.
+    /// It goes when the ssh command ends, which clears the title, or when a local shell titles itself again.
+    public static func after(_ title: String, was: RemoteTitle?, localHost: String = RemoteTitle.localHost) -> RemoteTitle? {
+        if title.isEmpty { return nil }
+        if let remote = RemoteTitle(title, localHost: localHost) { return remote }
+        // With no local name to match, any shell title parses. One that does was turned down for being local.
+        return RemoteTitle(title, localHost: "") == nil ? was : nil
+    }
+
     /// Read once with gethostname, since ProcessInfo's hostName can wait on a DNS lookup.
     public static let localHost: String = {
         var name = [CChar](repeating: 0, count: 256)
