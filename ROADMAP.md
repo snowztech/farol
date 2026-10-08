@@ -35,7 +35,7 @@ Someone who downloads Farol understands what it is for in the first minute.
 - [x] Agent status around the notch, as another option next to the menu bar
 - [x] Farol themes in the colors of the app icons, with Farol Beam as the default
 - [ ] Install updates in place (Sparkle), behind the same button
-- [ ] Homebrew cask
+- [x] Homebrew cask
 
 ## Next: review
 
@@ -86,6 +86,16 @@ Speed is the first rule, and every git feature adds calls. These keep the window
 - [ ] The review panel's state in `FarolCore`, where it has tests. It lives in the window code today, so its scope and refresh order are checked by hand
 - [ ] Timing for git refreshes: each one logs how long it took, so a slow one can be found and measured
 
+## Remote sessions
+
+A session over ssh says where you are, and shows nothing that belongs to another machine.
+
+- [x] A session over ssh named after the host, with the remote folder under it
+- [x] The host kept when a program on the server sets its own title, under the program's name
+- [x] The files, review and git graph panels empty over ssh, where they showed the repo on your Mac
+- [ ] A `TERM` the server knows, so colors and keys work on hosts without Ghostty's terminfo
+- [ ] Hosts whose shell sets no title, which still look local
+
 ## Hardening
 
 - [ ] Checksum for the prebuilt libghostty, checked before every release
@@ -95,6 +105,7 @@ Speed is the first rule, and every git feature adds calls. These keep the window
 ## Later
 
 - Linear as a ticket source
+- The server's repo in the panels over ssh, which needs git run on the server
 - Command palette: Farol's actions, like push, commit or new task, in the ⌘P list
 
 ## Not planned
