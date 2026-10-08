@@ -15,6 +15,19 @@ import Testing
     #expect(RemoteTitle("lucas@Mac.local:~/dev", localHost: "mac") == nil)
 }
 
+@Test func theHostOutlivesAProgramTitle() {
+    let remote = RemoteTitle("root@srv1: ~/apps", localHost: "mac")
+    #expect(RemoteTitle.after("vim todo.md", was: remote, localHost: "mac") == remote)
+    #expect(RemoteTitle.after("root@srv1: ~", was: remote, localHost: "mac")?.path == "~")
+    #expect(RemoteTitle.after("vim todo.md", was: nil, localHost: "mac") == nil)
+}
+
+@Test func theHostGoesWhenSshEnds() {
+    let remote = RemoteTitle("root@srv1: ~/apps", localHost: "mac")
+    #expect(RemoteTitle.after("", was: remote, localHost: "mac") == nil)
+    #expect(RemoteTitle.after("lucas@mac: ~/dev", was: remote, localHost: "mac") == nil)
+}
+
 @Test func programTitlesAreNotRemote() {
     #expect(RemoteTitle("ssh root@srv1555787", localHost: "mac") == nil)
     #expect(RemoteTitle("vim notes: me@web1", localHost: "mac") == nil)
