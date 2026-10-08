@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.30.5] - 2026-10-08
+
+A session over ssh says which machine you are on.
+
 ### Changed
 
 - Over ssh, a session is named after the host and shows the remote folder, not the local folder and branch.
@@ -648,7 +652,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.30.4...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.30.5...HEAD
+[0.30.5]: https://github.com/snowztech/farol/releases/tag/v0.30.5
 [0.30.4]: https://github.com/snowztech/farol/releases/tag/v0.30.4
 [0.30.3]: https://github.com/snowztech/farol/releases/tag/v0.30.3
 [0.30.2]: https://github.com/snowztech/farol/releases/tag/v0.30.2
