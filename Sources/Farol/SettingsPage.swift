@@ -41,7 +41,10 @@ struct SettingsPage: View {
         var id: String { agent.id + (connect ? " connect" : " disconnect") }
     }
 
-    @State private var section = Section.terminal
+    private var section: Section {
+        get { state.settingsSection }
+        nonmutating set { state.settingsSection = newValue }
+    }
     @State private var themeQuery = ""
     @State private var themes = Theme.all()
 

@@ -5,6 +5,8 @@ import SwiftUI
 final class WindowState: ObservableObject {
     @Published var palette: Palette
     @Published var showingSettings = false
+    /// Kept here so the About menu item can open settings on its page.
+    @Published var settingsSection = SettingsPage.Section.terminal
     /// The three column merge view replaces the terminal while git is stopped on conflicts.
     @Published var showingMerge = false
     /// The session list under the title is open, from a click or ⌘P.

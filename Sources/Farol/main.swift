@@ -55,6 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func switchSession(_ sender: Any?) { windowController.switchSession() }
 
     @objc func toggleSettings(_ sender: Any?) { windowController.toggleSettings() }
+    @objc func showAbout(_ sender: Any?) { windowController.showAbout() }
     @objc func toggleSidebar(_ sender: Any?) { windowController.toggleSidebar() }
     @objc func toggleFiles(_ sender: Any?) { windowController.toggleFiles() }
     @objc func toggleGraph(_ sender: Any?) { windowController.toggleGraph() }
@@ -83,6 +84,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let main = NSMenu()
 
         let app = NSMenu()
+        app.addItem(withTitle: "About Farol", action: #selector(showAbout), keyEquivalent: "")
+        app.addItem(.separator())
         app.addItem(withTitle: "Settings…", action: #selector(toggleSettings), keyEquivalent: ",")
         // "," with Shift rather than "<", which is only Shift-comma on some layouts, so every keyboard shows ⇧⌘,.
         app.addItem(withTitle: "Reload Configuration", action: #selector(reloadConfig), keyEquivalent: ",")
