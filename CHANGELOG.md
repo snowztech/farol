@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- About Farol in the Farol menu, which opens the About page in settings.
+
 ## [0.30.5] - 2026-10-08
 
 A session over ssh says which machine you are on.

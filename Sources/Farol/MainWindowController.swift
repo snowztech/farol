@@ -465,6 +465,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         show(store.selected)
     }
 
+    func showAbout() {
+        state.settingsSection = .about
+        if !state.showingSettings { toggleSettings() }
+    }
+
     /// Back to the terminal, with the tests running in a new pane under it. The title bar brings the merge view back.
     private func runAfterMerge(_ command: String) {
         guard let session = store.selected else { return }
