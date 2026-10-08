@@ -117,7 +117,7 @@ final class Session: ObservableObject, Identifiable {
     /// A worktree folder is named after its branch, so the repo name says more there.
     var displayName: String {
         if let customName { return customName }
-        if let remote { return remote.host }
+        if let remote, !hasProgramTitle { return remote.host }
         if hasProgramTitle { return programTitle }
         if worktree != nil, let repoName { return repoName }
         return folderName
@@ -130,7 +130,8 @@ final class Session: ObservableObject, Identifiable {
     }
 
     /// The second line over ssh, where the local branch says nothing about the machine you are on.
-    var remoteLocation: String? { remote?.path }
+    /// A program's title takes the name, so the host moves down here.
+    var remoteLocation: String? { remote.map { hasProgramTitle ? $0.host : $0.path } }
 
     private var remote: RemoteTitle? { remotes[panes.focused.id] }
 

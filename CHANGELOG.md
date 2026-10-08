@@ -10,7 +10,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Fixed
 
-- Over ssh, a session keeps the host's name when a program like vim or an agent sets its own title.
+- Over ssh, a session still shows the host when a program like vim or an agent sets its own title, under the program's name.
 
 ## [0.30.5] - 2026-10-08
 
