@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- Over ssh, a session is named after the host and shows the remote user and folder, not the local folder and branch.
+
 ## [0.30.4] - 2026-10-07
 
 Searching with ⌘P finds the right file sooner, and Return always takes you somewhere.

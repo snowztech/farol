@@ -110,11 +110,12 @@ final class Session: ObservableObject, Identifiable {
         }
     }
 
-    /// Shells default to titles like "user@host:~/dir", which read worse than the folder name.
+    /// Shells default to titles like "user@host:~/dir", which read worse than the folder name, unless the host is remote.
     /// Programs that set a real title (Claude Code, vim, htop) keep it.
     /// A worktree folder is named after its branch, so the repo name says more there.
     var displayName: String {
         if let customName { return customName }
+        if let remote { return remote.host }
         if hasProgramTitle { return programTitle }
         if worktree != nil, let repoName { return repoName }
         return folderName
@@ -125,6 +126,13 @@ final class Session: ObservableObject, Identifiable {
         guard branch == nil else { return nil }
         return (directory as NSString).abbreviatingWithTildeInPath
     }
+
+    /// The second line over ssh, where the local branch says nothing about the machine you are on.
+    var remoteLocation: String? {
+        remote.map { [$0.user, $0.path].filter { !$0.isEmpty }.joined(separator: " · ") }
+    }
+
+    private var remote: RemoteTitle? { RemoteTitle(title) }
 
     /// Agents put their status in the title, like Claude Code's ✳. The sidebar dot already shows it.
     private var programTitle: String { AgentTitle.withoutStatus(title) }
