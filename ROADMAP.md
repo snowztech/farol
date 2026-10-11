@@ -100,29 +100,38 @@ A session over ssh says where you are, and shows nothing that belongs to another
 
 Answer your agents when you are away from the Mac. Turn Remote on in settings, scan a QR code with your phone, and your sessions are there. The Mac has to stay on, since the agents run on it.
 
-Three more rules decide how it is built:
+Four more rules decide how it is built:
 
 - **Off means off.** With Remote off, Farol runs as it does today: no extra process, no connection, nothing between the terminal and the shell.
 - **Only what libghostty offers.** Farol reads a pane and types into it through libghostty's own calls. Nothing wraps the shell, so a pane keeps behaving like Ghostty, with Remote on too.
-- **The relay can read nothing.** The keys stay on the Mac and the phone. The relay passes encrypted bytes and stores none.
+- **The relay can read nothing.** The keys stay on the Mac and the phone. The relay passes encrypted bytes, and keeps only a phone's push token so a notification can reach it.
+- **One way in.** The messages, their models and the encryption live in a package of their own, `FarolRemote`, shared with the iOS app and tested alone. In the Mac app one bridge joins it to the sessions, the way `GhosttyTerminal` is the only code that touches Ghostty.
 
 First, know and answer. Few things, each one finished.
 
 - [ ] A command Farol runs when a session waits or finishes, set in Settings → Agents. It works without Remote, for a notification through a service you already use
-- [ ] The remote protocol in `FarolCore`, with tests: the sessions and their status, a pane's text, and text and keys sent back. Every message is encrypted between the Mac and the phone
-- [ ] Farol answers a phone off the main thread, and only while one is connected. Status is sent as it changes, and a pane's text only for the session the phone has open
-- [ ] Settings → Remote: the switch, a QR code that works once and expires, the paired devices with a way to remove each, and a notice on the Mac whenever a device pairs
+- [ ] A pane's text read and its input sent through `GhosttyTerminal`, tried first from the `farol` command on the same Mac: a hidden session, a Claude Code prompt, a Codex prompt, and typing that is no slower while a pane is read
+- [ ] `FarolRemote`, with tests: the messages and their version, the sessions and their status, a pane's text, text and keys sent back, pairing and the encryption. It builds for the Mac and for iOS, and knows nothing of git or AppKit
+- [ ] The bridge in the Mac app, the only code that joins `FarolRemote` to the sessions. It exists only while Remote is on, sends status as it changes and a pane's text only for the session the phone has open, and keeps the network and the encryption off the main thread
+- [ ] Settings → Remote: the switch, a QR code that works once and expires, the paired devices with a way to remove each at once, and a notice on the Mac whenever a device pairs
 - [ ] The relay, in Go under `relay/`, running at `relay.farol.sh`. It joins a Mac and its devices and limits how much each can send. A field in settings points Farol at your own
-- [ ] A plain web page as the first client, to try the whole path from a phone before the app exists. It stays as the client for Android and any browser
 - [ ] The iOS app: the sessions with their status, and a session's screen with a reply bar and the keys a phone lacks. Face ID opens it
 - [ ] A notification when a session waits or finishes that shows what the agent asks, answered from the notification itself. Its text is encrypted like everything else
 - [ ] The Mac kept awake while agents work, on power only
-- [ ] "Your Mac is not connected" on the phone when the Mac sleeps or Farol is closed, with the sessions as they last were
+- [ ] "Your Mac is not connected" on the phone when the Mac sleeps or Farol is closed, with the sessions as they last were and typing off until it is back
+
+It has to hold on a bad connection.
+
+- [ ] A message that arrives twice is typed once, since each one carries its own id
+- [ ] A phone that changes network or comes back from the background gets the sessions and the open screen again in full, so nothing has to be replayed
+- [ ] A reply from the phone goes in whole, never mixed into what is being typed on the Mac, and the Mac shows which session a phone is in
+- [ ] A session that prints without end costs the phone nothing: it gets the screen as it is now, and the screens in between are dropped
 
 Then, work from the phone, once the first part is in daily use.
 
 - [ ] New task from the phone
 - [ ] The review on the phone, with commit, push and open a pull request
+- [ ] A web client for Android and any browser
 
 ## Hardening
 
