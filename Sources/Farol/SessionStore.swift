@@ -190,6 +190,7 @@ final class SessionStore: ObservableObject {
         cliPath = Bundle.main.resourceURL?.appendingPathComponent("bin/farol").path ?? "farol"
         statusServer = StatusServer(path: socketPath)
         statusServer.onMessage = { [weak self] in self?.receive($0) }
+        statusServer.onRequest = { [weak self] in self?.answer($0) ?? .refused("Farol is closing.") }
         do {
             try statusServer.start()
         } catch {
@@ -218,6 +219,34 @@ final class SessionStore: ObservableObject {
         // A "done" you are already looking at needs no light.
         if session.id == selectedID && NSApp.isActive { session.acknowledge() }
         report(session, from: before)
+    }
+
+    /// Set by Settings → Remote. Typing into a session can approve an agent's prompt, so until you turn it on only your keyboard does.
+    static let remoteKey = "remote.enabled"
+
+    /// Answers `farol` about a session, named by its place in the sidebar. The focused pane is the one read and typed into.
+    private func answer(_ request: PaneRequest) -> PaneAnswer {
+        let pane = { (place: Int) in self.ordered.indices.contains(place - 1) ? self.ordered[place - 1].panes.focused : nil }
+        let missing = PaneAnswer.refused("There is no session at that place. `farol sessions` lists them.")
+        let remote = UserDefaults.standard.bool(forKey: Self.remoteKey)
+        let off = PaneAnswer.refused("Remote is off, so nothing but the keyboard types into a session.")
+        switch request {
+        case .sessions:
+            return .text(ordered.enumerated()
+                .map { "\($0 + 1)\t\($1.activity)\t\($1.displayName)\t\($1.branch ?? "")\n" }
+                .joined())
+        case .read(let place):
+            return pane(place).map { .text($0.screenText) } ?? missing
+        case .send(let place, let text):
+            guard remote else { return off }
+            guard let pane = pane(place) else { return missing }
+            pane.pasteText(text)
+        case .key(let place, let key):
+            guard remote else { return off }
+            guard let pane = pane(place), let key = TerminalView.Key(rawValue: key.rawValue) else { return missing }
+            pane.press(key)
+        }
+        return .text("")
     }
 
     private func report(_ session: Session, from before: Session.Activity) {

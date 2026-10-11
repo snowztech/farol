@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- `farol sessions` lists the open sessions with their status, and `farol read` prints what one shows. The Claude Code and Codex skill tells agents about both.
+
 ## [0.30.6] - 2026-10-08
 
 Over ssh, Farol keeps showing the host and stops showing the repo on your Mac.

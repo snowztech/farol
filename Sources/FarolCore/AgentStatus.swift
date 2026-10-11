@@ -25,6 +25,8 @@ public struct StatusMessage: Codable, Equatable, Sendable {
 public final class StatusServer {
     public let path: String
     public var onMessage: ((StatusMessage) -> Void)?
+    /// Answers a request from `farol`. Called on the delivery queue, and the answer goes back to the client.
+    public var onRequest: ((PaneRequest) -> PaneAnswer)?
 
     private let delivery: DispatchQueue
     private let queue = DispatchQueue(label: "dev.farol.status")
@@ -82,8 +84,20 @@ public final class StatusServer {
             data.append(contentsOf: buffer[0..<count])
         }
         for line in data.split(separator: UInt8(ascii: "\n")) {
-            guard let message = try? JSONDecoder().decode(StatusMessage.self, from: Data(line)) else { continue }
-            delivery.async { [weak self] in self?.onMessage?(message) }
+            if let message = try? JSONDecoder().decode(StatusMessage.self, from: Data(line)) {
+                delivery.async { [weak self] in self?.onMessage?(message) }
+            } else if let request = try? JSONDecoder().decode(PaneRequest.self, from: Data(line)) {
+                // The client waits on this connection, so the answer is fetched before it closes.
+                var answer = PaneAnswer.refused("Farol did not answer in time.")
+                let work = DispatchWorkItem { [weak self] in
+                    answer = self?.onRequest?(request) ?? .refused("Farol has nothing to answer with.")
+                }
+                delivery.async(execute: work)
+                // A busy app must not act on this later, when nobody expects it any more.
+                if work.wait(timeout: .now() + 2) == .timedOut { work.cancel() }
+                guard !work.isCancelled, let reply = try? JSONEncoder().encode(answer) else { continue }
+                _ = reply.withUnsafeBytes { write(client, $0.baseAddress, $0.count) }
+            }
         }
     }
 }
@@ -101,6 +115,33 @@ public enum StatusClient {
         var line = try JSONEncoder().encode(message)
         line.append(UInt8(ascii: "\n"))
         _ = line.withUnsafeBytes { write(fd, $0.baseAddress, $0.count) }
+    }
+
+    /// Sends a request and waits for the app's answer.
+    public static func ask(_ request: PaneRequest, at path: String) throws -> PaneAnswer {
+        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+        guard fd >= 0 else { throw posixError("socket") }
+        defer { close(fd) }
+        var address = try unixAddress(path)
+        let connected = withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
+        }
+        guard connected == 0 else { throw posixError("connect") }
+        var line = try JSONEncoder().encode(request)
+        line.append(UInt8(ascii: "\n"))
+        _ = line.withUnsafeBytes { write(fd, $0.baseAddress, $0.count) }
+        // The server reads until the end, so closing this side is what tells it the request is complete.
+        shutdown(fd, SHUT_WR)
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        while true {
+            let count = read(fd, &buffer, buffer.count)
+            guard count > 0 else { break }
+            data.append(contentsOf: buffer[0..<count])
+        }
+        // Nothing comes back when the app was too busy to answer in time.
+        guard !data.isEmpty else { return .refused("Farol did not answer in time.") }
+        return try JSONDecoder().decode(PaneAnswer.self, from: data)
     }
 }
 

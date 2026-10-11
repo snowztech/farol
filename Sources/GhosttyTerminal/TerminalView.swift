@@ -219,6 +219,51 @@ public final class TerminalView: NSView {
         ghostty_surface_text(surface, text, UInt(text.utf8.count))
     }
 
+    /// What the pane shows right now, as plain text without colors. Empty once the shell has gone.
+    public var screenText: String {
+        guard let surface else { return "" }
+        let whole = ghostty_selection_s(
+            top_left: ghostty_point_s(tag: GHOSTTY_POINT_VIEWPORT, coord: GHOSTTY_POINT_COORD_TOP_LEFT, x: 0, y: 0),
+            bottom_right: ghostty_point_s(tag: GHOSTTY_POINT_VIEWPORT, coord: GHOSTTY_POINT_COORD_BOTTOM_RIGHT, x: 0, y: 0),
+            rectangle: false)
+        var text = ghostty_text_s()
+        guard ghostty_surface_read_text(surface, whole, &text) else { return "" }
+        defer { ghostty_surface_free_text(surface, &text) }
+        return text.text.map { String(cString: $0) } ?? ""
+    }
+
+    /// A key that isn't text. The raw values match the names `farol key` takes.
+    public enum Key: String {
+        case enter, escape, tab, up, down, left, right, interrupt
+    }
+
+    /// Presses and releases a key, as the keyboard would, for a prompt that waits on Return or an arrow.
+    public func press(_ key: Key) {
+        guard let surface else { return }
+        // The Mac's own key codes, with the text and the character each one carries when typed.
+        let (code, typed, character): (UInt32, String?, UInt32) = switch key {
+        case .enter: (36, "\r", 0x0D)
+        case .escape: (53, "\u{1B}", 0x1B)
+        case .tab: (48, "\t", 0x09)
+        case .up: (126, nil, 0xF700)
+        case .down: (125, nil, 0xF701)
+        case .left: (123, nil, 0xF702)
+        case .right: (124, nil, 0xF703)
+        case .interrupt: (8, "c", 0x63)
+        }
+        var input = ghostty_input_key_s()
+        input.keycode = code
+        input.unshifted_codepoint = character
+        if key == .interrupt { input.mods = GHOSTTY_MODS_CTRL }
+        for action in [GHOSTTY_ACTION_PRESS, GHOSTTY_ACTION_RELEASE] {
+            input.action = action
+            (action == GHOSTTY_ACTION_PRESS ? typed : nil).withOptionalCString { pointer in
+                input.text = pointer
+                _ = ghostty_surface_key(surface, input)
+            }
+        }
+    }
+
     // MARK: Drops
 
     public override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {

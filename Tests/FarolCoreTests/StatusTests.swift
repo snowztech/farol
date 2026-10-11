@@ -78,3 +78,43 @@ final class Listening {
         try StatusClient.send(StatusMessage(pane: "x", event: .working), to: "/tmp/farol-nobody-\(UUID().uuidString.prefix(8)).sock")
     }
 }
+
+@Test func answersARequestOnTheSameConnection() throws {
+    let box = try Listening()
+    box.server.onRequest = { request in
+        request == .read(session: 2) ? .text("➜  shelf git:(main)\n") : .refused("unexpected")
+    }
+    #expect(try StatusClient.ask(.read(session: 2), at: box.server.path) == .text("➜  shelf git:(main)\n"))
+}
+
+@Test func passesARefusalBack() throws {
+    let box = try Listening()
+    box.server.onRequest = { _ in .refused("Remote is off.") }
+    #expect(try StatusClient.ask(.key(session: 1, key: .enter), at: box.server.path) == .refused("Remote is off."))
+}
+
+@Test func aRequestWithNobodyToAnswerIsRefused() throws {
+    let box = try Listening()
+    #expect(try StatusClient.ask(.sessions, at: box.server.path) == .refused("Farol has nothing to answer with."))
+}
+
+@Test func givesUpOnAnAppThatIsTooBusyAndNeverActsLate() throws {
+    let busy = DispatchQueue(label: "busy")
+    let server = StatusServer(path: "/tmp/farol-test-\(UUID().uuidString.prefix(8)).sock", deliverOn: busy)
+    defer { server.stop() }
+    let acted = NSLock()
+    var count = 0
+    server.onRequest = { _ in
+        acted.lock(); count += 1; acted.unlock()
+        return .text("")
+    }
+    try server.start()
+    // Holds the queue the answer would come from for longer than the server waits.
+    let release = DispatchSemaphore(value: 0)
+    busy.async { release.wait() }
+    #expect(try StatusClient.ask(.key(session: 1, key: .enter), at: server.path) == .refused("Farol did not answer in time."))
+    release.signal()
+    busy.sync {}
+    acted.lock(); defer { acted.unlock() }
+    #expect(count == 0)
+}
