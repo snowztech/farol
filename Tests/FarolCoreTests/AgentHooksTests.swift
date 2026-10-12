@@ -22,7 +22,7 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
     ]
     let settings = AgentHooks.claude.install(into: mine)
     #expect(settings["model"] as? String == "opus")
-    #expect(commands(settings, "PreToolUse") == ["my-guard.sh"])
+    #expect(commands(settings, "PreToolUse") == ["my-guard.sh", AgentHooks.command("waiting")])
     #expect(commands(settings, "Stop") == ["say done", AgentHooks.command("done")])
 }
 

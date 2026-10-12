@@ -29,6 +29,8 @@ public struct AgentHooks {
         Event(name: "UserPromptSubmit", status: "working", matcher: nil),
         Event(name: "PostToolUse", status: "working", matcher: nil),
         Event(name: "Notification", status: "waiting", matcher: "permission_prompt|elicitation_dialog"),
+        // Claude's own questions are a tool, so this is where their options come from.
+        Event(name: "PreToolUse", status: "waiting", matcher: "AskUserQuestion"),
         Event(name: "Stop", status: "done", matcher: nil),
         Event(name: "SessionEnd", status: "clear", matcher: nil),
         // A background agent keeps working after the main agent's Stop, so the pane stays working until it ends.

@@ -13,10 +13,13 @@ public enum AgentStatus: String, Codable, CaseIterable, Sendable {
 public struct StatusMessage: Codable, Equatable, Sendable {
     public var pane: String
     public var event: AgentEvent
+    /// What a waiting agent asks, when the hook said.
+    public var prompt: AgentPrompt?
 
-    public init(pane: String, event: AgentEvent) {
+    public init(pane: String, event: AgentEvent, prompt: AgentPrompt? = nil) {
         self.pane = pane
         self.event = event
+        self.prompt = prompt
     }
 }
 

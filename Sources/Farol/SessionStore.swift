@@ -14,6 +14,7 @@ final class Session: ObservableObject, Identifiable {
     @Published var directory: String
     /// Reported per pane by agent hooks or interactive terminal titles.
     @Published private(set) var agents: [UUID: AgentActivity] = [:]
+    private var prompts: [UUID: AgentPrompt] = [:]
     /// The program rang the bell or sent a notification while you were elsewhere. Covers agents without hooks.
     @Published var bellRang = false
     /// The host each pane is on over ssh, kept apart from the title so it outlives a program retitling the pane.
@@ -67,8 +68,16 @@ final class Session: ObservableObject, Identifiable {
         return .idle
     }
 
-    func apply(_ event: AgentEvent, pane: UUID) {
+    func apply(_ event: AgentEvent, pane: UUID, prompt: AgentPrompt? = nil) {
         agents[pane, default: AgentActivity()].apply(event)
+        guard agents[pane]?.status == .waiting else { return prompts[pane] = nil }
+        // A permission message can follow the question that has the options, and would hide them.
+        if let prompt, !prompt.options.isEmpty || prompts[pane]?.options.isEmpty ?? true { prompts[pane] = prompt }
+    }
+
+    /// What the waiting agent asks, if its hook said.
+    var prompt: AgentPrompt? {
+        agents.first { $0.value.status == .waiting }.flatMap { prompts[$0.key] }
     }
 
     /// An agent in one of the panes waits for your approval or answer, as opposed to a bell or terminal notification.
@@ -212,7 +221,7 @@ final class SessionStore: ObservableObject {
         guard let pane = UUID(uuidString: message.pane),
               let session = sessions.first(where: { $0.panes.terminals.contains { $0.id == pane } }) else { return }
         let before = session.activity
-        session.apply(message.event, pane: pane)
+        session.apply(message.event, pane: pane, prompt: message.prompt)
         // An agent's turn can end on a rebase it started and git stopped, so its checkout is looked at again.
         session.refreshGit()
         // A "done" you are already looking at needs no light.

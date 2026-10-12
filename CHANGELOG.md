@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- The notification for a waiting agent shows its question and the options it offers, or the permission it asks for. Click **Connect** again to update Claude Code's hooks.
+
 ## [0.30.6] - 2026-10-08
 
 Over ssh, Farol keeps showing the host and stops showing the repo on your Mac.
