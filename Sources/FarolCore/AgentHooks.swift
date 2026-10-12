@@ -33,6 +33,8 @@ public struct AgentHooks {
         Event(name: "Notification", status: "waiting", matcher: "permission_prompt|elicitation_dialog"),
         // Claude's own questions are a tool, so this is where their options come from.
         Event(name: "PreToolUse", status: "waiting", matcher: "AskUserQuestion"),
+        // Says which tool asks and for what. It gives no decision, so Claude's own prompt is unchanged.
+        Event(name: "PermissionRequest", status: "waiting", matcher: nil),
         // Waits for you to pick an answer in Farol. Without one, Claude asks in the terminal as usual.
         Event(name: "PermissionRequest", status: "ask", matcher: "AskUserQuestion", timeout: 86_400),
         Event(name: "Stop", status: "done", matcher: nil),

@@ -73,8 +73,8 @@ final class Session: ObservableObject, Identifiable {
     func apply(_ event: AgentEvent, pane: UUID, prompt: AgentPrompt? = nil) {
         agents[pane, default: AgentActivity()].apply(event)
         guard agents[pane]?.status == .waiting else { return prompts[pane] = nil }
-        // A permission message can follow the question that has the options, and would hide them.
-        if let prompt, !prompt.options.isEmpty || prompts[pane]?.options.isEmpty ?? true { prompts[pane] = prompt }
+        // A generic message can follow the tool or the question that said more, and would hide it.
+        if let prompt, prompts[pane] == nil || !prompt.options.isEmpty { prompts[pane] = prompt }
     }
 
     /// What the waiting agent asks, if its hook said.
@@ -263,6 +263,14 @@ final class SessionStore: ObservableObject {
         ask.connection.reply(AskReply(answers: answers))
         // The agent goes on at once, and its next hook would say so a moment later.
         if answers != nil { receive(StatusMessage(pane: ask.pane.uuidString, event: .working)) }
+        onAskEnd?(session)
+    }
+
+    /// Turns the question down so you can talk it over with the agent. It stops, and its terminal is where you go on.
+    func chat(_ session: Session) {
+        guard let ask = session.ask else { return }
+        session.ask = nil
+        ask.connection.reply(AskReply(chat: true))
         onAskEnd?(session)
     }
 

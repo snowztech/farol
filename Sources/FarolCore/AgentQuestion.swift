@@ -40,9 +40,12 @@ public struct AskMessage: Codable, Equatable, Sendable {
 public struct AskReply: Codable, Equatable, Sendable {
     /// The chosen label (or typed text) for each question, keyed by the question's text.
     public var answers: [String: String]?
+    /// Turn the question down so the user can talk it over with the agent.
+    public var chat: Bool?
 
-    public init(answers: [String: String]? = nil) {
+    public init(answers: [String: String]? = nil, chat: Bool? = nil) {
         self.answers = answers
+        self.chat = chat
     }
 }
 
@@ -75,6 +78,23 @@ public enum AskHook {
             "hookSpecificOutput": [
                 "hookEventName": "PermissionRequest",
                 "decision": ["behavior": "allow", "updatedInput": toolInput],
+            ],
+        ]
+        return try? JSONSerialization.data(withJSONObject: output, options: [.sortedKeys, .withoutEscapingSlashes])
+    }
+
+    /// What the hook prints to refuse the question and stop the agent, like the question dialog's own "Chat about this".
+    public static func chatOutput() -> Data? {
+        let output: [String: Any] = [
+            "continue": true,
+            "suppressOutput": true,
+            "hookSpecificOutput": [
+                "hookEventName": "PermissionRequest",
+                "decision": [
+                    "behavior": "deny",
+                    "message": "The user didn't answer this question. They want to chat about it first.",
+                    "interrupt": true,
+                ],
             ],
         ]
         return try? JSONSerialization.data(withJSONObject: output, options: [.sortedKeys, .withoutEscapingSlashes])

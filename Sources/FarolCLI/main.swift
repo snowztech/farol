@@ -45,8 +45,8 @@ if isAsk {
     // Anything Farol can't show or answer leaves the agent to ask in the terminal. A hook must never fail the agent.
     guard let questions = AskHook.questions(in: input),
           let reply = try? StatusClient.ask(AskMessage(pane: pane, questions: questions), to: socket),
-          let answers = reply.answers,
-          let output = AskHook.output(for: input, answers: answers) else { exit(0) }
+          let output = reply.chat == true ? AskHook.chatOutput() : reply.answers.flatMap({ AskHook.output(for: input, answers: $0) })
+    else { exit(0) }
     FileHandle.standardOutput.write(output + Data("\n".utf8))
     exit(0)
 }

@@ -8,7 +8,7 @@ final class AgentNotifier: NSObject, UNUserNotificationCenterDelegate {
     var onOpen: ((UUID) -> Void)?
 
     /// What you picked in the notification: one of the question's options, or your own words.
-    enum Choice { case option(Int), text(String) }
+    enum Choice { case option(Int), text(String), chat }
     /// Answering a question from its notification.
     var onAnswer: ((UUID, Choice) -> Void)?
 
@@ -17,6 +17,7 @@ final class AgentNotifier: NSObject, UNUserNotificationCenterDelegate {
     private var categories: [UUID: UNNotificationCategory] = [:]
     private static let optionPrefix = "farol.option."
     private static let textAction = "farol.text"
+    private static let chatAction = "farol.chat"
 
     private let settings: AgentSettings
 
@@ -58,6 +59,8 @@ final class AgentNotifier: NSObject, UNUserNotificationCenterDelegate {
             actions.append(UNTextInputNotificationAction(
                 identifier: Self.textAction, title: "Other…", options: [],
                 textInputButtonTitle: "Send", textInputPlaceholder: "Your answer"))
+            // The conversation goes on in the terminal, so this one brings Farol forward.
+            actions.append(UNNotificationAction(identifier: Self.chatAction, title: "Chat about this", options: [.foreground]))
             let id = "farol.ask.\(session.id.uuidString)"
             categories[session.id] = UNNotificationCategory(identifier: id, actions: actions, intentIdentifiers: [])
             center.setNotificationCategories(Set(categories.values))
@@ -103,11 +106,15 @@ final class AgentNotifier: NSObject, UNUserNotificationCenterDelegate {
         // A button answers without bringing Farol forward, which is the point of having it there.
         let choice: Choice? = {
             if action.hasPrefix(Self.optionPrefix), let index = Int(action.dropFirst(Self.optionPrefix.count)) { return .option(index) }
+            if action == Self.chatAction { return .chat }
             if action == Self.textAction, let reply = response as? UNTextInputNotificationResponse { return .text(reply.userText) }
             return nil
         }()
         if let id, let choice {
-            DispatchQueue.main.async { self.onAnswer?(id, choice) }
+            DispatchQueue.main.async {
+                self.onAnswer?(id, choice)
+                if case .chat = choice { NSApp.activate(ignoringOtherApps: true); self.onOpen?(id) }
+            }
             return completionHandler()
         }
         DispatchQueue.main.async {

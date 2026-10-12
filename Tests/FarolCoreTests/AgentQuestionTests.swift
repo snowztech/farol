@@ -44,6 +44,15 @@ private let input = """
     #expect((updated["questions"] as? [Any])?.count == 2)
 }
 
+@Test func chatRefusesTheQuestionAndStopsTheAgent() throws {
+    let data = try #require(AskHook.chatOutput())
+    let root = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let decision = try #require((root["hookSpecificOutput"] as? [String: Any])?["decision"] as? [String: Any])
+    #expect(decision["behavior"] as? String == "deny")
+    #expect(decision["interrupt"] as? Bool == true)
+    #expect((decision["message"] as? String)?.isEmpty == false)
+}
+
 @Test func joinsPicksWithACommaAndASpace() {
     #expect(AskHook.join(["Lint", "Tests"]) == "Lint, Tests")
     #expect(AskHook.join(["Lint"]) == "Lint")
@@ -53,15 +62,26 @@ private let input = """
     let reply = AskReply(answers: ["Q": "A"])
     #expect(try JSONDecoder().decode(AskReply.self, from: JSONEncoder().encode(reply)) == reply)
     #expect(try JSONDecoder().decode(AskReply.self, from: Data("{}".utf8)).answers == nil)
+    #expect(try JSONDecoder().decode(AskReply.self, from: JSONEncoder().encode(AskReply(chat: true))).chat == true)
 }
 
 @Test func installsTheAskHookWithALongTimeout() throws {
     let settings = AgentHooks.claude.install(into: [:])
     let groups = try #require((settings["hooks"] as? [String: Any])?["PermissionRequest"] as? [[String: Any]])
-    let hook = try #require((groups.first?["hooks"] as? [[String: Any]])?.first)
+    let group = try #require(groups.first { $0["matcher"] as? String == "AskUserQuestion" })
+    let hook = try #require((group["hooks"] as? [[String: Any]])?.first)
     #expect(hook["command"] as? String == "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" ask")
     #expect(hook["timeout"] as? Int == 86_400)
-    #expect(groups.first?["matcher"] as? String == "AskUserQuestion")
+}
+
+@Test func reportsEveryPermissionRequestAsWaiting() throws {
+    let settings = AgentHooks.claude.install(into: [:])
+    let groups = try #require((settings["hooks"] as? [String: Any])?["PermissionRequest"] as? [[String: Any]])
+    let group = try #require(groups.first { $0["matcher"] == nil })
+    let hook = try #require((group["hooks"] as? [[String: Any]])?.first)
+    #expect(hook["command"] as? String == AgentHooks.command("waiting"))
+    // Without a timeout, so it never holds up Claude's own prompt.
+    #expect(hook["timeout"] == nil)
 }
 
 @Test func answersOverTheSocket() throws {

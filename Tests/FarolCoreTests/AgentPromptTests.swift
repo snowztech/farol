@@ -30,6 +30,24 @@ private func prompt(_ json: String) -> AgentPrompt? {
     #expect(result == AgentPrompt(text: "Claude needs your permission to use Bash"))
 }
 
+@Test func readsTheToolAndWhatItTouches() {
+    #expect(prompt(#"{"tool_name": "Bash", "tool_input": {"command": "rm -rf build", "description": "Clean"}}"#)
+        == AgentPrompt(text: "Bash: rm -rf build"))
+    #expect(prompt(#"{"tool_name": "Edit", "tool_input": {"file_path": "/src/store.ts", "old_string": "a"}}"#)
+        == AgentPrompt(text: "Edit: /src/store.ts"))
+    #expect(prompt(#"{"tool_name": "WebFetch", "tool_input": {"url": "https://example.com"}}"#)
+        == AgentPrompt(text: "WebFetch: https://example.com"))
+}
+
+@Test func keepsOnlyTheFirstLineOfACommand() {
+    #expect(prompt(#"{"tool_name": "Bash", "tool_input": {"command": "cd app\nnpm test"}}"#) == AgentPrompt(text: "Bash: cd app…"))
+}
+
+@Test func namesAToolWithNothingToShow() {
+    #expect(prompt(#"{"tool_name": "ExitPlanMode", "tool_input": {"plan": "x"}}"#) == AgentPrompt(text: "ExitPlanMode"))
+    #expect(prompt(#"{"tool_name": "Task"}"#) == AgentPrompt(text: "Task"))
+}
+
 @Test func aQuestionWinsOverTheMessage() {
     let result = prompt(#"{"message": "waiting", "tool_input": {"questions": [{"question": "Go?", "options": []}]}}"#)
     #expect(result == AgentPrompt(text: "Go?"))

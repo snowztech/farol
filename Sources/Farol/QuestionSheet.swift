@@ -7,6 +7,8 @@ struct QuestionSheet: View {
     let palette: Palette
     /// The answer to each question, keyed by its text.
     let answer: ([String: String]) -> Void
+    /// Turns the question down to talk it over with the agent.
+    let chat: () -> Void
     /// Lets the agent ask in its terminal as usual.
     let useTerminal: () -> Void
 
@@ -31,6 +33,8 @@ struct QuestionSheet: View {
             .frame(maxHeight: 480)
             Rectangle().fill(p.line).frame(height: 1)
             HStack {
+                Button("Chat About This", action: chat)
+                    .buttonStyle(SheetButton(palette: p, primary: false))
                 Spacer()
                 Button("Answer in Terminal", action: useTerminal)
                     .buttonStyle(SheetButton(palette: p, primary: false))

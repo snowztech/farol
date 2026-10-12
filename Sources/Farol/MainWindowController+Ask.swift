@@ -16,6 +16,11 @@ extension MainWindowController {
                 dismissAsk(for: session)
                 store.answer(session, with: answers)
             },
+            chat: { [weak self, weak session] in
+                guard let self, let session else { return }
+                dismissAsk(for: session)
+                store.chat(session)
+            },
             useTerminal: { [weak self, weak session] in
                 guard let self, let session else { return }
                 dismissAsk(for: session)
@@ -24,13 +29,21 @@ extension MainWindowController {
         let host = NSHostingController(rootView: view)
         host.sizingOptions = [.preferredContentSize]
         sheet.contentViewController = host
-        askSheet = (sheet, session)
+        // A sheet has no outside to click, but the window under it still sees the click. It hands the question back.
+        let outsideClick = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self, weak session] event in
+            guard let self, let session, event.window === self.window, self.askSheet?.session === session else { return event }
+            dismissAsk(for: session)
+            store.answer(session, with: nil)
+            return nil
+        }
+        askSheet = (sheet, session, outsideClick)
         window.beginSheet(sheet)
     }
 
     func dismissAsk(for session: Session) {
         guard let shown = askSheet, shown.session === session else { return }
         askSheet = nil
+        shown.outsideClick.map(NSEvent.removeMonitor)
         window?.endSheet(shown.window)
     }
 
@@ -40,6 +53,9 @@ extension MainWindowController {
               let question = session.ask?.questions.first, session.ask?.fitsNotification == true else { return }
         let text: String
         switch choice {
+        case .chat:
+            dismissAsk(for: session)
+            return store.chat(session)
         case .option(let index):
             guard question.options.indices.contains(index) else { return }
             text = question.options[index].label

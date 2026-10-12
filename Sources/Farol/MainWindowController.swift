@@ -17,7 +17,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     private lazy var notifier = AgentNotifier(settings: agents)
     /// The sheet that asks an agent's question, and the session it is for.
-    var askSheet: (window: NSWindow, session: Session)?
+    var askSheet: (window: NSWindow, session: Session, outsideClick: Any?)?
     private let content = NSView()
     private let terminalContainer = NSView()
     private var sidebarWidth: NSLayoutConstraint!
