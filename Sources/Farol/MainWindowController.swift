@@ -16,6 +16,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     let state: WindowState
 
     private lazy var notifier = AgentNotifier(settings: agents)
+    /// The sheet that asks an agent's question, and the session it is for.
+    var askSheet: (window: NSWindow, session: Session, outsideClick: Any?)?
     private let content = NSView()
     private let terminalContainer = NSView()
     private var sidebarWidth: NSLayoutConstraint!
@@ -256,6 +258,41 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             self?.state.showingSettings = false
             self?.state.showingMerge = false
             self?.show($0)
+            self?.presentAsk()
+            self?.notch.refresh()
+        }
+        store.onAsk = { [weak self] session in
+            guard let self, let ask = session.ask else { return }
+            notifier.asked(session, ask)
+            presentAsk()
+            notch.refresh()
+        }
+        store.onAskEnd = { [weak self] session in
+            self?.notifier.askEnded(session)
+            self?.dismissAsk(for: session)
+            self?.notch.refresh()
+        }
+        notch.onAnswer = { [weak self] session, answers in
+            self?.dismissAsk(for: session)
+            self?.store.answer(session, with: answers)
+        }
+        // The conversation, or the question itself, goes on in the terminal, so these bring you to the session.
+        notch.onChat = { [weak self] session in
+            self?.store.chat(session)
+            self?.show(session: session)
+        }
+        notch.onTerminal = { [weak self] session in
+            self?.store.answer(session, with: nil)
+            self?.show(session: session)
+        }
+        notifier.onAnswer = { [weak self] id, choice in self?.answer(sessionID: id, choice) }
+        // A question waits for you to come back, and shows as soon as you do.
+        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.presentAsk()
+            self?.notch.refresh()
+        }
+        NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.notch.refresh()
         }
         // Once git goes on past the last conflict, there is nothing left to show, so the terminal comes back.
         mergeDone = merge.$operation.sink { [weak self] operation in
