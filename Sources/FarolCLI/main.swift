@@ -3,22 +3,23 @@ import Foundation
 
 let usage = """
 usage: farol status working|waiting|done|clear|subagent-start|subagent-stop
+       farol ask
 
-Reports what the agent in this pane is doing, so Farol's sidebar can show it.
+status reports what the agent in this pane is doing, so Farol's sidebar can show it.
 subagent-start and subagent-stop keep the pane working while a background agent runs.
 With waiting, the hook's JSON on stdin is read for the question or message to show in the notification.
-Outside Farol it does nothing, so hooks that call it are safe in any terminal.
+
+ask is the hook for an agent's question tool. It shows the question in Farol and prints the answer for the agent.
+If Farol can't answer, it prints nothing, and the agent asks in the terminal as usual.
+
+Outside Farol both do nothing, so hooks that call them are safe in any terminal.
 """
 
 let arguments = Array(CommandLine.arguments.dropFirst())
-guard arguments.count == 2, arguments[0] == "status" else {
+let isAsk = arguments == ["ask"]
+guard isAsk || (arguments.count == 2 && arguments[0] == "status") else {
     print(usage)
     exit(arguments.first == "help" || arguments.first == "--help" ? 0 : 64)
-}
-
-guard let event = AgentEvent(rawValue: arguments[1]) else {
-    FileHandle.standardError.write("farol: unknown status \(arguments[1])\n\n\(usage)\n".data(using: .utf8)!)
-    exit(64)
 }
 
 // Farol sets these in every shell it starts. Without them this isn't a Farol pane.
@@ -37,6 +38,22 @@ func hookInput() -> Data {
         data.append(contentsOf: buffer[0..<count])
     }
     return data
+}
+
+if isAsk {
+    let input = hookInput()
+    // Anything Farol can't show or answer leaves the agent to ask in the terminal. A hook must never fail the agent.
+    guard let questions = AskHook.questions(in: input),
+          let reply = try? StatusClient.ask(AskMessage(pane: pane, questions: questions), to: socket),
+          let answers = reply.answers,
+          let output = AskHook.output(for: input, answers: answers) else { exit(0) }
+    FileHandle.standardOutput.write(output + Data("\n".utf8))
+    exit(0)
+}
+
+guard let event = AgentEvent(rawValue: arguments[1]) else {
+    FileHandle.standardError.write("farol: unknown status \(arguments[1])\n\n\(usage)\n".data(using: .utf8)!)
+    exit(64)
 }
 
 // Only a waiting agent has something to ask.

@@ -28,6 +28,8 @@ public struct StatusMessage: Codable, Equatable, Sendable {
 public final class StatusServer {
     public let path: String
     public var onMessage: ((StatusMessage) -> Void)?
+    /// A question the agent is blocked on. The connection stays open until it is answered.
+    public var onAsk: ((AskMessage, AskConnection) -> Void)?
 
     private let delivery: DispatchQueue
     private let queue = DispatchQueue(label: "dev.farol.status")
@@ -74,20 +76,97 @@ public final class StatusServer {
     private func acceptClient() {
         let client = accept(listener, nil, nil)
         guard client >= 0 else { return }
-        defer { close(client) }
+        // A client that went away mid-answer must not take Farol down with a broken pipe.
+        var on: Int32 = 1
+        setsockopt(client, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
 
         // Messages are a few dozen bytes, so a small cap keeps a misbehaving client from holding memory.
+        // A question's client waits for the answer without closing, so a line is read up to its newline.
         var data = Data()
         var buffer = [UInt8](repeating: 0, count: 1024)
         while data.count < 64 * 1024 {
             let count = read(client, &buffer, buffer.count)
             guard count > 0 else { break }
             data.append(contentsOf: buffer[0..<count])
+            if buffer[0..<count].contains(UInt8(ascii: "\n")) { break }
         }
-        for line in data.split(separator: UInt8(ascii: "\n")) {
+        let lines = data.split(separator: UInt8(ascii: "\n"))
+
+        if let line = lines.first, let ask = try? JSONDecoder().decode(AskMessage.self, from: Data(line)) {
+            let connection = AskConnection(descriptor: client, deliverOn: delivery)
+            delivery.async { [weak self] in
+                if let handler = self?.onAsk { handler(ask, connection) } else { connection.reply(AskReply()) }
+            }
+            return
+        }
+        close(client)
+        for line in lines {
             guard let message = try? JSONDecoder().decode(StatusMessage.self, from: Data(line)) else { continue }
             delivery.async { [weak self] in self?.onMessage?(message) }
         }
+    }
+}
+
+/// The open end of a question, answered once. Closing it without answers sends the agent back to its own prompt.
+public final class AskConnection: @unchecked Sendable {
+    private let descriptor: Int32
+    private let delivery: DispatchQueue
+    private let lock = NSLock()
+    private var finished = false
+    private var watcher: DispatchSourceRead?
+
+    init(descriptor: Int32, deliverOn delivery: DispatchQueue) {
+        self.descriptor = descriptor
+        self.delivery = delivery
+    }
+
+    /// A connection let go without an answer closes, so the hook falls back to the terminal instead of waiting forever.
+    deinit {
+        if !finished { close() }
+    }
+
+    /// Calls `onClose` if the hook goes away first, for instance because it was answered in the terminal.
+    public func watch(_ onClose: @escaping () -> Void) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !finished else { return }
+        let source = DispatchSource.makeReadSource(fileDescriptor: descriptor, queue: DispatchQueue(label: "dev.farol.ask"))
+        source.setEventHandler { [weak self] in
+            var byte: UInt8 = 0
+            // The hook sends nothing after its question, so anything readable is the end of the connection.
+            guard let self, read(self.descriptor, &byte, 1) <= 0, self.finish() else { return }
+            self.delivery.async(execute: onClose)
+        }
+        source.setCancelHandler { [descriptor] in Darwin.close(descriptor) }
+        watcher = source
+        source.resume()
+    }
+
+    public func reply(_ reply: AskReply) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !finished else { return }
+        // Written under the lock, so a hook that left at the same moment can't leave us writing to a closed descriptor.
+        if var line = try? JSONEncoder().encode(reply) {
+            line.append(UInt8(ascii: "\n"))
+            _ = line.withUnsafeBytes { write(descriptor, $0.baseAddress, $0.count) }
+        }
+        close()
+    }
+
+    /// True the first time only, which is when the descriptor is closed.
+    private func finish() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !finished else { return false }
+        close()
+        return true
+    }
+
+    /// With the lock held.
+    private func close() {
+        finished = true
+        if let watcher { watcher.cancel() } else { Darwin.close(descriptor) }
     }
 }
 
@@ -104,6 +183,33 @@ public enum StatusClient {
         var line = try JSONEncoder().encode(message)
         line.append(UInt8(ascii: "\n"))
         _ = line.withUnsafeBytes { write(fd, $0.baseAddress, $0.count) }
+    }
+}
+
+extension StatusClient {
+    /// Sends a question and waits as long as it takes for the answer. Nil when Farol closes without one.
+    public static func ask(_ message: AskMessage, to path: String) throws -> AskReply? {
+        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+        guard fd >= 0 else { throw posixError("socket") }
+        defer { close(fd) }
+        var address = try unixAddress(path)
+        let connected = withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
+        }
+        guard connected == 0 else { throw posixError("connect") }
+        var line = try JSONEncoder().encode(message)
+        line.append(UInt8(ascii: "\n"))
+        guard line.withUnsafeBytes({ write(fd, $0.baseAddress, $0.count) }) == line.count else { throw posixError("write") }
+
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        while data.count < 64 * 1024 {
+            let count = read(fd, &buffer, buffer.count)
+            guard count > 0 else { break }
+            data.append(contentsOf: buffer[0..<count])
+            if buffer[0..<count].contains(UInt8(ascii: "\n")) { break }
+        }
+        return data.split(separator: UInt8(ascii: "\n")).first.flatMap { try? JSONDecoder().decode(AskReply.self, from: Data($0)) }
     }
 }
 

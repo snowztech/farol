@@ -15,6 +15,8 @@ final class Session: ObservableObject, Identifiable {
     /// Reported per pane by agent hooks or interactive terminal titles.
     @Published private(set) var agents: [UUID: AgentActivity] = [:]
     private var prompts: [UUID: AgentPrompt] = [:]
+    /// A question the agent is blocked on, which Farol can answer through the agent's hook.
+    var ask: PendingAsk?
     /// The program rang the bell or sent a notification while you were elsewhere. Covers agents without hooks.
     @Published var bellRang = false
     /// The host each pane is on over ssh, kept apart from the title so it outlives a program retitling the pane.
@@ -190,6 +192,11 @@ final class SessionStore: ObservableObject {
     /// A session's activity changed, from the old value to the new one. Used for notifications.
     var onActivityChange: ((Session, Session.Activity, Session.Activity) -> Void)?
 
+    /// An agent asked a question that Farol can answer.
+    var onAsk: ((Session) -> Void)?
+    /// The question is over: answered, handed back to the terminal, or the agent went on without it.
+    var onAskEnd: ((Session) -> Void)?
+
     private let statusServer: StatusServer
     private let cliPath: String
 
@@ -199,6 +206,7 @@ final class SessionStore: ObservableObject {
         cliPath = Bundle.main.resourceURL?.appendingPathComponent("bin/farol").path ?? "farol"
         statusServer = StatusServer(path: socketPath)
         statusServer.onMessage = { [weak self] in self?.receive($0) }
+        statusServer.onAsk = { [weak self] in self?.receiveAsk($0, $1) }
         do {
             try statusServer.start()
         } catch {
@@ -227,6 +235,35 @@ final class SessionStore: ObservableObject {
         // A "done" you are already looking at needs no light.
         if session.id == selectedID && NSApp.isActive { session.acknowledge() }
         report(session, from: before)
+    }
+
+    private func receiveAsk(_ message: AskMessage, _ connection: AskConnection) {
+        guard let pane = UUID(uuidString: message.pane),
+              let session = sessions.first(where: { $0.panes.terminals.contains { $0.id == pane } }),
+              let first = message.questions.first else { return connection.reply(AskReply()) }
+        // A new question replaces one the agent has already moved past.
+        session.ask?.connection.reply(AskReply())
+        let ask = PendingAsk(pane: pane, questions: message.questions, connection: connection)
+        session.ask = ask
+        connection.watch { [weak self, weak session, weak ask] in
+            // The hook left, for instance because the question was answered in the terminal.
+            guard let self, let session, let ask, session.ask === ask else { return }
+            session.ask = nil
+            onAskEnd?(session)
+        }
+        // The question's own hook usually said so already, but this one is what carries the options.
+        receive(StatusMessage(pane: message.pane, event: .waiting, prompt: AgentPrompt(text: first.text, options: first.options.map(\.label))))
+        onAsk?(session)
+    }
+
+    /// Sends the answers to the agent, or nil to let it ask in its terminal.
+    func answer(_ session: Session, with answers: [String: String]?) {
+        guard let ask = session.ask else { return }
+        session.ask = nil
+        ask.connection.reply(AskReply(answers: answers))
+        // The agent goes on at once, and its next hook would say so a moment later.
+        if answers != nil { receive(StatusMessage(pane: ask.pane.uuidString, event: .working)) }
+        onAskEnd?(session)
     }
 
     private func report(_ session: Session, from before: Session.Activity) {
