@@ -40,6 +40,13 @@ extension MainWindowController {
         window.beginSheet(sheet)
     }
 
+    /// Brings Farol forward on a session, from a panel that isn't part of its window.
+    func show(session: Session) {
+        window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        store.select(session)
+    }
+
     func dismissAsk(for session: Session) {
         guard let shown = askSheet, shown.session === session else { return }
         askSheet = nil

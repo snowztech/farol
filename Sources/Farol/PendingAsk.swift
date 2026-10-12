@@ -3,6 +3,8 @@ import Foundation
 
 /// A question an agent is blocked on. Its hook keeps the connection open until Farol answers or lets go.
 final class PendingAsk {
+    /// Tells one question from the next, so a form showing the old one doesn't keep its picks.
+    let id = UUID()
     let pane: UUID
     let questions: [AgentQuestion]
     let connection: AskConnection
