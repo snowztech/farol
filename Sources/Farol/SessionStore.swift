@@ -201,7 +201,7 @@ final class SessionStore: ObservableObject {
     private func makeTerminal(in directory: String?, run: String? = nil) -> TerminalView {
         let id = UUID()
         let command = run?.trimmingCharacters(in: .whitespaces) ?? ""
-        return TerminalView(runtime: runtime, workingDirectory: directory, id: id, environment: [
+        return TerminalView(runtime: runtime, workingDirectory: directory ?? OpenPath.fallback, id: id, environment: [
             "FAROL_PANE": id.uuidString,
             "FAROL_SOCKET": statusServer.path,
             "FAROL_CLI": cliPath,

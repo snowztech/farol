@@ -8,6 +8,14 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - Remote: answer your agents from your phone. Turn it on in Settings → Remote, scan the code with Farol Remote for iPhone, and the phone lists your sessions, shows a session's screen, types your replies and tells you when an agent waits or finishes. Everything between the Mac and the phone is encrypted end to end.
 
+## [0.30.7] - 2026-10-13
+
+Open a folder in Farol from Finder or another app.
+
+### Fixed
+
+- Opening a folder from Finder or `open -a Farol <folder>` starts a session in that folder.
+
 ## [0.30.6] - 2026-10-08
 
 Over ssh, Farol keeps showing the host and stops showing the repo on your Mac.
@@ -672,7 +680,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.30.6...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.30.7...HEAD
+[0.30.7]: https://github.com/snowztech/farol/releases/tag/v0.30.7
 [0.30.6]: https://github.com/snowztech/farol/releases/tag/v0.30.6
 [0.30.5]: https://github.com/snowztech/farol/releases/tag/v0.30.5
 [0.30.4]: https://github.com/snowztech/farol/releases/tag/v0.30.4

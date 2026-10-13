@@ -8,6 +8,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var settings: Settings!
     /// Set once quitting is already decided, so it isn't asked twice.
     private var quitConfirmed = false
+    /// Folders handed over by Finder or `open`, kept until restore has run.
+    private var pendingOpenURLs: [URL] = []
+    private var restored = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let runtime = TerminalRuntime(overrideFiles: [Settings.fileURL])
@@ -30,12 +33,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         AppIcon.apply()
         windowController.showWindow(nil)
         store.restore()
+        restored = true
+        processPendingOpenURLs()
         NSApp.activate(ignoringOtherApps: true)
         // Reads each agent's config, so it stays off the main thread and out of the launch.
         DispatchQueue.global(qos: .utility).async { AgentSetup.refreshSkills() }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        pendingOpenURLs.append(contentsOf: urls)
+        processPendingOpenURLs()
+    }
+
+    /// Starts a session for each opened folder once restore has run, so restore never swallows them.
+    private func processPendingOpenURLs() {
+        guard restored, !pendingOpenURLs.isEmpty else { return }
+        let urls = pendingOpenURLs
+        pendingOpenURLs.removeAll()
+        for url in urls {
+            if let directory = OpenPath.directory(for: url.path) {
+                windowController.newSession(in: directory)
+            }
+        }
+    }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if quitConfirmed { return .terminateNow }
