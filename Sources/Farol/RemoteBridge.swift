@@ -9,6 +9,7 @@ final class RemoteBridge: ObservableObject {
     private static let relayKey = "remote.relay"
     private static let defaultRelay = "wss://relay.farol.sh"
     private static let devicesKey = "remote.devices"
+    private static let pushKey = "remote.push"
     /// Where the phone lands when it scans the code. The offer rides after the #, which never reaches that server.
     private static let pairingPage = URL(string: "https://remote.farol.sh/pair")!
 
@@ -34,6 +35,17 @@ final class RemoteBridge: ObservableObject {
     private var timer: Timer?
     private var offerEnd: Timer?
 
+    /// Where Apple can reach a paired phone with a notification, as that phone said.
+    private struct PushTarget: Codable {
+        var device: Data
+        var token: Data
+        var sandbox: Bool
+    }
+
+    private var pushTargets: [PushTarget] = [] {
+        didSet { UserDefaults.standard.set(try? JSONEncoder().encode(pushTargets), forKey: Self.pushKey) }
+    }
+
     /// One phone's connection, by the number the relay gave it.
     private struct Phone {
         var link: MacLink
@@ -48,6 +60,9 @@ final class RemoteBridge: ObservableObject {
         self.store = store
         if let saved = UserDefaults.standard.data(forKey: Self.devicesKey) {
             devices = (try? JSONDecoder().decode([PairedDevice].self, from: saved)) ?? []
+        }
+        if let saved = UserDefaults.standard.data(forKey: Self.pushKey) {
+            pushTargets = (try? JSONDecoder().decode([PushTarget].self, from: saved)) ?? []
         }
     }
 
@@ -147,6 +162,7 @@ final class RemoteBridge: ObservableObject {
     func remove(_ device: PairedDevice) {
         devices.removeAll { $0.key == device.key }
         seen[device.key] = nil
+        pushTargets.removeAll { $0.device == device.key }
         phones = phones.filter { $0.value.device?.key != device.key }
         connected.remove(device.key)
         save()
@@ -217,6 +233,9 @@ final class RemoteBridge: ObservableObject {
             phones[id]?.watching = session
             phones[id]?.screen = nil
             tick()
+        case .notify(let token, let sandbox):
+            pushTargets.removeAll { $0.device == device.key }
+            pushTargets.append(PushTarget(device: device.key, token: token, sandbox: sandbox))
         case .send(let session, let text):
             act(command, by: device, on: session, from: id) { $0.pasteText(text) }
         case .key(let session, let key):
@@ -246,6 +265,23 @@ final class RemoteBridge: ObservableObject {
     private func send(_ frame: WireFrame, to id: UInt32) {
         guard let payload = try? JSONEncoder().encode(frame) else { return }
         connection?.send(RelayFrame.encode(payload, to: id))
+    }
+
+    // MARK: Notifications
+
+    /// Has the relay ask Apple to notify every paired phone when a session starts waiting or finishes.
+    /// The relay is told which of the two and nothing else, so it never learns the session.
+    func activityChanged(from before: Session.Activity, to after: Session.Activity) {
+        guard let connection, before != after else { return }
+        let notice: RemoteNotice? = switch after {
+        case .waiting: .waiting
+        case .done: .done
+        default: nil
+        }
+        guard let notice else { return }
+        for target in pushTargets {
+            connection.send(RelayFrame.push(token: target.token, sandbox: target.sandbox, notice: notice))
+        }
     }
 
     // MARK: Sessions
