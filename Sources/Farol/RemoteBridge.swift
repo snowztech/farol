@@ -40,6 +40,8 @@ final class RemoteBridge: ObservableObject {
         var device: Data
         var token: Data
         var sandbox: Bool
+        /// What this phone asked to hear about. Nil is everything, which is what a phone that never said gets.
+        var notices: [RemoteNotice]?
     }
 
     private var pushTargets: [PushTarget] = [] {
@@ -233,9 +235,9 @@ final class RemoteBridge: ObservableObject {
             phones[id]?.watching = session
             phones[id]?.screen = nil
             tick()
-        case .notify(let token, let sandbox):
+        case .notify(let token, let sandbox, let notices):
             pushTargets.removeAll { $0.device == device.key }
-            pushTargets.append(PushTarget(device: device.key, token: token, sandbox: sandbox))
+            pushTargets.append(PushTarget(device: device.key, token: token, sandbox: sandbox, notices: notices))
         case .send(let session, let text):
             act(command, by: device, on: session, from: id) { $0.pasteText(text) }
         case .type(let session, let text):
@@ -281,7 +283,7 @@ final class RemoteBridge: ObservableObject {
         default: nil
         }
         guard let notice else { return }
-        for target in pushTargets {
+        for target in pushTargets where target.notices?.contains(notice) ?? true {
             connection.send(RelayFrame.push(token: target.token, sandbox: target.sandbox, notice: notice))
         }
     }
