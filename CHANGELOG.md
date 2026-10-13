@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- Opening a folder from Finder or `open -a Farol <folder>` starts a session in that folder.
+
 ## [0.30.6] - 2026-10-08
 
 Over ssh, Farol keeps showing the host and stops showing the repo on your Mac.
