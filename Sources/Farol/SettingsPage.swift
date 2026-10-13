@@ -576,16 +576,21 @@ struct SettingsPage: View {
             GroupTitle(title: "Connection", palette: p)
             let whose = remote.ownRelay == nil ? "Farol's relay" : remote.relayHost
             Row(title: remote.online ? "Connected through \(whose)" : "Not connected to \(whose)",
-                detail: "The relay joins this Mac with your phone. Everything is encrypted between the two, so the relay cannot read it.",
+                detail: relayDraft == nil
+                    ? "The relay joins this Mac with your phone. Everything is encrypted between the two, so the relay cannot read it."
+                    : "The address of a relay you run, like relay.example.com. Phones you already paired have to scan a new code after a change.",
                 palette: p) {
                 if let draft = relayDraft {
-                    TextField("relay.example.com", text: Binding(get: { draft }, set: { relayDraft = $0 }))
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 200)
-                        .onSubmit {
-                            remote.useRelay(draft)
-                            relayDraft = nil
-                        }
+                    HStack(spacing: 8) {
+                        TextField("relay.example.com", text: Binding(get: { draft }, set: { relayDraft = $0 }))
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 200)
+                            .onSubmit(saveRelay)
+                            // Escape leaves the relay as it was.
+                            .onExitCommand { relayDraft = nil }
+                        ShipButton(title: "Cancel", busy: false, palette: p) { relayDraft = nil }
+                        ShipButton(title: "Use it", busy: false, palette: p, action: saveRelay)
+                    }
                 } else if remote.ownRelay == nil {
                     ShipButton(title: "Use your own", help: "For a relay you run yourself.", busy: false, palette: p) { relayDraft = "" }
                 } else {
@@ -593,6 +598,12 @@ struct SettingsPage: View {
                 }
             }
         }
+    }
+
+    /// An empty field changes nothing, so leaving it blank is the same as Cancel.
+    private func saveRelay() {
+        if let draft = relayDraft, !draft.trimmingCharacters(in: .whitespaces).isEmpty { remote.useRelay(draft) }
+        relayDraft = nil
     }
 
     /// Black on white whatever the theme, since that is what a camera reads best.
