@@ -12,8 +12,8 @@ final class RemoteBridge: ObservableObject {
     static let appStore = "https://apps.apple.com/app/id6821882114"
     private static let devicesKey = "remote.devices"
     private static let pushKey = "remote.push"
-    /// Where the phone lands when it scans the code. The offer rides after the #, which never reaches that server.
-    private static let pairingPage = URL(string: "https://remote.farol.sh/pair")!
+    /// Where a phone lands when its own camera scans the code, a page that says to scan from the app. The offer rides after the #, which never reaches that server.
+    private static let pairingPage = URL(string: "https://farol.sh/pair")!
 
     /// The phones this Mac lets in.
     @Published private(set) var devices: [PairedDevice] = []
