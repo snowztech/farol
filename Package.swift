@@ -5,8 +5,8 @@ let package = Package(
     name: "Farol",
     platforms: [.macOS(.v14)],
     dependencies: [
-        // What a paired phone and the Mac say to each other, shared with the iOS app. A branch until the protocol settles, then a version.
-        .package(url: "https://github.com/snowztech/farol-remote", branch: "main"),
+        // What a paired phone and the Mac say to each other, shared with the iOS app.
+        .package(url: "https://github.com/snowztech/farol-remote", from: "0.1.0"),
     ],
     targets: [
         .binaryTarget(name: "GhosttyKit", path: "vendor/GhosttyKit.xcframework"),

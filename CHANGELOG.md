@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Remote: answer your agents from your phone. Turn it on in Settings → Remote, scan the code with Farol Remote for iPhone, and the phone lists your sessions, shows a session's screen, types your replies and tells you when an agent waits or finishes. Everything between the Mac and the phone is encrypted end to end.
+
 ## [0.30.6] - 2026-10-08
 
 Over ssh, Farol keeps showing the host and stops showing the repo on your Mac.

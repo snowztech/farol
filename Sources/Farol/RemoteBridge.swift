@@ -240,6 +240,9 @@ final class RemoteBridge: ObservableObject {
         case .notify(let token, let sandbox, let notices, let key):
             pushTargets.removeAll { $0.device == device.key }
             pushTargets.append(PushTarget(device: device.key, token: token, sandbox: sandbox, notices: notices, key: key))
+        case .options, .task:
+            // Starting a task from the phone, which this version does not do. The phone is told so, and says to update.
+            tell(.refused(command: command.id, reason: "This version of Farol cannot start tasks from the phone."), id)
         case .history(let session):
             // Read once, when the phone asks. Reading it on every change would cost the Mac for something rarely looked at.
             guard let pane = store.sessions.first(where: { $0.id == session })?.panes.focused else { return }
