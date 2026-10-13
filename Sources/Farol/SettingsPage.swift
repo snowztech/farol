@@ -553,12 +553,16 @@ struct SettingsPage: View {
                     }
                 }
             }
+            // The app comes before the code, since the code is only read from inside it.
+            Row(title: "Farol for iPhone", detail: "The app that scans the code and shows your sessions.", palette: p) {
+                ShipButton(title: "Get the app", busy: false, palette: p) {
+                    if let store = URL(string: RemoteBridge.appStore) { NSWorkspace.shared.open(store) }
+                }
+            }
             Row(title: remote.devices.isEmpty ? "Pair your phone" : "Pair another phone",
                 detail: remote.offer == nil
-                    ? "Shows a code to scan from Farol for iPhone. It works once, for two minutes."
-                    : "Open Farol for iPhone and scan this. Whoever scans it can type into your sessions, so show it to nobody else.",
-                // The app is the first thing someone needs, so its name leads to it before a code is shown and after.
-                link: ("Farol for iPhone", RemoteBridge.appStore),
+                    ? "Shows a code to scan from the app. It works once, for two minutes."
+                    : "Scan this from the app. Whoever scans it can type into your sessions, so show it to nobody else.",
                 palette: p) {
                 ShipButton(title: remote.offer == nil ? "Show code" : "Hide", busy: false, palette: p) {
                     remote.offer == nil ? remote.showOffer() : remote.hideOffer()
@@ -568,16 +572,11 @@ struct SettingsPage: View {
                 Image(nsImage: code)
                     .interpolation(.none)
                     .resizable()
-                    .frame(width: 220, height: 220)
+                    .frame(width: 200, height: 200)
                     .padding(12)
                     .background(Color.white)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .padding(.top, 12)
-                if let store = URL(string: RemoteBridge.appStore) {
-                    QuietLink(words: "Get Farol for iPhone", url: store, palette: p)
-                        .font(.system(size: 11.5))
-                        .padding(.top, 8)
-                }
+                    .padding(.vertical, 12)
             }
 
             GroupTitle(title: "Connection", palette: p)
