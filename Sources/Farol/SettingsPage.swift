@@ -1,4 +1,6 @@
+import CoreImage.CIFilterBuiltins
 import FarolCore
+import FarolRemote
 import SwiftUI
 import UserNotifications
 import GhosttyTerminal
@@ -10,11 +12,13 @@ struct SettingsPage: View {
     @ObservedObject var worktrees: WorktreeSettings
     @ObservedObject var state: WindowState
     @ObservedObject var updates: UpdateChecker
+    @ObservedObject var remote: RemoteBridge
     /// Opens a session with a command typed in, for setting up a tool that asks questions.
     let runInTerminal: (String) -> Void
 
     @AppStorage(AppIcon.key) private var appIcon = AppIcon.default.rawValue
     @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = false
+    @AppStorage(RemoteBridge.relayKey) private var relay = RemoteBridge.defaultRelay
     @State private var versionCopied = false
     /// One setup per Claude Code and Codex config folder, with each one's state by id.
     @State private var agentSetups: [AgentSetup] = []
@@ -54,6 +58,7 @@ struct SettingsPage: View {
         case agents = "Agents"
         case worktrees = "Worktrees"
         case integrations = "Integrations"
+        case remote = "Remote"
         case shortcuts = "Shortcuts"
         case about = "About"
     }
@@ -87,6 +92,7 @@ struct SettingsPage: View {
                         case .agents: agentsSection(p)
                         case .worktrees: worktreesSection(p)
                         case .integrations: integrationsSection(p)
+                        case .remote: remoteSection(p)
                         case .shortcuts: shortcuts(p)
                         case .about: EmptyView()
                         }
@@ -523,6 +529,63 @@ struct SettingsPage: View {
             agentError = "Could not update \(path): \(error.localizedDescription)"
         }
         refreshAgents()
+    }
+
+    @ViewBuilder private func remoteSection(_ p: Palette) -> some View {
+        Heading(title: "Remote", detail: "Answer your agents from your phone when you are away from the Mac.", palette: p)
+        Row(title: "Remote",
+            detail: "Lets a phone you paired see your sessions and type into them. The Mac has to stay on, since the agents run on it.",
+            palette: p) {
+            toggle($agents.remote)
+        }
+        if let problem = remote.problem {
+            Text(problem).font(.system(size: 12)).foregroundStyle(p.waiting).padding(.top, 6)
+        }
+        if agents.remote {
+            GroupTitle(title: "Devices", palette: p)
+            ForEach(remote.devices, id: \.key) { device in
+                Row(title: device.name, palette: p) {
+                    ShipButton(title: "Remove", busy: false, palette: p) { remote.remove(device) }
+                }
+            }
+            Row(title: "Pair a device",
+                detail: remote.offer == nil
+                    ? "Shows a code to scan with the phone. It works once, for two minutes."
+                    : "Scan this with the phone's camera. Anyone who scans it can type into your sessions, so show it to nobody else.",
+                palette: p) {
+                ShipButton(title: remote.offer == nil ? "Show code" : "Hide", busy: false, palette: p) {
+                    remote.offer == nil ? remote.showOffer() : remote.hideOffer()
+                }
+            }
+            if let link = remote.link, let code = Self.qrCode(link.absoluteString) {
+                Image(nsImage: code)
+                    .interpolation(.none)
+                    .resizable()
+                    .frame(width: 220, height: 220)
+                    .padding(12)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .padding(.top, 12)
+            }
+
+            GroupTitle(title: "Relay", palette: p)
+            Row(title: remote.online ? "Connected" : "Not connected",
+                detail: "Joins this Mac with its phones and passes messages it cannot read. Change it to run your own, then turn Remote off and on.",
+                palette: p) {
+                TextField(RemoteBridge.defaultRelay, text: $relay)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 220)
+            }
+        }
+    }
+
+    /// Black on white whatever the theme, since that is what a camera reads best.
+    private static func qrCode(_ text: String) -> NSImage? {
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = Data(text.utf8)
+        guard let output = filter.outputImage,
+              let image = CIContext().createCGImage(output, from: output.extent) else { return nil }
+        return NSImage(cgImage: image, size: NSSize(width: output.extent.width, height: output.extent.height))
     }
 
     @ViewBuilder private func shortcuts(_ p: Palette) -> some View {

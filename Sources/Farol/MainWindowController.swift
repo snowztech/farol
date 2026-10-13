@@ -59,6 +59,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var notchSwitch: AnyCancellable?
     private var notchPlace: AnyCancellable?
     private var sessionsChange: AnyCancellable?
+    private(set) lazy var remote = RemoteBridge(store: store)
+    private var remoteSwitch: AnyCancellable?
 
     init(store: SessionStore, runtime: TerminalRuntime, settings: Settings, agents: AgentSettings,
          worktrees: WorktreeSettings) {
@@ -116,7 +118,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         state.filesVisible = UserDefaults.standard.bool(forKey: Self.filesVisibleKey)
         state.graphVisible = UserDefaults.standard.bool(forKey: Self.graphVisibleKey)
         settingsView = hosting(SettingsPage(
-            settings: settings, agents: agents, worktrees: worktrees, state: state, updates: updates,
+            settings: settings, agents: agents, worktrees: worktrees, state: state, updates: updates, remote: remote,
             runInTerminal: { [weak self] command in
                 guard let self else { return }
                 if state.showingSettings { toggleSettings() }
@@ -232,6 +234,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
         menuBarSwitch = agents.$menuBarStatus.sink { [weak self] in self?.menuBar.setVisible($0) }
         notch.onSelect = menuBar.onSelect
+        remoteSwitch = agents.$remote.sink { [weak self] in self?.remote.setEnabled($0) }
         notchSwitch = agents.$notchStatus.sink { [weak self] in self?.notch.setVisible($0) }
         // A Mac without a notch shows it on the screen edge, whatever was saved.
         notchPlace = agents.$statusPanelPlace.sink { [weak self] in
