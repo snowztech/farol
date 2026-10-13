@@ -96,6 +96,19 @@ A session over ssh says where you are, and shows nothing that belongs to another
 - [ ] A `TERM` the server knows, so colors and keys work on hosts without Ghostty's terminfo
 - [ ] Hosts whose shell sets no title, which still look local
 
+## From your phone
+
+Answer your agents when you are away from the Mac. Turn Remote on in settings, scan a code with your phone, and your sessions are there. The Mac has to stay on, since the agents run on it.
+
+With Remote off, Farol runs as it does today. The messages, their encryption and the relay live in [farol-remote](https://github.com/snowztech/farol-remote), and the relay cannot read what it passes.
+
+- [x] The Mac side: the switch, pairing with a QR code, the paired devices, and one bridge that sends the sessions and types the replies
+- [x] The encrypted protocol and the relay, in farol-remote
+- [ ] The iOS app: the sessions with their status, a session's screen and a reply bar
+- [ ] A notification when a session waits or finishes, answered from the notification itself
+- [ ] The Mac kept awake while agents work, on power only
+- [ ] New task and the review from the phone
+
 ## Hardening
 
 - [ ] Checksum for the prebuilt libghostty, checked before every release
@@ -107,6 +120,7 @@ A session over ssh says where you are, and shows nothing that belongs to another
 - Linear as a ticket source
 - The server's repo in the panels over ssh, which needs git run on the server
 - Command palette: Farol's actions, like push, commit or new task, in the ⌘P list
+- A live terminal on the phone, with colors, once libghostty lets the app around it read a pane's output. Until then the phone shows a pane as text
 
 ## Not planned
 
