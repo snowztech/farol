@@ -238,6 +238,8 @@ final class RemoteBridge: ObservableObject {
             pushTargets.append(PushTarget(device: device.key, token: token, sandbox: sandbox))
         case .send(let session, let text):
             act(command, by: device, on: session, from: id) { $0.pasteText(text) }
+        case .type(let session, let text):
+            act(command, by: device, on: session, from: id) { $0.type(text) }
         case .key(let session, let key):
             act(command, by: device, on: session, from: id) { pane in
                 TerminalView.Key(rawValue: key.rawValue).map { pane.press($0) }

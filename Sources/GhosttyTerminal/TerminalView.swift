@@ -234,7 +234,12 @@ public final class TerminalView: NSView {
 
     /// A key that isn't text.
     public enum Key: String {
-        case enter, escape, tab, up, down, left, right, interrupt
+        case enter, escape, tab, up, down, left, right, backspace, interrupt
+    }
+
+    /// Types text as the keyboard would, one key after the other, where `pasteText` hands it over whole.
+    public func type(_ text: String) {
+        text.forEach { sendText(String($0)) }
     }
 
     /// Presses and releases a key, as the keyboard would, for a prompt that waits on Return or an arrow.
@@ -249,6 +254,7 @@ public final class TerminalView: NSView {
         case .down: (125, nil, 0xF701)
         case .left: (123, nil, 0xF702)
         case .right: (124, nil, 0xF703)
+        case .backspace: (51, nil, 0x7F)
         case .interrupt: (8, "c", 0x63)
         }
         var input = ghostty_input_key_s()
