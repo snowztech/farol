@@ -1,4 +1,5 @@
 import AppKit
+import FarolCore
 import FarolRemote
 import GhosttyTerminal
 import UserNotifications
@@ -240,6 +241,15 @@ final class RemoteBridge: ObservableObject {
         case .notify(let token, let sandbox, let notices, let key):
             pushTargets.removeAll { $0.device == device.key }
             pushTargets.append(PushTarget(device: device.key, token: token, sandbox: sandbox, notices: notices, key: key))
+        case .options:
+            let agents = AgentFolder.find()
+            let saved = UserDefaults.standard.string(forKey: "newTask.agent") ?? ""
+            tell(.options(
+                projects: projects.map { RemoteChoice(id: $0, name: URL(fileURLWithPath: $0).lastPathComponent) },
+                agents: agents.map { RemoteChoice(id: $0.id, name: $0.label) },
+                agent: (AgentFolder.choice(saved, in: agents) ?? agents.first)?.id), id)
+        case .task(let project, let agent, let text):
+            startTask(command, by: device, in: project, with: agent, text: text, from: id)
         case .history(let session):
             // Read once, when the phone asks. Reading it on every change would cost the Mac for something rarely looked at.
             guard let pane = store.sessions.first(where: { $0.id == session })?.panes.focused else { return }
@@ -275,6 +285,40 @@ final class RemoteBridge: ObservableObject {
     private func send(_ frame: WireFrame, to id: UInt32) {
         guard let payload = try? JSONEncoder().encode(frame) else { return }
         connection?.send(RelayFrame.encode(payload, to: id))
+    }
+
+    // MARK: New task
+
+    /// The repositories with a session open, which is where a phone may start a task. Not any folder on the Mac.
+    private var projects: [String] {
+        var seen = Set<String>()
+        return store.ordered.compactMap(\.repoRoot).filter { seen.insert($0).inserted }
+    }
+
+    /// The same as New task on the Mac: a worktree on a new branch, and the agent started in it with the task as its first prompt.
+    private func startTask(_ command: RemoteCommand, by device: PairedDevice, in project: String, with agent: String, text: String, from id: UInt32) {
+        // A phone resends what was not answered, and a second worktree for the same task would be a mess.
+        guard seen[device.key, default: SeenCommands()].insert(command.id) else { return tell(.done(command: command.id), id) }
+        let task = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard projects.contains(project), let folder = AgentFolder.find().first(where: { $0.id == agent }),
+              !task.isEmpty, let branch = Worktrees.branchName(from: NewTask.branchName(for: task)) else {
+            return tell(.refused(command: command.id, reason: "The Mac could not start that task. Open the sheet again and retry."), id)
+        }
+        let copyEnvironmentFiles = WorktreeSettings().copyEnvironmentFiles
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = Result { try Worktrees.default.create(branch: branch, from: project, copyEnvironmentFiles: copyEnvironmentFiles) }
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                switch result {
+                case .success(let path):
+                    store.create(directory: path, run: folder.command(task: task))
+                    tell(.done(command: command.id), id)
+                    tick()
+                case .failure(let error):
+                    tell(.refused(command: command.id, reason: "The worktree could not be created: \(error)"), id)
+                }
+            }
+        }
     }
 
     // MARK: Notifications
