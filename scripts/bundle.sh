@@ -52,6 +52,15 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>FarolVersion</key><string>$version</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>NSHighResolutionCapable</key><true/>
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key><string>Folder</string>
+      <key>CFBundleTypeRole</key><string>Viewer</string>
+      <key>LSItemContentTypes</key>
+      <array><string>public.folder</string></array>
+    </dict>
+  </array>
   <!-- Shown when a program in a session asks macOS for access. -->
   <key>NSAppleEventsUsageDescription</key><string>A program running in Farol would like to use AppleScript.</string>
   <key>NSCameraUsageDescription</key><string>A program running in Farol would like to use the camera.</string>
