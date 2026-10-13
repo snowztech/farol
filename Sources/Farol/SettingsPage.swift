@@ -591,6 +591,8 @@ struct SettingsPage: View {
                         ShipButton(title: "Cancel", busy: false, palette: p) { relayDraft = nil }
                         ShipButton(title: "Use it", busy: false, palette: p, action: saveRelay)
                     }
+                    // Without this the row squeezes the buttons until their titles are cut to dots.
+                    .fixedSize()
                 } else if remote.ownRelay == nil {
                     ShipButton(title: "Use your own", help: "For a relay you run yourself.", busy: false, palette: p) { relayDraft = "" }
                 } else {
