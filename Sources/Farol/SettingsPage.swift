@@ -543,6 +543,11 @@ struct SettingsPage: View {
             Text(problem).font(.system(size: 12)).foregroundStyle(p.waiting).padding(.top, 6)
         }
         if agents.remote {
+            Row(title: "Keep the Mac awake for agents",
+                detail: "While an agent works or waits for you, the Mac does not go to sleep by itself. Closing the lid still puts it to sleep.",
+                palette: p) {
+                toggle($agents.remoteKeepAwake)
+            }
             GroupTitle(title: "Phones", palette: p)
             ForEach(remote.devices, id: \.key) { device in
                 Row(title: device.name,

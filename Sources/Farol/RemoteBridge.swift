@@ -36,6 +36,11 @@ final class RemoteBridge: ObservableObject {
     private var seen: [Data: SeenCommands] = [:]
     private var timer: Timer?
     private var offerEnd: Timer?
+    private var wake: NSObjectProtocol?
+    /// Held while the Mac is kept awake, and nil the rest of the time.
+    private var awake: NSObjectProtocol?
+    /// Keeps the Mac from sleeping by itself while an agent works or waits for an answer, so a phone can still reach it.
+    var keepAwake = false { didSet { refreshAwake() } }
 
     /// Where Apple can reach a paired phone with a notification, as that phone said.
     private struct PushTarget: Codable {
@@ -70,6 +75,12 @@ final class RemoteBridge: ObservableObject {
         if let saved = UserDefaults.standard.data(forKey: Self.pushKey) {
             pushTargets = (try? JSONDecoder().decode([PushTarget].self, from: saved)) ?? []
         }
+        // A connection from before a sleep is dead and does not say so. A new one is made at once, so a phone is not left waiting.
+        wake = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self, connection != nil else { return }
+            stop()
+            start()
+        }
     }
 
     func setEnabled(_ enabled: Bool) {
@@ -94,6 +105,7 @@ final class RemoteBridge: ObservableObject {
         }
         self.connection = connection
         connection.start()
+        refreshAwake()
         #if DEBUG
         // Lets a test pair without a camera: the link a QR code would carry, written where the test asks.
         if let path = ProcessInfo.processInfo.environment["FAROL_REMOTE_LINK_FILE"] {
@@ -111,6 +123,18 @@ final class RemoteBridge: ObservableObject {
         problem = nil
         hideOffer()
         forgetPhones()
+        refreshAwake()
+    }
+
+    /// The Mac stays awake only while Remote is on and a session needs it. The screen may still sleep, and closing the lid still sleeps the Mac.
+    func refreshAwake() {
+        let needed = keepAwake && connection != nil && store.sessions.contains { $0.activity == .working || $0.activity == .waiting }
+        if needed, awake == nil {
+            awake = ProcessInfo.processInfo.beginActivity(options: .idleSystemSleepDisabled, reason: "An agent is working, and a paired phone may answer it.")
+        } else if !needed, let held = awake {
+            ProcessInfo.processInfo.endActivity(held)
+            awake = nil
+        }
     }
 
     /// The relay's address with its scheme. A bare host is taken as secure, since that is what a phone accepts.
@@ -287,6 +311,7 @@ final class RemoteBridge: ObservableObject {
     /// Has the relay ask Apple to notify every paired phone when a session starts waiting or finishes.
     /// The relay is told which of the two. Which session it is goes along sealed, for the phone alone.
     func activityChanged(_ session: Session, from before: Session.Activity, to after: Session.Activity) {
+        refreshAwake()
         guard let connection, before != after else { return }
         let notice: RemoteNotice? = switch after {
         case .waiting: .waiting

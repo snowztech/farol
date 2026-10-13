@@ -61,6 +61,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var sessionsChange: AnyCancellable?
     private(set) lazy var remote = RemoteBridge(store: store)
     private var remoteSwitch: AnyCancellable?
+    private var awakeSwitch: AnyCancellable?
 
     init(store: SessionStore, runtime: TerminalRuntime, settings: Settings, agents: AgentSettings,
          worktrees: WorktreeSettings) {
@@ -236,6 +237,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         menuBarSwitch = agents.$menuBarStatus.sink { [weak self] in self?.menuBar.setVisible($0) }
         notch.onSelect = menuBar.onSelect
         remoteSwitch = agents.$remote.sink { [weak self] in self?.remote.setEnabled($0) }
+        awakeSwitch = agents.$remoteKeepAwake.sink { [weak self] in self?.remote.keepAwake = $0 }
         notchSwitch = agents.$notchStatus.sink { [weak self] in self?.notch.setVisible($0) }
         // A Mac without a notch shows it on the screen edge, whatever was saved.
         notchPlace = agents.$statusPanelPlace.sink { [weak self] in
@@ -247,6 +249,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             DispatchQueue.main.async {
                 self?.menuBar.refresh()
                 self?.notch.refresh()
+                // A session closed while it worked reports no change, and would keep the Mac awake.
+                self?.remote.refreshAwake()
             }
         }
         styleSwitch = state.$style.dropFirst().sink { [weak self] in self?.applyTheme(style: $0) }

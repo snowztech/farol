@@ -14,6 +14,7 @@ final class AgentSettings: ObservableObject {
     @Published var statusPanelPlace: String { didSet { Self.defaults.set(statusPanelPlace, forKey: "agents.statusPanelPlace") } }
     /// Lets a paired phone see the sessions and type into them.
     @Published var remote: Bool { didSet { Self.defaults.set(remote, forKey: RemoteBridge.enabledKey) } }
+    @Published var remoteKeepAwake: Bool { didSet { Self.defaults.set(remoteKeepAwake, forKey: "remote.keepAwake") } }
     /// Typed into the shell of each new session, for example "claude". Empty starts a plain shell.
     @Published var startCommand: String { didSet { Self.defaults.set(startCommand, forKey: "agents.startCommand") } }
 
@@ -29,5 +30,6 @@ final class AgentSettings: ObservableObject {
         statusPanelPlace = Self.defaults.string(forKey: "agents.statusPanelPlace") ?? "notch"
         startCommand = Self.defaults.string(forKey: "agents.startCommand") ?? ""
         remote = Self.defaults.bool(forKey: RemoteBridge.enabledKey)
+        remoteKeepAwake = Self.defaults.bool(forKey: "remote.keepAwake")
     }
 }
