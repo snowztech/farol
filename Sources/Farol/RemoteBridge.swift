@@ -42,6 +42,8 @@ final class RemoteBridge: ObservableObject {
         var sandbox: Bool
         /// What this phone asked to hear about. Nil is everything, which is what a phone that never said gets.
         var notices: [RemoteNotice]?
+        /// Seals which session a notification is about, so only this phone reads it. Nil for a phone that sent none.
+        var key: Data?
     }
 
     private var pushTargets: [PushTarget] = [] {
@@ -235,9 +237,13 @@ final class RemoteBridge: ObservableObject {
             phones[id]?.watching = session
             phones[id]?.screen = nil
             tick()
-        case .notify(let token, let sandbox, let notices):
+        case .notify(let token, let sandbox, let notices, let key):
             pushTargets.removeAll { $0.device == device.key }
-            pushTargets.append(PushTarget(device: device.key, token: token, sandbox: sandbox, notices: notices))
+            pushTargets.append(PushTarget(device: device.key, token: token, sandbox: sandbox, notices: notices, key: key))
+        case .history(let session):
+            // Read once, when the phone asks. Reading it on every change would cost the Mac for something rarely looked at.
+            guard let pane = store.sessions.first(where: { $0.id == session })?.panes.focused else { return }
+            tell(.history(session: session, text: pane.historyText()), id)
         case .send(let session, let text):
             act(command, by: device, on: session, from: id) { $0.pasteText(text) }
         case .type(let session, let text):
@@ -274,8 +280,8 @@ final class RemoteBridge: ObservableObject {
     // MARK: Notifications
 
     /// Has the relay ask Apple to notify every paired phone when a session starts waiting or finishes.
-    /// The relay is told which of the two and nothing else, so it never learns the session.
-    func activityChanged(from before: Session.Activity, to after: Session.Activity) {
+    /// The relay is told which of the two. Which session it is goes along sealed, for the phone alone.
+    func activityChanged(_ session: Session, from before: Session.Activity, to after: Session.Activity) {
         guard let connection, before != after else { return }
         let notice: RemoteNotice? = switch after {
         case .waiting: .waiting
@@ -284,7 +290,10 @@ final class RemoteBridge: ObservableObject {
         }
         guard let notice else { return }
         for target in pushTargets where target.notices?.contains(notice) ?? true {
-            connection.send(RelayFrame.push(token: target.token, sandbox: target.sandbox, notice: notice))
+            let sealed = target.key.flatMap {
+                NoticeBox.seal(RemoteNoticeContent(session: session.id, name: session.displayName, notice: notice), key: $0)
+            }
+            connection.send(RelayFrame.push(token: target.token, sandbox: target.sandbox, notice: notice, sealed: sealed))
         }
     }
 

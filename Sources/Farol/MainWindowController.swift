@@ -224,7 +224,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         store.onActivityChange = { [weak self] session, before, after in
             guard let self else { return }
             notifier.activityChanged(session, from: before, to: after)
-            remote.activityChanged(from: before, to: after)
+            remote.activityChanged(session, from: before, to: after)
             refreshBadge(enabled: agents.dockBadge)
             menuBar.refresh()
             notch.refresh()

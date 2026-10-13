@@ -220,16 +220,32 @@ public final class TerminalView: NSView {
     }
 
     /// What the pane shows right now, as plain text without colors. Empty once the shell has gone.
-    public var screenText: String {
+    public var screenText: String { read(GHOSTTY_POINT_VIEWPORT) }
+
+    private func read(_ tag: ghostty_point_tag_e) -> String {
         guard let surface else { return "" }
         let whole = ghostty_selection_s(
-            top_left: ghostty_point_s(tag: GHOSTTY_POINT_VIEWPORT, coord: GHOSTTY_POINT_COORD_TOP_LEFT, x: 0, y: 0),
-            bottom_right: ghostty_point_s(tag: GHOSTTY_POINT_VIEWPORT, coord: GHOSTTY_POINT_COORD_BOTTOM_RIGHT, x: 0, y: 0),
+            top_left: ghostty_point_s(tag: tag, coord: GHOSTTY_POINT_COORD_TOP_LEFT, x: 0, y: 0),
+            bottom_right: ghostty_point_s(tag: tag, coord: GHOSTTY_POINT_COORD_BOTTOM_RIGHT, x: 0, y: 0),
             rectangle: false)
         var text = ghostty_text_s()
         guard ghostty_surface_read_text(surface, whole, &text) else { return "" }
         defer { ghostty_surface_free_text(surface, &text) }
         return text.text.map { String(cString: $0) } ?? ""
+    }
+
+    /// What scrolled off the top of the screen, oldest first: at most the last `lines` lines and `bytes` bytes of it.
+    /// It reads the whole scrollback, a few milliseconds for tens of thousands of lines, so it is for when someone asks and not for a timer.
+    public func historyText(lines: Int = 2000, bytes: Int = 120_000) -> String {
+        let all = read(GHOSTTY_POINT_SCREEN), shown = read(GHOSTTY_POINT_ACTIVE)
+        let above = all.hasSuffix(shown) ? all.dropLast(shown.count) : Substring(all)
+        var kept = above.split(separator: "\n", omittingEmptySubsequences: false).suffix(lines)
+        var size = kept.reduce(0) { $0 + $1.utf8.count + 1 }
+        while size > bytes, let first = kept.first {
+            size -= first.utf8.count + 1
+            kept = kept.dropFirst()
+        }
+        return kept.joined(separator: "\n")
     }
 
     /// A key that isn't text.
