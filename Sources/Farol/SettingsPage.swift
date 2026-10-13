@@ -18,7 +18,8 @@ struct SettingsPage: View {
 
     @AppStorage(AppIcon.key) private var appIcon = AppIcon.default.rawValue
     @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = false
-    @AppStorage(RemoteBridge.relayKey) private var relay = RemoteBridge.defaultRelay
+    /// The relay field, shown only once you ask to use your own.
+    @State private var relayDraft: String?
     @State private var versionCopied = false
     /// One setup per Claude Code and Codex config folder, with each one's state by id.
     @State private var agentSetups: [AgentSetup] = []
@@ -533,8 +534,8 @@ struct SettingsPage: View {
 
     @ViewBuilder private func remoteSection(_ p: Palette) -> some View {
         Heading(title: "Remote", detail: "Answer your agents from your phone when you are away from the Mac.", palette: p)
-        Row(title: "Remote",
-            detail: "Lets a phone you paired see your sessions and type into them. The Mac has to stay on, since the agents run on it.",
+        Row(title: "Let a paired phone in",
+            detail: "It sees your sessions and types into them. The Mac has to stay on, since the agents run on it.",
             palette: p) {
             toggle($agents.remote)
         }
@@ -542,16 +543,20 @@ struct SettingsPage: View {
             Text(problem).font(.system(size: 12)).foregroundStyle(p.waiting).padding(.top, 6)
         }
         if agents.remote {
-            GroupTitle(title: "Devices", palette: p)
+            GroupTitle(title: "Phones", palette: p)
             ForEach(remote.devices, id: \.key) { device in
-                Row(title: device.name, palette: p) {
-                    ShipButton(title: "Remove", busy: false, palette: p) { remote.remove(device) }
+                Row(title: device.name,
+                    detail: remote.connected.contains(device.key) ? "Connected now" : "Not connected",
+                    palette: p) {
+                    ShipButton(title: "Remove", help: "It is cut off at once, and has to scan a new code to come back.", busy: false, palette: p) {
+                        remote.remove(device)
+                    }
                 }
             }
-            Row(title: "Pair a device",
+            Row(title: remote.devices.isEmpty ? "Pair your phone" : "Pair another phone",
                 detail: remote.offer == nil
-                    ? "Shows a code to scan with the phone. It works once, for two minutes."
-                    : "Scan this with the phone's camera. Anyone who scans it can type into your sessions, so show it to nobody else.",
+                    ? "Shows a code to scan from Farol on the phone. It works once, for two minutes."
+                    : "Open Farol on the phone and scan this. Whoever scans it can type into your sessions, so show it to nobody else.",
                 palette: p) {
                 ShipButton(title: remote.offer == nil ? "Show code" : "Hide", busy: false, palette: p) {
                     remote.offer == nil ? remote.showOffer() : remote.hideOffer()
@@ -568,13 +573,24 @@ struct SettingsPage: View {
                     .padding(.top, 12)
             }
 
-            GroupTitle(title: "Relay", palette: p)
-            Row(title: remote.online ? "Connected" : "Not connected",
-                detail: "Joins this Mac with its phones and passes messages it cannot read. Change it to run your own, then turn Remote off and on.",
+            GroupTitle(title: "Connection", palette: p)
+            let whose = remote.ownRelay == nil ? "Farol's relay" : remote.relayHost
+            Row(title: remote.online ? "Connected through \(whose)" : "Not connected to \(whose)",
+                detail: "The relay joins this Mac with your phone. Everything is encrypted between the two, so the relay cannot read it.",
                 palette: p) {
-                TextField(RemoteBridge.defaultRelay, text: $relay)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 220)
+                if let draft = relayDraft {
+                    TextField("relay.example.com", text: Binding(get: { draft }, set: { relayDraft = $0 }))
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 200)
+                        .onSubmit {
+                            remote.useRelay(draft)
+                            relayDraft = nil
+                        }
+                } else if remote.ownRelay == nil {
+                    ShipButton(title: "Use your own", help: "For a relay you run yourself.", busy: false, palette: p) { relayDraft = "" }
+                } else {
+                    ShipButton(title: "Use Farol's", busy: false, palette: p) { remote.useRelay("") }
+                }
             }
         }
     }

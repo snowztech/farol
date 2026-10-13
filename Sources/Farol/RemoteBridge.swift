@@ -6,8 +6,8 @@ import UserNotifications
 /// The only code that joins `FarolRemote` to the sessions. It holds nothing and connects to nothing until Remote is turned on.
 final class RemoteBridge: ObservableObject {
     static let enabledKey = "remote.enabled"
-    static let relayKey = "remote.relay"
-    static let defaultRelay = "wss://relay.farol.sh"
+    private static let relayKey = "remote.relay"
+    private static let defaultRelay = "wss://relay.farol.sh"
     private static let devicesKey = "remote.devices"
     /// Where the phone lands when it scans the code. The offer rides after the #, which never reaches that server.
     private static let pairingPage = URL(string: "https://remote.farol.sh/pair")!
@@ -20,6 +20,10 @@ final class RemoteBridge: ObservableObject {
     @Published private(set) var online = false
     /// Why Remote is on and not working, in words for the settings page.
     @Published private(set) var problem: String?
+    /// The paired phones that are connected right now, by their key.
+    @Published private(set) var connected: Set<Data> = []
+    /// A relay of your own, as you typed it. Nil for Farol's.
+    @Published private(set) var ownRelay = UserDefaults.standard.string(forKey: RemoteBridge.relayKey)
 
     private let store: SessionStore
     private var key: DeviceKey?
@@ -59,7 +63,6 @@ final class RemoteBridge: ObservableObject {
         }
         problem = nil
         self.key = key
-        let relay = UserDefaults.standard.string(forKey: Self.relayKey) ?? Self.defaultRelay
         guard let url = URL(string: "\(relay)/v1/rooms/\(RelayFrame.room(for: key.publicKey))/mac") else { return }
         let connection = RelayConnection(url: url)
         connection.onMessage = { [weak self] in self?.receive($0) }
@@ -89,8 +92,32 @@ final class RemoteBridge: ObservableObject {
         forgetPhones()
     }
 
+    /// The relay's address with its scheme. A bare host is taken as secure, since that is what a phone accepts.
+    private var relay: String {
+        guard let own = ownRelay?.trimmingCharacters(in: .whitespaces), !own.isEmpty else { return Self.defaultRelay }
+        if own.hasPrefix("https://") { return "wss://" + own.dropFirst(8) }
+        if own.hasPrefix("http://") { return "ws://" + own.dropFirst(7) }
+        return own.contains("://") ? own : "wss://" + own
+    }
+
+    /// The relay without its scheme, for the settings page.
+    var relayHost: String {
+        URL(string: relay)?.host ?? relay
+    }
+
+    /// Empty goes back to Farol's relay. The connection moves over at once.
+    func useRelay(_ address: String) {
+        let address = address.trimmingCharacters(in: .whitespaces)
+        ownRelay = address.isEmpty ? nil : address
+        UserDefaults.standard.set(ownRelay, forKey: Self.relayKey)
+        guard connection != nil else { return }
+        stop()
+        start()
+    }
+
     private func forgetPhones() {
         phones = [:]
+        connected = []
         timer?.invalidate()
         timer = nil
     }
@@ -101,7 +128,7 @@ final class RemoteBridge: ObservableObject {
     var link: URL? { offer?.link(on: Self.pairingPage) }
 
     func showOffer() {
-        guard let key, let relay = URL(string: UserDefaults.standard.string(forKey: Self.relayKey) ?? Self.defaultRelay) else { return }
+        guard let key, let relay = URL(string: relay) else { return }
         let offer = PairingOffer(relay: relay, mac: key)
         self.offer = offer
         offerEnd?.invalidate()
@@ -121,6 +148,7 @@ final class RemoteBridge: ObservableObject {
         devices.removeAll { $0.key == device.key }
         seen[device.key] = nil
         phones = phones.filter { $0.value.device?.key != device.key }
+        connected.remove(device.key)
         save()
     }
 
@@ -159,6 +187,8 @@ final class RemoteBridge: ObservableObject {
         case .data(nil, _), .online, .offline:
             break
         }
+        let now = Set(phones.values.compactMap { $0.device?.key })
+        if now != connected { connected = now }
     }
 
     private func handle(_ output: MacLink.Output, from id: UInt32) {
