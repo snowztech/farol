@@ -229,7 +229,7 @@ public struct Forge: Equatable {
     /// The repo's open issues, newest first, to start a task from. Talks to the forge, so call it off the main thread.
     public func issues(in directory: String) -> [Ticket] {
         // ponytail: GitHub only, and the newest 30. glab lists issues too, for when GitLab needs them.
-        let arguments = ["issue", "list", "--state", "open", "--json", "number,title,body", "--limit", "30"]
+        let arguments = ["issue", "list", "--state", "open", "--json", "number,title,body,url", "--limit", "30"]
         guard kind == .github, let path = kind.toolPath,
               let output = try? Git.run(path, arguments, in: directory) else { return [] }
         return Self.issues(from: output)
@@ -240,7 +240,8 @@ public struct Forge: Equatable {
         return list.compactMap { issue in
             guard let number = issue["number"] as? Int, let title = issue["title"] as? String else { return nil }
             let body = (issue["body"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            return Ticket(source: .github, key: "#\(number)", summary: title, description: body)
+            let url = (issue["url"] as? String).flatMap(URL.init(string:))
+            return Ticket(source: .github, key: "#\(number)", summary: title, description: body, url: url)
         }
     }
 

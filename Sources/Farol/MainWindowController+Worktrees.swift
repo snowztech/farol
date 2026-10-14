@@ -12,8 +12,8 @@ extension MainWindowController {
     func newTask() {
         withRepo(purpose: "the new task") { [weak self] directory in
             guard let self, let window = self.window else { return }
-            NewTaskSheet.present(in: window, directory: directory, palette: self.state.palette) { branch, command in
-                self.startWorktreeSession(branch: branch, from: directory, run: command)
+            NewTaskSheet.present(in: window, directory: directory, palette: self.state.palette) { branch, command, task in
+                self.startWorktreeSession(branch: branch, from: directory, run: command, environment: [NewTask.variable: task])
             }
         }
     }
@@ -72,7 +72,7 @@ extension MainWindowController {
         }
     }
 
-    private func startWorktreeSession(branch: String, from directory: String, run command: String?) {
+    private func startWorktreeSession(branch: String, from directory: String, run command: String?, environment: [String: String] = [:]) {
         let copyEnvironmentFiles = worktreeSettings.copyEnvironmentFiles
         // Checking out a big repo can take a moment, so keep it off the main thread.
         DispatchQueue.global(qos: .userInitiated).async {
@@ -82,7 +82,7 @@ extension MainWindowController {
             }
             DispatchQueue.main.async { [weak self] in
                 switch result {
-                case .success(let path): self?.store.create(directory: path, run: command)
+                case .success(let path): self?.store.create(directory: path, run: command, environment: environment)
                 case .failure(let error): self?.showError("Couldn't create the worktree", "\(error)")
                 }
             }

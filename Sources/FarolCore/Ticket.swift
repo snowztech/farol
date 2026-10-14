@@ -11,15 +11,17 @@ public struct Ticket: Equatable, Identifiable, Sendable {
     public let key: String
     public let summary: String
     public let description: String
+    /// Sent with the task, so the agent can read the comments and whatever changed since.
+    public let url: URL?
 
     public var id: String { key }
 
     /// The agent's first prompt: the ticket's key and title, then what it says.
     public var task: String {
-        // The prompt is typed into a shell, where a tab asks for completions and GitHub's line endings count twice.
-        "\(key): \(summary)\n\n\(description)"
+        // GitHub's line endings would count twice.
+        [[key + ": " + summary, url?.absoluteString].compactMap { $0 }.joined(separator: "\n"), description]
+            .joined(separator: "\n\n")
             .replacingOccurrences(of: "\r\n", with: "\n")
-            .replacingOccurrences(of: "\t", with: "  ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
