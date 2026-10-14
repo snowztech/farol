@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.30.8] - 2026-10-14
+
+Farol uses much less memory with many sessions open.
+
 ### Fixed
 
 - Sessions in the background no longer hold a full window of graphics memory each, so Farol uses much less memory with many sessions open.
@@ -680,7 +684,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.30.7...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.30.8...HEAD
+[0.30.8]: https://github.com/snowztech/farol/releases/tag/v0.30.8
 [0.30.7]: https://github.com/snowztech/farol/releases/tag/v0.30.7
 [0.30.6]: https://github.com/snowztech/farol/releases/tag/v0.30.6
 [0.30.5]: https://github.com/snowztech/farol/releases/tag/v0.30.5
