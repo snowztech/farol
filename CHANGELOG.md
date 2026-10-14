@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- Closing a session or a pane ends its shell and frees its memory. Closed sessions used to keep running in the background, with their programs, until Farol quit.
+
 ## [0.30.8] - 2026-10-14
 
 Farol uses much less memory with many sessions open.
