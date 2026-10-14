@@ -559,7 +559,7 @@ struct SettingsPage: View {
                 }
             }
             // The app comes before the code, since the code is only read from inside it.
-            Row(title: "Farol for iPhone", detail: "The app that scans the code and shows your sessions.", palette: p) {
+            Row(title: "Farol for iPhone", detail: "The app that scans the code and shows your sessions. Remote needs an iPhone for now.", palette: p) {
                 ShipButton(title: "Get the app", busy: false, palette: p) {
                     if let store = URL(string: RemoteBridge.appStore) { NSWorkspace.shared.open(store) }
                 }

@@ -102,12 +102,17 @@ Answer your agents when you are away from the Mac. Turn Remote on in settings, s
 
 With Remote off, Farol runs as it does today. The messages, their encryption and the relay live in [farol-remote](https://github.com/snowztech/farol-remote), and the relay cannot read what it passes.
 
+It needs an iPhone for now. For Android or the web, [say so in an issue](https://github.com/snowztech/farol/issues/new?title=Remote%20on%20Android%20or%20the%20web), since that decides what comes next.
+
 - [x] The Mac side: the switch, pairing with a QR code, the paired devices, and one bridge that sends the sessions and types the replies
 - [x] The encrypted protocol and the relay, in farol-remote
-- [ ] The iOS app: the sessions with their status, a session's screen and a reply bar
-- [ ] A notification when a session waits or finishes, answered from the notification itself
-- [ ] The Mac kept awake while agents work, on power only
-- [ ] New task and the review from the phone
+- [x] The iPhone app: the sessions with their status, a session's screen and its earlier output, a reply bar with the keys a phone lacks, and dictation
+- [x] A notification when a session waits or finishes, naming the session and opening it
+- [x] The Mac kept awake while agents work, as a setting
+- [ ] Answering from the notification itself
+- [ ] New task from the phone
+- [ ] Agents on a machine of your own that stays on, so the Mac can be off. A preview is in farol-remote as `farol-host`
+- [ ] Android or the web, if people ask
 
 ## Hardening
 
