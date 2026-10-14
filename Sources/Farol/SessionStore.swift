@@ -388,6 +388,7 @@ final class SessionStore: ObservableObject {
     /// Closing the last session ends the app: there is never a window without a terminal.
     func close(_ session: Session) {
         guard let index = sessions.firstIndex(where: { $0.id == session.id }) else { return }
+        session.panes.terminals.forEach { $0.close() }
         if sessions.count == 1 {
             // Nothing to restore: the next launch starts fresh in the home folder.
             sessions.removeAll()

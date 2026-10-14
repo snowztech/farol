@@ -89,8 +89,14 @@ public final class TerminalView: NSView {
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    deinit {
-        if let surface { ghostty_surface_free(surface) }
+    deinit { close() }
+
+    /// Ends the shell and frees what Ghostty holds: its threads, GPU buffers and scrollback.
+    /// Closing a session calls this rather than waiting for deinit, since SwiftUI can keep a closed row, and this view with it, alive.
+    public func close() {
+        guard let surface else { return }
+        self.surface = nil
+        ghostty_surface_free(surface)
     }
 
     static func from(_ userdata: UnsafeMutableRawPointer) -> TerminalView {
@@ -101,6 +107,9 @@ public final class TerminalView: NSView {
     public func setVisible(_ visible: Bool) {
         isHidden = !visible
         if let surface { ghostty_surface_set_occlusion(surface, visible) }
+        // Ghostty frees its buffers when occluded, but its layer redraws on any resize, bypassing that check.
+        // Each layout pass would rebuild a full-size buffer for every hidden session.
+        layer?.needsDisplayOnBoundsChange = visible
     }
 
     /// Runs on the main thread during ghostty_app_tick. C strings are only valid for this call.
