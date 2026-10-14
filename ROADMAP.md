@@ -110,7 +110,6 @@ It needs an iPhone for now. For Android or the web, [say so in an issue](https:/
 - [x] A notification when a session waits or finishes, naming the session and opening it
 - [x] The Mac kept awake while agents work, as a setting
 - [ ] Answering from the notification itself
-- [ ] New task from the phone
 - [ ] Agents on a machine of your own that stays on, so the Mac can be off. A preview is in farol-remote as `farol-host`
 - [ ] Android or the web, if people ask
 
