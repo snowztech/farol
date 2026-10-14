@@ -215,8 +215,8 @@ final class SessionStore: ObservableObject {
         session.apply(message.event, pane: pane)
         // An agent's turn can end on a rebase it started and git stopped, so its checkout is looked at again.
         // Only then: "working" comes after every tool call, and each lookup also refreshes the review panel.
-        // A session in the background waits until it is selected.
-        if message.event == .done && session.id == selectedID { session.refreshGit() }
+        // Background sessions too, so the sidebar shows when one of them is stopped on a rebase.
+        if message.event == .done { session.refreshGit() }
         // A "done" you are already looking at needs no light.
         if session.id == selectedID && NSApp.isActive { session.acknowledge() }
         report(session, from: before)
@@ -372,8 +372,6 @@ final class SessionStore: ObservableObject {
         session.acknowledge()
         report(session, from: before)
         selectedID = session.id
-        // Catches up on what its agents did with git while it was in the background.
-        session.refreshGit()
         onSelectionChange?(session)
         save()
     }

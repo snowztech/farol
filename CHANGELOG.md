@@ -6,7 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Fixed
 
-- A working agent no longer makes Farol run git after each of its steps. Sessions in the background read their git state when you open them.
+- A working agent no longer makes Farol run git after each of its steps, only when its turn ends.
 
 ## [0.30.10] - 2026-10-15
 
