@@ -101,6 +101,9 @@ public final class TerminalView: NSView {
     public func setVisible(_ visible: Bool) {
         isHidden = !visible
         if let surface { ghostty_surface_set_occlusion(surface, visible) }
+        // Ghostty frees its buffers when occluded, but its layer redraws on any resize, bypassing that check.
+        // Each layout pass would rebuild a full-size buffer for every hidden session.
+        layer?.needsDisplayOnBoundsChange = visible
     }
 
     /// Runs on the main thread during ghostty_app_tick. C strings are only valid for this call.
