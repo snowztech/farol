@@ -4,6 +4,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- New Task shows the picked ticket's text before you start, and sends its link along so the agent can read the comments.
+- A task no longer fills the terminal and your shell history. The agent gets it from `$FAROL_TASK`.
+
 ## [0.30.9] - 2026-10-14
 
 Closing a session stops what runs in it.

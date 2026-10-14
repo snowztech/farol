@@ -12,8 +12,8 @@ struct NewTaskSheet: View {
     /// A tool that lists tickets is set up, so the select is worth holding a place for while they load.
     let expectsTickets: Bool
     let palette: Palette
-    /// Gets a valid branch and the command that launches the agent.
-    let start: (String, String) -> Void
+    /// Gets a valid branch, the command that launches the agent, and its task for the command to read.
+    let start: (String, String, String) -> Void
     let close: () -> Void
 
     @AppStorage("newTask.agent") private var agent = AgentFolder.Kind.claude.rawValue
@@ -37,7 +37,7 @@ struct NewTaskSheet: View {
     @State private var query = ""
     @FocusState private var searching: Bool
 
-    static func present(in window: NSWindow, directory: String, palette: Palette, start: @escaping (String, String) -> Void) {
+    static func present(in window: NSWindow, directory: String, palette: Palette, start: @escaping (String, String, String) -> Void) {
         // Git is asked off the main thread, so a slow repo can't freeze the window before the sheet shows.
         DispatchQueue.global(qos: .userInitiated).async {
             let repo = Git.repoRoot(of: directory).map { URL(fileURLWithPath: $0).lastPathComponent } ?? "repository"
@@ -87,6 +87,7 @@ struct NewTaskSheet: View {
                 } else if expectsTickets {
                     ticketPlaceholder(p)
                 }
+                if let picked, !picked.description.isEmpty { ticketPreview(picked.description, p) }
                 // Return starts the task. Option-Return adds a line, for longer ones.
                 TextField(picked == nil ? "What should the agent do?" : "Anything to add? The agent gets the ticket as it is.",
                           text: $task, axis: .vertical)
@@ -124,10 +125,10 @@ struct NewTaskSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button("Start") {
                     guard let name else { return }
-                    let command = choice.command(task: prompt)
+                    let command = choice.command() + " \"$\(NewTask.variable)\""
                     close()
                     // The worktree may fail and show why, which needs this sheet gone first.
-                    DispatchQueue.main.async { start(name, command) }
+                    DispatchQueue.main.async { start(name, command, prompt) }
                 }
                 .buttonStyle(SheetButton(palette: p, primary: true))
                 .keyboardShortcut(.defaultAction)
@@ -171,6 +172,22 @@ struct NewTaskSheet: View {
             if loaded == nil { ProgressView().controlSize(.mini) }
         }
         .foregroundStyle(p.muted.opacity(0.6))
+        .sheetField(p, focused: false)
+    }
+
+    /// What the agent will read. Anyone can open an issue on a public repo, so the text is worth a look before it becomes instructions.
+    private func ticketPreview(_ description: String, _ p: Palette) -> some View {
+        let text = Text(description)
+            .font(.system(size: 12))
+            .foregroundStyle(p.muted)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        // Short ones show whole, long ones scroll, so the sheet stays on screen.
+        return ViewThatFits(in: .vertical) {
+            text.fixedSize(horizontal: false, vertical: true)
+            ScrollView { text }
+        }
+        .frame(maxHeight: 160)
         .sheetField(p, focused: false)
     }
 
