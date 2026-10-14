@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- Sessions in the background no longer hold a full window of graphics memory each, so Farol uses much less memory with many sessions open.
+
 ## [0.30.7] - 2026-10-13
 
 Open a folder in Farol from Finder or another app.
