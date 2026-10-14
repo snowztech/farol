@@ -143,9 +143,17 @@ extension MainWindowController {
             store.close(session)
             return
         }
+        // Closing the session can't stop these, so they are named here and stopped only if the folder goes.
+        let programs = DetachedProgram.running(in: worktree)
+        let names = DetachedProgram.names(programs)
         let alert = NSAlert()
         alert.messageText = "Remove the worktree too?"
         alert.informativeText = "The branch \(session.branch.map { "\($0) " } ?? "")stays, so no commits are lost. Only the folder goes."
+        if !names.isEmpty {
+            let shown = names.prefix(3).map { $0.count > 60 ? $0.prefix(59) + "…" : $0 }
+            let list = shown.joined(separator: "\n") + (names.count > 3 ? "\nand \(names.count - 3) more" : "")
+            alert.informativeText += "\n\nStill running in it, outside any terminal:\n\(list)\n\nRemoving the worktree stops \(names.count == 1 ? "it" : "them")."
+        }
         alert.addButton(withTitle: "Remove Worktree")
         alert.addButton(withTitle: "Keep Worktree")
         alert.addButton(withTitle: "Cancel")
@@ -155,7 +163,7 @@ extension MainWindowController {
             switch response {
             case .alertFirstButtonReturn:
                 do {
-                    try Worktrees.default.remove(worktree)
+                    try Worktrees.default.remove(worktree, stopping: programs)
                 } catch {
                     // Rare now that unsaved work is checked first, so a plain note is enough.
                     self.showError("Worktree kept", "It couldn't be removed and stays at \(worktree). Nothing was deleted.")

@@ -99,10 +99,14 @@ public struct Worktrees {
 
     /// Removes the worktree folder but never the branch, so no commit is lost.
     /// Git refuses when there are uncommitted changes, and that error is passed on.
-    public func remove(_ path: String) throws {
+    /// `programs` are stopped once the folder is gone, and only then, so a refusal stops nothing.
+    public func remove(_ path: String, stopping programs: [DetachedProgram] = []) throws {
         guard contains(path), let root = Git.repoRoot(of: path) else {
             throw GitError(description: "\(path) is not a Farol worktree.")
         }
+        // Checked again while the folder still exists, so a process id reused since the user agreed is left alone.
+        let running = Set(DetachedProgram.running(in: path).map(\.pid))
         try Git.run(["worktree", "remove", path], in: root)
+        for program in programs where running.contains(program.pid) { kill(program.pid, SIGTERM) }
     }
 }

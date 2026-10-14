@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- Removing a worktree also stops what still runs in it outside any terminal, like a dev server an agent started, after naming it in the confirmation.
+
 ## [0.30.8] - 2026-10-14
 
 Farol uses much less memory with many sessions open.
