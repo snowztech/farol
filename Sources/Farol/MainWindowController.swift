@@ -113,6 +113,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let reviewPanel = hosting(ReviewPanel(
             review: review, state: state,
             open: { [weak self] in self?.open($0, line: $1) },
+            pick: { [weak self] in self?.store.selected?.pick($0) },
             close: { [weak self] in self?.toggleReview(closing: true) },
             resize: { [weak self] in self?.setReviewWidth($0) }))
         reviewPanel.clipsToBounds = true
@@ -402,6 +403,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         // Over a commit, "Review changes" brings your changes back. Closing the panel there would hide what you asked for.
         if !closing, review.leaveCommit() { return graph.select(nil) }
         review.isOpen.toggle()
+        // The title bar counts the whole task, so the panel opens on a repo that has changes rather than "No changes."
+        let repos = review.taskRepos
+        if review.isOpen, repos.first(where: { $0.path == review.root })?.stat.isEmpty == true,
+           let changed = repos.first(where: { !$0.stat.isEmpty }) {
+            store.selected?.pick(changed.path)
+        }
         let saved = UserDefaults.standard.double(forKey: Self.reviewWidthKey)
         let width = review.isOpen ? clampedReviewWidth(saved > 0 ? saved : ReviewPanel.defaultWidth) : 0
         withAnimation(.easeOut(duration: 0.18)) { state.reviewWidth = width }

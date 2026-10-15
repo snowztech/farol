@@ -446,6 +446,8 @@ struct ReviewPanel: View {
     @ObservedObject var state: WindowState
     /// Opens a file in the file pane, at a line.
     let open: (String, Int) -> Void
+    /// Shows another of the task's repos.
+    let pick: (String) -> Void
     let close: () -> Void
     let resize: (CGFloat) -> Void
 
@@ -454,6 +456,7 @@ struct ReviewPanel: View {
     var body: some View {
         let p = state.palette
         VStack(alignment: .leading, spacing: 0) {
+            TaskRepoTabs(review: review, palette: p, pick: pick)
             header(p)
             HStack(spacing: 8) {
                 ScopeMenu(review: review, palette: p)
