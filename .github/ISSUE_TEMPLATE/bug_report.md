@@ -15,3 +15,7 @@ labels: bug
 **Farol version and macOS version**
 
 <!-- Settings → About shows the Farol version. -->
+
+**Feels slow?**
+
+<!-- View → Farol Inspector (⌥⌘I), use Farol for a minute, then paste Copy Report here. -->

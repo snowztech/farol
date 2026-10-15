@@ -171,6 +171,7 @@ These hooks complement the terminal-title status used by interactive Codex sessi
 | Full screen | ⌃⌘F |
 | Settings | ⌘, |
 | Reload configuration | ⇧⌘, |
+| Farol Inspector: what Farol spends, to tell if it's slowing down | ⌥⌘I |
 
 Closing the last session quits Farol. Closing a session or quitting asks first when a program is still running. Ghostty's other default shortcuts, such as ⌘K to clear and ⌘+ to zoom, work as in Ghostty.
 
