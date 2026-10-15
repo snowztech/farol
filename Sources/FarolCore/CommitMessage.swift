@@ -97,6 +97,8 @@ public enum CommitMessage {
 
     static func run(_ executable: String, _ arguments: [String], input: String, environment: [String: String],
                             in directory: String, started: (Process) -> Void) throws -> String {
+        let timer = Perf.shared.begin(executable, arguments)
+        defer { Perf.shared.end(timer) }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
