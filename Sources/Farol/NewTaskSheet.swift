@@ -349,7 +349,6 @@ struct NewTaskSheet: View {
         if chosen.contains(repo) { chosen.remove(repo) } else { chosen.insert(repo) }
     }
 
-
     /// One quiet line, since most tasks stay in one repo. It opens the checklist with this repo already ticked.
     private func addReposLink(beside root: String, _ p: Palette) -> some View {
         let folder = ((root as NSString).deletingLastPathComponent as NSString).lastPathComponent
