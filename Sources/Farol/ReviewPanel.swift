@@ -51,6 +51,8 @@ final class ReviewModel: ObservableObject {
     @Published private(set) var commitSubject: String?
     /// The request being shown, for the compare menu and the link to its page.
     @Published private(set) var shownRequest: Forge.Request?
+    /// Its description and comments, above its files. Nil while they are read, or without the forge's tool.
+    @Published private(set) var discussion: Forge.Discussion?
     /// While a commit or a push runs.
     @Published private(set) var isShipping = false
     /// The commit sheet is open, from the Commit button or ⌥⌘C.
@@ -164,8 +166,25 @@ final class ReviewModel: ObservableObject {
     /// Shows what an open request changes, as from the git graph.
     func show(request: Forge.Request) {
         guard let root else { return }
+        if shownRequest?.number != request.number { discussion = nil }
         shownRequest = request
         browse(.request(request.number), in: root)
+        guard let forge else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let discussion = forge.discussion(ofRequest: request.number, in: root)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.root == root, self.shownRequest?.number == request.number else { return }
+                self.discussion = discussion
+            }
+        }
+    }
+
+    /// Unfolds a file and brings it into view, as from a comment left on one of its lines.
+    func reveal(_ path: String) {
+        guard files.contains(where: { $0.path == path }) else { return }
+        collapsed.remove(path)
+        rebuild()
+        focus = (path, UUID())
     }
 
     private func browse(_ scope: Diff.Scope, in root: String) {
@@ -448,6 +467,9 @@ struct ReviewPanel: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 0) {
+                            if let discussion = review.discussion, review.scope == review.shownRequest.map({ .request($0.number) }) {
+                                Conversation(discussion: discussion, palette: p, reveal: review.reveal)
+                            }
                             ForEach(review.rows) { row(for: $0, p) }
                         }
                         .padding(.bottom, 12)
@@ -700,3 +722,108 @@ private struct FileHeader: View {
     }
 }
 
+/// A request's description and comments, above its files. It folds like a file.
+private struct Conversation: View {
+    let discussion: Forge.Discussion
+    let palette: Palette
+    let reveal: (String) -> Void
+
+    @State private var folded = false
+    @State private var hovering = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .bold))
+                    .rotationEffect(.degrees(folded ? 0 : 90))
+                    .foregroundStyle(palette.muted)
+                    .frame(width: 12)
+                Text("Conversation").font(.system(size: 12.5)).foregroundStyle(palette.text)
+                Text(discussion.comments.count == 1 ? "1 comment" : "\(discussion.comments.count) comments")
+                    .font(.system(size: 11))
+                    .foregroundStyle(palette.muted)
+                Spacer(minLength: 8)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 34)
+            .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised : palette.surface))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(palette.line))
+            .padding(.horizontal, 8)
+            .padding(.top, 10)
+            .padding(.bottom, 4)
+            .contentShape(Rectangle())
+            .onClickableHover { hovering = $0 }
+            .onTapGesture { folded.toggle() }
+            if !folded {
+                CommentView(comment: discussion.description, empty: "No description.", palette: palette, reveal: reveal)
+                ForEach(Array(discussion.comments.enumerated()), id: \.offset) { _, comment in
+                    CommentView(comment: comment, empty: "", palette: palette, reveal: reveal)
+                }
+            }
+        }
+    }
+}
+
+private struct CommentView: View {
+    let comment: Forge.Discussion.Comment
+    /// Shown in place of the text when there is none.
+    let empty: String
+    let palette: Palette
+    let reveal: (String) -> Void
+
+    private static let age: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter
+    }()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Text(comment.author).font(.system(size: 12, weight: .semibold)).foregroundStyle(palette.text)
+                if let verdict = comment.verdict {
+                    Text(verdict).font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(verdict == "approved" ? palette.added : palette.removed)
+                }
+                if let path = comment.path {
+                    Button { reveal(path) } label: {
+                        Text((path as NSString).lastPathComponent + (comment.line.map { ":\($0)" } ?? ""))
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(palette.muted)
+                            .lineLimit(1)
+                    }
+                    .buttonStyle(.plain)
+                    .hoverTip("Show \(path) in the diff")
+                }
+                if let date = comment.date {
+                    Text(Self.age.localizedString(for: date, relativeTo: Date())).font(.system(size: 11)).foregroundStyle(palette.muted)
+                }
+                Spacer(minLength: 8)
+                if let url = comment.url {
+                    IconButton(symbol: "arrow.up.right.square", help: "Open in the browser", palette: palette) { NSWorkspace.shared.open(url) }
+                }
+            }
+            if comment.text.isEmpty {
+                if !empty.isEmpty { Text(empty).font(.system(size: 12)).foregroundStyle(palette.muted) }
+            } else {
+                Text(text)
+                    .font(.system(size: 12))
+                    .foregroundStyle(palette.text)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(palette.line))
+        .padding(.horizontal, 8)
+        .padding(.top, 6)
+    }
+
+    /// Bold, code and links read as they would on the forge. Headings and lists stay as written, which reads well enough.
+    private var text: AttributedString {
+        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        return (try? AttributedString(markdown: comment.text, options: options)) ?? AttributedString(comment.text)
+    }
+}

@@ -7,6 +7,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Added
 
 - A pull request's button in the git graph shows its changes in the review panel, anyone's request, without checking it out. Right click it for its page in the browser.
+- Above a pull request's changes, its description and comments, reviews and comments on lines included. A comment on a line takes you to its file.
 
 ## [0.30.10] - 2026-10-15
 
