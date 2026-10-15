@@ -4,6 +4,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- A GitHub or GitLab on your company's own domain is recognized once gh or glab is logged in there, so its requests, reviews and checks show.
+- New Task lists a GitLab repo's open issues, as it does GitHub's.
+
 ## [0.32.0] - 2026-10-15
 
 A task can now span several repos, each with its own worktree on one branch, reviewed repo by repo.

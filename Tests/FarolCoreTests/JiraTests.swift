@@ -37,12 +37,19 @@ import Testing
 
 @Test func readsGitHubIssues() {
     let json = #"[{"number": 41, "title": "Support multiple accounts", "body": "One.\r\nTwo.\r\n", "url": "https://github.com/acme/app/issues/41"}, {"number": 7, "title": "No body"}]"#
-    let issues = Forge.issues(from: json)
+    let issues = Forge.issues(from: json, source: .github)
     #expect(issues.map(\.key) == ["#41", "#7"])
     #expect(issues[0].task == "#41: Support multiple accounts\nhttps://github.com/acme/app/issues/41\n\nOne.\nTwo.")
     #expect(issues[0].branch == "41-support-multiple-accounts")
     #expect(issues[1].task == "#7: No body")
-    #expect(Forge.issues(from: "not logged in") == [])
+    #expect(Forge.issues(from: "not logged in", source: .github) == [])
+}
+
+@Test func readsGitLabIssues() {
+    let json = #"[{"iid": 12, "title": "Fix the pipeline", "description": "It fails.", "web_url": "https://gitlab.com/g/app/-/issues/12"}]"#
+    let issues = Forge.issues(from: json, source: .gitlab)
+    #expect(issues == [Ticket(source: .gitlab, key: "#12", summary: "Fix the pipeline", description: "It fails.",
+                              url: URL(string: "https://gitlab.com/g/app/-/issues/12"))])
 }
 
 @Test func readsTheJiraAccountsPicture() {
