@@ -150,6 +150,26 @@ import Testing
     #expect(discussion.head == "h1")
 }
 
+@Test func readsGitLabApprovalsAndOutdatedComments() throws {
+    let request = #"{"description":"","author":{"username":"ana"},"diff_refs":{"base_sha":"b1","start_sha":"s1","head_sha":"h2"}}"#
+    let notes = #"""
+    [{"id":1,"body":"Why?","system":false,"author":{"username":"bo"},"created_at":"2026-10-15T08:00:00.000Z","position":{"new_path":"a.swift","new_line":3,"head_sha":"h1"}},
+     {"id":2,"body":"Here?","system":false,"author":{"username":"bo"},"created_at":"2026-10-15T09:00:00.000Z","position":{"new_path":"a.swift","new_line":5,"head_sha":"h2"}},
+     {"id":3,"body":"approved this merge request","system":true,"author":{"username":"cy"},"created_at":"2026-10-15T10:00:00.000Z"},
+     {"id":4,"body":"requested changes","system":true,"author":{"username":"di"},"created_at":"2026-10-15T11:00:00.000Z"},
+     {"id":5,"body":"added 1 commit","system":true,"author":{"username":"ana"},"created_at":"2026-10-15T12:00:00.000Z"}]
+    """#
+    let discussion = try #require(Forge.discussion(gitlab: request, notes: notes))
+    // A note left on an older diff stays in the conversation, rather than under a line that moved.
+    #expect(discussion.comments[0].outdated)
+    #expect(!discussion.comments[1].outdated)
+    // Approvals show as verdicts, GitLab's other notes about itself stay out.
+    #expect(discussion.comments.map(\.author) == ["bo", "bo", "cy", "di"])
+    #expect(discussion.comments[2].verdict == "approved")
+    #expect(discussion.comments[2].text.isEmpty)
+    #expect(discussion.comments[3].verdict == "requested changes")
+}
+
 @Test func placesAGitLabCommentOnALine() throws {
     let request = #"{"description":"","author":{"username":"ana"},"diff_refs":{"base_sha":"b1","start_sha":"s1","head_sha":"h1"}}"#
     let discussion = try #require(Forge.discussion(gitlab: request, notes: "[]"))

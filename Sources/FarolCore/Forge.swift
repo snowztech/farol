@@ -287,21 +287,31 @@ public struct Forge: Equatable {
         let page = request["web_url"] as? String
         let description = Discussion.Comment(author: username(request), date: date(request["created_at"]),
                                              text: request["description"] as? String ?? "", url: page.flatMap(URL.init(string:)))
+        let refs = request["diff_refs"] as? [String: Any]
+        let head = refs?["head_sha"] as? String
         let list: [[String: Any]] = json(notes) as? [[String: Any]] ?? []
         let comments = list.compactMap { note -> Discussion.Comment? in
-            guard note["system"] as? Bool != true else { return nil }
-            let position = note["position"] as? [String: Any]
             let link = page.flatMap { page in (note["id"] as? Int).flatMap { URL(string: "\(page)#note_\($0)") } }
+            if note["system"] as? Bool == true {
+                // An approval is one of GitLab's notes about itself, the only kind worth showing, as a review's verdict is.
+                guard let verdict = verdicts[note["body"] as? String ?? ""] else { return nil }
+                return Discussion.Comment(author: username(note), date: date(note["created_at"]), text: "", verdict: verdict, url: link)
+            }
+            let position = note["position"] as? [String: Any]
             // A note on a removed line has only the old line's number.
             let new = position?["new_line"] as? Int
+            // GitLab doesn't mark a note outdated. One left on an older diff than the request's own is.
+            let outdated = position.map { ($0["head_sha"] as? String).map { $0 != head } ?? false } ?? false
             return Discussion.Comment(author: username(note), date: date(note["created_at"]), text: note["body"] as? String ?? "",
                                       path: position?["new_path"] as? String, line: new ?? position?["old_line"] as? Int,
-                                      old: position != nil && new == nil, url: link)
+                                      old: position != nil && new == nil, outdated: outdated, url: link)
         }
-        let refs = request["diff_refs"] as? [String: Any]
-        return Discussion(description: description, comments: comments, head: refs?["head_sha"] as? String,
+        return Discussion(description: description, comments: comments, head: head,
                           base: refs?["base_sha"] as? String, start: refs?["start_sha"] as? String)
     }
+
+    /// GitLab's notes about itself that say what a reviewer decided, and how the conversation shows it.
+    private static let verdicts = ["approved this merge request": "approved", "requested changes": "requested changes"]
 
     /// Whether this forge takes new comments on lines from Farol: its tool is installed.
     public var takesLineComments: Bool { kind.toolPath != nil }
