@@ -10,6 +10,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - Started from inside a repo, New Task offers Add repos to pick the repos beside it.
 - The repo list gets a search past 8 repos, and shows the branch a repo is on when it isn't main or master, since the task branch starts from it.
 - In a task across repos, the review and graph panels show a tab per repo with its changes, and the title bar counts the changes of all of them.
+- On GitLab too, the "+" next to a line of a merge request's diff writes a comment on it.
 
 ## [0.31.0] - 2026-10-15
 

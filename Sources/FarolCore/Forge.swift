@@ -200,8 +200,29 @@ public struct Forge: Equatable {
 
         public let description: Comment
         public let comments: [Comment]
-        /// The commit the request's branch is at, which a new comment on a line has to name. GitHub only.
+        /// The commit the request's branch is at, which a new comment on a line has to name.
         public var head: String?
+        /// GitLab also wants the diff's base and start commits, from its `diff_refs`.
+        public var base: String?
+        public var start: String?
+    }
+
+    /// Where a new comment goes on a request's diff.
+    public struct LinePlace: Equatable {
+        public let path: String
+        /// The file's path before a rename, which GitLab wants too.
+        public let oldPath: String
+        /// The line in the new file. Nil for a removed line.
+        public let newLine: Int?
+        /// The line in the old file. Nil for an added line. GitLab wants both for a line the request leaves alone.
+        public let oldLine: Int?
+
+        public init(path: String, oldPath: String, newLine: Int?, oldLine: Int?) {
+            self.path = path
+            self.oldPath = oldPath
+            self.newLine = newLine
+            self.oldLine = oldLine
+        }
     }
 
     /// Request `number`'s description and comments. Talks to the forge, so call it off the main thread.
@@ -277,21 +298,51 @@ public struct Forge: Equatable {
                                       path: position?["new_path"] as? String, line: new ?? position?["old_line"] as? Int,
                                       old: position != nil && new == nil, url: link)
         }
-        return Discussion(description: description, comments: comments)
+        let refs = request["diff_refs"] as? [String: Any]
+        return Discussion(description: description, comments: comments, head: refs?["head_sha"] as? String,
+                          base: refs?["base_sha"] as? String, start: refs?["start_sha"] as? String)
     }
 
-    /// Whether this forge takes new comments on lines from Farol.
-    public var takesLineComments: Bool { kind == .github && kind.toolPath != nil }
+    /// Whether this forge takes new comments on lines from Farol: its tool is installed.
+    public var takesLineComments: Bool { kind.toolPath != nil }
 
-    /// Leaves `text` on a line of request `number`'s diff, at commit `head`. `old` puts it on a removed line, counted in the old file.
+    /// Leaves `text` at `place` on request `number`'s diff, against the commits `discussion` read.
     /// Talks to the forge, so call it off the main thread.
-    public func comment(_ text: String, onRequest number: Int, head: String, path: String, line: Int, old: Bool,
+    public func comment(_ text: String, onRequest number: Int, at place: LinePlace, of discussion: Discussion,
                         in directory: String) throws {
-        // ponytail: GitHub only. GitLab wants the diff's three commits in a position, to add once it can be tried on a real instance.
-        guard kind == .github, let tool = kind.toolPath else { throw GitError(description: "Comments on lines need gh, on GitHub.") }
-        // -f sends text as it is, -F turns the line into a number.
-        try Git.run(tool, ["api", "repos/{owner}/{repo}/pulls/\(number)/comments", "-f", "body=\(text)", "-f", "commit_id=\(head)",
-                           "-f", "path=\(path)", "-F", "line=\(line)", "-f", "side=\(old ? "LEFT" : "RIGHT")"], in: directory)
+        guard let tool = kind.toolPath else { throw GitError(description: "\(self.tool) isn't installed.") }
+        switch kind {
+        case .github:
+            guard let head = discussion.head, let line = place.newLine ?? place.oldLine else {
+                throw GitError(description: "The pull request's head commit isn't known yet.")
+            }
+            // -f sends text as it is, -F turns the line into a number.
+            try Git.run(tool, ["api", "repos/{owner}/{repo}/pulls/\(number)/comments", "-f", "body=\(text)", "-f", "commit_id=\(head)",
+                               "-f", "path=\(place.path)", "-F", "line=\(line)",
+                               "-f", "side=\(place.newLine == nil ? "LEFT" : "RIGHT")"], in: directory)
+        case .gitlab:
+            guard let body = Self.gitlabComment(text, at: place, of: discussion) else {
+                throw GitError(description: "The merge request's diff commits aren't known yet.")
+            }
+            // The position nests, so the body goes as JSON rather than as fields.
+            let file = FileManager.default.temporaryDirectory.appendingPathComponent("farol-comment-\(UUID().uuidString).json")
+            try JSONSerialization.data(withJSONObject: body).write(to: file)
+            defer { try? FileManager.default.removeItem(at: file) }
+            try Git.run(tool, ["api", "--method", "POST", "--header", "Content-Type: application/json", "--input", file.path,
+                               "projects/:id/merge_requests/\(number)/discussions"], in: directory)
+        }
+    }
+
+    /// GitLab's body for a new comment on a line. Nil without the diff's three commits.
+    static func gitlabComment(_ text: String, at place: LinePlace, of discussion: Discussion) -> [String: Any]? {
+        guard let base = discussion.base, let start = discussion.start, let head = discussion.head else { return nil }
+        var position: [String: Any] = [
+            "position_type": "text", "base_sha": base, "start_sha": start, "head_sha": head,
+            "new_path": place.path, "old_path": place.oldPath,
+        ]
+        position["new_line"] = place.newLine
+        position["old_line"] = place.oldLine
+        return ["body": text, "position": position]
     }
 
     private static func json(_ text: String) -> Any? { try? JSONSerialization.jsonObject(with: Data(text.utf8)) }

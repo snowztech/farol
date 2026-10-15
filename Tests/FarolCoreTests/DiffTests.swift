@@ -117,3 +117,13 @@ private func write(_ text: String, _ name: String, in box: Sandbox) throws {
     // No remote, so no forge to ask for the request's changes.
     #expect(throws: (any Error).self) { try Diff.files(in: box.repo, .request(1)) }
 }
+
+@Test func findsAnUnchangedLinesOldNumber() {
+    let file = Diff.parse(sample)[0]
+    // "let a" opens the hunk on both sides. "let d" comes after one removed and two added lines.
+    #expect(file.oldLine(forNew: 10) == 10)
+    #expect(file.oldLine(forNew: 13) == 12)
+    // An added line has no old number, and neither does a line the diff doesn't show.
+    #expect(file.oldLine(forNew: 11) == nil)
+    #expect(file.oldLine(forNew: 99) == nil)
+}
