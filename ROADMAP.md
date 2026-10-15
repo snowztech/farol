@@ -49,6 +49,7 @@ Most of the time with parallel agents goes into checking what they did. That wor
 - [x] Push the branch and open a merge request or pull request from the session
 - [ ] Pipeline status and open review comments in the sidebar, with a notification when a pipeline fails
 - [ ] Send review comments or a failed job's log back to the agent in one action
+- [ ] The ports a session's programs listen on, under its branch in the sidebar, so a dev server an agent started is easy to find. Read at each prompt, never polled
 
 ## Then: integrations
 
@@ -76,6 +77,7 @@ An agent running in Farol can change Farol when you ask, so you stay in the conv
 - [ ] `farol sessions`: the sessions with their branch, folder and status, so an agent can tell which one is waiting
 - [ ] `farol task`: a task started in a new worktree session from the command line, so one agent can hand work to another
 - [ ] The `farol` command working from Codex, which runs its commands without Farol's environment
+- [ ] Claude Code and Codex conversations resumed when Farol restores a session. The hooks already receive the session id, so Farol keeps it and restarts the agent on that conversation (`claude --resume`, `codex resume`)
 
 ## Speed and upkeep
 

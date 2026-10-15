@@ -13,6 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var restored = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // First, so hangs are counted from the moment launch is done.
+        Perf.shared.watchMainThread()
         let runtime = TerminalRuntime(overrideFiles: [Settings.fileURL])
         settings = Settings()
         let agents = AgentSettings()
@@ -97,6 +99,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func findSelection(_ sender: Any?) { windowController.findSelection() }
     @objc func saveFile(_ sender: Any?) { windowController.saveFile() }
 
+    @objc private func toggleInspector() {
+        Inspector.shared.toggle(state: windowController.state, over: windowController.window)
+    }
+
     /// ⌘S only means something while a file has focus, and stays free for the terminal otherwise.
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         item.action == #selector(saveFile) ? windowController.canSaveFile : true
@@ -168,6 +174,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         view.addItem(withTitle: "Push", action: #selector(push), keyEquivalent: "p")
             .keyEquivalentModifierMask = [.command, .option]
         view.addItem(withTitle: "Resolve Conflicts", action: #selector(toggleMerge), keyEquivalent: "m")
+            .keyEquivalentModifierMask = [.command, .option]
+        // Last and apart, as macOS apps keep their inspectors: there when you look for it, out of the way otherwise.
+        view.addItem(.separator())
+        view.addItem(withTitle: "Farol Inspector", action: #selector(toggleInspector), keyEquivalent: "i")
             .keyEquivalentModifierMask = [.command, .option]
         main.addItem(submenu: view, title: "View")
 

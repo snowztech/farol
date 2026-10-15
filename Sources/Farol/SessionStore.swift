@@ -26,6 +26,8 @@ final class Session: ObservableObject, Identifiable {
     @Published private(set) var repoRoot: String?
     /// The top of the checkout the session is in, a worktree's own folder for worktrees. The files panel starts there.
     @Published private(set) var topLevel: String?
+    /// The checkout the git panels and the branch follow: the one you are in, or in a task the repo you picked.
+    @Published private(set) var checkout: String?
     /// A merge, rebase, cherry-pick or revert git stopped on in this checkout, often one an agent started.
     @Published private(set) var stopped: Merge.Operation?
     /// Files still in conflict while stopped.
@@ -36,6 +38,14 @@ final class Session: ObservableObject, Identifiable {
     var onGitStateChange: ((Activity) -> Void)?
     /// Set when the session runs in one of Farol's worktrees, even after `cd` into a subfolder.
     let worktree: String?
+    /// Set when the session runs in a task folder holding a worktree of several repos.
+    let taskFolder: String?
+    /// The worktrees in the task folder, in order.
+    private let taskFolderRepos: [String]
+    /// The task's repos while the session is in its folder. Empty once it `cd`s out, where it is a plain session again.
+    @Published private(set) var taskRepos: [String] = []
+    /// The task repo the git panels show. Until you pick one or `cd` into one, the first with changes, or else the first.
+    private var pickedRepo: String?
     private var refreshingGit = false
     private var refreshGitAgain = false
 
@@ -43,6 +53,8 @@ final class Session: ObservableObject, Identifiable {
         self.panes = panes
         self.directory = directory
         worktree = Worktrees.default.root(of: directory)
+        taskFolder = TaskFolders.default.root(of: directory)
+        taskFolderRepos = taskFolder.map(TaskFolders.repos(in:)) ?? []
         refreshGit()
     }
 
@@ -52,6 +64,18 @@ final class Session: ObservableObject, Identifiable {
         syncRemote()
         if let folder = terminal.workingDirectory { directory = folder }
         refreshGit()
+    }
+
+    /// Shows another of the task's repos in the git panels.
+    func pick(_ repo: String) {
+        pickedRepo = repo
+        refreshGit()
+    }
+
+    /// A repo with changes, to show first. Ignored once you have picked or gone into one.
+    func suggest(_ repo: String) {
+        guard pickedRepo == nil else { return }
+        pick(repo)
     }
 
     var hasRunningProcess: Bool { panes.terminals.contains { $0.hasRunningProcess } }
@@ -86,12 +110,19 @@ final class Session: ObservableObject, Identifiable {
         guard !refreshingGit else { return refreshGitAgain = true }
         refreshingGit = true
         let directory = directory
+        let taskFolder = taskFolder, before = topLevel, picked = pickedRepo ?? taskFolderRepos.first
+        let allTaskRepos = taskFolderRepos
         DispatchQueue.global(qos: .userInitiated).async {
-            let branch = Git.branch(of: directory)
             let root = Git.repoRoot(of: directory)
             let topLevel = Git.topLevel(of: directory)
-            let operation = topLevel.flatMap { Merge.operation(in: $0) }
-            let conflicts = topLevel.flatMap { top in operation.map { Merge.conflicts(in: top, $0.kind).count } } ?? 0
+            let inTask = taskFolder != nil && TaskFolders.default.root(of: directory) == taskFolder
+            let taskRepos = inTask ? allTaskRepos : []
+            // In a task the panels follow the last repo you went into or clicked, so a click wins until the next `cd`.
+            let moved = topLevel != before && topLevel.map(taskRepos.contains) == true
+            let checkout = taskRepos.isEmpty ? topLevel : moved ? topLevel : picked
+            let branch = Git.branch(of: checkout ?? directory)
+            let operation = checkout.flatMap { Merge.operation(in: $0) }
+            let conflicts = checkout.flatMap { top in operation.map { Merge.conflicts(in: top, $0.kind).count } } ?? 0
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 self.refreshingGit = false
@@ -106,6 +137,11 @@ final class Session: ObservableObject, Identifiable {
                 if self.activity != before { self.onGitStateChange?(before) }
                 self.branch = branch
                 if self.topLevel != topLevel { self.topLevel = topLevel }
+                // Before the checkout, so whatever follows the checkout already sees which task it is in.
+                if self.taskRepos != taskRepos { self.taskRepos = taskRepos }
+                if self.checkout != checkout { self.checkout = checkout }
+                // Only a `cd` moves the pick here, so a click made while git was answering isn't undone.
+                if moved { self.pickedRepo = topLevel }
                 self.repoName = root.map { URL(fileURLWithPath: $0).lastPathComponent }
                 if self.repoRoot != root {
                     self.repoRoot = root
@@ -198,14 +234,14 @@ final class SessionStore: ObservableObject {
     }
 
     /// Every terminal gets its id and the socket in its environment, so its shell can report back.
-    private func makeTerminal(in directory: String?, run: String? = nil) -> TerminalView {
+    private func makeTerminal(in directory: String?, run: String? = nil, environment: [String: String] = [:]) -> TerminalView {
         let id = UUID()
         let command = run?.trimmingCharacters(in: .whitespaces) ?? ""
         return TerminalView(runtime: runtime, workingDirectory: directory ?? OpenPath.fallback, id: id, environment: [
             "FAROL_PANE": id.uuidString,
             "FAROL_SOCKET": statusServer.path,
             "FAROL_CLI": cliPath,
-        ], input: command.isEmpty ? nil : command + "\n")
+        ].merging(environment) { $1 }, input: command.isEmpty ? nil : command + "\n")
     }
 
     private func receive(_ message: StatusMessage) {
@@ -213,8 +249,9 @@ final class SessionStore: ObservableObject {
               let session = sessions.first(where: { $0.panes.terminals.contains { $0.id == pane } }) else { return }
         let before = session.activity
         session.apply(message.event, pane: pane)
-        // An agent's turn can end on a rebase it started and git stopped, so its checkout is looked at again.
-        session.refreshGit()
+        // An agent can end its turn, or stop to ask you, on a rebase git stopped, so every session's checkout is looked at again.
+        // Not on "working": it comes after every tool call, and each lookup also refreshes the review panel.
+        if message.event == .done || message.event == .waiting { session.refreshGit() }
         // A "done" you are already looking at needs no light.
         if session.id == selectedID && NSApp.isActive { session.acknowledge() }
         report(session, from: before)
@@ -242,9 +279,10 @@ final class SessionStore: ObservableObject {
     var ordered: [Session] { groups.flatMap(\.items) }
 
     /// `run` is typed into the new shell, for example "claude" to start an agent right away.
+    /// `environment` holds what is too long to type, which `run` can name as a variable.
     @discardableResult
-    func create(directory: String = NSHomeDirectory(), run: String? = nil) -> Session {
-        create(PaneContainer(makeTerminal(in: directory, run: run)), directory: directory)
+    func create(directory: String = NSHomeDirectory(), run: String? = nil, environment: [String: String] = [:]) -> Session {
+        create(PaneContainer(makeTerminal(in: directory, run: run, environment: environment)), directory: directory)
     }
 
     /// An empty name goes back to the automatic one.
@@ -388,6 +426,7 @@ final class SessionStore: ObservableObject {
     /// Closing the last session ends the app: there is never a window without a terminal.
     func close(_ session: Session) {
         guard let index = sessions.firstIndex(where: { $0.id == session.id }) else { return }
+        session.panes.terminals.forEach { $0.close() }
         if sessions.count == 1 {
             // Nothing to restore: the next launch starts fresh in the home folder.
             sessions.removeAll()

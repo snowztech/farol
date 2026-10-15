@@ -32,8 +32,12 @@ final class GraphModel: ObservableObject {
     var onRunInTerminal: ((String) -> Void)?
     /// Opens the review panel on a commit.
     var onShowInReview: ((History.Commit, _ file: String?) -> Void)?
+    /// Opens the review panel on an open request.
+    var onShowRequest: ((Forge.Request) -> Void)?
     private var watcher: FolderWatcher?
     private var pending: DispatchWorkItem?
+    /// The checkout whose .git a watcher was asked for, so each is looked up once while git answers.
+    private var watching: String?
 
     /// Follows another checkout, or stops when `root` is nil, as when the panel is closed.
     func show(_ root: String?, current: String?) {
@@ -43,6 +47,7 @@ final class GraphModel: ObservableObject {
         self.current = current
         if rootChanged {
             watcher = nil
+            watching = nil
             rows = []
             error = nil
             selected = nil
@@ -51,11 +56,20 @@ final class GraphModel: ObservableObject {
         }
         guard let root else {
             watcher = nil
+            watching = nil
             return
         }
         // Commits and branch moves land in the repo's own .git, which a worktree only points to.
-        if watcher == nil, let repo = Git.repoRoot(of: root) {
-            watcher = FolderWatcher((repo as NSString).appendingPathComponent(".git")) { [weak self] in self?.changed($0) }
+        // Git finds it off the main thread, like every other git call, so a slow disk can't freeze the window.
+        if watcher == nil, watching != root {
+            watching = root
+            DispatchQueue.global(qos: .userInitiated).async {
+                let repo = Git.repoRoot(of: root)
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.root == root, self.watcher == nil, let repo else { return }
+                    self.watcher = FolderWatcher((repo as NSString).appendingPathComponent(".git")) { [weak self] in self?.changed($0) }
+                }
+            }
         }
         reload()
         if rootChanged { loadRequests() }
@@ -207,6 +221,9 @@ struct GraphPanel: View {
 
     @ObservedObject var graph: GraphModel
     @ObservedObject var state: WindowState
+    /// For the task's repo tabs, which the review panel shows too.
+    let review: ReviewModel
+    let pick: (String) -> Void
     let resize: (CGFloat) -> Void
 
     @State private var dragStart: CGFloat?
@@ -218,6 +235,7 @@ struct GraphPanel: View {
     var body: some View {
         let p = state.palette
         VStack(alignment: .leading, spacing: 0) {
+            TaskRepoTabs(review: review, palette: p, yieldsToReview: true, pick: pick)
             if graph.root != nil, graph.error == nil {
                 BranchList(graph: graph, query: $query, colors: branchColors, palette: p)
                 Rectangle().fill(p.line).frame(height: 1)
@@ -482,6 +500,7 @@ private struct BranchList: View {
                                   palette: palette,
                                   update: { graph.update(entry.name, failed: gitError("Couldn't update \(entry.name)")) },
                                   push: { graph.push(entry.name, failed: gitError("Couldn't push \(entry.name)")) },
+                                  showRequest: { graph.onShowRequest?($0) },
                                   hover: { inside in
                                       if inside { graph.hoveredBranch = entry.name } else if graph.hoveredBranch == entry.name { graph.hoveredBranch = nil }
                                   }) {
@@ -608,6 +627,7 @@ private struct BranchRow: View {
     let palette: Palette
     var update: () -> Void = {}
     var push: () -> Void = {}
+    var showRequest: (Forge.Request) -> Void = { _ in }
     var hover: (Bool) -> Void = { _ in }
     let checkout: () -> Void
 
@@ -639,7 +659,7 @@ private struct BranchRow: View {
                 }
             }
             if let request {
-                PullRequestButton(request: request, palette: palette)
+                PullRequestButton(request: request, palette: palette) { showRequest(request) }
             }
             if current {
                 Image(systemName: "checkmark").font(.system(size: 10, weight: .semibold)).foregroundStyle(palette.text)
@@ -666,15 +686,16 @@ private struct BranchRow: View {
     }
 }
 
-/// Opens the branch's pull request in the browser.
+/// Shows the branch's pull request in the review panel. Its page in the browser is a right click away.
 private struct PullRequestButton: View {
     let request: Forge.Request
     let palette: Palette
+    let show: () -> Void
 
     @State private var hovering = false
 
     var body: some View {
-        Button { NSWorkspace.shared.open(request.url) } label: {
+        Button(action: show) {
             HStack(spacing: 3) {
                 PullRequestGlyph()
                     .stroke(style: StrokeStyle(lineWidth: 1.15, lineCap: .round, lineJoin: .round))
@@ -689,7 +710,8 @@ private struct PullRequestButton: View {
         }
         .buttonStyle(.plain)
         .onClickableHover { hovering = $0 }
-        .hoverTip("#\(request.number) \(request.title)\nOpen in the browser")
+        .hoverTip("#\(request.number) \(request.title)\nShow its changes")
+        .contextMenu { Button("Open in the Browser") { NSWorkspace.shared.open(request.url) } }
     }
 }
 

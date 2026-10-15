@@ -11,6 +11,9 @@ public enum NewTask {
         return words.joined(separator: "-")
     }
 
+    /// Holds the task in the agent's shell. A ticket can run long, and typed in it would fill the screen and the history.
+    public static let variable = "FAROL_TASK"
+
     /// Single quotes keep every character literal, so a task can't run anything by itself.
     static func shellQuoted(_ text: String) -> String {
         "'" + text.replacingOccurrences(of: "'", with: #"'\''"#) + "'"

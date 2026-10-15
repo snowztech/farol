@@ -97,8 +97,15 @@ public enum Jira {
             guard let key = issue["key"] as? String, let fields = issue["fields"] as? [String: Any],
                   let summary = fields["summary"] as? String else { return nil }
             let description = text(of: fields["description"]).trimmingCharacters(in: .whitespacesAndNewlines)
-            return Ticket(source: .jira, key: key, summary: summary, description: description)
+            return Ticket(source: .jira, key: key, summary: summary, description: description, url: browseURL(key, self: issue["self"]))
         }
+    }
+
+    /// An issue's "self" is its API address, and the page people open sits under the same site.
+    /// Data Center can serve Jira under a path, like https://host/jira/rest/api/2/issue/1.
+    static func browseURL(_ key: String, self api: Any?) -> URL? {
+        guard let api = api as? String, let rest = api.range(of: "/rest/") else { return nil }
+        return URL(string: api[..<rest.lowerBound] + "/browse/" + key)
     }
 
     /// Jira Cloud sends a description as a tree of nodes, and Jira Data Center as plain text.
@@ -126,6 +133,6 @@ public enum Jira {
     /// An app opened from the Dock never reads those, so the tool runs through your shell, as it would in a terminal.
     private static func shell(_ command: String) throws -> String {
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        return try Git.run(shell, ["-ilc", command], in: NSHomeDirectory())
+        return try Git.run(shell, ["-ilc", command], in: NSHomeDirectory(), named: "jira tickets")
     }
 }

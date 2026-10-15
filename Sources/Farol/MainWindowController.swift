@@ -108,11 +108,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             self?.open(path)
         })
         filesPanel.clipsToBounds = true
-        let graphPanel = hosting(GraphPanel(graph: graph, state: state) { [weak self] in self?.setGraphWidth($0) })
+        let graphPanel = hosting(GraphPanel(
+            graph: graph, state: state, review: review,
+            pick: { [weak self] in self?.store.selected?.pick($0) },
+            resize: { [weak self] in self?.setGraphWidth($0) }))
         graphPanel.clipsToBounds = true
         let reviewPanel = hosting(ReviewPanel(
             review: review, state: state,
             open: { [weak self] in self?.open($0, line: $1) },
+            pick: { [weak self] in self?.store.selected?.pick($0) },
             close: { [weak self] in self?.toggleReview(closing: true) },
             resize: { [weak self] in self?.setReviewWidth($0) }))
         reviewPanel.clipsToBounds = true
@@ -212,6 +216,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         graph.onShowInReview = { [weak self] commit, file in
             guard let self else { return }
             review.show(commit: commit.hash, subject: commit.subject, file: file)
+            if !review.isOpen { toggleReview() }
+        }
+        graph.onShowRequest = { [weak self] request in
+            guard let self else { return }
+            review.show(request: request)
             if !review.isOpen { toggleReview() }
         }
         graph.onRunInTerminal = { command in
@@ -404,8 +413,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// Opens or closes the review panel at the width you last gave it.
     func toggleReview(closing: Bool = false) {
-        // Over a commit, "Review changes" brings your changes back. Closing the panel there would hide what you asked for.
-        if !closing, review.leaveCommit() { return graph.select(nil) }
+        // Over a commit or a request, "Review changes" brings your changes back. Closing the panel there would hide what you asked for.
+        if !closing, review.showYours() { return graph.select(nil) }
         review.isOpen.toggle()
         let saved = UserDefaults.standard.double(forKey: Self.reviewWidthKey)
         let width = review.isOpen ? clampedReviewWidth(saved > 0 ? saved : ReviewPanel.defaultWidth) : 0
@@ -435,13 +444,16 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         guard let session else {
             reviewFollow = nil
             state.remote = false
+            review.follow(task: [])
             return review.follow(nil, branch: nil)
         }
         // Over ssh the panels would show the repo on this Mac, so they get no folder, as outside a git repo.
-        reviewFollow = session.$topLevel.combineLatest(session.$branch, session.$isRemote)
-            .sink { [weak self] topLevel, branch, remote in
+        review.onFirstCounts = { [weak session] in session?.suggest($0) }
+        reviewFollow = session.$checkout.combineLatest(session.$branch, session.$isRemote)
+            .sink { [weak self] checkout, branch, remote in
                 self?.state.remote = remote
-                self?.review.follow(remote ? nil : topLevel, branch: remote ? nil : branch)
+                self?.review.follow(remote ? nil : checkout, branch: remote ? nil : branch)
+                self?.review.follow(task: remote ? [] : session.taskRepos)
             }
     }
 
@@ -460,8 +472,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             graphFollow = nil
             return graph.show(nil, current: nil)
         }
-        graphFollow = session.$topLevel.combineLatest(session.$branch, session.$isRemote)
-            .sink { [weak self] topLevel, branch, remote in self?.graph.show(remote ? nil : topLevel, current: remote ? nil : branch) }
+        graphFollow = session.$checkout.combineLatest(session.$branch, session.$isRemote)
+            .sink { [weak self] checkout, branch, remote in self?.graph.show(remote ? nil : checkout, current: remote ? nil : branch) }
     }
 
     /// Does what the user chose in System Settings for a title bar double-click: zoom, minimize or nothing.
@@ -719,7 +731,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             mergeFollow = nil
             return merge.follow(nil)
         }
-        mergeFollow = session.$topLevel.sink { [weak self] in self?.merge.follow($0) }
+        mergeFollow = session.$checkout.sink { [weak self] in self?.merge.follow($0) }
         // Resolving here changes what the sidebar says about the session, so it reads git again.
         mergeCount = merge.$conflicts.dropFirst().sink { [weak session] _ in session?.refreshGit() }
     }

@@ -771,6 +771,7 @@ struct SettingsPage: View {
             ("Full screen", ["⌃⌘F", "⌘↩"]),
             ("Settings", ["⌘,"]),
             ("Reload configuration", ["⇧⌘,"]),
+            ("Farol Inspector", ["⌥⌘I"]),
             ("Quit", ["⌘Q"]),
         ]),
         ShortcutGroup(title: "Conflicts", items: [

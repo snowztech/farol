@@ -9,6 +9,85 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - Remote: answer your agents from your phone. Turn it on in Settings → Remote, scan the code with Farol Remote for iPhone, and the phone lists your sessions, shows a session's screen, types your replies and tells you when an agent waits or finishes. Everything between the Mac and the phone is encrypted end to end.
 - Remote: an option to keep the Mac awake while an agent works or waits for you, so the phone can still reach it. Closing the lid still puts the Mac to sleep.
 
+## [0.33.0] - 2026-10-15
+
+A snappier window, fewer calls to GitHub, and an inspector to keep it that way.
+
+### Added
+
+- The Farol Inspector, in the View menu or with ⌥⌘I: the programs Farol starts, freezes, memory and CPU, with a report to copy into a bug report.
+
+### Fixed
+
+- The window no longer waits on git when the graph follows a repo or New Task opens.
+- The review panel asks GitHub about a branch's pull request once where it asked up to four times.
+
+## [0.32.1] - 2026-10-15
+
+GitLab catches up with GitHub: comments on a merge request's lines, approvals, issues in New Task, and forges on a company's own domain.
+
+### Added
+
+- A GitHub or GitLab on your company's own domain is recognized once gh or glab is logged in there, so its requests, reviews and checks show.
+- New Task lists a GitLab repo's open issues, as it does GitHub's.
+- On GitLab too, the "+" next to a line of a merge request's diff writes a comment on it.
+- A GitLab merge request's conversation shows who approved it or requested changes.
+
+### Fixed
+
+- A comment on an older version of a GitLab merge request's diff stays in the conversation instead of showing under a line that moved.
+
+## [0.32.0] - 2026-10-15
+
+A task can now span several repos, each with its own worktree on one branch, reviewed repo by repo.
+
+### Added
+
+- New Task works across several repos. Start it from a folder of repos, tick the ones the task touches, and each gets a worktree on the same branch in one folder, where the agent starts. Closing the session offers to remove them all and keeps every branch.
+- Started from inside a repo, New Task offers Add repos to pick the repos beside it.
+- The repo list gets a search past 8 repos, and shows the branch a repo is on when it isn't main or master, since the task branch starts from it.
+- In a task across repos, the review and graph panels show a tab per repo with its changes, and the title bar counts the changes of all of them.
+
+## [0.31.0] - 2026-10-15
+
+Pull requests open in the review panel, comments and all, and Markdown files preview in the file pane.
+
+### Added
+
+- A preview for Markdown files in the file pane: headings, lists, tasks, code, quotes, tables and links. The eye in its header switches between the source and the preview, Farol keeps your choice, and the preview follows an agent's edits. A link to another file opens it in the pane.
+- A pull request's button in the git graph shows its changes in the review panel, anyone's request, without checking it out. Right click it for its page in the browser.
+- Above a pull request's changes, its description and comments, reviews and comments on lines included, each folded to its first line. A comment on a line takes you to its file.
+- A pull request's comments on lines show under those lines in its diff. On GitHub, the "+" next to a line number writes a new one.
+
+### Fixed
+
+- A working agent no longer makes Farol run git after each of its steps, only when its turn ends or it stops to ask you something.
+
+## [0.30.10] - 2026-10-15
+
+New Task shows the ticket before you start.
+
+### Changed
+
+- New Task shows the picked ticket's text before you start, and sends its link along so the agent can read the comments.
+- A task no longer fills the terminal and your shell history. The agent gets it from `$FAROL_TASK`.
+
+## [0.30.9] - 2026-10-14
+
+Closing a session stops what runs in it.
+
+### Fixed
+
+- Closing a session or a pane ends its shell and frees its memory. Closed sessions used to keep running in the background, with their programs, until Farol quit.
+
+## [0.30.8] - 2026-10-14
+
+Farol uses much less memory with many sessions open.
+
+### Fixed
+
+- Sessions in the background no longer hold a full window of graphics memory each, so Farol uses much less memory with many sessions open.
+
 ## [0.30.7] - 2026-10-13
 
 Open a folder in Farol from Finder or another app.
@@ -681,7 +760,14 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.30.7...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.33.0...HEAD
+[0.33.0]: https://github.com/snowztech/farol/releases/tag/v0.33.0
+[0.32.1]: https://github.com/snowztech/farol/releases/tag/v0.32.1
+[0.32.0]: https://github.com/snowztech/farol/releases/tag/v0.32.0
+[0.31.0]: https://github.com/snowztech/farol/releases/tag/v0.31.0
+[0.30.10]: https://github.com/snowztech/farol/releases/tag/v0.30.10
+[0.30.9]: https://github.com/snowztech/farol/releases/tag/v0.30.9
+[0.30.8]: https://github.com/snowztech/farol/releases/tag/v0.30.8
 [0.30.7]: https://github.com/snowztech/farol/releases/tag/v0.30.7
 [0.30.6]: https://github.com/snowztech/farol/releases/tag/v0.30.6
 [0.30.5]: https://github.com/snowztech/farol/releases/tag/v0.30.5

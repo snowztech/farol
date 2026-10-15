@@ -78,7 +78,8 @@ public struct Forge: Equatable {
     public var tool: String { kind.tool }
 
     /// Understands the forms git accepts: https://host/path, ssh://git@host:22/path and git@host:path, with or without .git.
-    public init?(remote: String) {
+    /// A host named neither github nor gitlab is one when `hosts` says so, as for a company's own domain.
+    public init?(remote: String, hosts: [String: Kind] = Forge.loggedInHosts()) {
         var rest = remote.trimmingCharacters(in: .whitespacesAndNewlines)
         if rest.hasSuffix("/") { rest.removeLast() }
         if rest.hasSuffix(".git") { rest.removeLast(4) }
@@ -103,16 +104,55 @@ public struct Forge: Equatable {
         if let at = authority.lastIndex(of: "@") { authority = String(authority[authority.index(after: at)...]) }
         guard !authority.isEmpty, !path.isEmpty else { return nil }
 
-        // ponytail: goes by the host's name, so a GitLab at git.company.com isn't recognized. A setting per host would cover it.
         let host = authority.lowercased()
         if host.contains("github") {
             kind = .github
         } else if host.contains("gitlab") {
             kind = .gitlab
+        } else if let known = hosts[String(host.prefix { $0 != ":" })] {
+            kind = known
         } else {
             return nil
         }
         web = "\(scheme)://\(authority)/\(path)"
+    }
+
+    /// The hosts gh and glab are logged into, so a GitHub or GitLab on a company's own domain is recognized.
+    /// Read from their config files, without running them, since every repo's remote is checked against it.
+    public static func loggedInHosts() -> [String: Kind] {
+        let environment = ProcessInfo.processInfo.environment
+        let config = environment["XDG_CONFIG_HOME"] ?? NSHomeDirectory() + "/.config"
+        let read = { (path: String) in (try? String(contentsOfFile: path, encoding: .utf8)) ?? "" }
+        var hosts: [String: Kind] = [:]
+        let gh = (environment["GH_CONFIG_DIR"] ?? config + "/gh") + "/hosts.yml"
+        for host in Self.hosts(inConfig: read(gh), under: nil) { hosts[host] = .github }
+        // glab keeps its config under Application Support on macOS, and under the XDG folder when one is set.
+        let glab = [environment["GLAB_CONFIG_DIR"] ?? config + "/glab-cli", NSHomeDirectory() + "/Library/Application Support/glab-cli"]
+        for folder in glab {
+            for host in Self.hosts(inConfig: read(folder + "/config.yml"), under: "hosts") { hosts[host] = .gitlab }
+        }
+        return hosts
+    }
+
+    /// The keys of a YAML config's top level, or of its `section`: the hosts in gh's and glab's files.
+    static func hosts(inConfig yaml: String, under section: String?) -> [String] {
+        var hosts: [String] = []
+        var inside = section == nil
+        var level: Int? = section == nil ? 0 : nil
+        for line in yaml.split(separator: "\n") {
+            let indent = line.prefix { $0 == " " }.count
+            let key = line.dropFirst(indent)
+            if let section, indent == 0 {
+                inside = key == section + ":"
+                level = nil
+                continue
+            }
+            // A host is a key with its settings under it, so nothing follows its colon.
+            guard inside, key.hasSuffix(":"), !key.contains(" ") else { continue }
+            if level == nil { level = indent }
+            if indent == level { hosts.append(String(key.dropLast())) }
+        }
+        return hosts
     }
 
     /// What is known about a branch's request. Asking needs the forge's own command line tool, gh or glab, installed and logged in.
@@ -133,6 +173,20 @@ public struct Forge: Equatable {
         // Not logged in, offline, or a repo the tool can't place all end here.
         guard let output = try? Git.run(path, arguments, in: directory) else { return .unknown }
         return Self.request(from: output)
+    }
+
+    /// Whether `branch` has an open request, and the steps that ran for it. Talks to the forge, so call it off the main thread.
+    /// On GitHub one call answers both, where asking for each would be two.
+    public func requestAndChecks(for branch: String, in directory: String) -> (state: RequestState, checks: [Check]) {
+        guard kind == .github else {
+            let state = request(for: branch, in: directory)
+            guard case .open = state else { return (state, []) }
+            return (state, checks(for: branch, in: directory))
+        }
+        guard let path = kind.toolPath else { return (.unknown, []) }
+        let arguments = ["pr", "list", "--head", branch, "--state", "open", "--json", "number,url,statusCheckRollup", "--limit", "1"]
+        guard let output = try? Git.run(path, arguments, in: directory) else { return (.unknown, []) }
+        return (Self.request(from: output), Self.checks(from: output))
     }
 
     /// An open pull request, or merge request.
@@ -167,6 +221,203 @@ public struct Forge: Equatable {
             requests[head] = requests[head] ?? Request(number: number, url: url, title: item["title"] as? String ?? "")
         }
         return requests
+    }
+
+    /// What request `number` changes, as its page shows it. Works for anyone's request, without checking it out.
+    /// Talks to the forge, so call it off the main thread.
+    public func files(ofRequest number: Int, in directory: String) throws -> [Diff.File] {
+        guard let path = kind.toolPath else { throw GitError(description: "\(tool) isn't installed.") }
+        let arguments = switch kind {
+        case .github: ["pr", "diff", "\(number)", "--color", "never"]
+        case .gitlab: ["mr", "diff", "\(number)", "--raw"]
+        }
+        return Diff.parse(try Git.run(path, arguments, in: directory, trimming: false))
+    }
+
+    /// What was said on a request: its description, then every comment, oldest first.
+    public struct Discussion: Equatable {
+        public struct Comment: Equatable {
+            public let author: String
+            public let date: Date?
+            public let text: String
+            /// "approved" or "requested changes", when a review said so.
+            public var verdict: String?
+            /// Where a comment on a line of the diff was left. Nil for the rest of the conversation.
+            public var path: String?
+            public var line: Int?
+            /// The line is one the request removes, so `line` counts in the old file.
+            public var old = false
+            /// The code moved since, so `line` is where it was left, not a line of the diff now.
+            public var outdated = false
+            public var url: URL?
+        }
+
+        public let description: Comment
+        public let comments: [Comment]
+        /// The commit the request's branch is at, which a new comment on a line has to name.
+        public var head: String?
+        /// GitLab also wants the diff's base and start commits, from its `diff_refs`.
+        public var base: String?
+        public var start: String?
+    }
+
+    /// Where a new comment goes on a request's diff.
+    public struct LinePlace: Equatable {
+        public let path: String
+        /// The file's path before a rename, which GitLab wants too.
+        public let oldPath: String
+        /// The line in the new file. Nil for a removed line.
+        public let newLine: Int?
+        /// The line in the old file. Nil for an added line. GitLab wants both for a line the request leaves alone.
+        public let oldLine: Int?
+
+        public init(path: String, oldPath: String, newLine: Int?, oldLine: Int?) {
+            self.path = path
+            self.oldPath = oldPath
+            self.newLine = newLine
+            self.oldLine = oldLine
+        }
+    }
+
+    /// Request `number`'s description and comments. Talks to the forge, so call it off the main thread.
+    /// Nil when the tool is missing or can't answer.
+    public func discussion(ofRequest number: Int, in directory: String) -> Discussion? {
+        guard let path = kind.toolPath else { return nil }
+        switch kind {
+        case .github:
+            guard let view = try? Git.run(path, ["pr", "view", "\(number)", "--json", "author,body,createdAt,url,comments,reviews,headRefOid"],
+                                          in: directory) else { return nil }
+            // Comments on lines of the diff aren't part of the pull request's view, only of the API.
+            // The first 100 only, here and on GitLab. Paging through the API would reach the rest of a long review.
+            let lines = try? Git.run(path, ["api", "repos/{owner}/{repo}/pulls/\(number)/comments?per_page=100"], in: directory)
+            return Self.discussion(github: view, lines: lines ?? "[]")
+        case .gitlab:
+            guard let request = try? Git.run(path, ["api", "projects/:id/merge_requests/\(number)"], in: directory) else { return nil }
+            let notes = try? Git.run(path, ["api", "projects/:id/merge_requests/\(number)/notes?sort=asc&per_page=100"], in: directory)
+            return Self.discussion(gitlab: request, notes: notes ?? "[]")
+        }
+    }
+
+    /// Reads `gh pr view`'s JSON, and the API's list of comments on lines.
+    static func discussion(github view: String, lines: String) -> Discussion? {
+        guard let request = json(view) as? [String: Any] else { return nil }
+        let login = { (item: [String: Any], key: String) in (item[key] as? [String: Any])?["login"] as? String ?? "someone" }
+        let url = { (item: [String: Any], key: String) in (item[key] as? String).flatMap(URL.init(string:)) }
+        let description = Discussion.Comment(author: login(request, "author"), date: date(request["createdAt"]),
+                                             text: request["body"] as? String ?? "", url: url(request, "url"))
+        var comments = (request["comments"] as? [[String: Any]] ?? []).map { comment in
+            Discussion.Comment(author: login(comment, "author"), date: date(comment["createdAt"]),
+                               text: comment["body"] as? String ?? "", url: url(comment, "url"))
+        }
+        for review in request["reviews"] as? [[String: Any]] ?? [] {
+            let verdict: String? = switch review["state"] as? String {
+            case "APPROVED": "approved"
+            case "CHANGES_REQUESTED": "requested changes"
+            default: nil
+            }
+            let text = review["body"] as? String ?? ""
+            // A review with nothing to say holds only its comments on lines, which come from the API.
+            guard verdict != nil || !text.isEmpty else { continue }
+            comments.append(Discussion.Comment(author: login(review, "author"), date: date(review["submittedAt"]), text: text, verdict: verdict))
+        }
+        for comment in json(lines) as? [[String: Any]] ?? [] {
+            comments.append(Discussion.Comment(author: login(comment, "user"), date: date(comment["created_at"]),
+                                               text: comment["body"] as? String ?? "",
+                                               path: comment["path"] as? String,
+                                               // An outdated comment's line is gone, so it keeps the one it was left on.
+                                               line: comment["line"] as? Int ?? comment["original_line"] as? Int,
+                                               old: comment["side"] as? String == "LEFT",
+                                               outdated: comment["line"] as? Int == nil,
+                                               url: url(comment, "html_url")))
+        }
+        return Discussion(description: description, comments: comments.sorted { ($0.date ?? .distantPast) < ($1.date ?? .distantPast) },
+                          head: request["headRefOid"] as? String)
+    }
+
+    /// Reads GitLab's merge request and its notes, leaving out the ones GitLab writes itself, like "added 1 commit".
+    static func discussion(gitlab request: String, notes: String) -> Discussion? {
+        guard let request = json(request) as? [String: Any] else { return nil }
+        let username = { (item: [String: Any]) in (item["author"] as? [String: Any])?["username"] as? String ?? "someone" }
+        let page = request["web_url"] as? String
+        let description = Discussion.Comment(author: username(request), date: date(request["created_at"]),
+                                             text: request["description"] as? String ?? "", url: page.flatMap(URL.init(string:)))
+        let refs = request["diff_refs"] as? [String: Any]
+        let head = refs?["head_sha"] as? String
+        let list: [[String: Any]] = json(notes) as? [[String: Any]] ?? []
+        let comments = list.compactMap { note -> Discussion.Comment? in
+            let link = page.flatMap { page in (note["id"] as? Int).flatMap { URL(string: "\(page)#note_\($0)") } }
+            if note["system"] as? Bool == true {
+                // An approval is one of GitLab's notes about itself, the only kind worth showing, as a review's verdict is.
+                guard let verdict = verdicts[note["body"] as? String ?? ""] else { return nil }
+                return Discussion.Comment(author: username(note), date: date(note["created_at"]), text: "", verdict: verdict, url: link)
+            }
+            let position = note["position"] as? [String: Any]
+            // A note on a removed line has only the old line's number.
+            let new = position?["new_line"] as? Int
+            // GitLab doesn't mark a note outdated. One left on an older diff than the request's own is.
+            let outdated = position.map { ($0["head_sha"] as? String).map { $0 != head } ?? false } ?? false
+            return Discussion.Comment(author: username(note), date: date(note["created_at"]), text: note["body"] as? String ?? "",
+                                      path: position?["new_path"] as? String, line: new ?? position?["old_line"] as? Int,
+                                      old: position != nil && new == nil, outdated: outdated, url: link)
+        }
+        return Discussion(description: description, comments: comments, head: head,
+                          base: refs?["base_sha"] as? String, start: refs?["start_sha"] as? String)
+    }
+
+    /// GitLab's notes about itself that say what a reviewer decided, and how the conversation shows it.
+    private static let verdicts = ["approved this merge request": "approved", "requested changes": "requested changes"]
+
+    /// Whether this forge takes new comments on lines from Farol: its tool is installed.
+    public var takesLineComments: Bool { kind.toolPath != nil }
+
+    /// Leaves `text` at `place` on request `number`'s diff, against the commits `discussion` read.
+    /// Talks to the forge, so call it off the main thread.
+    public func comment(_ text: String, onRequest number: Int, at place: LinePlace, of discussion: Discussion,
+                        in directory: String) throws {
+        guard let tool = kind.toolPath else { throw GitError(description: "\(self.tool) isn't installed.") }
+        switch kind {
+        case .github:
+            guard let head = discussion.head, let line = place.newLine ?? place.oldLine else {
+                throw GitError(description: "The pull request's head commit isn't known yet.")
+            }
+            // -f sends text as it is, -F turns the line into a number.
+            try Git.run(tool, ["api", "repos/{owner}/{repo}/pulls/\(number)/comments", "-f", "body=\(text)", "-f", "commit_id=\(head)",
+                               "-f", "path=\(place.path)", "-F", "line=\(line)",
+                               "-f", "side=\(place.newLine == nil ? "LEFT" : "RIGHT")"], in: directory)
+        case .gitlab:
+            guard let body = Self.gitlabComment(text, at: place, of: discussion) else {
+                throw GitError(description: "The merge request's diff commits aren't known yet.")
+            }
+            // The position nests, so the body goes as JSON rather than as fields.
+            let file = FileManager.default.temporaryDirectory.appendingPathComponent("farol-comment-\(UUID().uuidString).json")
+            try JSONSerialization.data(withJSONObject: body).write(to: file)
+            defer { try? FileManager.default.removeItem(at: file) }
+            try Git.run(tool, ["api", "--method", "POST", "--header", "Content-Type: application/json", "--input", file.path,
+                               "projects/:id/merge_requests/\(number)/discussions"], in: directory)
+        }
+    }
+
+    /// GitLab's body for a new comment on a line. Nil without the diff's three commits.
+    static func gitlabComment(_ text: String, at place: LinePlace, of discussion: Discussion) -> [String: Any]? {
+        guard let base = discussion.base, let start = discussion.start, let head = discussion.head else { return nil }
+        var position: [String: Any] = [
+            "position_type": "text", "base_sha": base, "start_sha": start, "head_sha": head,
+            "new_path": place.path, "old_path": place.oldPath,
+        ]
+        position["new_line"] = place.newLine
+        position["old_line"] = place.oldLine
+        return ["body": text, "position": position]
+    }
+
+    private static func json(_ text: String) -> Any? { try? JSONSerialization.jsonObject(with: Data(text.utf8)) }
+
+    /// GitHub writes "2026-10-14T17:26:34Z", GitLab adds milliseconds.
+    private static func date(_ value: Any?) -> Date? {
+        guard let text = value as? String else { return nil }
+        let formatter = ISO8601DateFormatter()
+        if let date = formatter.date(from: text) { return date }
+        formatter.formatOptions.insert(.withFractionalSeconds)
+        return formatter.date(from: text)
     }
 
     /// One step of a request's pipeline: a check on GitHub, a job on GitLab.
@@ -224,23 +475,27 @@ public struct Forge: Equatable {
     }
 
     /// Whether this forge's issues can be listed at all, without asking it.
-    public var listsIssues: Bool { kind == .github && kind.toolPath != nil }
+    public var listsIssues: Bool { kind.toolPath != nil }
 
     /// The repo's open issues, newest first, to start a task from. Talks to the forge, so call it off the main thread.
     public func issues(in directory: String) -> [Ticket] {
-        // ponytail: GitHub only, and the newest 30. glab lists issues too, for when GitLab needs them.
-        let arguments = ["issue", "list", "--state", "open", "--json", "number,title,body", "--limit", "30"]
-        guard kind == .github, let path = kind.toolPath,
-              let output = try? Git.run(path, arguments, in: directory) else { return [] }
-        return Self.issues(from: output)
+        // ponytail: the newest 30. Searching on the forge's side would reach the rest.
+        let arguments = switch kind {
+        case .github: ["issue", "list", "--state", "open", "--json", "number,title,body,url", "--limit", "30"]
+        case .gitlab: ["issue", "list", "--output", "json", "--per-page", "30"]
+        }
+        guard let path = kind.toolPath, let output = try? Git.run(path, arguments, in: directory) else { return [] }
+        return Self.issues(from: output, source: kind == .github ? .github : .gitlab)
     }
 
-    static func issues(from json: String) -> [Ticket] {
+    /// Reads either tool's JSON list: gh says number, body and url, glab says iid, description and web_url.
+    static func issues(from json: String, source: Ticket.Source) -> [Ticket] {
         let list = (try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]]) ?? []
         return list.compactMap { issue in
-            guard let number = issue["number"] as? Int, let title = issue["title"] as? String else { return nil }
-            let body = (issue["body"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            return Ticket(source: .github, key: "#\(number)", summary: title, description: body)
+            guard let number = (issue["number"] ?? issue["iid"]) as? Int, let title = issue["title"] as? String else { return nil }
+            let body = ((issue["body"] ?? issue["description"]) as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let url = ((issue["url"] ?? issue["web_url"]) as? String).flatMap(URL.init(string:))
+            return Ticket(source: source, key: "#\(number)", summary: title, description: body, url: url)
         }
     }
 
@@ -266,7 +521,7 @@ public struct Forge: Equatable {
 
     /// The forge the checked out branch pushes to, or nil when its remote isn't GitHub or GitLab.
     public static func detect(in directory: String) -> Forge? {
-        (try? Git.run(["remote", "get-url", History.pushRemote(in: directory)], in: directory)).flatMap(Forge.init(remote:))
+        (try? Git.run(["remote", "get-url", History.pushRemote(in: directory)], in: directory)).flatMap { Forge(remote: $0) }
     }
 
     /// The page that opens a pull request, or merge request, from `branch` into the default branch.

@@ -44,7 +44,7 @@
     .download { color: var(--sn-fg-muted); font-size: var(--sn-text-sm); text-decoration: none; }
     .download:hover { color: var(--sn-fg); }
 
-    .docs-hero { position: relative; padding: 48px 0 64px; overflow: hidden; }
+    .docs-hero { position: relative; padding: 48px 20px 64px; overflow: hidden; }
     .docs-hero::before {
       content: ""; position: absolute; inset: -80% 5% auto; height: 180%; z-index: 0;
       background: radial-gradient(ellipse at center, var(--sn-accent-soft), transparent 68%);
@@ -55,7 +55,7 @@
     h1 { margin: 0 0 12px; font-size: 34px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.2; }
     .lede { margin: 0; max-width: 620px; color: var(--sn-fg-muted); font-size: var(--sn-text-md); }
 
-    .docs-layout { display: grid; grid-template-columns: 210px minmax(0, 720px); gap: 64px; align-items: start; }
+    .docs-layout { display: grid; grid-template-columns: minmax(0, 720px); }
     .toc { position: sticky; top: 28px; }
     .toc b { display: block; margin-bottom: 12px; font-size: var(--sn-text-sm); font-weight: 500; }
     .toc ul { list-style: none; margin: 0; padding: 0; }
@@ -118,7 +118,7 @@
     footer a:hover { color: var(--sn-fg); }
 
     @media (max-width: 760px) {
-      .docs-hero { padding: 36px 0 44px; }
+      .docs-hero { padding: 36px 20px 44px; }
       h1 { font-size: 29px; }
       .docs-layout { display: block; }
       .toc { position: static; margin-bottom: 56px; padding-bottom: 24px; border-bottom: 1px solid var(--sn-border-subtle); }
@@ -146,7 +146,7 @@
     </header>
 
     <div class="docs-layout wide">
-      <article id="content">
+      <article class="content" id="content">
         <section id="mac">
           <h2>Farol for Mac</h2>
           <p>Farol runs on your Mac and keeps your sessions and settings there. It asks GitHub whether a newer version exists, which shows GitHub your IP address like any download does. Nothing about you or your work goes to a Farol service, since there is none besides the relay described below.</p>
