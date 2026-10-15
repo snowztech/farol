@@ -4,7 +4,7 @@ import SwiftUI
 
 /// The New Task sheet: what to do, on which branch, with which agent.
 struct NewTaskSheet: View {
-    private enum Field { case task, branch }
+    private enum Field { case task, branch, repos }
 
     let directory: String
     let repo: String
@@ -14,6 +14,8 @@ struct NewTaskSheet: View {
     /// From inside a repo: its main checkout, and the repos beside it that "Add repos" offers.
     let root: String?
     let siblings: [String]
+    /// What each listed repo has checked out, read once when the sheet opens.
+    let branches: [String: String]
     /// A tool that lists tickets is set up, so the select is worth holding a place for while they load.
     let expectsTickets: Bool
     let palette: Palette
@@ -39,6 +41,7 @@ struct NewTaskSheet: View {
     @State private var picked: Ticket?
     @State private var chosen: Set<String> = []
     @State private var addingRepos = false
+    @State private var repoQuery = ""
     @State private var pickingTicket = false
     @State private var pickingAgent = false
     @State private var query = ""
@@ -50,15 +53,19 @@ struct NewTaskSheet: View {
             let root = Git.repoRoot(of: directory)
             let repos = root == nil ? TaskFolders.repos(in: directory) : []
             let siblings = root.map { TaskFolders.repos(in: ($0 as NSString).deletingLastPathComponent) } ?? []
+            var branches = (repos + siblings).reduce(into: [String: String]()) { $0[$1] = TaskFolders.branch(of: $1) }
+            let current = Git.branch(of: directory)
+            // The current repo starts from the checkout you are in, which may be a worktree on another branch than its main one.
+            if let root { branches[root] = current }
             let repo = URL(fileURLWithPath: root ?? directory).lastPathComponent
-            let base = Git.branch(of: directory) ?? "the current commit"
+            let base = current ?? "the current commit"
             let expectsTickets = Jira.isSetUp || Forge.detect(in: directory)?.listsIssues == true
             DispatchQueue.main.async { [weak window] in
                 // Checked here too: a second press can arrive while git is still answering the first.
                 guard let window, window.attachedSheet == nil else { return }
                 let sheet = NSWindow(contentRect: .zero, styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: true)
                 let view = NewTaskSheet(
-                    directory: directory, repo: repo, base: base, repos: repos, root: root, siblings: siblings, expectsTickets: expectsTickets,
+                    directory: directory, repo: repo, base: base, repos: repos, root: root, siblings: siblings, branches: branches, expectsTickets: expectsTickets,
                     palette: palette, start: start,
                     close: { [weak window, weak sheet] in sheet.map { window?.endSheet($0) } })
                 let host = NSHostingController(rootView: view)
@@ -263,38 +270,85 @@ struct NewTaskSheet: View {
 
     /// The repos in the folder, to tick the ones the task touches.
     private func repoChecklist(_ p: Palette) -> some View {
+        let shown = shownRepos
         let list = VStack(spacing: 1) {
-            ForEach(listed, id: \.self) { repo in
-                SheetChoice(palette: p) {
-                    if chosen.contains(repo) { chosen.remove(repo) } else { chosen.insert(repo) }
-                } label: {
+            ForEach(shown, id: \.self) { repo in
+                SheetChoice(palette: p) { toggle(repo) } label: {
                     Image(systemName: chosen.contains(repo) ? "checkmark.square.fill" : "square")
                         .foregroundStyle(chosen.contains(repo) ? p.text : p.muted)
                     Text(URL(fileURLWithPath: repo).lastPathComponent).lineLimit(1).truncationMode(.middle)
+                    Spacer(minLength: 8)
+                    // A new branch starts from what the repo has checked out, which is worth seeing when it isn't main.
+                    if let branch = branches[repo], !["main", "master"].contains(branch) {
+                        Text("from \(branch)").font(.system(size: 11)).foregroundStyle(p.muted)
+                            .lineLimit(1).truncationMode(.middle)
+                    }
                 }
+            }
+            if shown.isEmpty {
+                Text("No repo matches.").foregroundStyle(p.muted).frame(maxWidth: .infinity).padding(.vertical, 8)
             }
         }
         return VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(chosen.isEmpty ? "Repos" : "Repos · \(chosen.count) of \(listed.count)").foregroundStyle(p.muted)
                 Spacer()
-                Button(chosen.count == listed.count ? "None" : "All") {
-                    chosen = chosen.count == listed.count ? [] : Set(listed)
+                // On what the search shows, so "All" never ticks repos you can't see.
+                let all = !shown.isEmpty && Set(shown).isSubset(of: chosen)
+                Button(all ? "None" : "All") {
+                    if all { chosen.subtract(shown) } else { chosen.formUnion(shown) }
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(p.muted)
+                .disabled(shown.isEmpty)
             }
             .font(.system(size: 12))
-            // A few show whole, a long list scrolls, so the sheet stays on screen.
-            ViewThatFits(in: .vertical) {
-                list.fixedSize(horizontal: false, vertical: true)
-                ScrollView { list }
+            VStack(spacing: 0) {
+                if listed.count > Self.searchAbove {
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(p.muted)
+                        // Return ticks the first match and clears the search for the next one.
+                        TextField("Search \(listed.count) repos", text: $repoQuery)
+                            .textFieldStyle(.plain)
+                            .focused($focus, equals: .repos)
+                            .onSubmit {
+                                guard let first = shownRepos.first else { return }
+                                toggle(first)
+                                repoQuery = ""
+                            }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    Rectangle().fill(p.line).frame(height: 1)
+                }
+                // A few show whole, a long list scrolls, so the sheet stays on screen.
+                ViewThatFits(in: .vertical) {
+                    list.fixedSize(horizontal: false, vertical: true)
+                    ScrollView { list }
+                }
+                .frame(maxHeight: 200)
+                .padding(6)
             }
-            .frame(maxHeight: 200)
-            .padding(-4)
-            .sheetField(p, focused: false)
+            .background(RoundedRectangle(cornerRadius: 8).fill(p.surface))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(focus == .repos ? p.muted : p.line))
         }
     }
+
+    /// The search only shows up past this many repos, where scrolling for one gets slow.
+    private static let searchAbove = 8
+
+    private var shownRepos: [String] {
+        let words = repoQuery.lowercased().split(separator: " ")
+        return listed.filter { repo in
+            let name = URL(fileURLWithPath: repo).lastPathComponent.lowercased()
+            return words.allSatisfy(name.contains)
+        }
+    }
+
+    private func toggle(_ repo: String) {
+        if chosen.contains(repo) { chosen.remove(repo) } else { chosen.insert(repo) }
+    }
+
 
     /// One quiet line, since most tasks stay in one repo. It opens the checklist with this repo already ticked.
     private func addReposLink(beside root: String, _ p: Palette) -> some View {

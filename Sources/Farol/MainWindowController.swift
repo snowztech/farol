@@ -403,12 +403,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         // Over a commit, "Review changes" brings your changes back. Closing the panel there would hide what you asked for.
         if !closing, review.leaveCommit() { return graph.select(nil) }
         review.isOpen.toggle()
-        // The title bar counts the whole task, so the panel opens on a repo that has changes rather than "No changes."
-        let repos = review.taskRepos
-        if review.isOpen, repos.first(where: { $0.path == review.root })?.stat.isEmpty == true,
-           let changed = repos.first(where: { !$0.stat.isEmpty }) {
-            store.selected?.pick(changed.path)
-        }
         let saved = UserDefaults.standard.double(forKey: Self.reviewWidthKey)
         let width = review.isOpen ? clampedReviewWidth(saved > 0 ? saved : ReviewPanel.defaultWidth) : 0
         withAnimation(.easeOut(duration: 0.18)) { state.reviewWidth = width }
@@ -441,6 +435,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             return review.follow(nil, branch: nil)
         }
         // Over ssh the panels would show the repo on this Mac, so they get no folder, as outside a git repo.
+        review.onFirstCounts = { [weak session] in session?.suggest($0) }
         reviewFollow = session.$checkout.combineLatest(session.$branch, session.$isRemote)
             .sink { [weak self] checkout, branch, remote in
                 self?.state.remote = remote

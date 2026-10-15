@@ -82,6 +82,9 @@ final class ReviewModel: ObservableObject {
             sum.removed += repo.stat.removed
         }
     }
+    /// Gets the first task repo with changes once they are counted, so the panels can start there.
+    var onFirstCounts: ((String) -> Void)?
+    private var countedOnce = true
     private var taskWatcher: FolderWatcher?
     private var pendingTask: DispatchWorkItem?
     /// Each task repo's default scope, worked out once since it takes a few git calls.
@@ -167,6 +170,7 @@ final class ReviewModel: ObservableObject {
         pendingTask?.cancel()
         taskRepos = repos.map { ($0, Diff.Stat()) }
         defaultScopes = [:]
+        countedOnce = false
         // The repos sit side by side in the task folder, so one watcher sees them all.
         taskWatcher = repos.first.map { first in
             FolderWatcher((first as NSString).deletingLastPathComponent) { [weak self] _ in self?.taskChanged() }
@@ -203,6 +207,10 @@ final class ReviewModel: ObservableObject {
                 guard let self, self.taskRepos.map(\.path) == repos else { return }
                 self.taskRepos = Array(zip(repos, stats))
                 for (repo, scope) in zip(repos, scopes) { self.defaultScopes[repo] = scope }
+                if !self.countedOnce {
+                    self.countedOnce = true
+                    if let changed = self.taskRepos.first(where: { !$0.stat.isEmpty }) { self.onFirstCounts?(changed.path) }
+                }
             }
         }
     }
@@ -736,10 +744,12 @@ private struct FileHeader: View {
 struct TaskRepoTabs: View {
     @ObservedObject var review: ReviewModel
     let palette: Palette
+    /// The graph's tabs step aside while the review is open, so one row picks for both.
+    var yieldsToReview = false
     let pick: (String) -> Void
 
     var body: some View {
-        if review.taskRepos.count > 1 {
+        if review.taskRepos.count > 1, !(yieldsToReview && review.isOpen) {
             ScrollView(.horizontal) {
                 HStack(spacing: 2) {
                     ForEach(review.taskRepos, id: \.path) { repo in

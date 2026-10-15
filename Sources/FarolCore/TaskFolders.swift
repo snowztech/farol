@@ -22,6 +22,19 @@ public struct TaskFolders {
             .filter { FileManager.default.fileExists(atPath: $0 + "/.git") }
     }
 
+    /// The branch a repo has checked out, read from its HEAD file without running git. Nil when detached.
+    public static func branch(of repo: String) -> String? {
+        var gitDir = repo + "/.git"
+        // A worktree's `.git` is a file that points at its real git folder.
+        if let link = try? String(contentsOfFile: gitDir, encoding: .utf8), link.hasPrefix("gitdir: ") {
+            let target = link.dropFirst("gitdir: ".count).trimmingCharacters(in: .whitespacesAndNewlines)
+            gitDir = target.hasPrefix("/") ? target : repo + "/" + target
+        }
+        guard let head = try? String(contentsOfFile: gitDir + "/HEAD", encoding: .utf8),
+              head.hasPrefix("ref: refs/heads/") else { return nil }
+        return head.dropFirst("ref: refs/heads/".count).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     /// The task folder a path is in, even from inside one of its repos, or nil outside Farol's tasks.
     public func root(of path: String) -> String? {
         let resolved = { (url: URL) in url.resolvingSymlinksInPath().path }

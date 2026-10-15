@@ -84,3 +84,14 @@ struct Workspace {
     let space = try Workspace()
     #expect(throws: GitError.self) { try space.tasks.remove(space.parent) }
 }
+
+@Test func readsTheBranchWithoutGit() throws {
+    let space = try Workspace()
+    try Git.run(["checkout", "--quiet", "-b", "feat/x"], in: space.parent + "/web")
+    #expect(TaskFolders.branch(of: space.parent + "/api") == "main")
+    #expect(TaskFolders.branch(of: space.parent + "/web") == "feat/x")
+
+    let folder = try space.tasks.create(branch: "task", repos: space.repos)
+    #expect(TaskFolders.branch(of: folder + "/api") == "task")
+    #expect(TaskFolders.branch(of: space.parent + "/notes") == nil)
+}

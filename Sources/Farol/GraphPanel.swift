@@ -221,7 +221,7 @@ struct GraphPanel: View {
     var body: some View {
         let p = state.palette
         VStack(alignment: .leading, spacing: 0) {
-            TaskRepoTabs(review: review, palette: p, pick: pick)
+            TaskRepoTabs(review: review, palette: p, yieldsToReview: true, pick: pick)
             if graph.root != nil, graph.error == nil {
                 BranchList(graph: graph, query: $query, colors: branchColors, palette: p)
                 Rectangle().fill(p.line).frame(height: 1)
