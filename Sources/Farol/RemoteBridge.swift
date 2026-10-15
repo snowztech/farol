@@ -8,8 +8,8 @@ final class RemoteBridge: ObservableObject {
     static let enabledKey = "remote.enabled"
     private static let relayKey = "remote.relay"
     private static let defaultRelay = "wss://relay.farol.sh"
-    /// Farol Remote on the App Store, the app that scans the code.
-    static let appStore = "https://apps.apple.com/app/id6821882114"
+    /// Farol Remote, the app that scans the code. The site sends this on to TestFlight or the App Store, so moving between them needs no release.
+    static let iPhoneApp = "https://farol.sh/iphone"
     private static let devicesKey = "remote.devices"
     private static let pushKey = "remote.push"
     /// Where a phone lands when its own camera scans the code, a page that says to scan from the app. The offer rides after the #, which never reaches that server.

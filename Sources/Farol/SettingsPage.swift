@@ -533,7 +533,7 @@ struct SettingsPage: View {
     }
 
     @ViewBuilder private func remoteSection(_ p: Palette) -> some View {
-        Heading(title: "Remote", detail: "Answer your agents from your phone when you are away from the Mac.", palette: p)
+        Heading(title: "Remote", detail: "Answer your agents from your phone when you are away from the Mac.", palette: p, beta: true)
         Row(title: "Let a paired phone in",
             detail: "It sees your sessions and types into them. The Mac has to stay on, since the agents run on it.",
             palette: p) {
@@ -561,7 +561,7 @@ struct SettingsPage: View {
             // The app comes before the code, since the code is only read from inside it.
             Row(title: "Farol for iPhone", detail: "The app that scans the code and shows your sessions. Remote needs an iPhone for now.", palette: p) {
                 ShipButton(title: "Get the app", busy: false, palette: p) {
-                    if let store = URL(string: RemoteBridge.appStore) { NSWorkspace.shared.open(store) }
+                    if let page = URL(string: RemoteBridge.iPhoneApp) { NSWorkspace.shared.open(page) }
                 }
             }
             Row(title: remote.devices.isEmpty ? "Pair your phone" : "Pair another phone",
@@ -788,10 +788,21 @@ private struct Heading: View {
     let title: String
     let detail: String?
     let palette: Palette
+    var beta = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.system(size: 20, weight: .semibold))
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(title).font(.system(size: 20, weight: .semibold))
+                if beta {
+                    Text("Beta")
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundStyle(palette.muted)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .overlay(Capsule().strokeBorder(palette.muted.opacity(0.4)))
+                }
+            }
             if let detail {
                 Text(detail).font(.system(size: 12.5)).foregroundStyle(palette.muted)
             }
