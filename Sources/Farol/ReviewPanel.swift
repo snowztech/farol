@@ -886,6 +886,11 @@ private struct CommentView: View {
     /// Brings a commented file into view. Nil under the line itself, where the place goes without saying.
     let reveal: ((String) -> Void)?
 
+    /// A comment starts as its first line, so a long thread stays easy to scan.
+    @State private var expanded = false
+    /// Whether the text needs more than its first line, which is when there is something to open.
+    @State private var truncated = false
+
     private static let age: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
@@ -914,6 +919,10 @@ private struct CommentView: View {
                     Text(Self.age.localizedString(for: date, relativeTo: Date())).font(.system(size: 11)).foregroundStyle(palette.muted)
                 }
                 Spacer(minLength: 8)
+                if truncated || expanded {
+                    IconButton(symbol: expanded ? "chevron.up" : "chevron.down", help: expanded ? "Show less" : "Show all",
+                               palette: palette) { expanded.toggle() }
+                }
                 if let url = comment.url {
                     IconButton(symbol: "arrow.up.right.square", help: "Open in the browser", palette: palette) { NSWorkspace.shared.open(url) }
                 }
@@ -924,8 +933,16 @@ private struct CommentView: View {
                 Text(text)
                     .font(.system(size: 12))
                     .foregroundStyle(palette.text)
+                    .lineLimit(expanded ? nil : 1)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
+                    .background {
+                        // The whole text is tried in the one line's space: when it doesn't fit, the second view is the one shown.
+                        ViewThatFits(in: .vertical) {
+                            Text(text).font(.system(size: 12)).hidden().onAppear { if !expanded { truncated = false } }
+                            Color.clear.onAppear { if !expanded { truncated = true } }
+                        }
+                    }
             }
         }
         .padding(10)

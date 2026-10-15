@@ -7,7 +7,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Added
 
 - A pull request's button in the git graph shows its changes in the review panel, anyone's request, without checking it out. Right click it for its page in the browser.
-- Above a pull request's changes, its description and comments, reviews and comments on lines included. A comment on a line takes you to its file.
+- Above a pull request's changes, its description and comments, reviews and comments on lines included, each folded to its first line. A comment on a line takes you to its file.
 - A pull request's comments on lines show under those lines in its diff. On GitHub, the "+" next to a line number writes a new one.
 
 ## [0.30.10] - 2026-10-15
