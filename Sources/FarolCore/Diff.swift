@@ -9,6 +9,18 @@ public enum Diff {
         case branch(base: String)
         /// What one commit changed, against its first parent. The working tree plays no part.
         case commit(String)
+        /// What an open pull request, or merge request, changes, as its forge shows it. Nothing needs checking out.
+        case request(Int)
+
+        /// Your own work in the checkout, rather than a commit or a request you are looking at.
+        public var isYours: Bool {
+            switch self {
+            case .uncommitted, .branch: true
+            case .commit, .request: false
+            }
+        }
+
+        public var isRequest: Bool { if case .request = self { true } else { false } }
     }
 
     public struct Line: Equatable {
@@ -59,6 +71,10 @@ public enum Diff {
             self.removed = removed
         }
 
+        public init(_ files: [File]) {
+            self.init(files: files.count, added: files.reduce(0) { $0 + $1.added }, removed: files.reduce(0) { $0 + $1.removed })
+        }
+
         public var isEmpty: Bool { files == 0 }
     }
 
@@ -88,14 +104,20 @@ public enum Diff {
     }
 
     public static func files(in directory: String, _ scope: Scope) throws -> [File] {
+        if case .request(let number) = scope {
+            guard let forge = Forge.detect(in: directory) else { throw GitError(description: "The branch doesn't push to GitHub or GitLab.") }
+            return try forge.files(ofRequest: number, in: directory)
+        }
         let output = try Git.run(["-c", "core.quotePath=false", "diff", "--no-color", "--no-ext-diff", "--find-renames"]
                                  + range(scope, in: directory), in: directory, trimming: false)
-        if case .commit = scope { return parse(output) }
+        if !scope.isYours { return parse(output) }
         return parse(output) + untracked(in: directory).compactMap { added($0, in: directory) }
     }
 
     /// Counts only, cheap enough to run after every change the agent makes.
     public static func stat(in directory: String, _ scope: Scope) throws -> Stat {
+        // The forge only gives the whole diff, so the counts come from it.
+        if case .request = scope { return Stat(try files(in: directory, scope)) }
         let output = try Git.run(["diff", "--numstat", "--find-renames"] + range(scope, in: directory), in: directory)
         var stat = Stat()
         for line in output.split(separator: "\n") {
@@ -105,7 +127,7 @@ public enum Diff {
             stat.added += Int(parts[0]) ?? 0
             stat.removed += Int(parts[1]) ?? 0
         }
-        if case .commit = scope { return stat }
+        if !scope.isYours { return stat }
         for path in untracked(in: directory) {
             stat.files += 1
             stat.added += lineCount(path, in: directory)
@@ -122,6 +144,8 @@ public enum Diff {
             let parent = try (try? Git.run(["rev-parse", "--verify", "--quiet", hash + "^1"], in: directory))
                 ?? Git.run(["hash-object", "-t", "tree", "/dev/null"], in: directory)
             return [parent, hash]
+        case .request:
+            throw GitError(description: "A request's changes come from its forge, not from git.")
         }
     }
 

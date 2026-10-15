@@ -211,6 +211,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             review.show(commit: commit.hash, subject: commit.subject, file: file)
             if !review.isOpen { toggleReview() }
         }
+        graph.onShowRequest = { [weak self] request in
+            guard let self else { return }
+            review.show(request: request)
+            if !review.isOpen { toggleReview() }
+        }
         graph.onRunInTerminal = { command in
             guard let session = store.selected else { return }
             store.split(session, .down, run: command)
@@ -396,8 +401,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// Opens or closes the review panel at the width you last gave it.
     func toggleReview(closing: Bool = false) {
-        // Over a commit, "Review changes" brings your changes back. Closing the panel there would hide what you asked for.
-        if !closing, review.leaveCommit() { return graph.select(nil) }
+        // Over a commit or a request, "Review changes" brings your changes back. Closing the panel there would hide what you asked for.
+        if !closing, review.showYours() { return graph.select(nil) }
         review.isOpen.toggle()
         let saved = UserDefaults.standard.double(forKey: Self.reviewWidthKey)
         let width = review.isOpen ? clampedReviewWidth(saved > 0 ? saved : ReviewPanel.defaultWidth) : 0
