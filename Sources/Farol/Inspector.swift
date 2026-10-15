@@ -138,6 +138,8 @@ final class InspectorMonitor: ObservableObject {
     func readings(at now: Date) -> [Inspector.Reading] {
         let rates = snapshot.rate(over: Self.window, at: now)
         let rate = rates.values.reduce(0, +)
+        // A launch, a session switch or a push starts a burst that's over in seconds. A loop keeps going, so the color goes by the minute.
+        let sustained = snapshot.rate(over: Self.recent, at: now).values.reduce(0, +)
         let tools = rates.sorted { $0.value > $1.value }.map { "\($0.key) \(Self.decimal($0.value))" }
         let blocking = snapshot.blocking
         let hangs = snapshot.hangs
@@ -145,9 +147,9 @@ final class InspectorMonitor: ObservableObject {
         return [
             Inspector.Reading(
                 section: "Processes", title: "Rate", value: rate == 0 ? "0/s" : "\(Self.decimal(rate))/s", note: tools.joined(separator: " · "),
-                help: "git, gh and glab processes started a second, over the last \(Int(Self.window)) seconds. Under 2 is calm. A launch or a push starts more for a moment.",
+                help: "git, gh and glab processes started a second, over the last \(Int(Self.window)) seconds. A launch or a push starts a burst. The color goes by the last minute's average, where under 2 is calm.",
                 // An agent at work keeps git busy, but #159 showed 10 a second is a loop, not work.
-                level: rate < 2 ? .good : rate < 5 ? .worthALook : .problem),
+                level: sustained < 2 ? .good : sustained < 5 ? .worthALook : .problem),
             Inspector.Reading(
                 section: "Main thread", title: "Blocking runs", value: blocking.isEmpty ? "none" : "\(snapshot.onMain)",
                 help: "Processes run on the main thread since launch. The window can't redraw or answer until each one ends, so there should be none.",
