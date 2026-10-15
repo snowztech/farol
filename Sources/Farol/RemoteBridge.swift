@@ -356,8 +356,8 @@ final class RemoteBridge: ObservableObject {
     }
 
     /// Has the relay update the Live Activity on each phone that has one, when what it shows changed.
-    /// Once nothing waits or works it is ended. When something gets busy again, it is started on each phone that is not open,
-    /// and an open one starts its own.
+    /// Once nothing waits or works it is ended.
+    /// When something gets busy again, it is started on each phone that is not open, and an open one starts its own.
     private func updateActivities() {
         guard let connection else { return }
         let sessions = remoteSessions
