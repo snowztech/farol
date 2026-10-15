@@ -19,6 +19,8 @@ public enum Diff {
             case .commit, .request: false
             }
         }
+
+        public var isRequest: Bool { if case .request = self { true } else { false } }
     }
 
     public struct Line: Equatable {

@@ -150,6 +150,7 @@ final class ReviewModel: ObservableObject {
                 guard let self, self.root == root else { return }
                 self.forge = forge
                 self.ignored = ignored
+                if self.discussion == nil { self.loadDiscussion() }
                 self.checkRequest()
             }
         }
@@ -168,8 +169,15 @@ final class ReviewModel: ObservableObject {
         guard let root else { return }
         if shownRequest?.number != request.number { discussion = nil }
         shownRequest = request
+        // Another click reads it again, for commits pushed since.
+        fetchedRequest = nil
         browse(.request(request.number), in: root)
-        guard let forge else { return }
+        loadDiscussion()
+    }
+
+    /// Also runs once the forge is known, for a request shown before it was.
+    private func loadDiscussion() {
+        guard let root, let forge, let request = shownRequest, scope == .request(request.number) else { return }
         DispatchQueue.global(qos: .userInitiated).async {
             let discussion = forge.discussion(ofRequest: request.number, in: root)
             DispatchQueue.main.async { [weak self] in
@@ -351,8 +359,9 @@ final class ReviewModel: ObservableObject {
                 guard let self, self.root == root, self.scope == scope else { return }
                 if let stat { self.stat = (try? stat.get()) ?? Diff.Stat() }
                 if files != nil { self.error = (try? files?.get()) == nil ? "Couldn't read the changes." : nil }
+                // Failed or not, the request isn't asked for again on every file change. Another click on it retries.
+                if files != nil, case .request(let number) = scope { self.fetchedRequest = number }
                 if let files = try? files?.get() {
-                    if case .request(let number) = scope { self.fetchedRequest = number } else { self.fetchedRequest = nil }
                     let known = Set(self.files.map(\.path))
                     for file in files where !known.contains(file.path) && file.added + file.removed > Self.foldedAbove {
                         self.collapsed.insert(file.path)
@@ -515,7 +524,8 @@ struct ReviewPanel: View {
             FileHeader(file: file, collapsed: collapsed, ticked: review.isTicked(file.path), palette: p,
                        tick: { review.toggleExcluded(file.path) },
                        toggle: { review.toggle(file.path) },
-                       open: { review.root.map { open(($0 as NSString).appendingPathComponent(file.path), file.firstChange) } })
+                       // A request's files are its branch's, not the ones in your checkout.
+                       open: review.scope.isRequest ? nil : { review.root.map { open(($0 as NSString).appendingPathComponent(file.path), file.firstChange) } })
         case .body(let file):
             DiffText(file: file, colors: p.diff, syntax: p.code).padding(.horizontal, 8)
         case .note(_, let text):
@@ -657,7 +667,7 @@ private struct FileHeader: View {
     let palette: Palette
     let tick: () -> Void
     let toggle: () -> Void
-    let open: () -> Void
+    let open: (() -> Void)?
 
     @State private var hovering = false
 
@@ -687,7 +697,7 @@ private struct FileHeader: View {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(file.path, forType: .string)
             }
-            if file.status != .deleted {
+            if let open, file.status != .deleted {
                 IconButton(symbol: "arrow.up.right.square", help: "Open in the file pane", palette: palette, action: open)
             }
         }
@@ -762,6 +772,10 @@ private struct Conversation: View {
                 }
             }
         }
+        // Anyone can comment on a public request, so its links open only on the web, never a file or another app.
+        .environment(\.openURL, OpenURLAction { url in
+            ["http", "https", "mailto"].contains(url.scheme?.lowercased() ?? "") ? .systemAction : .discarded
+        })
     }
 }
 
@@ -807,11 +821,10 @@ private struct CommentView: View {
             if comment.text.isEmpty {
                 if !empty.isEmpty { Text(empty).font(.system(size: 12)).foregroundStyle(palette.muted) }
             } else {
-                Text(text)
+                MarkdownBlocks(blocks: Markdown.blocks(in: comment.text), palette: palette)
                     .font(.system(size: 12))
                     .foregroundStyle(palette.text)
                     .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(10)
@@ -820,10 +833,64 @@ private struct CommentView: View {
         .padding(.horizontal, 8)
         .padding(.top, 6)
     }
+}
 
-    /// Bold, code and links read as they would on the forge. Headings and lists stay as written, which reads well enough.
-    private var text: AttributedString {
-        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        return (try? AttributedString(markdown: comment.text, options: options)) ?? AttributedString(comment.text)
+/// A comment's Markdown, read like the file pane's preview: headings, lists, code, quotes and tables, and bots' HTML.
+private struct MarkdownBlocks: View {
+    let blocks: [Markdown.Block]
+    let palette: Palette
+
+    private static let options = AttributedString.MarkdownParsingOptions(
+        interpretedSyntax: .inlineOnlyPreservingWhitespace, failurePolicy: .returnPartiallyParsedIfPossible)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in view(for: block) }
+        }
+    }
+
+    @ViewBuilder private func view(for block: Markdown.Block) -> some View {
+        switch block {
+        case .heading(let level, let text):
+            inline(text).font(.system(size: level <= 2 ? 14 : 12.5, weight: .semibold))
+        case .paragraph(let text):
+            inline(text).fixedSize(horizontal: false, vertical: true)
+        case .code(_, let text):
+            Text(text)
+                .font(.system(size: 11.5, design: .monospaced))
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+                .background(RoundedRectangle(cornerRadius: 5).fill(palette.surface))
+        case .quote(let blocks):
+            MarkdownBlocks(blocks: blocks, palette: palette)
+                .foregroundStyle(palette.muted)
+                .padding(.leading, 10)
+                .overlay(alignment: .leading) { Rectangle().fill(palette.line).frame(width: 3) }
+        case .list(let ordered, let start, let items):
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(item.checked.map { $0 ? "☑" : "☐" } ?? (ordered ? "\(start + index)." : "•")).foregroundStyle(palette.muted)
+                        MarkdownBlocks(blocks: item.blocks, palette: palette)
+                    }
+                }
+            }
+        case .table(let header, let rows):
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
+                GridRow { ForEach(Array(header.enumerated()), id: \.offset) { inline($1).fontWeight(.semibold) } }
+                Divider()
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, cells in
+                    GridRow { ForEach(Array(cells.enumerated()), id: \.offset) { inline($1) } }
+                }
+            }
+        case .rule:
+            Divider()
+        }
+    }
+
+    private func inline(_ text: String) -> Text {
+        let markdown = Markdown.inlineHTML(text)
+        return Text((try? AttributedString(markdown: markdown, options: Self.options)) ?? AttributedString(markdown))
     }
 }
