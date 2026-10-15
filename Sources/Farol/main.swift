@@ -13,6 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var restored = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // First, so a slow launch shows in the inspector as hangs too.
+        Perf.shared.watchMainThread()
         let runtime = TerminalRuntime(overrideFiles: [Settings.fileURL])
         settings = Settings()
         let agents = AgentSettings()

@@ -36,98 +36,70 @@ final class Inspector: NSObject, NSWindowDelegate {
         panel.isFloatingPanel = true
         panel.isReleasedWhenClosed = false
         panel.contentMinSize = NSSize(width: 300, height: 260)
+        panel.setFrameAutosaveName("FarolInspector")
         panel.delegate = self
         panel.contentViewController = NSHostingController(rootView: InspectorView(monitor: monitor, state: state))
-        if let screen = NSScreen.main?.visibleFrame {
+        // The first time only. After that it opens where you left it.
+        if !panel.setFrameUsingName("FarolInspector"), let screen = NSScreen.main?.visibleFrame {
             panel.setFrameTopLeftPoint(NSPoint(x: screen.maxX - 360, y: screen.maxY - 20))
         }
         return panel
     }
 }
 
-/// One thing the inspector measures.
-struct Reading {
-    enum Level: Int, Comparable {
-        case good, worthALook, problem
+extension Inspector {
+    /// One thing the inspector measures.
+    struct Reading {
+        enum Level: Int, Comparable {
+            case good, worthALook, problem
 
-        static func < (a: Level, b: Level) -> Bool { a.rawValue < b.rawValue }
+            static func < (a: Level, b: Level) -> Bool { a.rawValue < b.rawValue }
 
-        var word: String {
-            switch self {
-            case .good: "fine"
-            case .worthALook: "worth a look"
-            case .problem: "problem"
+            var word: String {
+                switch self {
+                case .good: "fine"
+                case .worthALook: "worth a look"
+                case .problem: "problem"
+                }
             }
         }
-    }
 
-    let section: String
-    let title: String
-    let value: String
-    /// Quieter context beside the value, like which tools ran.
-    var note = ""
-    /// What the number means and what good looks like, shown on hover.
-    let help: String
-    var level = Level.good
-    /// The runs behind a value that needs a look, so it says where to look.
-    var details: [String] = []
+        let section: String
+        let title: String
+        let value: String
+        /// Quieter context beside the value, like which tools ran.
+        var note = ""
+        /// What the number means and what good looks like, shown on hover.
+        let help: String
+        var level = Level.good
+        /// The runs behind a value that needs a look, so it says where to look.
+        var details: [String] = []
+    }
 }
 
 /// Samples while the inspector is open: Perf's snapshot, memory and CPU once a second, and how late the main thread answers.
 final class InspectorMonitor: ObservableObject {
-    struct Hang {
-        let at: Date
-        let duration: TimeInterval
-    }
-
     @Published private(set) var snapshot = Perf.shared.snapshot()
-    @Published private(set) var memory: UInt64 = 0
+    @Published private(set) var memory: (now: UInt64, peak: UInt64) = (0, 0)
     @Published private(set) var cpu: Double = 0
-    /// Hangs from the last minute.
-    @Published private(set) var hangs: [Hang] = []
 
-    /// Apple's own line for a hang, as Instruments and Xcode count them.
-    static let hangAbove: TimeInterval = 0.25
     /// What the process rate and the longest processes cover.
     static let window: TimeInterval = 10
 
     private var timer: Timer?
-    private var pinger: DispatchSourceTimer?
     private var lastCPU: (time: TimeInterval, at: Date)?
 
+    /// Hangs are watched from launch by Perf, so only the snapshot, memory and CPU are read here, once a second.
     func start() {
         guard timer == nil else { return }
         sample()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.sample() }
-        // A ping every 50 ms from another thread. However late the main thread runs it is how long it was busy.
-        // One at a time, so a long hang counts once, at its full length, rather than once per ping queued behind it.
-        let waiting = OSAllocatedUnfairLock(initialState: false)
-        let pinger = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
-        pinger.schedule(deadline: .now(), repeating: .milliseconds(50))
-        pinger.setEventHandler { [weak self] in
-            guard waiting.withLock({ busy in defer { busy = true }; return !busy }) else { return }
-            let sent = Date()
-            DispatchQueue.main.async {
-                waiting.withLock { $0 = false }
-                self?.answered(sent)
-            }
-        }
-        pinger.resume()
-        self.pinger = pinger
     }
 
     func stop() {
         timer?.invalidate()
         timer = nil
-        pinger?.cancel()
-        pinger = nil
         lastCPU = nil
-    }
-
-    private func answered(_ sent: Date) {
-        let delay = Date().timeIntervalSince(sent)
-        guard delay >= Self.hangAbove else { return }
-        hangs.append(Hang(at: sent, duration: delay))
     }
 
     private func sample() {
@@ -137,17 +109,16 @@ final class InspectorMonitor: ObservableObject {
         let used = Self.cpuTime()
         if let last = lastCPU { cpu = (used - last.time) / now.timeIntervalSince(last.at) * 100 }
         lastCPU = (used, now)
-        hangs.removeAll { $0.at < now.addingTimeInterval(-60) }
     }
 
-    /// The memory Activity Monitor shows for Farol.
-    private static func footprint() -> UInt64 {
+    /// The memory Activity Monitor shows for Farol, and the most it has used since launch, which macOS keeps anyway.
+    private static func footprint() -> (now: UInt64, peak: UInt64) {
         var info = task_vm_info_data_t()
         var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
         let result = withUnsafeMutablePointer(to: &info) {
             $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count) }
         }
-        return result == KERN_SUCCESS ? info.phys_footprint : 0
+        return result == KERN_SUCCESS ? (info.phys_footprint, UInt64(info.ledger_phys_footprint_peak)) : (0, 0)
     }
 
     /// Seconds of CPU Farol itself has used, not the processes it starts.
@@ -161,35 +132,36 @@ final class InspectorMonitor: ObservableObject {
     // MARK: Readings
 
     /// What the window and the copied report both show, so they never disagree.
-    func readings(at now: Date) -> [Reading] {
+    func readings(at now: Date) -> [Inspector.Reading] {
         let rates = snapshot.rate(over: Self.window, at: now)
         let rate = rates.values.reduce(0, +)
         let tools = rates.sorted { $0.value > $1.value }.map { "\($0.key) \(Self.decimal($0.value))" }
-        let blocking = snapshot.recent.filter(\.onMain)
+        let blocking = snapshot.blocking
+        let hangs = snapshot.hangs
         let longestHang = hangs.map(\.duration).max() ?? 0
         return [
-            Reading(
+            Inspector.Reading(
                 section: "Processes", title: "Rate", value: rate == 0 ? "idle" : "\(Self.decimal(rate))/s", note: tools.joined(separator: " · "),
                 help: "git, gh and glab processes started a second, over the last \(Int(Self.window)) seconds. Under 2 is calm. A launch or a push starts more for a moment.",
                 // An agent at work keeps git busy, but #159 showed 10 a second is a loop, not work.
                 level: rate < 2 ? .good : rate < 5 ? .worthALook : .problem),
-            Reading(section: "Processes", title: "Since launch", value: "\(snapshot.total)", help: "Every git, gh and glab process Farol has started."),
-            Reading(
+            Inspector.Reading(
                 section: "Main thread", title: "Blocking runs", value: blocking.isEmpty ? "none" : "\(snapshot.onMain)",
                 help: "Processes run on the main thread since launch. The window can't redraw or answer until each one ends, so there should be none.",
                 // Under 100 ms nobody feels it, but it breaks the rule and a slow disk would turn it into a hang.
                 level: blocking.isEmpty ? .good : blocking.contains { $0.duration >= 0.1 } ? .problem : .worthALook,
                 details: blocking.prefix(3).map { "\($0.command) · \(Self.ms($0.duration)) · \(Self.ago($0.start, now: now))" }),
-            Reading(
+            Inspector.Reading(
                 section: "Main thread", title: "Hangs", value: hangs.isEmpty ? "none" : "\(hangs.count)",
-                note: hangs.isEmpty ? "" : "longest \(Self.ms(longestHang))",
-                help: "Times in the last minute the window didn't answer for \(Self.ms(Self.hangAbove)) or more, Apple's measure of a hang.",
-                level: hangs.isEmpty ? .good : longestHang < 1 ? .worthALook : .problem),
-            Reading(
-                section: "Resources", title: "Memory", value: Self.size(memory),
-                help: "What Activity Monitor shows for Farol, terminals included.",
-                level: memory < 1 << 30 ? .good : memory < 2 << 30 ? .worthALook : .problem),
-            Reading(
+                note: hangs.count < 2 ? "" : "longest \(Self.ms(longestHang))",
+                help: "Times since launch the window didn't answer for 250 ms or more, Apple's measure of a hang. Watched even while the inspector is closed.",
+                level: hangs.isEmpty ? .good : longestHang < 1 ? .worthALook : .problem,
+                details: hangs.prefix(3).map { "\(Self.ms($0.duration)) · \(Self.ago($0.start, now: now))" }),
+            Inspector.Reading(
+                section: "Resources", title: "Memory", value: Self.size(memory.now), note: "peak \(Self.size(memory.peak))",
+                help: "What Activity Monitor shows for Farol, terminals included, and the most it has used since launch. A peak that keeps climbing is a leak.",
+                level: memory.now < 1 << 30 ? .good : memory.now < 2 << 30 ? .worthALook : .problem),
+            Inspector.Reading(
                 section: "Resources", title: "CPU", value: "\(Int(cpu.rounded()))%",
                 help: "Farol itself, not the processes it starts. Near 0 while idle.",
                 level: cpu < 25 ? .good : cpu < 75 ? .worthALook : .problem),
@@ -215,6 +187,7 @@ final class InspectorMonitor: ObservableObject {
             lines.append("Longest processes, last \(Int(Self.window)) s")
             lines += longest.map { "  " + Self.ms($0.duration).leftPadded(to: 8) + "  " + $0.command }
         }
+        lines.append("\(snapshot.total) processes since launch")
         return lines.joined(separator: "\n")
     }
 
@@ -265,6 +238,7 @@ private struct InspectorView: View {
             }
             Rectangle().fill(p.line).frame(height: 1)
             HStack {
+                Text("\(monitor.snapshot.total) processes since launch").foregroundStyle(p.muted)
                 Spacer()
                 Button(copied ? "Copied" : "Copy Report") {
                     NSPasteboard.general.clearContents()
@@ -282,10 +256,11 @@ private struct InspectorView: View {
         .font(.system(size: 11.5))
         .foregroundStyle(p.text)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(p.background)
+        // The content starts below the title bar, and the theme's color reaches under it.
+        .background(p.background.ignoresSafeArea())
     }
 
-    private static func sections(of readings: [Reading]) -> [String] {
+    private static func sections(of readings: [Inspector.Reading]) -> [String] {
         readings.reduce(into: []) { sections, reading in
             if sections.last != reading.section { sections.append(reading.section) }
         }
@@ -300,7 +275,7 @@ private struct InspectorView: View {
         .foregroundStyle(p.muted)
     }
 
-    private func row(_ reading: Reading, _ p: Palette) -> some View {
+    private func row(_ reading: Inspector.Reading, _ p: Palette) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(alignment: .firstTextBaseline, spacing: 0) {
                 Text(reading.title).foregroundStyle(p.muted).frame(width: 104, alignment: .leading)
@@ -336,7 +311,7 @@ private struct InspectorView: View {
     }
 
     /// The theme's own colors: plain text when fine, its yellow to look at, its red for a problem.
-    private func color(_ level: Reading.Level, _ p: Palette) -> Color {
+    private func color(_ level: Inspector.Reading.Level, _ p: Palette) -> Color {
         switch level {
         case .good: p.text
         case .worthALook: p.waiting

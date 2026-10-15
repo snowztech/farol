@@ -51,3 +51,27 @@ import Testing
     #expect(run.tool == "git")
     #expect(run.duration >= 0)
 }
+
+@Test func countsABusyRunLoopStepAsAHangButNotASleep() {
+    var watch = HangWatch()
+    #expect(watch.note(at: 0, afterSleep: false) == nil)
+    #expect(watch.note(at: 0.1, afterSleep: false) == nil)
+    // Busy from 0.1 to 0.5 without a break: a hang.
+    #expect(watch.note(at: 0.5, afterSleep: false) == 0.4)
+    // Asleep until 5, waiting for something to do: not a hang.
+    #expect(watch.note(at: 5, afterSleep: true) == nil)
+    #expect(watch.note(at: 5.3, afterSleep: false).map { ($0 * 10).rounded() / 10 } == 0.3)
+}
+
+@Test func keepsTheLastBlockingRunsAndHangsApart() {
+    let perf = Perf(capacity: 2)
+    let now = Date()
+    perf.record(Perf.Run(command: "git rev-parse", tool: "git", start: now, duration: 0.03, onMain: true))
+    // The ring fills with other runs, and the blocking one stays known.
+    for _ in 0..<5 { perf.record(Perf.Run(command: "git status", tool: "git", start: now, duration: 0.01, onMain: false)) }
+    perf.recordHang(Perf.Hang(start: now, duration: 0.4))
+    let snapshot = perf.snapshot()
+    #expect(snapshot.blocking.map(\.command) == ["git rev-parse"])
+    #expect(snapshot.onMain == 1)
+    #expect(snapshot.hangs == [Perf.Hang(start: now, duration: 0.4)])
+}

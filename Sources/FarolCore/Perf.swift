@@ -1,9 +1,9 @@
 import Foundation
 import os
 
-/// What Farol spends on outside commands: every git, gh and glab run, for the Farol Inspector (⌥⌘I).
+/// What Farol spends, for the Farol Inspector (⌥⌘I): every git, gh and glab process, and every hang of the main thread.
 /// Always on: a record is a lock and an append, next to a process that takes milliseconds to start.
-/// Each run is also an interval in Instruments' Points of Interest, for a closer look.
+/// Each process is also an interval in Instruments' Points of Interest, for a closer look.
 public final class Perf: @unchecked Sendable {
     public static let shared = Perf()
 
@@ -17,12 +17,22 @@ public final class Perf: @unchecked Sendable {
         public let onMain: Bool
     }
 
+    /// The main thread busy for `duration` without a break, so the window couldn't answer.
+    public struct Hang: Equatable, Sendable {
+        public let start: Date
+        public let duration: TimeInterval
+    }
+
     public struct Snapshot: Equatable, Sendable {
         /// The last runs kept, newest first.
         public let recent: [Run]
         /// Every run since launch, kept or not.
         public let total: Int
         public let onMain: Int
+        /// The last runs on the main thread, newest first, kept apart so a busy session can't push them out.
+        public let blocking: [Run]
+        /// The last hangs since launch, newest first.
+        public let hangs: [Hang]
 
         /// Runs per second over the `window` seconds before `now`, by tool.
         public func rate(over window: TimeInterval, at now: Date) -> [String: Double] {
@@ -44,6 +54,8 @@ public final class Perf: @unchecked Sendable {
         let command: String
         let tool: String
         let start: Date
+        /// Durations come from a clock that never jumps, unlike the date when macOS sets the time.
+        let started: ContinuousClock.Instant
         let onMain: Bool
         let interval: OSSignpostIntervalState
     }
@@ -55,6 +67,10 @@ public final class Perf: @unchecked Sendable {
     private var next = 0
     private var total = 0
     private var onMain = 0
+    private var blocking: [Run] = []
+    private var hangs: [Hang] = []
+    /// How many blocking runs and hangs are kept, enough to see a pattern.
+    private static let kept = 5
     private let signposter = OSSignposter(subsystem: "dev.farol.Farol", category: .pointsOfInterest)
 
     init(capacity: Int = 256) {
@@ -65,13 +81,14 @@ public final class Perf: @unchecked Sendable {
         let command = Self.command(executable, arguments)
         let interval = signposter.beginInterval("Command", id: signposter.makeSignpostID(), "\(command, privacy: .public)")
         return Timer(command: command, tool: URL(fileURLWithPath: executable).lastPathComponent, start: Date(),
-                     onMain: Thread.isMainThread, interval: interval)
+                     started: .now, onMain: Thread.isMainThread, interval: interval)
     }
 
     public func end(_ timer: Timer) {
         signposter.endInterval("Command", timer.interval)
-        record(Run(command: timer.command, tool: timer.tool, start: timer.start,
-                   duration: Date().timeIntervalSince(timer.start), onMain: timer.onMain))
+        let elapsed = ContinuousClock.now - timer.started
+        let duration = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+        record(Run(command: timer.command, tool: timer.tool, start: timer.start, duration: duration, onMain: timer.onMain))
     }
 
     func record(_ run: Run) {
@@ -79,15 +96,33 @@ public final class Perf: @unchecked Sendable {
             if runs.count < capacity { runs.append(run) } else { runs[next] = run }
             next = (next + 1) % capacity
             total += 1
-            if run.onMain { onMain += 1 }
+            if run.onMain {
+                onMain += 1
+                blocking = Array(([run] + blocking).prefix(Self.kept))
+            }
         }
+    }
+
+    func recordHang(_ hang: Hang) {
+        lock.withLock { hangs = Array(([hang] + hangs).prefix(Self.kept)) }
+    }
+
+    /// Watches the main run loop for hangs from launch, open inspector or not: two clock reads a pass, no timer, no thread.
+    public func watchMainThread() {
+        var watch = HangWatch()
+        let observer = CFRunLoopObserverCreateWithHandler(nil, CFRunLoopActivity.allActivities.rawValue, true, 0) { [weak self] _, activity in
+            let now = ProcessInfo.processInfo.systemUptime
+            guard let busy = watch.note(at: now, afterSleep: activity == .afterWaiting) else { return }
+            self?.recordHang(Hang(start: Date(timeIntervalSinceNow: -busy), duration: busy))
+        }
+        CFRunLoopAddObserver(CFRunLoopGetMain(), observer, .commonModes)
     }
 
     public func snapshot() -> Snapshot {
         lock.withLock {
             // The ring's oldest run sits at `next` once it's full.
             let ordered = runs.count < capacity ? runs : Array(runs[next...] + runs[..<next])
-            return Snapshot(recent: ordered.reversed(), total: total, onMain: onMain)
+            return Snapshot(recent: ordered.reversed(), total: total, onMain: onMain, blocking: blocking, hangs: hangs)
         }
     }
 
@@ -104,5 +139,19 @@ public final class Perf: @unchecked Sendable {
         let tool = URL(fileURLWithPath: executable).lastPathComponent
         // A shell's command is a whole script, which says nothing at a glance.
         return tool == "zsh" || tool == "bash" ? tool : ([tool] + words).joined(separator: " ")
+    }
+}
+
+/// The gaps between the main run loop's steps. One that ran 250 ms or more without sleeping is a hang, as Apple counts them.
+struct HangWatch {
+    private var last: TimeInterval?
+
+    /// Notes a step at `time`, and returns how long the one before it took when that was a hang.
+    /// `afterSleep` means the loop was waiting for something to do, which is the opposite of busy.
+    mutating func note(at time: TimeInterval, afterSleep: Bool, threshold: TimeInterval = 0.25) -> TimeInterval? {
+        defer { last = time }
+        guard let last, !afterSleep else { return nil }
+        let busy = time - last
+        return busy >= threshold ? busy : nil
     }
 }
