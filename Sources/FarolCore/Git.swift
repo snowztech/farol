@@ -15,8 +15,8 @@ public enum Git {
     /// Some tools report on stderr even when all is well, and `mergingErrors` returns that with the output.
     @discardableResult
     static func run(_ executable: String, _ arguments: [String], in directory: String, trimming: Bool = true,
-                    mergingErrors: Bool = false) throws -> String {
-        let timer = Perf.shared.begin(executable, arguments)
+                    mergingErrors: Bool = false, named name: String? = nil) throws -> String {
+        let timer = Perf.shared.begin(executable, arguments, named: name)
         defer { Perf.shared.end(timer) }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
@@ -65,7 +65,7 @@ public enum Git {
         // It also keeps whatever those files print out of the PATH.
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("farol-path-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: file) }
-        let timer = Perf.shared.begin(shell, ["-ilc"])
+        let timer = Perf.shared.begin(shell, ["-ilc"], named: URL(fileURLWithPath: shell).lastPathComponent + " PATH")
         defer { Perf.shared.end(timer) }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: shell)

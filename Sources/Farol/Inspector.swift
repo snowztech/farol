@@ -132,7 +132,7 @@ final class InspectorMonitor: ObservableObject {
             Inspector.Reading(
                 section: "Processes", title: "Started", value: "\(count)",
                 note: (["in \(Int(Self.window)) s"] + tools).joined(separator: " · "),
-                meaning: "git, gh and glab runs in the last \(Int(Self.window)) s. Bursts are normal. A minute above 4/s means a loop.",
+                meaning: "Programs Farol started in the last \(Int(Self.window)) s, like git. Bursts are normal. A minute above 4/s means a loop.",
                 level: snapshot.processLevel(at: now)),
             // What you feel first, then what causes it, so the two read as effect and cause.
             Inspector.Reading(
@@ -143,7 +143,7 @@ final class InspectorMonitor: ObservableObject {
                 details: hangs.prefix(3).map { "\(Self.ms($0.duration)) · \(Self.ago($0.start, now: now))" }),
             Inspector.Reading(
                 section: "Responsiveness", title: "Blocking processes", value: blocking.isEmpty ? "none" : "\(snapshot.onMain)",
-                meaning: "git, gh or glab run where the window is drawn. Each pauses it, even too briefly to notice. Should be none.",
+                meaning: "Programs Farol ran where the window is drawn, like git. Each pauses it, even too briefly to notice. Should be none.",
                 level: snapshot.blockingLevel,
                 details: blocking.prefix(3).map { "\($0.command) · \(Self.ms($0.duration)) · \(Self.ago($0.start, now: now))" }),
             Inspector.Reading(
@@ -184,9 +184,15 @@ final class InspectorMonitor: ObservableObject {
         return lines.joined(separator: "\n")
     }
 
-    /// Long for its kind: git works on the disk, gh and glab go over the network.
+    /// Long for its kind: git works on the disk, gh, glab and jira go online, and a shell reads your startup files.
+    /// An agent writing a commit message thinks for a while.
     static func isLong(_ run: Perf.Run) -> Bool {
-        run.duration > (["gh", "glab"].contains(run.tool) ? 2 : 0.3)
+        let limit: TimeInterval = switch run.tool {
+        case "gh", "glab", "jira", "curl", "zsh", "bash": 2
+        case "claude", "codex": 30
+        default: 0.3
+        }
+        return run.duration > limit
     }
 
     static func ms(_ seconds: TimeInterval) -> String { "\(Int((seconds * 1000).rounded())) ms" }
@@ -284,7 +290,7 @@ private struct InspectorView: View {
 
     private func longest(_ now: Date, _ p: Palette) -> some View {
         let runs = monitor.snapshot.longest(5, over: InspectorMonitor.recent, at: now)
-        let meaning = "The slowest runs of the last minute. git takes 10–100 ms, gh and glab up to 2 s."
+        let meaning = "The slowest programs of the last minute. git takes 10–100 ms, tools that go online up to 2 s."
         return Explained(meaning: meaning, palette: p) {
             VStack(alignment: .leading, spacing: 6) {
                 header("Longest processes", span: "last minute", p)
