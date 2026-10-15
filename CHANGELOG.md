@@ -8,6 +8,12 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - A GitHub or GitLab on your company's own domain is recognized once gh or glab is logged in there, so its requests, reviews and checks show.
 - New Task lists a GitLab repo's open issues, as it does GitHub's.
+- On GitLab too, the "+" next to a line of a merge request's diff writes a comment on it.
+- A GitLab merge request's conversation shows who approved it or requested changes.
+
+### Fixed
+
+- A comment on an older version of a GitLab merge request's diff stays in the conversation instead of showing under a line that moved.
 
 ## [0.32.0] - 2026-10-15
 
@@ -19,12 +25,6 @@ A task can now span several repos, each with its own worktree on one branch, rev
 - Started from inside a repo, New Task offers Add repos to pick the repos beside it.
 - The repo list gets a search past 8 repos, and shows the branch a repo is on when it isn't main or master, since the task branch starts from it.
 - In a task across repos, the review and graph panels show a tab per repo with its changes, and the title bar counts the changes of all of them.
-- On GitLab too, the "+" next to a line of a merge request's diff writes a comment on it.
-- A GitLab merge request's conversation shows who approved it or requested changes.
-
-### Fixed
-
-- A comment on an older version of a GitLab merge request's diff stays in the conversation instead of showing under a line that moved.
 
 ## [0.31.0] - 2026-10-15
 
