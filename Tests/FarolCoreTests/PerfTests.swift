@@ -52,12 +52,16 @@ import Testing
     #expect(run.duration >= 0)
 }
 
-@Test func countsABusyRunLoopStepAsAHangButNotASleep() {
+@Test func countsABusyRunLoopStepAsAHangButNotASleepOrTheLaunch() {
     var watch = HangWatch()
+    // Launch work, before the window is there to answer anyone, isn't a hang.
     #expect(watch.note(at: 0, afterSleep: false) == nil)
-    #expect(watch.note(at: 0.1, afterSleep: false) == nil)
-    // Busy from 0.1 to 0.5 without a break: a hang.
-    #expect(watch.note(at: 0.5, afterSleep: false) == 0.4)
+    #expect(watch.note(at: 0.8, afterSleep: false) == nil)
+    // Idle for the first time: from here on the window is waiting for you.
+    #expect(watch.note(at: 2, afterSleep: true) == nil)
+    #expect(watch.note(at: 2.1, afterSleep: false) == nil)
+    // Busy from 2.1 to 2.5 without a break: a hang.
+    #expect(watch.note(at: 2.5, afterSleep: false).map { ($0 * 10).rounded() / 10 } == 0.4)
     // Asleep until 5, waiting for something to do: not a hang.
     #expect(watch.note(at: 5, afterSleep: true) == nil)
     #expect(watch.note(at: 5.3, afterSleep: false).map { ($0 * 10).rounded() / 10 } == 0.3)
@@ -74,4 +78,38 @@ import Testing
     #expect(snapshot.blocking.map(\.command) == ["git rev-parse"])
     #expect(snapshot.onMain == 1)
     #expect(snapshot.hangs == [Perf.Hang(start: now, duration: 0.4)])
+}
+
+@Test func aLaunchBurstIsCalmAndALoopIsAProblem() {
+    let now = Date()
+    // 100 processes in the first seconds after launch, then quiet.
+    let launch = Perf()
+    for index in 0..<100 { launch.record(Perf.Run(command: "git status", tool: "git", start: now.addingTimeInterval(-Double(index) / 20), duration: 0.02, onMain: false)) }
+    #expect(launch.snapshot().processLevel(at: now) == .good)
+
+    // 10 a second for a whole minute, as the hook loop #159 fixed was.
+    let loop = Perf()
+    for index in 0..<600 { loop.record(Perf.Run(command: "git status", tool: "git", start: now.addingTimeInterval(-Double(index) / 10), duration: 0.02, onMain: false)) }
+    #expect(loop.snapshot().processLevel(at: now) == .problem)
+}
+
+@Test func judgesBlockingRunsHangsMemoryAndCPU() {
+    let now = Date()
+    let quick = Perf(), slow = Perf()
+    quick.record(Perf.Run(command: "git rev-parse", tool: "git", start: now, duration: 0.03, onMain: true))
+    slow.record(Perf.Run(command: "git rev-parse", tool: "git", start: now, duration: 0.12, onMain: true))
+    #expect(Perf().snapshot().blockingLevel == .good)
+    #expect(quick.snapshot().blockingLevel == .worthALook)
+    #expect(slow.snapshot().blockingLevel == .problem)
+
+    quick.recordHang(Perf.Hang(start: now, duration: 0.4))
+    slow.recordHang(Perf.Hang(start: now, duration: 1.2))
+    #expect(Perf().snapshot().hangLevel == .good)
+    #expect(quick.snapshot().hangLevel == .worthALook)
+    #expect(slow.snapshot().hangLevel == .problem)
+
+    #expect(Perf.memoryLevel(300 << 20) == .good)
+    #expect(Perf.memoryLevel(3 << 30) == .problem)
+    #expect(Perf.cpuLevel(2) == .good)
+    #expect(Perf.cpuLevel(90) == .problem)
 }

@@ -51,20 +51,6 @@ final class Inspector: NSObject, NSWindowDelegate {
 extension Inspector {
     /// One thing the inspector measures.
     struct Reading {
-        enum Level: Int, Comparable {
-            case good, worthALook, problem
-
-            static func < (a: Level, b: Level) -> Bool { a.rawValue < b.rawValue }
-
-            var word: String {
-                switch self {
-                case .good: "fine"
-                case .worthALook: "worth a look"
-                case .problem: "problem"
-                }
-            }
-        }
-
         let section: String
         let title: String
         let value: String
@@ -72,7 +58,7 @@ extension Inspector {
         var note = ""
         /// What the number means and what good looks like, shown on hover.
         let help: String
-        var level = Level.good
+        var level = Perf.Level.good
         /// The runs behind a value that needs a look, so it says where to look.
         var details: [String] = []
     }
@@ -138,8 +124,6 @@ final class InspectorMonitor: ObservableObject {
     func readings(at now: Date) -> [Inspector.Reading] {
         let rates = snapshot.rate(over: Self.window, at: now)
         let rate = rates.values.reduce(0, +)
-        // A launch, a session switch or a push starts a burst that's over in seconds. A loop keeps going, so the color goes by the minute.
-        let sustained = snapshot.rate(over: Self.recent, at: now).values.reduce(0, +)
         let tools = rates.sorted { $0.value > $1.value }.map { "\($0.key) \(Self.decimal($0.value))" }
         let blocking = snapshot.blocking
         let hangs = snapshot.hangs
@@ -148,28 +132,26 @@ final class InspectorMonitor: ObservableObject {
             Inspector.Reading(
                 section: "Processes", title: "Rate", value: rate == 0 ? "0/s" : "\(Self.decimal(rate))/s", note: tools.joined(separator: " · "),
                 help: "git, gh and glab processes started a second, over the last \(Int(Self.window)) seconds. A launch or a push starts a burst. The color goes by the last minute's average, where under 2 is calm.",
-                // An agent at work keeps git busy, but #159 showed 10 a second is a loop, not work.
-                level: sustained < 2 ? .good : sustained < 5 ? .worthALook : .problem),
+                level: snapshot.processLevel(at: now)),
             Inspector.Reading(
                 section: "Main thread", title: "Blocking runs", value: blocking.isEmpty ? "none" : "\(snapshot.onMain)",
                 help: "Processes run on the main thread since launch. The window can't redraw or answer until each one ends, so there should be none.",
-                // Under 100 ms nobody feels it, but it breaks the rule and a slow disk would turn it into a hang.
-                level: blocking.isEmpty ? .good : blocking.contains { $0.duration >= 0.1 } ? .problem : .worthALook,
+                level: snapshot.blockingLevel,
                 details: blocking.prefix(3).map { "\($0.command) · \(Self.ms($0.duration)) · \(Self.ago($0.start, now: now))" }),
             Inspector.Reading(
                 section: "Main thread", title: "Hangs", value: hangs.isEmpty ? "none" : "\(hangs.count)",
                 note: hangs.count < 2 ? "" : "longest \(Self.ms(longestHang))",
                 help: "Times since launch the window didn't answer for 250 ms or more, Apple's measure of a hang. Watched even while the inspector is closed.",
-                level: hangs.isEmpty ? .good : longestHang < 1 ? .worthALook : .problem,
+                level: snapshot.hangLevel,
                 details: hangs.prefix(3).map { "\(Self.ms($0.duration)) · \(Self.ago($0.start, now: now))" }),
             Inspector.Reading(
                 section: "Resources", title: "Memory", value: Self.size(memory.now), note: "peak \(Self.size(memory.peak))",
                 help: "What Activity Monitor shows for Farol, terminals included, and the most it has used since launch. A peak that keeps climbing is a leak.",
-                level: memory.now < 1 << 30 ? .good : memory.now < 2 << 30 ? .worthALook : .problem),
+                level: Perf.memoryLevel(memory.now)),
             Inspector.Reading(
                 section: "Resources", title: "CPU", value: "\(Int(cpu.rounded()))%",
                 help: "Farol itself, not the processes it starts. Near 0 while idle.",
-                level: cpu < 25 ? .good : cpu < 75 ? .worthALook : .problem),
+                level: Perf.cpuLevel(cpu)),
         ]
     }
 
@@ -183,7 +165,11 @@ final class InspectorMonitor: ObservableObject {
                 lines.append(section)
             }
             let note = reading.note.isEmpty ? "" : "  \(reading.note)"
-            let verdict = reading.level == .good ? "" : "  (\(reading.level.word))"
+            let verdict = switch reading.level {
+            case .good: ""
+            case .worthALook: "  (worth a look)"
+            case .problem: "  (problem)"
+            }
             lines.append("  " + reading.title.padding(toLength: 15, withPad: " ", startingAt: 0) + reading.value + note + verdict)
             lines += reading.details.map { "    \($0)" }
         }
@@ -316,7 +302,7 @@ private struct InspectorView: View {
     }
 
     /// The theme's own colors: plain text when fine, its yellow to look at, its red for a problem.
-    private func color(_ level: Inspector.Reading.Level, _ p: Palette) -> Color {
+    private func color(_ level: Perf.Level, _ p: Palette) -> Color {
         switch level {
         case .good: p.text
         case .worthALook: p.waiting

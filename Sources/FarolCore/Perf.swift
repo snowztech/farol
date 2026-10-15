@@ -17,6 +17,13 @@ public final class Perf: @unchecked Sendable {
         public let onMain: Bool
     }
 
+    /// How a reading stands. The lines are here, tested, so a color only ever means something real.
+    public enum Level: Int, Comparable, Sendable {
+        case good, worthALook, problem
+
+        public static func < (a: Level, b: Level) -> Bool { a.rawValue < b.rawValue }
+    }
+
     /// The main thread busy for `duration` without a break, so the window couldn't answer.
     public struct Hang: Equatable, Sendable {
         public let start: Date
@@ -42,6 +49,24 @@ public final class Perf: @unchecked Sendable {
         /// The `count` longest runs over the `window` seconds before `now`, longest first.
         public func longest(_ count: Int, over window: TimeInterval, at now: Date) -> [Run] {
             Array(within(window, at: now).sorted { $0.duration > $1.duration }.prefix(count))
+        }
+
+        /// By the last minute's average: a launch, a session switch or a push starts a burst that's over in seconds, a loop keeps going.
+        /// Under 2 a second is calm. #159's loop ran 10 a second.
+        public func processLevel(at now: Date) -> Level {
+            let sustained = rate(over: 60, at: now).values.reduce(0, +)
+            return sustained < 2 ? .good : sustained < 5 ? .worthALook : .problem
+        }
+
+        /// Any run on the main thread breaks the rule. Under 100 ms nobody feels it, past that the window stutters.
+        public var blockingLevel: Level {
+            blocking.isEmpty ? .good : blocking.contains { $0.duration >= 0.1 } ? .problem : .worthALook
+        }
+
+        /// Every hang is felt. Past a second it reads as Farol stuck.
+        public var hangLevel: Level {
+            guard let longest = hangs.map(\.duration).max() else { return .good }
+            return longest < 1 ? .worthALook : .problem
         }
 
         private func within(_ window: TimeInterval, at now: Date) -> [Run] {
@@ -73,7 +98,8 @@ public final class Perf: @unchecked Sendable {
     private static let kept = 5
     private let signposter = OSSignposter(subsystem: "dev.farol.Farol", category: .pointsOfInterest)
 
-    init(capacity: Int = 256) {
+    /// Enough for a minute at 30 processes a second, so the last minute's rate holds even in a loop far past the red line.
+    init(capacity: Int = 2048) {
         self.capacity = capacity
     }
 
@@ -101,6 +127,16 @@ public final class Perf: @unchecked Sendable {
                 blocking = Array(([run] + blocking).prefix(Self.kept))
             }
         }
+    }
+
+    /// Farol with several sessions sits around 200 to 300 MB. A gigabyte means something holds on to too much.
+    public static func memoryLevel(_ bytes: UInt64) -> Level {
+        bytes < 1 << 30 ? .good : bytes < 2 << 30 ? .worthALook : .problem
+    }
+
+    /// Farol itself, near 0 while idle. A quarter of a core that doesn't drop is work nobody asked for.
+    public static func cpuLevel(_ percent: Double) -> Level {
+        percent < 25 ? .good : percent < 75 ? .worthALook : .problem
     }
 
     func recordHang(_ hang: Hang) {
@@ -145,12 +181,15 @@ public final class Perf: @unchecked Sendable {
 /// The gaps between the main run loop's steps. One that ran 250 ms or more without sleeping is a hang, as Apple counts them.
 struct HangWatch {
     private var last: TimeInterval?
+    /// Launch keeps the loop busy before the window is there to answer anyone, so counting starts once it first sleeps.
+    private var launched = false
 
     /// Notes a step at `time`, and returns how long the one before it took when that was a hang.
     /// `afterSleep` means the loop was waiting for something to do, which is the opposite of busy.
     mutating func note(at time: TimeInterval, afterSleep: Bool, threshold: TimeInterval = 0.25) -> TimeInterval? {
         defer { last = time }
-        guard let last, !afterSleep else { return nil }
+        if afterSleep { launched = true }
+        guard launched, let last, !afterSleep else { return nil }
         let busy = time - last
         return busy >= threshold ? busy : nil
     }
