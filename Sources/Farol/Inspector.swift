@@ -56,8 +56,8 @@ extension Inspector {
         let value: String
         /// Quieter context beside the value, like which tools ran.
         var note = ""
-        /// What the number means and what good looks like, shown on hover.
-        let help: String
+        /// What the reading means and what normal looks like, for someone who has never heard of a main thread. Shown on a click.
+        let meaning: String
         var level = Perf.Level.good
         /// The runs behind a value that needs a look, so it says where to look.
         var details: [String] = []
@@ -132,26 +132,26 @@ final class InspectorMonitor: ObservableObject {
             Inspector.Reading(
                 section: "Processes", title: "Started", value: "\(count)",
                 note: (["in \(Int(Self.window)) s"] + tools).joined(separator: " · "),
-                help: "git, gh and glab processes started in the last \(Int(Self.window)) seconds. Opening a panel or pushing starts a burst. The color goes by the last minute: a loop that keeps going, over 4 a second, is what to look for.",
+                meaning: "Programs Farol started in the last \(Int(Self.window)) seconds: git to read your repos, gh and glab to talk to GitHub and GitLab. Opening a panel or pushing starts a short burst, which is normal. It only turns yellow when Farol keeps starting more than 4 a second for a whole minute, a sign that something runs git in a loop.",
                 level: snapshot.processLevel(at: now)),
             Inspector.Reading(
                 section: "Main thread", title: "Blocking runs", value: blocking.isEmpty ? "none" : "\(snapshot.onMain)",
-                help: "Processes run on the main thread since launch. The window can't redraw or answer until each one ends, so there should be none.",
+                meaning: "Programs Farol ran on the main thread since launch, the one that draws the window. While one runs, the window can't redraw or react to you, so there should be none. Yellow when each was too short to feel, under 100 ms. Red from 100 ms, when the window stutters.",
                 level: snapshot.blockingLevel,
                 details: blocking.prefix(3).map { "\($0.command) · \(Self.ms($0.duration)) · \(Self.ago($0.start, now: now))" }),
             Inspector.Reading(
                 section: "Main thread", title: "Hangs", value: hangs.isEmpty ? "none" : "\(hangs.count)",
                 note: hangs.count < 2 ? "" : "longest \(Self.ms(longestHang))",
-                help: "Times since launch the window didn't answer for 250 ms or more, Apple's measure of a hang. Watched even while the inspector is closed.",
+                meaning: "Times since launch the window didn't respond for a quarter of a second or more, the way Apple measures a hang. Counted even while the inspector is closed, so the one that made you open it is here.",
                 level: snapshot.hangLevel,
                 details: hangs.prefix(3).map { "\(Self.ms($0.duration)) · \(Self.ago($0.start, now: now))" }),
             Inspector.Reading(
                 section: "Resources", title: "Memory", value: Self.size(memory.now), note: "peak \(Self.size(memory.peak))",
-                help: "What Activity Monitor shows for Farol, terminals included, and the most it has used since launch. A peak that keeps climbing is a leak.",
+                meaning: "What Activity Monitor shows for Farol, terminals and their scrollback included, and the most it has used since launch. 200 to 300 MB is normal with a few sessions. A peak that keeps climbing as you work means something holds on to memory.",
                 level: Perf.memoryLevel(memory.now)),
             Inspector.Reading(
                 section: "Resources", title: "CPU", value: "\(Int(cpu.rounded()))%",
-                help: "Farol itself, not the processes it starts. Near 0 while idle.",
+                meaning: "How busy Farol itself keeps the processor, not the programs it starts. Near 0 while idle, a few percent while it draws.",
                 level: Perf.cpuLevel(cpu)),
         ]
     }
@@ -238,7 +238,6 @@ private struct InspectorView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(copied ? p.text : p.muted)
-                .help("The readings as text, to paste into a pull request as a before or after")
             }
             .padding(.horizontal, 16)
             .frame(height: 34)
@@ -266,35 +265,38 @@ private struct InspectorView: View {
     }
 
     private func row(_ reading: Inspector.Reading, _ p: Palette) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(alignment: .firstTextBaseline, spacing: 0) {
-                Text(reading.title).foregroundStyle(p.muted).frame(width: 104, alignment: .leading)
-                Text(reading.value).monospacedDigit().foregroundStyle(color(reading.level, p))
-                if !reading.note.isEmpty {
-                    Text("   " + reading.note).foregroundStyle(p.muted).lineLimit(1)
+        Explained(meaning: reading.meaning, palette: p) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    Text(reading.title).foregroundStyle(p.muted).frame(width: 104, alignment: .leading)
+                    Text(reading.value).monospacedDigit().foregroundStyle(color(reading.level, p))
+                    if !reading.note.isEmpty {
+                        Text("   " + reading.note).foregroundStyle(p.muted).lineLimit(1)
+                    }
+                }
+                ForEach(reading.details, id: \.self) { detail in
+                    Text(detail).foregroundStyle(p.muted).padding(.leading, 104).lineLimit(1).truncationMode(.middle)
                 }
             }
-            ForEach(reading.details, id: \.self) { detail in
-                Text(detail).foregroundStyle(p.muted).padding(.leading, 104).lineLimit(1).truncationMode(.middle)
-            }
         }
-        .contentShape(Rectangle())
-        .help(reading.help)
     }
 
     private func longest(_ now: Date, _ p: Palette) -> some View {
         let runs = monitor.snapshot.longest(5, over: InspectorMonitor.recent, at: now)
-        return VStack(alignment: .leading, spacing: 6) {
-            header("Longest processes", span: "last minute", p)
-                .help("The processes that took longest lately. Each one takes some time, so only one long for its kind gets a color.")
-            if runs.isEmpty { Text("none").foregroundStyle(p.muted) }
-            ForEach(Array(runs.enumerated()), id: \.offset) { _, run in
-                HStack(spacing: 0) {
-                    Text(InspectorMonitor.ms(run.duration)).monospacedDigit()
-                        .foregroundStyle(InspectorMonitor.isLong(run) ? p.waiting : p.muted)
-                        .frame(width: 92, alignment: .leading)
-                    Text(run.command).font(.system(size: 11, design: .monospaced)).lineLimit(1).truncationMode(.tail)
-                        .padding(.leading, 12)
+        let meaning = "The programs that took longest in the last minute. Every one takes some time: git usually 10 to 100 ms, "
+            + "gh and glab up to a second or two since they go over the network. Only one slow for its kind turns yellow."
+        return Explained(meaning: meaning, palette: p) {
+            VStack(alignment: .leading, spacing: 6) {
+                header("Longest processes", span: "last minute", p)
+                if runs.isEmpty { Text("none").foregroundStyle(p.muted) }
+                ForEach(Array(runs.enumerated()), id: \.offset) { _, run in
+                    HStack(spacing: 0) {
+                        Text(InspectorMonitor.ms(run.duration)).monospacedDigit()
+                            .foregroundStyle(InspectorMonitor.isLong(run) ? p.waiting : p.muted)
+                            .frame(width: 92, alignment: .leading)
+                        Text(run.command).font(.system(size: 11, design: .monospaced)).lineLimit(1).truncationMode(.tail)
+                            .padding(.leading, 12)
+                    }
                 }
             }
         }
@@ -307,6 +309,37 @@ private struct InspectorView: View {
         case .worthALook: p.waiting
         case .problem: p.removed
         }
+    }
+}
+
+/// A part of the inspector that says what it means on a click. A light background and the hand on hover show it can.
+/// Inline rather than a tooltip, since the inspector never takes focus and a sentence or two needs room to wrap.
+private struct Explained<Content: View>: View {
+    let meaning: String
+    let palette: Palette
+    @ViewBuilder let content: Content
+
+    @State private var open = false
+    @State private var hovering = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            content
+            if open {
+                Text(meaning).font(.system(size: 11)).foregroundStyle(palette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .transition(.opacity)
+            }
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 5).fill(hovering ? palette.raised : open ? palette.surface : .clear))
+        // The highlight reaches past the text, so the text stays lined up with the section titles.
+        .padding(.horizontal, -6)
+        .contentShape(Rectangle())
+        .onClickableHover { hovering = $0 }
+        .onTapGesture { withAnimation(.easeOut(duration: 0.15)) { open.toggle() } }
     }
 }
 
