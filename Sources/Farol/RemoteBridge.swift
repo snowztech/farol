@@ -12,6 +12,7 @@ final class RemoteBridge: ObservableObject {
     static let iPhoneApp = "https://farol.sh/iphone"
     private static let devicesKey = "remote.devices"
     private static let pushKey = "remote.push"
+    private static let activityKey = "remote.activity"
     /// Where a phone lands when its own camera scans the code, a page that says to scan from the app. The offer rides after the #, which never reaches that server.
     private static let pairingPage = URL(string: "https://farol.sh/pair")!
 
@@ -57,6 +58,18 @@ final class RemoteBridge: ObservableObject {
         didSet { UserDefaults.standard.set(try? JSONEncoder().encode(pushTargets), forKey: Self.pushKey) }
     }
 
+    /// Where Apple can reach the Live Activity a phone started, and the sessions it last showed, so only a change is sent.
+    private struct ActivityTarget: Codable {
+        var device: Data
+        var token: Data
+        var sandbox: Bool
+        var shown: [RemoteSession] = []
+    }
+
+    private var activityTargets: [ActivityTarget] = [] {
+        didSet { UserDefaults.standard.set(try? JSONEncoder().encode(activityTargets), forKey: Self.activityKey) }
+    }
+
     /// One phone's connection, by the number the relay gave it.
     private struct Phone {
         var link: MacLink
@@ -74,6 +87,9 @@ final class RemoteBridge: ObservableObject {
         }
         if let saved = UserDefaults.standard.data(forKey: Self.pushKey) {
             pushTargets = (try? JSONDecoder().decode([PushTarget].self, from: saved)) ?? []
+        }
+        if let saved = UserDefaults.standard.data(forKey: Self.activityKey) {
+            activityTargets = (try? JSONDecoder().decode([ActivityTarget].self, from: saved)) ?? []
         }
         // A connection from before a sleep is dead and does not say so. A new one is made at once, so a phone is not left waiting.
         wake = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
@@ -193,6 +209,7 @@ final class RemoteBridge: ObservableObject {
         devices.removeAll { $0.key == device.key }
         seen[device.key] = nil
         pushTargets.removeAll { $0.device == device.key }
+        activityTargets.removeAll { $0.device == device.key }
         phones = phones.filter { $0.value.device?.key != device.key }
         connected.remove(device.key)
         save()
@@ -266,6 +283,10 @@ final class RemoteBridge: ObservableObject {
         case .notify(let token, let sandbox, let notices, let key):
             pushTargets.removeAll { $0.device == device.key }
             pushTargets.append(PushTarget(device: device.key, token: token, sandbox: sandbox, notices: notices, key: key))
+        case .activity(let token, let sandbox):
+            activityTargets.removeAll { $0.device == device.key }
+            activityTargets.append(ActivityTarget(device: device.key, token: token, sandbox: sandbox))
+            updateActivities()
         case .options, .task:
             // Starting a task from the phone, which this version does not do. The phone is told so, and says to update.
             tell(.refused(command: command.id, reason: "This version of Farol cannot start tasks from the phone."), id)
@@ -313,6 +334,7 @@ final class RemoteBridge: ObservableObject {
     func activityChanged(_ session: Session, from before: Session.Activity, to after: Session.Activity) {
         refreshAwake()
         guard let connection, before != after else { return }
+        updateActivities()
         let notice: RemoteNotice? = switch after {
         case .waiting: .waiting
         case .done: .done
@@ -327,7 +349,27 @@ final class RemoteBridge: ObservableObject {
         }
     }
 
+    /// Has the relay update the Live Activity on each phone that started one, when what it shows changed.
+    /// Once nothing waits or works it is ended, and the phone starts a new one the next time it is opened.
+    private func updateActivities() {
+        guard let connection, !activityTargets.isEmpty else { return }
+        let sessions = remoteSessions
+        let busy = sessions.filter { $0.status == .waiting || $0.status == .stopped || $0.status == .working }
+        for (place, target) in activityTargets.enumerated().reversed() where target.shown != busy {
+            let key = pushTargets.first { $0.device == target.device }?.key
+            let state = RemoteActivityState(sessions, key: key)
+            connection.send(RelayFrame.activity(token: target.token, sandbox: target.sandbox, ending: state.isQuiet, state: state))
+            if state.isQuiet { activityTargets.remove(at: place) } else { activityTargets[place].shown = busy }
+        }
+    }
+
     // MARK: Sessions
+
+    private var remoteSessions: [RemoteSession] {
+        store.ordered.map {
+            RemoteSession(id: $0.id, name: $0.displayName, branch: $0.branch, status: RemoteStatus(rawValue: "\($0.activity)") ?? .idle)
+        }
+    }
 
     /// Runs only while a phone is connected.
     private func watch() {
@@ -338,9 +380,7 @@ final class RemoteBridge: ObservableObject {
 
     /// Sends each phone what changed: the list, and the screen of the session it has open. Always in full.
     private func tick() {
-        let sessions = store.ordered.map {
-            RemoteSession(id: $0.id, name: $0.displayName, branch: $0.branch, status: RemoteStatus(rawValue: "\($0.activity)") ?? .idle)
-        }
+        let sessions = remoteSessions
         for (id, phone) in phones where phone.device != nil {
             if phone.sessions != sessions {
                 phones[id]?.sessions = sessions
