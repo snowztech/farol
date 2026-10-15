@@ -97,6 +97,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func findSelection(_ sender: Any?) { windowController.findSelection() }
     @objc func saveFile(_ sender: Any?) { windowController.saveFile() }
 
+    @objc private func toggleDeveloperPanel() {
+        DeveloperPanel.shared.toggle()
+    }
+
     /// ⌘S only means something while a file has focus, and stays free for the terminal otherwise.
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         item.action == #selector(saveFile) ? windowController.canSaveFile : true
@@ -169,6 +173,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             .keyEquivalentModifierMask = [.command, .option]
         view.addItem(withTitle: "Resolve Conflicts", action: #selector(toggleMerge), keyEquivalent: "m")
             .keyEquivalentModifierMask = [.command, .option]
+        // Hidden, for contributors: answers ⌥⌘I without a place in the menu.
+        let developer = view.addItem(withTitle: "Developer Panel", action: #selector(toggleDeveloperPanel), keyEquivalent: "i")
+        developer.keyEquivalentModifierMask = [.command, .option]
+        developer.isHidden = true
+        developer.allowsKeyEquivalentWhenHidden = true
         main.addItem(submenu: view, title: "View")
 
         for menu in [app, sessions, view] {
