@@ -326,7 +326,7 @@ final class ReviewModel: ObservableObject {
             let sent = Result {
                 try forge.comment(text, onRequest: request.number, at: place, of: discussion, in: root)
             }
-            let discussion = (try? sent.get()) == nil ? nil : forge.discussion(ofRequest: request.number, in: root)
+            let updated = (try? sent.get()) == nil ? nil : forge.discussion(ofRequest: request.number, in: root)
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 self.isSending = false
@@ -334,9 +334,9 @@ final class ReviewModel: ObservableObject {
                 if case .failure(let error) = sent { return self.sendError = String(describing: error) }
                 self.draft = ""
                 // Without the conversation read back, the comment wouldn't show. The field stays to say it went.
-                guard let discussion else { return self.sendError = "Sent, but couldn't read it back. View on \(forge.name) shows it." }
+                guard let updated else { return self.sendError = "Sent, but couldn't read it back. View on \(forge.name) shows it." }
                 self.composing = nil
-                self.discussion = discussion
+                self.discussion = updated
             }
         }
     }
