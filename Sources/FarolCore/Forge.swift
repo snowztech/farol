@@ -193,6 +193,8 @@ public struct Forge: Equatable {
             public var line: Int?
             /// The line is one the request removes, so `line` counts in the old file.
             public var old = false
+            /// The code moved since, so `line` is where it was left, not a line of the diff now.
+            public var outdated = false
             public var url: URL?
         }
 
@@ -250,6 +252,7 @@ public struct Forge: Equatable {
                                                // An outdated comment's line is gone, so it keeps the one it was left on.
                                                line: comment["line"] as? Int ?? comment["original_line"] as? Int,
                                                old: comment["side"] as? String == "LEFT",
+                                               outdated: comment["line"] as? Int == nil,
                                                url: url(comment, "html_url")))
         }
         return Discussion(description: description, comments: comments.sorted { ($0.date ?? .distantPast) < ($1.date ?? .distantPast) },

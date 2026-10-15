@@ -250,9 +250,11 @@ final class ReviewModel: ObservableObject {
                 self.isSending = false
                 guard self.root == root, self.shownRequest?.number == request.number else { return }
                 if case .failure(let error) = sent { return self.sendError = String(describing: error) }
-                self.composing = nil
                 self.draft = ""
-                if let discussion { self.discussion = discussion } else { self.rebuild() }
+                // Without the conversation read back, the comment wouldn't show. The field stays to say it went.
+                guard let discussion else { return self.sendError = "Sent, but couldn't read it back. View on \(forge.name) shows it." }
+                self.composing = nil
+                self.discussion = discussion
             }
         }
     }
@@ -492,7 +494,7 @@ final class ReviewModel: ObservableObject {
         var threads: [LineRef: [Forge.Discussion.Comment]] = [:]
         var conversation: [Forge.Discussion.Comment] = []
         for comment in showsRequest ? discussion?.comments ?? [] : [] {
-            if let path = comment.path, let line = comment.line, let file = files.first(where: { $0.path == path }),
+            if !comment.outdated, let path = comment.path, let line = comment.line, let file = files.first(where: { $0.path == path }),
                DiffTextView.row(of: line, old: comment.old, in: file) != nil {
                 threads[LineRef(path: path, line: line, old: comment.old), default: []].append(comment)
             } else {

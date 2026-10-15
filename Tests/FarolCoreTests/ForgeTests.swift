@@ -120,6 +120,8 @@ import Testing
     #expect(discussion.comments[0].path == "a.swift")
     #expect(discussion.comments[0].line == 7)
     #expect(discussion.comments[0].old)
+    // Its line is gone, so it stays in the conversation rather than under a line that moved.
+    #expect(discussion.comments[0].outdated)
     #expect(discussion.head == "abc123")
     #expect(discussion.comments[2].verdict == "approved")
     #expect(Forge.discussion(github: "not logged in", lines: "[]") == nil)
