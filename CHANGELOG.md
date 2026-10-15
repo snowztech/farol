@@ -6,6 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
+- A preview for Markdown files in the file pane: headings, lists, tasks, code, quotes, tables and links. The eye in its header switches between the source and the preview, Farol keeps your choice, and the preview follows an agent's edits. A link to another file opens it in the pane.
 - A pull request's button in the git graph shows its changes in the review panel, anyone's request, without checking it out. Right click it for its page in the browser.
 - Above a pull request's changes, its description and comments, reviews and comments on lines included, each folded to its first line. A comment on a line takes you to its file.
 - A pull request's comments on lines show under those lines in its diff. On GitHub, the "+" next to a line number writes a new one.

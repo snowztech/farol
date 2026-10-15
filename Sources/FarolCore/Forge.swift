@@ -211,6 +211,7 @@ public struct Forge: Equatable {
             guard let view = try? Git.run(path, ["pr", "view", "\(number)", "--json", "author,body,createdAt,url,comments,reviews,headRefOid"],
                                           in: directory) else { return nil }
             // Comments on lines of the diff aren't part of the pull request's view, only of the API.
+            // The first 100 only, here and on GitLab. Paging through the API would reach the rest of a long review.
             let lines = try? Git.run(path, ["api", "repos/{owner}/{repo}/pulls/\(number)/comments?per_page=100"], in: directory)
             return Self.discussion(github: view, lines: lines ?? "[]")
         case .gitlab:

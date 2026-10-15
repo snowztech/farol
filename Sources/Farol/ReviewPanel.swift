@@ -173,6 +173,7 @@ final class ReviewModel: ObservableObject {
                 guard let self, self.root == root else { return }
                 self.forge = forge
                 self.ignored = ignored
+                if self.discussion == nil { self.loadDiscussion() }
                 self.checkRequest()
             }
         }
@@ -195,8 +196,15 @@ final class ReviewModel: ObservableObject {
             draft = ""
         }
         shownRequest = request
+        // Another click reads it again, for commits pushed since.
+        fetchedRequest = nil
         browse(.request(request.number), in: root)
-        guard let forge else { return }
+        loadDiscussion()
+    }
+
+    /// Also runs once the forge is known, for a request shown before it was.
+    private func loadDiscussion() {
+        guard let root, let forge, let request = shownRequest, scope == .request(request.number) else { return }
         DispatchQueue.global(qos: .userInitiated).async {
             let discussion = forge.discussion(ofRequest: request.number, in: root)
             DispatchQueue.main.async { [weak self] in
@@ -421,8 +429,9 @@ final class ReviewModel: ObservableObject {
                 guard let self, self.root == root, self.scope == scope else { return }
                 if let stat { self.stat = (try? stat.get()) ?? Diff.Stat() }
                 if files != nil { self.error = (try? files?.get()) == nil ? "Couldn't read the changes." : nil }
+                // Failed or not, the request isn't asked for again on every file change. Another click on it retries.
+                if files != nil, case .request(let number) = scope { self.fetchedRequest = number }
                 if let files = try? files?.get() {
-                    if case .request(let number) = scope { self.fetchedRequest = number } else { self.fetchedRequest = nil }
                     let known = Set(self.files.map(\.path))
                     for file in files where !known.contains(file.path) && file.added + file.removed > Self.foldedAbove {
                         self.collapsed.insert(file.path)
@@ -615,7 +624,8 @@ struct ReviewPanel: View {
             FileHeader(file: file, collapsed: collapsed, ticked: review.isTicked(file.path), palette: p,
                        tick: { review.toggleExcluded(file.path) },
                        toggle: { review.toggle(file.path) },
-                       open: { review.root.map { open(($0 as NSString).appendingPathComponent(file.path), file.firstChange) } })
+                       // A request's files are its branch's, not the ones in your checkout.
+                       open: review.scope.isRequest ? nil : { review.root.map { open(($0 as NSString).appendingPathComponent(file.path), file.firstChange) } })
         case .body(let file, let rows):
             DiffText(file: file, rows: rows, colors: p.diff, syntax: p.code,
                      comment: review.canComment ? { review.startComment(on: .init(path: file.path, line: $0, old: $1)) } : nil)
@@ -769,7 +779,7 @@ private struct FileHeader: View {
     let palette: Palette
     let tick: () -> Void
     let toggle: () -> Void
-    let open: () -> Void
+    let open: (() -> Void)?
 
     @State private var hovering = false
 
@@ -799,7 +809,7 @@ private struct FileHeader: View {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(file.path, forType: .string)
             }
-            if file.status != .deleted {
+            if let open, file.status != .deleted {
                 IconButton(symbol: "arrow.up.right.square", help: "Open in the file pane", palette: palette, action: open)
             }
         }
@@ -875,6 +885,10 @@ private struct Conversation: View {
                 }
             }
         }
+        // Anyone can comment on a public request, so its links open only on the web, never a file or another app.
+        .environment(\.openURL, OpenURLAction { url in
+            ["http", "https", "mailto"].contains(url.scheme?.lowercased() ?? "") ? .systemAction : .discarded
+        })
     }
 }
 
@@ -890,6 +904,22 @@ private struct CommentView: View {
     @State private var expanded = false
     /// Whether the text needs more than its first line, which is when there is something to open.
     @State private var truncated = false
+
+    private var blocks: [Markdown.Block] { Markdown.blocks(in: comment.text) }
+
+    /// The first block's text, as the folded comment's one line.
+    private var preview: Text { MarkdownBlocks.inline(blocks.first.map(Self.summary) ?? "") }
+
+    private static func summary(_ block: Markdown.Block) -> String {
+        switch block {
+        case .heading(_, let text), .paragraph(let text): text
+        case .code(_, let text): String(text.prefix { $0 != "\n" })
+        case .quote(let blocks): blocks.first.map(summary) ?? ""
+        case .list(_, _, let items): items.first?.blocks.first.map(summary) ?? ""
+        case .table(let header, _): header.joined(separator: " · ")
+        case .rule: ""
+        }
+    }
 
     private static let age: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
@@ -930,19 +960,24 @@ private struct CommentView: View {
             if comment.text.isEmpty {
                 if !empty.isEmpty { Text(empty).font(.system(size: 12)).foregroundStyle(palette.muted) }
             } else {
-                Text(text)
-                    .font(.system(size: 12))
-                    .foregroundStyle(palette.text)
-                    .lineLimit(expanded ? nil : 1)
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .background {
-                        // The whole text is tried in the one line's space: when it doesn't fit, the second view is the one shown.
-                        ViewThatFits(in: .vertical) {
-                            Text(text).font(.system(size: 12)).hidden().onAppear { if !expanded { truncated = false } }
-                            Color.clear.onAppear { if !expanded { truncated = true } }
+                if expanded {
+                    MarkdownBlocks(blocks: blocks, palette: palette)
+                        .font(.system(size: 12))
+                        .foregroundStyle(palette.text)
+                        .textSelection(.enabled)
+                } else {
+                    preview
+                        .font(.system(size: 12))
+                        .foregroundStyle(palette.text)
+                        .lineLimit(1)
+                        .background {
+                            // The first block is tried in the one line's space: when it doesn't fit, the second view is the one shown.
+                            ViewThatFits(in: .vertical) {
+                                preview.font(.system(size: 12)).hidden().onAppear { truncated = blocks.count > 1 || !blocks.allSatisfy(\.isText) }
+                                Color.clear.onAppear { truncated = true }
+                            }
                         }
-                    }
+                }
             }
         }
         .padding(10)
@@ -951,11 +986,65 @@ private struct CommentView: View {
         .padding(.horizontal, 8)
         .padding(.top, 6)
     }
+}
 
-    /// Bold, code and links read as they would on the forge. Headings and lists stay as written, which reads well enough.
-    private var text: AttributedString {
-        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        return (try? AttributedString(markdown: comment.text, options: options)) ?? AttributedString(comment.text)
+/// A comment's Markdown, read like the file pane's preview: headings, lists, code, quotes and tables, and bots' HTML.
+private struct MarkdownBlocks: View {
+    let blocks: [Markdown.Block]
+    let palette: Palette
+
+    private static let options = AttributedString.MarkdownParsingOptions(
+        interpretedSyntax: .inlineOnlyPreservingWhitespace, failurePolicy: .returnPartiallyParsedIfPossible)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in view(for: block) }
+        }
+    }
+
+    @ViewBuilder private func view(for block: Markdown.Block) -> some View {
+        switch block {
+        case .heading(let level, let text):
+            Self.inline(text).font(.system(size: level <= 2 ? 14 : 12.5, weight: .semibold))
+        case .paragraph(let text):
+            Self.inline(text).fixedSize(horizontal: false, vertical: true)
+        case .code(_, let text):
+            Text(text)
+                .font(.system(size: 11.5, design: .monospaced))
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+                .background(RoundedRectangle(cornerRadius: 5).fill(palette.surface))
+        case .quote(let blocks):
+            MarkdownBlocks(blocks: blocks, palette: palette)
+                .foregroundStyle(palette.muted)
+                .padding(.leading, 10)
+                .overlay(alignment: .leading) { Rectangle().fill(palette.line).frame(width: 3) }
+        case .list(let ordered, let start, let items):
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(item.checked.map { $0 ? "☑" : "☐" } ?? (ordered ? "\(start + index)." : "•")).foregroundStyle(palette.muted)
+                        MarkdownBlocks(blocks: item.blocks, palette: palette)
+                    }
+                }
+            }
+        case .table(let header, let rows):
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
+                GridRow { ForEach(Array(header.enumerated()), id: \.offset) { Self.inline($1).fontWeight(.semibold) } }
+                Divider()
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, cells in
+                    GridRow { ForEach(Array(cells.enumerated()), id: \.offset) { Self.inline($1) } }
+                }
+            }
+        case .rule:
+            Divider()
+        }
+    }
+
+    static func inline(_ text: String) -> Text {
+        let markdown = Markdown.inlineHTML(text)
+        return Text((try? AttributedString(markdown: markdown, options: Self.options)) ?? AttributedString(markdown))
     }
 }
 
@@ -996,5 +1085,15 @@ private struct LineComposer: View {
         .padding(.top, 6)
         .onAppear { focused = true }
         .onExitCommand { review.cancelComment() }
+    }
+}
+
+private extension Markdown.Block {
+    /// A heading or a paragraph, which a folded comment's one line shows whole when it fits.
+    var isText: Bool {
+        switch self {
+        case .heading, .paragraph: true
+        default: false
+        }
     }
 }
