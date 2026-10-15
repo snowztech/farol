@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- New Task works across several repos. Start it from a folder of repos, tick the ones the task touches, and each gets a worktree on the same branch in one folder, where the agent starts. Closing the session offers to remove them all and keeps every branch.
+
 ## [0.30.10] - 2026-10-15
 
 New Task shows the ticket before you start.

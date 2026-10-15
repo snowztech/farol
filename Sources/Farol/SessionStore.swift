@@ -36,6 +36,8 @@ final class Session: ObservableObject, Identifiable {
     var onGitStateChange: ((Activity) -> Void)?
     /// Set when the session runs in one of Farol's worktrees, even after `cd` into a subfolder.
     let worktree: String?
+    /// Set when the session runs in a task folder holding a worktree of several repos.
+    let taskFolder: String?
     private var refreshingGit = false
     private var refreshGitAgain = false
 
@@ -43,6 +45,7 @@ final class Session: ObservableObject, Identifiable {
         self.panes = panes
         self.directory = directory
         worktree = Worktrees.default.root(of: directory)
+        taskFolder = TaskFolders.default.root(of: directory)
         refreshGit()
     }
 

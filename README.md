@@ -41,7 +41,7 @@ It needs a Mac with Apple Silicon and macOS 14 or later. Releases are signed and
 
 ## Features
 
-- **New task.** ⇧⌘N asks what to do, then starts Claude Code or Codex on it in a new worktree, with the task as its first prompt. Or pick one of your open Jira tickets or the repo's GitHub issues, and the branch is named after it and the agent gets the ticket in full. With more than one Claude Code or Codex account, each one is a choice.
+- **New task.** ⇧⌘N asks what to do, then starts Claude Code or Codex on it in a new worktree, with the task as its first prompt. Or pick one of your open Jira tickets or the repo's GitHub issues, and the branch is named after it and the agent gets the ticket in full. With more than one Claude Code or Codex account, each one is a choice. From a folder of repos, tick the ones the task touches: each gets a worktree on the same branch, side by side in one folder, and the agent starts there.
 - **Agent status.** Each session shows whether its agent is working, waiting for you or done, with a notification when it waits in the background. See [Agent status](#agent-status).
 - **Agents from any app.** Farol's lighthouse in the menu bar lights up while agents work, wait or finish, and its menu opens any session. Or pick a small status panel at the notch or on the screen edge, which you can drag anywhere along the side.
 - **Worktree sessions.** ⇧⌘T asks for a branch and opens a session in its own git worktree, so parallel agents never touch each other's files. Closing it offers to remove the worktree and always keeps the branch.

@@ -9,11 +9,13 @@ struct NewTaskSheet: View {
     let directory: String
     let repo: String
     let base: String
+    /// The repos inside `directory` when it is a folder of them rather than a repo. Empty for a repo.
+    let repos: [String]
     /// A tool that lists tickets is set up, so the select is worth holding a place for while they load.
     let expectsTickets: Bool
     let palette: Palette
-    /// Gets a valid branch, the command that launches the agent, and its task for the command to read.
-    let start: (String, String, String) -> Void
+    /// Gets a valid branch, the command that launches the agent, its task for the command to read, and the repos.
+    let start: (String, String, String, [String]) -> Void
     let close: () -> Void
 
     @AppStorage("newTask.agent") private var agent = AgentFolder.Kind.claude.rawValue
@@ -32,15 +34,18 @@ struct NewTaskSheet: View {
     /// Empty without the tools that list them, and the first time, until they load.
     private var tickets: [Ticket] { loaded ?? Self.remembered[directory] ?? [] }
     @State private var picked: Ticket?
+    @State private var chosen: Set<String> = []
     @State private var pickingTicket = false
     @State private var pickingAgent = false
     @State private var query = ""
     @FocusState private var searching: Bool
 
-    static func present(in window: NSWindow, directory: String, palette: Palette, start: @escaping (String, String, String) -> Void) {
+    static func present(in window: NSWindow, directory: String, palette: Palette, start: @escaping (String, String, String, [String]) -> Void) {
         // Git is asked off the main thread, so a slow repo can't freeze the window before the sheet shows.
         DispatchQueue.global(qos: .userInitiated).async {
-            let repo = Git.repoRoot(of: directory).map { URL(fileURLWithPath: $0).lastPathComponent } ?? "repository"
+            let root = Git.repoRoot(of: directory)
+            let repos = root == nil ? TaskFolders.repos(in: directory) : []
+            let repo = URL(fileURLWithPath: root ?? directory).lastPathComponent
             let base = Git.branch(of: directory) ?? "the current commit"
             let expectsTickets = Jira.isSetUp || Forge.detect(in: directory)?.listsIssues == true
             DispatchQueue.main.async { [weak window] in
@@ -48,7 +53,7 @@ struct NewTaskSheet: View {
                 guard let window, window.attachedSheet == nil else { return }
                 let sheet = NSWindow(contentRect: .zero, styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: true)
                 let view = NewTaskSheet(
-                    directory: directory, repo: repo, base: base, expectsTickets: expectsTickets,
+                    directory: directory, repo: repo, base: base, repos: repos, expectsTickets: expectsTickets,
                     palette: palette, start: start,
                     close: { [weak window, weak sheet] in sheet.map { window?.endSheet($0) } })
                 let host = NSHostingController(rootView: view)
@@ -67,6 +72,12 @@ struct NewTaskSheet: View {
     }
     private var name: String? { Worktrees.branchName(from: branch) }
     private var choice: AgentFolder { AgentFolder.choice(agent, in: folders) ?? folders[0] }
+    /// Where the worktrees come from: this repo, or the repos picked from the folder, in the folder's order.
+    private var sources: [String] { repos.isEmpty ? [directory] : repos.filter(chosen.contains) }
+    private var subtitle: String {
+        if repos.isEmpty { return "The agent starts in its own worktree, on a new branch from \(base)." }
+        return "Each repo you pick gets its own worktree on the same branch, side by side in one folder. The agent starts there and sees them all."
+    }
 
     var body: some View {
         let p = palette
@@ -74,7 +85,7 @@ struct NewTaskSheet: View {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("New task in \(repo)").font(.system(size: 15, weight: .semibold))
-                    Text("The agent starts in its own worktree, on a new branch from \(base).")
+                    Text(subtitle)
                         .foregroundStyle(p.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -98,6 +109,7 @@ struct NewTaskSheet: View {
                     .onChange(of: task) { _, task in
                         if !branchEdited { branch = NewTask.branchName(for: task) }
                     }
+                if !repos.isEmpty { repoChecklist(p) }
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
                         Image(systemName: "arrow.triangle.branch").foregroundStyle(p.muted)
@@ -128,11 +140,11 @@ struct NewTaskSheet: View {
                     let command = choice.command() + " \"$\(NewTask.variable)\""
                     close()
                     // The worktree may fail and show why, which needs this sheet gone first.
-                    DispatchQueue.main.async { start(name, command, prompt) }
+                    DispatchQueue.main.async { [sources] in start(name, command, prompt, sources) }
                 }
                 .buttonStyle(SheetButton(palette: p, primary: true))
                 .keyboardShortcut(.defaultAction)
-                .disabled(prompt.isEmpty || name == nil)
+                .disabled(prompt.isEmpty || name == nil || sources.isEmpty)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
@@ -233,6 +245,41 @@ struct NewTaskSheet: View {
             }
             .frame(width: 420)
             .onAppear { searching = true }
+        }
+    }
+
+    /// The repos in the folder, to tick the ones the task touches.
+    private func repoChecklist(_ p: Palette) -> some View {
+        let list = VStack(spacing: 1) {
+            ForEach(repos, id: \.self) { repo in
+                SheetChoice(palette: p) {
+                    if chosen.contains(repo) { chosen.remove(repo) } else { chosen.insert(repo) }
+                } label: {
+                    Image(systemName: chosen.contains(repo) ? "checkmark.square.fill" : "square")
+                        .foregroundStyle(chosen.contains(repo) ? p.text : p.muted)
+                    Text(URL(fileURLWithPath: repo).lastPathComponent).lineLimit(1).truncationMode(.middle)
+                }
+            }
+        }
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(chosen.isEmpty ? "Repos" : "Repos · \(chosen.count) of \(repos.count)").foregroundStyle(p.muted)
+                Spacer()
+                Button(chosen.count == repos.count ? "None" : "All") {
+                    chosen = chosen.count == repos.count ? [] : Set(repos)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(p.muted)
+            }
+            .font(.system(size: 12))
+            // A few show whole, a long list scrolls, so the sheet stays on screen.
+            ViewThatFits(in: .vertical) {
+                list.fixedSize(horizontal: false, vertical: true)
+                ScrollView { list }
+            }
+            .frame(maxHeight: 200)
+            .padding(-4)
+            .sheetField(p, focused: false)
         }
     }
 
