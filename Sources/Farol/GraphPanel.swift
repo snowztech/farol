@@ -36,6 +36,8 @@ final class GraphModel: ObservableObject {
     var onShowRequest: ((Forge.Request) -> Void)?
     private var watcher: FolderWatcher?
     private var pending: DispatchWorkItem?
+    /// The checkout whose .git a watcher was asked for, so each is looked up once while git answers.
+    private var watching: String?
 
     /// Follows another checkout, or stops when `root` is nil, as when the panel is closed.
     func show(_ root: String?, current: String?) {
@@ -45,6 +47,7 @@ final class GraphModel: ObservableObject {
         self.current = current
         if rootChanged {
             watcher = nil
+            watching = nil
             rows = []
             error = nil
             selected = nil
@@ -53,11 +56,20 @@ final class GraphModel: ObservableObject {
         }
         guard let root else {
             watcher = nil
+            watching = nil
             return
         }
         // Commits and branch moves land in the repo's own .git, which a worktree only points to.
-        if watcher == nil, let repo = Git.repoRoot(of: root) {
-            watcher = FolderWatcher((repo as NSString).appendingPathComponent(".git")) { [weak self] in self?.changed($0) }
+        // Git finds it off the main thread, like every other git call, so a slow disk can't freeze the window.
+        if watcher == nil, watching != root {
+            watching = root
+            DispatchQueue.global(qos: .userInitiated).async {
+                let repo = Git.repoRoot(of: root)
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.root == root, self.watcher == nil, let repo else { return }
+                    self.watcher = FolderWatcher((repo as NSString).appendingPathComponent(".git")) { [weak self] in self?.changed($0) }
+                }
+            }
         }
         reload()
         if rootChanged { loadRequests() }

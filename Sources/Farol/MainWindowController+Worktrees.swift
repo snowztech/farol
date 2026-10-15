@@ -24,12 +24,20 @@ extension MainWindowController {
     private func withRepo(purpose: String, orFolderOfRepos: Bool = false, then: @escaping (String) -> Void) {
         // With a sheet already up, a second one would queue behind it and show once the first closes.
         guard let window, window.attachedSheet == nil else { return }
-        let fits = { (directory: String) in
-            Git.repoRoot(of: directory) != nil || orFolderOfRepos && !TaskFolders.repos(in: directory).isEmpty
+        let directory = store.selected?.directory
+        // Git is asked off the main thread, so a slow repo can't freeze the window before anything shows.
+        DispatchQueue.global(qos: .userInitiated).async {
+            let fits = directory.map { Self.fits($0, orFolderOfRepos: orFolderOfRepos) } ?? false
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.window?.attachedSheet == nil else { return }
+                if fits, let directory { return then(directory) }
+                pickRepo(purpose: purpose, orFolderOfRepos: orFolderOfRepos, then: then)
+            }
         }
-        if let directory = store.selected?.directory, fits(directory) {
-            return then(directory)
-        }
+    }
+
+    private func pickRepo(purpose: String, orFolderOfRepos: Bool, then: @escaping (String) -> Void) {
+        guard let window else { return }
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
@@ -37,16 +45,26 @@ extension MainWindowController {
             ? "Choose a git repository for \(purpose), or a folder of repos for a task across them."
             : "Choose a git repository for \(purpose)."
         panel.prompt = "Choose"
-        panel.beginSheetModal(for: window) { [weak self] response in
+        panel.beginSheetModal(for: window) { response in
             guard response == .OK, let path = panel.url?.path else { return }
-            guard fits(path) else {
-                self?.showError("Not a git repository", orFolderOfRepos
-                    ? "Choose a folder inside a git repository, or one with git repositories in it."
-                    : "Choose a folder inside a git repository.")
-                return
+            DispatchQueue.global(qos: .userInitiated).async {
+                let fits = Self.fits(path, orFolderOfRepos: orFolderOfRepos)
+                DispatchQueue.main.async { [weak self] in
+                    guard fits else {
+                        self?.showError("Not a git repository", orFolderOfRepos
+                            ? "Choose a folder inside a git repository, or one with git repositories in it."
+                            : "Choose a folder inside a git repository.")
+                        return
+                    }
+                    then(path)
+                }
             }
-            then(path)
         }
+    }
+
+    /// Inside a repo, or with `orFolderOfRepos`, a folder with repos right inside it. Asks git, so off the main thread.
+    private static func fits(_ directory: String, orFolderOfRepos: Bool) -> Bool {
+        Git.repoRoot(of: directory) != nil || orFolderOfRepos && !TaskFolders.repos(in: directory).isEmpty
     }
 
     private func askForBranch(from directory: String) {

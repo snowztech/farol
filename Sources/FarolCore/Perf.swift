@@ -1,7 +1,7 @@
 import Foundation
 import os
 
-/// What Farol spends, for the Farol Inspector (⌥⌘I): every git, gh and glab process, and every hang of the main thread.
+/// What Farol spends, for the Farol Inspector (⌥⌘I): every process it starts, git and the rest, and every hang of the main thread.
 /// Always on: a record is a lock and an append, next to a process that takes milliseconds to start.
 /// Each process is also an interval in Instruments' Points of Interest, for a closer look.
 public final class Perf: @unchecked Sendable {
@@ -108,10 +108,11 @@ public final class Perf: @unchecked Sendable {
         self.capacity = capacity
     }
 
-    public func begin(_ executable: String, _ arguments: [String]) -> Timer {
-        let command = Self.command(executable, arguments)
+    /// `name`, like "jira tickets", is for a run whose arguments don't say what it is, as a shell script's don't.
+    public func begin(_ executable: String, _ arguments: [String], named name: String? = nil) -> Timer {
+        let command = name ?? Self.command(executable, arguments)
         let interval = signposter.beginInterval("Command", id: signposter.makeSignpostID(), "\(command, privacy: .public)")
-        return Timer(command: command, tool: URL(fileURLWithPath: executable).lastPathComponent, start: Date(),
+        return Timer(command: command, tool: String(command.prefix { $0 != " " }), start: Date(),
                      started: .now, onMain: Thread.isMainThread, interval: interval)
     }
 
@@ -168,7 +169,15 @@ public final class Perf: @unchecked Sendable {
     }
 
     /// The tool and its first two words, like "git diff" or "gh pr view". Options, numbers and the values of -c and -C are skipped.
+    /// A wrapper is named by what it runs: env by the command after its settings, sh -c by the name it passes as $0.
     static func command(_ executable: String, _ arguments: [String]) -> String {
+        let tool = URL(fileURLWithPath: executable).lastPathComponent
+        if tool == "env", let index = arguments.firstIndex(where: { !$0.contains("=") }) {
+            return command(arguments[index], Array(arguments[(index + 1)...]))
+        }
+        if ["sh", "bash", "zsh"].contains(tool), arguments.first == "-c", arguments.count > 2 {
+            return command(arguments[2], Array(arguments.dropFirst(3)))
+        }
         var words: [String] = []
         var skipValue = false
         for argument in arguments where words.count < 2 {
@@ -177,7 +186,6 @@ public final class Perf: @unchecked Sendable {
             if argument.hasPrefix("-") || Int(argument) != nil { continue }
             words.append(argument)
         }
-        let tool = URL(fileURLWithPath: executable).lastPathComponent
         // A shell's command is a whole script, which says nothing at a glance.
         return tool == "zsh" || tool == "bash" ? tool : ([tool] + words).joined(separator: " ")
     }

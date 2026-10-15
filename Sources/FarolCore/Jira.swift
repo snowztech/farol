@@ -133,6 +133,6 @@ public enum Jira {
     /// An app opened from the Dock never reads those, so the tool runs through your shell, as it would in a terminal.
     private static func shell(_ command: String) throws -> String {
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        return try Git.run(shell, ["-ilc", command], in: NSHomeDirectory())
+        return try Git.run(shell, ["-ilc", command], in: NSHomeDirectory(), named: "jira tickets")
     }
 }

@@ -8,6 +8,17 @@ import Testing
     #expect(Perf.command("/bin/zsh", ["-ilc", "printf %s \"$PATH\""]) == "zsh")
     // A count like log's limit says nothing about which command it was.
     #expect(Perf.command("/usr/bin/git", ["log", "400", "--format=%H"]) == "git log")
+    // Wrappers are named by what they run: env after its settings, sh -c by the name it passes as $0.
+    #expect(Perf.command("/usr/bin/env", ["GIT_EDITOR=true", "/usr/bin/git", "rebase", "--continue"]) == "git rebase")
+    #expect(Perf.command("/bin/sh", ["-c", "/usr/bin/git \"$@\"", "git", "merge-file", "-p"]) == "git merge-file")
+}
+
+@Test func namesARunWhoseArgumentsDontSayWhatItIs() throws {
+    let perf = Perf()
+    perf.end(perf.begin("/bin/zsh", ["-ilc", "printf … | curl …"], named: "jira tickets"))
+    let run = try #require(perf.snapshot().recent.first)
+    #expect(run.command == "jira tickets")
+    #expect(run.tool == "jira")
 }
 
 @Test func keepsTheLastRunsAndCountsThemAll() {
