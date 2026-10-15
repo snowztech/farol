@@ -98,7 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func saveFile(_ sender: Any?) { windowController.saveFile() }
 
     @objc private func toggleInspector() {
-        Inspector.shared.toggle()
+        Inspector.shared.toggle(state: windowController.state, over: windowController.window)
     }
 
     /// ⌘S only means something while a file has focus, and stays free for the terminal otherwise.

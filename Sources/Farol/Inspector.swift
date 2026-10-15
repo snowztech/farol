@@ -12,10 +12,12 @@ final class Inspector: NSObject, NSWindowDelegate {
     private var panel: NSPanel?
     private let monitor = InspectorMonitor()
 
-    func toggle() {
+    /// Opens over `window`, in its theme.
+    func toggle(state: WindowState, over window: NSWindow?) {
         if let panel, panel.isVisible { return panel.close() }
-        let panel = self.panel ?? makePanel()
+        let panel = self.panel ?? makePanel(state: state)
         self.panel = panel
+        panel.appearance = window?.appearance
         monitor.start()
         panel.orderFront(nil)
     }
@@ -24,16 +26,19 @@ final class Inspector: NSObject, NSWindowDelegate {
         monitor.stop()
     }
 
-    private func makePanel() -> NSPanel {
-        // A HUD that never takes focus, so the terminal you are watching keeps it.
-        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: InspectorView.width, height: 400),
-                            styleMask: [.titled, .closable, .hudWindow, .utilityWindow, .nonactivatingPanel],
+    private func makePanel(state: WindowState) -> NSPanel {
+        // A small window in the theme's colors that never takes focus, so the terminal you are watching keeps it.
+        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: InspectorView.width, height: 300),
+                            styleMask: [.titled, .closable, .fullSizeContentView, .nonactivatingPanel, .utilityWindow],
                             backing: .buffered, defer: true)
         panel.title = "Farol Inspector"
+        panel.titleVisibility = .hidden
+        panel.titlebarAppearsTransparent = true
+        panel.isMovableByWindowBackground = true
         panel.isFloatingPanel = true
         panel.isReleasedWhenClosed = false
         panel.delegate = self
-        panel.contentViewController = NSHostingController(rootView: InspectorView(monitor: monitor))
+        panel.contentViewController = NSHostingController(rootView: InspectorView(monitor: monitor, state: state))
         if let screen = NSScreen.main?.visibleFrame {
             panel.setFrameTopLeftPoint(NSPoint(x: screen.maxX - InspectorView.width - 20, y: screen.maxY - 20))
         }
@@ -59,7 +64,9 @@ struct Reading {
 
     let title: String
     let value: String
-    /// What the number means and what good looks like, for someone seeing it the first time.
+    /// Quieter context beside the value, like which tools ran.
+    var note = ""
+    /// What the number means and what good looks like, shown on hover.
     let caption: String
     let level: Level
     /// The runs behind a bad number, so it says where to look.
@@ -159,34 +166,30 @@ final class InspectorMonitor: ObservableObject {
         let rate = rates.values.reduce(0, +)
         let tools = rates.sorted { $0.value > $1.value }.map { "\($0.key) \(Self.decimal($0.value))" }
         let longest = stalls.map(\.duration).max() ?? 0
-        let onMain = snapshot.recent.filter(\.onMain).prefix(3)
         return [
             Reading(
-                title: "Commands",
-                value: rate == 0 ? "None" : "\(Self.decimal(rate)) a second" + (tools.isEmpty ? "" : ", " + tools.joined(separator: ", ")),
-                caption: "git, gh and glab runs in the last \(Int(Self.window)) seconds. Under 2 a second is calm.",
+                title: "commands", value: rate == 0 ? "none" : "\(Self.decimal(rate))/s", note: tools.joined(separator: " · "),
+                caption: "git, gh and glab runs a second, over the last \(Int(Self.window)) seconds. Under 2 is calm, a launch or a push runs more.",
                 // An agent at work keeps git busy, but #159 showed 10 a second is a loop, not work.
                 level: rate < 2 ? .good : rate < 5 ? .worthALook : .problem),
             Reading(
-                title: "Git on the main thread",
-                value: snapshot.onMain == 0 ? "None" : "\(snapshot.onMain) since launch",
-                caption: "Each run freezes the window until it ends. It should stay at none.",
+                title: "main thread", value: "\(snapshot.onMain)", note: snapshot.onMain == 0 ? "" : "since launch",
+                caption: "git runs on the main thread since launch. Each one freezes the window until it ends, so it should stay at 0.",
                 level: snapshot.onMain == 0 ? .good : .problem,
-                details: onMain.map { "\($0.command), \(Self.ms($0.duration)), \(Self.ago($0.start, now: now))" }),
+                details: snapshot.recent.filter(\.onMain).prefix(3).map {
+                    "\($0.command) · \(Self.ms($0.duration)) · \(Self.ago($0.start, now: now))"
+                }),
             Reading(
-                title: "Window freezes",
-                value: stalls.isEmpty ? "None" : "\(stalls.count), the longest \(Self.ms(longest))",
+                title: "freezes", value: stalls.isEmpty ? "none" : "\(stalls.count)", note: stalls.isEmpty ? "" : "longest \(Self.ms(longest))",
                 caption: "Times in the last minute the window couldn't answer for over \(Self.ms(Self.stallAbove)).",
                 // A quarter second is where a pause turns into a stutter you notice while typing.
                 level: stalls.isEmpty ? .good : longest < 0.25 ? .worthALook : .problem),
             Reading(
-                title: "Memory",
-                value: Self.size(memory),
+                title: "memory", value: Self.size(memory),
                 caption: "What Activity Monitor shows for Farol, terminals included.",
                 level: memory < 1 << 30 ? .good : memory < 2 << 30 ? .worthALook : .problem),
             Reading(
-                title: "CPU",
-                value: "\(Int(cpu.rounded()))%",
+                title: "cpu", value: "\(Int(cpu.rounded()))%",
                 caption: "Farol itself, not the commands it starts. Near 0 while idle.",
                 level: cpu < 25 ? .good : cpu < 75 ? .worthALook : .problem),
         ]
@@ -196,16 +199,22 @@ final class InspectorMonitor: ObservableObject {
     func report(at now: Date) -> String {
         var lines = ["Farol Inspector, \(now.formatted(date: .abbreviated, time: .shortened))"]
         for reading in readings(at: now) {
-            lines.append("\(reading.title): \(reading.value) (\(reading.level.word))")
+            let note = reading.note.isEmpty ? "" : " (\(reading.note))"
+            lines.append("\(reading.title): \(reading.value)\(note), \(reading.level.word)")
             lines += reading.details.map { "    \($0)" }
         }
         let slowest = snapshot.slowest(5, over: Self.window, at: now)
         if !slowest.isEmpty {
-            lines.append("Slowest commands, last \(Int(Self.window)) seconds:")
+            lines.append("longest, last \(Int(Self.window)) seconds:")
             lines += slowest.map { "    " + Self.ms($0.duration).leftPadded(to: 7) + "  " + $0.command }
         }
         lines.append("\(snapshot.total) commands since launch")
         return lines.joined(separator: "\n")
+    }
+
+    /// Slow for its kind: git works on the disk, gh and glab go over the network.
+    static func isSlow(_ run: Perf.Run) -> Bool {
+        run.duration > (["gh", "glab"].contains(run.tool) ? 2 : 0.3)
     }
 
     static func ms(_ seconds: TimeInterval) -> String { "\(Int((seconds * 1000).rounded())) ms" }
@@ -222,112 +231,90 @@ final class InspectorMonitor: ObservableObject {
     }
 }
 
+/// Quiet like the rest of Farol: muted labels, plain values, and color only on a value that needs a look.
 private struct InspectorView: View {
-    static let width: CGFloat = 380
+    static let width: CGFloat = 300
 
     @ObservedObject var monitor: InspectorMonitor
+    @ObservedObject var state: WindowState
     @State private var copied = false
 
     var body: some View {
+        let p = state.palette
         let now = Date()
-        let readings = monitor.readings(at: now)
-        VStack(alignment: .leading, spacing: 14) {
-            summary(readings)
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(readings, id: \.title) { reading in row(reading) }
+        VStack(alignment: .leading, spacing: 0) {
+            // In the transparent title bar, beside the close button.
+            Text("Farol Inspector").font(.system(size: 11, weight: .medium)).foregroundStyle(p.muted)
+                .frame(maxWidth: .infinity).frame(height: 28)
+            VStack(alignment: .leading, spacing: 7) {
+                ForEach(monitor.readings(at: now), id: \.title) { row($0, p) }
             }
-            Divider()
-            slowest(now)
-            footer(now)
+            Rectangle().fill(p.line).frame(height: 1).padding(.vertical, 12)
+            slowest(now, p)
+            HStack {
+                Text("\(monitor.snapshot.total) since launch").foregroundStyle(p.muted)
+                Spacer()
+                Button(copied ? "copied" : "copy") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(monitor.report(at: now), forType: .string)
+                    copied = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copied = false }
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(copied ? p.text : p.muted)
+                .help("The readings as text, to paste into a pull request as a before or after")
+            }
+            .padding(.top, 12)
         }
-        .padding(16)
+        .font(.system(size: 11.5))
+        .foregroundStyle(p.text)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 14)
         .frame(width: Self.width, alignment: .topLeading)
         .fixedSize(horizontal: false, vertical: true)
+        .background(p.background)
     }
 
-    /// The first glance: is anything wrong, and if so what.
-    private func summary(_ readings: [Reading]) -> some View {
-        let worst = readings.map(\.level).max() ?? .good
-        let named = readings.filter { $0.level == worst }.map(\.title).joined(separator: ", ")
-        let text = switch worst {
-        case .good: "Everything looks healthy"
-        case .worthALook: "Worth a look: \(named)"
-        case .problem: "Needs attention: \(named)"
-        }
-        return HStack(spacing: 8) {
-            Dot(level: worst, size: 10)
-            Text(text).font(.system(size: 13, weight: .semibold))
-        }
-    }
-
-    private func row(_ reading: Reading) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Dot(level: reading.level, size: 7).alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(reading.title).font(.system(size: 12, weight: .medium))
-                    Spacer(minLength: 12)
-                    // Color only when it needs attention. The dot already says a value is fine.
-                    Text(reading.value).font(.system(size: 12).monospacedDigit())
-                        .foregroundStyle(reading.level == .good ? .primary : Dot.color(reading.level))
-                        .lineLimit(1)
-                }
-                Text(reading.caption).font(.system(size: 11)).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                ForEach(reading.details, id: \.self) { detail in
-                    Text(detail).font(.system(size: 11, design: .monospaced)).foregroundStyle(Dot.color(reading.level))
-                        .lineLimit(1)
+    private func row(_ reading: Reading, _ p: Palette) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                Text(reading.title).foregroundStyle(p.muted).frame(width: 92, alignment: .leading)
+                Text(reading.value).monospacedDigit().foregroundStyle(color(reading.level, p))
+                if !reading.note.isEmpty {
+                    Text("  " + reading.note).foregroundStyle(p.muted).lineLimit(1)
                 }
             }
+            ForEach(reading.details, id: \.self) { detail in
+                Text(detail).font(.system(size: 11)).foregroundStyle(p.muted).padding(.leading, 92).lineLimit(1)
+            }
         }
+        .contentShape(Rectangle())
+        .help(reading.caption)
     }
 
-    private func slowest(_ now: Date) -> some View {
+    private func slowest(_ now: Date, _ p: Palette) -> some View {
         let runs = monitor.snapshot.slowest(5, over: InspectorMonitor.window, at: now)
         return VStack(alignment: .leading, spacing: 5) {
-            Text("Slowest commands, last \(Int(InspectorMonitor.window)) seconds").font(.system(size: 12, weight: .medium))
-            if runs.isEmpty {
-                Text("Nothing ran").font(.system(size: 11)).foregroundStyle(.secondary)
-            }
+            Text("longest · \(Int(InspectorMonitor.window)) s").foregroundStyle(p.muted)
+                .help("The commands that took longest lately. Every command takes some time, so only a slow one gets a color.")
+            if runs.isEmpty { Text("nothing ran").foregroundStyle(p.muted) }
             ForEach(Array(runs.enumerated()), id: \.offset) { _, run in
-                HStack(spacing: 10) {
-                    Text(InspectorMonitor.ms(run.duration)).monospacedDigit().foregroundStyle(.secondary)
+                HStack(spacing: 0) {
+                    Text(InspectorMonitor.ms(run.duration)).monospacedDigit()
+                        .foregroundStyle(InspectorMonitor.isSlow(run) ? p.waiting : p.muted)
                         .frame(width: 56, alignment: .trailing)
-                    Text(run.command).font(.system(size: 11, design: .monospaced)).lineLimit(1).truncationMode(.tail)
+                    Text(run.command).font(.system(size: 10.5, design: .monospaced)).lineLimit(1).padding(.leading, 36)
                 }
-                .font(.system(size: 11))
             }
         }
     }
 
-    private func footer(_ now: Date) -> some View {
-        HStack {
-            Text("\(monitor.snapshot.total) commands since launch").font(.system(size: 11)).foregroundStyle(.secondary)
-            Spacer()
-            Button(copied ? "Copied" : "Copy Report") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(monitor.report(at: now), forType: .string)
-                copied = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copied = false }
-            }
-            .help("The readings as text, to paste into a pull request as a before or after")
-        }
-    }
-}
-
-private struct Dot: View {
-    let level: Reading.Level
-    let size: CGFloat
-
-    var body: some View {
-        Circle().fill(Self.color(level)).frame(width: size, height: size)
-    }
-
-    static func color(_ level: Reading.Level) -> Color {
+    /// The theme's own colors: plain text when fine, its yellow to look at, its red for a problem.
+    private func color(_ level: Reading.Level, _ p: Palette) -> Color {
         switch level {
-        case .good: .green
-        case .worthALook: .orange
-        case .problem: .red
+        case .good: p.text
+        case .worthALook: p.waiting
+        case .problem: p.removed
         }
     }
 }
