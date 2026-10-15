@@ -24,7 +24,7 @@ make lint
 - Commits are one line in the Conventional Commits style: `fix(sidebar): keep the selected session in view`.
 - If users would notice the change, add a line under **Unreleased** in `CHANGELOG.md`.
 - For UI changes, add a screenshot.
-- If your change runs git or touches the main thread, press ⌥⌘I in Farol for the developer panel: commands per second, git on the main thread, stalls, memory and CPU. Its Copy button gives a before and after to paste in the PR.
+- If your change runs git or touches the main thread, press ⌥⌘I in Farol for the Farol Inspector. It says whether Farol runs too many commands, runs git on the main thread, freezes, or uses too much memory or CPU, and Copy Report gives a before and after to paste in the PR.
 
 ## Writing
 

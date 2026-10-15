@@ -1,7 +1,7 @@
 import Foundation
 import os
 
-/// What Farol spends on outside commands: every git, gh and glab run, for the developer panel (⌥⌘I).
+/// What Farol spends on outside commands: every git, gh and glab run, for the Farol Inspector (⌥⌘I).
 /// Always on: a record is a lock and an append, next to a process that takes milliseconds to start.
 /// Each run is also an interval in Instruments' Points of Interest, for a closer look.
 public final class Perf: @unchecked Sendable {
