@@ -175,6 +175,20 @@ public struct Forge: Equatable {
         return Self.request(from: output)
     }
 
+    /// Whether `branch` has an open request, and the steps that ran for it. Talks to the forge, so call it off the main thread.
+    /// On GitHub one call answers both, where asking for each would be two.
+    public func requestAndChecks(for branch: String, in directory: String) -> (state: RequestState, checks: [Check]) {
+        guard kind == .github else {
+            let state = request(for: branch, in: directory)
+            guard case .open = state else { return (state, []) }
+            return (state, checks(for: branch, in: directory))
+        }
+        guard let path = kind.toolPath else { return (.unknown, []) }
+        let arguments = ["pr", "list", "--head", branch, "--state", "open", "--json", "number,url,statusCheckRollup", "--limit", "1"]
+        guard let output = try? Git.run(path, arguments, in: directory) else { return (.unknown, []) }
+        return (Self.request(from: output), Self.checks(from: output))
+    }
+
     /// An open pull request, or merge request.
     public struct Request: Equatable {
         public let number: Int

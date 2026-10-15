@@ -103,6 +103,8 @@ final class ReviewModel: ObservableObject {
     private var yourScope: Diff.Scope?
     /// The request whose files are loaded. Its diff doesn't move as you work, so the forge is asked once.
     private var fetchedRequest: Int?
+    /// The last branch asked about and when, so two asks moments apart make one network call.
+    private var lastRequestCheck: (key: String, at: Date)?
     /// In a task folder, each repo and its changes, for the tabs and the title bar's total. Empty outside one.
     @Published private(set) var taskRepos: [(path: String, stat: Diff.Stat)] = []
     /// Your changes across every repo of a task, or just this checkout's.
@@ -437,7 +439,8 @@ final class ReviewModel: ObservableObject {
                 self.refresh()
                 if let created, self.root == root, self.branch == branch { self.request = created }
                 if next != .nothing, failure == nil { self.checksDue = Date() + 60 }
-                self.checkRequest()
+                // A push or a new request changes what the forge says, so it's asked even if it just was.
+                self.checkRequest(force: true)
             }
         }
     }
@@ -452,12 +455,15 @@ final class ReviewModel: ObservableObject {
     }
 
     /// Asks the forge whether the branch has an open request. A network call, so only when something may have changed it.
-    func checkRequest() {
+    /// Following a repo and opening the panel both ask, moments apart, so a branch asked about in the last 10 seconds waits.
+    /// `force` is for when something just changed: a push, a request created, a pipeline still running.
+    func checkRequest(force: Bool = false) {
         guard let root, let branch, let forge, !isOnBaseBranch else { return }
+        let key = root + "\n" + branch
+        if !force, let last = lastRequestCheck, last.key == key, Date().timeIntervalSince(last.at) < 10 { return }
+        lastRequestCheck = (key, Date())
         DispatchQueue.global(qos: .utility).async {
-            let state = forge.request(for: branch, in: root)
-            var checks: [Forge.Check] = []
-            if case .open = state { checks = forge.checks(for: branch, in: root) }
+            let (state, checks) = forge.requestAndChecks(for: branch, in: root)
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root, self.branch == branch else { return }
                 self.request = state
@@ -465,7 +471,7 @@ final class ReviewModel: ObservableObject {
                 // Nothing local says a pipeline moved on, so the forge is asked again until it settles.
                 self.poll?.cancel()
                 guard self.isOpen, checks.contains(where: { $0.state == .running }) || Date() < self.checksDue else { return }
-                let poll = DispatchWorkItem { [weak self] in self?.checkRequest() }
+                let poll = DispatchWorkItem { [weak self] in self?.checkRequest(force: true) }
                 self.poll = poll
                 DispatchQueue.main.asyncAfter(deadline: .now() + 15, execute: poll)
             }
@@ -552,7 +558,7 @@ final class ReviewModel: ObservableObject {
                 // A push from the terminal starts a pipeline just the same.
                 if unpushed == 0, self.unpushed > 0, self.isOpen {
                     self.checksDue = Date() + 60
-                    self.checkRequest()
+                    self.checkRequest(force: true)
                 }
                 self.unpushed = unpushed
             }

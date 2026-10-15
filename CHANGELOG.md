@@ -4,6 +4,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- The window no longer waits on git when the graph follows a repo or New Task opens.
+- The review panel asks GitHub about a branch's pull request once where it asked up to four times.
+
 ## [0.32.1] - 2026-10-15
 
 GitLab catches up with GitHub: comments on a merge request's lines, approvals, issues in New Task, and forges on a company's own domain.

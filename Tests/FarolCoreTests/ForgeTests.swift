@@ -223,3 +223,11 @@ import Testing
     #expect(Forge(remote: "https://ghe.acme.com/team/app", hosts: hosts)?.kind == .github)
     #expect(Forge(remote: "git@git.other.com:team/app.git", hosts: hosts) == nil)
 }
+
+@Test func readsARequestAndItsChecksFromOneAnswer() {
+    // gh pr list with number,url,statusCheckRollup: one call where there were two.
+    let json = #"[{"number":7,"url":"https://github.com/o/r/pull/7","statusCheckRollup":[{"name":"test","status":"COMPLETED","conclusion":"SUCCESS"}]}]"#
+    #expect(Forge.request(from: json) == .open(number: 7, url: URL(string: "https://github.com/o/r/pull/7")!))
+    #expect(Forge.checks(from: json).map(\.name) == ["test"])
+    #expect(Forge.checks(from: json).first?.state == .passed)
+}
