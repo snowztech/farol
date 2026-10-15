@@ -8,6 +8,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - New Task works across several repos. Start it from a folder of repos, tick the ones the task touches, and each gets a worktree on the same branch in one folder, where the agent starts. Closing the session offers to remove them all and keeps every branch.
 - Started from inside a repo, New Task offers Add repos to pick the repos beside it.
+- The repo list gets a search past 8 repos, and shows the branch a repo is on when it isn't main or master, since the task branch starts from it.
 - In a task across repos, the review and graph panels show a tab per repo with its changes, and the title bar counts the changes of all of them.
 
 ## [0.30.10] - 2026-10-15
