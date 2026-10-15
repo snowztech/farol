@@ -40,7 +40,7 @@ final class FileView: NSView {
     private lazy var closeButton = QuietButton(symbol: "xmark", help: "Close file (⌘W)") { [weak self] in self?.onClose?() }
     private lazy var previewButton = QuietButton(symbol: "eye", help: "Preview") { [weak self] in self?.togglePreview() }
     /// Markdown reads as source or rendered. Source until you first pick the preview, then your choice holds for every Markdown file.
-    private var previewing = UserDefaults.standard.object(forKey: FileView.previewKey) as? Bool ?? false
+    private var previewing = false
     private static let previewKey = "FarolMarkdownPreview"
     private let preview = MarkdownView()
     private var themeColors: (background: NSColor, foreground: NSColor)?
@@ -172,6 +172,8 @@ final class FileView: NSView {
     /// Loads another file into the same pane. Callers check `isDirty` first, see confirmClose.
     func show(_ path: String) {
         self.path = path
+        // Read for each file, so a choice made in another pane holds here too.
+        previewing = UserDefaults.standard.bool(forKey: Self.previewKey)
         folder = ""
         language = Syntax.language(for: path)
         updateTitle()
@@ -197,6 +199,11 @@ final class FileView: NSView {
 
     /// Puts the cursor on a line and scrolls it near the top, for opening a file at its first change.
     func reveal(line: Int) {
+        // A line is a place in the source. The preview has no lines to go to.
+        if showsPreview {
+            previewing = false
+            updateMode()
+        }
         let string = text.string as NSString
         var location = 0
         for _ in 1..<max(line, 1) where location < string.length {

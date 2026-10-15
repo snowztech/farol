@@ -58,3 +58,41 @@ import Testing
     #expect(Markdown.handles("notes.MARKDOWN"))
     #expect(!Markdown.handles("main.swift"))
 }
+
+@Test func readsTheHTMLThatReadmesUse() {
+    let readme = """
+    <div align="center">
+      <img src="logo.png" alt="logo" width="400" />
+      <h3><em>Switch accounts</em></h3>
+      <p>
+        <a href="https://x.dev"><img src="https://badge.svg" alt="Build" /></a>
+      </p>
+    </div>
+    <!-- hidden
+    note -->
+
+    Line<br>
+    <hr>
+    """
+    #expect(Markdown.blocks(in: readme) == [
+        .paragraph(#"<img src="logo.png" alt="logo" width="400" />"#),
+        .heading(level: 3, text: "<em>Switch accounts</em>"),
+        .paragraph(#"<a href="https://x.dev"><img src="https://badge.svg" alt="Build" /></a>"#),
+        .paragraph("Line<br>"),
+        .rule,
+    ])
+}
+
+@Test func turnsInlineHTMLIntoMarkdown() {
+    #expect(Markdown.inlineHTML(#"<img src="logo.png" alt="logo" width="400" />"#) == "![logo](logo.png#width=400)")
+    #expect(Markdown.inlineHTML(#"<a href="https://x.dev"><img src="b.svg" alt="Build" /></a>"#) == "[![Build](b.svg)](https://x.dev)")
+    #expect(Markdown.inlineHTML("the <b> go-gituser </b> root <br>\nnext") == "the **go-gituser** root\u{2028}next")
+    // Code spans and words in brackets keep their text.
+    #expect(Markdown.inlineHTML("run `<b>x</b>` for <mode>") == "run `<b>x</b>` for <mode>")
+}
+
+@Test func keepsLookalikesAsText() {
+    #expect(Markdown.blocks(in: "The year\n2024. was good") == [.paragraph("The year 2024. was good")])
+    // A header with more cells than the delimiter row isn't a table.
+    #expect(Markdown.blocks(in: "a | b | c\n--- | ---") == [.paragraph("a | b | c --- | ---")])
+}

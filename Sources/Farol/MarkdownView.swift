@@ -11,6 +11,8 @@ final class MarkdownView: NSScrollView {
     private var colors = MarkdownColors(background: .textBackgroundColor, foreground: .textColor, syntax: nil)
     private var source = ""
     private var path = ""
+    private var hasImages = false
+    private var imageWidth: CGFloat = 0
 
     init() {
         super.init(frame: .zero)
@@ -53,12 +55,21 @@ final class MarkdownView: NSScrollView {
         render()
     }
 
+    /// Images are sized to the width they had, so a wider or narrower pane draws them again.
+    override func tile() {
+        super.tile()
+        if hasImages, abs(imageWidth - contentSize.width) > 1 { render() }
+    }
+
     /// Keeps the reading position, so an agent rewriting the file doesn't send you back to the top.
     private func render() {
         let origin = contentView.bounds.origin
+        imageWidth = contentSize.width
         // Relative links start from the file's folder.
-        var renderer = MarkdownRenderer(colors: colors, folder: (path as NSString).deletingLastPathComponent)
+        var renderer = MarkdownRenderer(colors: colors, folder: (path as NSString).deletingLastPathComponent,
+                                        width: imageWidth - 2 * text.textContainerInset.width - 10)
         renderer.render(Markdown.blocks(in: source), indent: 0)
+        hasImages = renderer.hasImages
         text.textStorage?.setAttributedString(renderer.finished())
         text.markdownColors = colors
         contentView.scroll(to: origin)
@@ -67,13 +78,19 @@ final class MarkdownView: NSScrollView {
 }
 
 extension MarkdownView: NSTextViewDelegate {
-    /// A link to a text file in the repo opens next to the terminal, like any file. The rest goes to the browser or its app.
+    /// A link to a file in the repo opens next to the terminal, like any file. Web and mail links go to their app.
+    /// Nothing else opens: a cloned repo's files carry no quarantine, so a link to an .app would launch it unchecked.
     func textView(_ textView: NSTextView, clickedOnLink link: Any, at charIndex: Int) -> Bool {
-        guard let url = link as? URL, url.isFileURL else { return false }
+        guard let url = link as? URL else { return true }
+        if ["http", "https", "mailto"].contains(url.scheme?.lowercased()) { return false }
+        guard url.isFileURL else { return true }
         var isFolder: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isFolder), !isFolder.boolValue,
-              let onOpenFile else { return false }
-        onOpenFile(url.path)
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isFolder) else { return true }
+        if isFolder.boolValue {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } else {
+            onOpenFile?(url.path)
+        }
         return true
     }
 }
@@ -112,6 +129,9 @@ private extension NSAttributedString.Key {
 private struct MarkdownRenderer {
     let colors: MarkdownColors
     let folder: String
+    /// The room an image can take.
+    let width: CGFloat
+    private(set) var hasImages = false
     private let output = NSMutableAttributedString()
     private var quote = 0
 
@@ -120,9 +140,10 @@ private struct MarkdownRenderer {
     private static let quoteStep: CGFloat = 16
     private static let gap: CGFloat = 10
 
-    init(colors: MarkdownColors, folder: String) {
+    init(colors: MarkdownColors, folder: String, width: CGFloat) {
         self.colors = colors
         self.folder = folder
+        self.width = width
     }
 
     func finished() -> NSAttributedString {
@@ -202,28 +223,33 @@ private struct MarkdownRenderer {
         }
     }
 
-    /// Cells padded to their column's width in a monospaced font, so the columns line up without a grid.
+    /// A native text table, so cells wrap in a narrow pane and keep their bold, code and links.
     private mutating func table(header: [String], rows: [[String]], left: CGFloat) {
-        let plain = ([header] + rows).map { $0.map(Self.plainText) }
-        let widths = header.indices.map { column in plain.map { $0[column].count }.max() ?? 0 }
-        let font = NSFont.monospacedSystemFont(ofSize: 12.5, weight: .regular)
-        let bold = NSFont.monospacedSystemFont(ofSize: 12.5, weight: .semibold)
-        func line(_ cells: [String]) -> String {
-            zip(cells, widths).map { $0 + String(repeating: " ", count: $1 - $0.count) }.joined(separator: "   ").trimmingCharacters(in: .whitespaces)
-        }
-        for (index, cells) in plain.enumerated() {
-            let style = paragraph(left: left, marker: nil)
-            style.lineBreakMode = .byTruncatingTail
-            if index == plain.count - 1 { style.paragraphSpacing = Self.gap }
-            let color = index == 0 ? colors.foreground : colors.foreground.withAlphaComponent(0.9)
-            append(nil, NSAttributedString(string: line(cells), attributes: [.font: index == 0 ? bold : font, .foregroundColor: color]),
-                   style: style)
-            if index == 0 {
-                let rule = widths.map { String(repeating: "─", count: $0) }.joined(separator: "   ")
-                append(nil, NSAttributedString(string: rule, attributes: [.font: font, .foregroundColor: colors.line]),
-                       style: paragraph(left: left, marker: nil))
+        let table = NSTextTable()
+        table.numberOfColumns = header.count
+        table.collapsesBorders = true
+        table.setWidth(left, type: .absoluteValueType, for: .margin, edge: .minX)
+        let font = NSFont.systemFont(ofSize: 13)
+        let bold = NSFont.systemFont(ofSize: 13, weight: .semibold)
+        for (row, cells) in ([header] + rows).enumerated() {
+            for (column, cell) in cells.enumerated() {
+                let block = NSTextTableBlock(table: table, startingRow: row, rowSpan: 1, startingColumn: column, columnSpan: 1)
+                block.setWidth(5, type: .absoluteValueType, for: .padding)
+                block.setWidth(10, type: .absoluteValueType, for: .padding, edge: .minX)
+                block.setWidth(10, type: .absoluteValueType, for: .padding, edge: .maxX)
+                block.setWidth(1, type: .absoluteValueType, for: .border, edge: .maxY)
+                block.setBorderColor(colors.line, for: .maxY)
+                if row == 0 { block.backgroundColor = colors.codeBackground }
+                let style = NSMutableParagraphStyle()
+                style.textBlocks = [block]
+                append(nil, inline(cell, font: row == 0 ? bold : font, color: colors.foreground), style: style)
             }
         }
+        // Text after a table ignores its margins and spacing, so an empty line of the gap's height sets it apart.
+        let spacer = NSMutableParagraphStyle()
+        spacer.minimumLineHeight = Self.gap
+        spacer.maximumLineHeight = Self.gap
+        append(nil, NSAttributedString(), style: spacer)
     }
 
     /// A list item's first line starts with its bullet, and a tab takes the text to where its other lines start.
@@ -270,9 +296,12 @@ private struct MarkdownRenderer {
         interpretedSyntax: .inlineOnlyPreservingWhitespace, failurePolicy: .returnPartiallyParsedIfPossible)
 
     /// Bold, italic, strikethrough, code and links, read by Foundation.
-    private func inline(_ text: String, font: NSFont, color: NSColor) -> NSAttributedString {
+    private mutating func inline(_ text: String, font: NSFont, color: NSColor) -> NSAttributedString {
+        // A hard break stays within the paragraph, without the spacing a new one gets.
+        let text = Markdown.inlineHTML(text).replacingOccurrences(of: "\n", with: "\u{2028}")
         let parsed = (try? AttributedString(markdown: text, options: Self.inlineOptions)) ?? AttributedString(text)
         let result = NSMutableAttributedString()
+        var previousImage: URL?
         for run in parsed.runs {
             let piece = String(parsed[run.range].characters)
             let intent = run.inlinePresentationIntent ?? []
@@ -292,8 +321,22 @@ private struct MarkdownRenderer {
                 attributes[.foregroundColor] = colors.link
                 attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
             }
-            // An image shows as its description, since the pane is text.
-            if run.imageURL != nil { attributes[.foregroundColor] = colors.muted }
+            defer { previousImage = run.imageURL }
+            if let source = run.imageURL {
+                if let image = resolve(source).flatMap(image(at:)) {
+                    let fragment = source.fragment ?? ""
+                    let wanted = fragment.hasPrefix("width=") ? Double(fragment.dropFirst(6)).map { CGFloat($0) } : nil
+                    // A description with bold in it spans several runs. The image shows once.
+                    if source != previousImage {
+                        let picture = NSMutableAttributedString(attributedString: attachment(image, width: wanted))
+                        if let link = attributes[.link] { picture.addAttribute(.link, value: link, range: NSRange(location: 0, length: picture.length)) }
+                        result.append(picture)
+                    }
+                    continue
+                }
+                // A web image shows as its description, since the pane doesn't fetch.
+                if attributes[.link] == nil { attributes[.foregroundColor] = colors.muted }
+            }
             result.append(NSAttributedString(string: piece, attributes: attributes))
         }
         return result
@@ -308,10 +351,24 @@ private struct MarkdownRenderer {
         return URL(fileURLWithPath: (folder as NSString).appendingPathComponent(decoded)).standardizedFileURL
     }
 
-    /// A cell's text without its Markdown, to measure and pad.
-    private static func plainText(_ cell: String) -> String {
-        let parsed = (try? AttributedString(markdown: cell, options: inlineOptions)) ?? AttributedString(cell)
-        return String(parsed.characters)
+    /// An image in the repo, fit to the pane and kept short enough to read past. Nil for a web image, which shows its description.
+    private func image(at url: URL) -> NSImage? {
+        // Only a regular file of sane size, so a link to /dev/zero or a huge file can't hang the pane.
+        guard url.isFileURL, let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+              attributes[.type] as? FileAttributeType == .typeRegular,
+              (attributes[.size] as? Int ?? 0) < 20_000_000 else { return nil }
+        return NSImage(contentsOf: url)
+    }
+
+    /// `wanted` is the width an <img> asked for, which wins over the height cap.
+    private mutating func attachment(_ image: NSImage, width wanted: CGFloat?) -> NSAttributedString {
+        hasImages = true
+        let room = max(40, width) / max(image.size.width, 1)
+        let scale = wanted.map { min(room, $0 / max(image.size.width, 1)) } ?? min(1, room, 320 / max(image.size.height, 1))
+        let attachment = NSTextAttachment()
+        attachment.image = image
+        attachment.bounds = NSRect(x: 0, y: 0, width: image.size.width * scale, height: image.size.height * scale)
+        return NSAttributedString(attachment: attachment)
     }
 }
 

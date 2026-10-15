@@ -59,6 +59,26 @@ public enum Markdown {
                 i += 1
                 continue
             }
+            // READMEs open with a centered <div> of badges and end with <hr>s. The tags become Markdown, the rest reads as usual.
+            if indent < 4, startsHTML(trimmed) {
+                flush()
+                var html: [String] = []
+                if trimmed.hasPrefix("<!--") {
+                    // A comment runs to its end, blank lines included.
+                    while i < lines.count {
+                        html.append(lines[i])
+                        i += 1
+                        if html.last!.contains("-->") { break }
+                    }
+                } else {
+                    while i < lines.count, !lines[i].trimmingCharacters(in: .whitespaces).isEmpty {
+                        html.append(lines[i])
+                        i += 1
+                    }
+                }
+                blocks += parse(markdown(fromHTML: html.joined(separator: "\n")).components(separatedBy: "\n"))
+                continue
+            }
             if indent < 4, let fence = fence(trimmed) {
                 flush()
                 var code: [String] = []
@@ -106,7 +126,8 @@ public enum Markdown {
                 blocks.append(.quote(parse(inner)))
                 continue
             }
-            if indent < 4, i + 1 < lines.count, trimmed.contains("|"), let columns = delimiterRow(lines[i + 1]) {
+            if indent < 4, i + 1 < lines.count, trimmed.contains("|"), let columns = delimiterRow(lines[i + 1]),
+               cells(trimmed, count: nil).count == columns {
                 flush()
                 let header = cells(trimmed, count: columns)
                 var rows: [[String]] = []
@@ -120,7 +141,8 @@ public enum Markdown {
                 blocks.append(.table(header: header, rows: rows))
                 continue
             }
-            if let first = marker(line) {
+            // A line like "2024. was a good year" carries on a paragraph. Only a list starting at 1 can break into one.
+            if let first = marker(line), paragraph.isEmpty || !first.ordered || first.number == 1 {
                 flush()
                 var items: [Item] = []
                 while i < lines.count, let item = marker(lines[i]), item.ordered == first.ordered, item.indent < first.content {
@@ -274,5 +296,61 @@ public enum Markdown {
         cells.append(cell.trimmingCharacters(in: .whitespaces))
         guard let count else { return cells }
         return Array((cells + Array(repeating: "", count: max(0, count - cells.count))).prefix(count))
+    }
+
+    // MARK: HTML
+
+    // ponytail: the tags READMEs use, by pattern. Attributes like align and width are dropped, a real HTML parser would keep them.
+    private static let blockTags = "div|p|h[1-6]|hr|br|center|details|summary|table|thead|tbody|tr|td|th|picture|section"
+
+    private static func startsHTML(_ line: String) -> Bool {
+        line.hasPrefix("<!--") || line.range(of: "^</?(\(blockTags))(\\s|/?>|$)", options: [.regularExpression, .caseInsensitive]) != nil
+    }
+
+    /// An HTML block as Markdown: headings and rules as their own, the other block tags as paragraph breaks.
+    /// Inline tags stay for `inlineHTML`, which reads them in each block's text.
+    static func markdown(fromHTML html: String) -> String {
+        var text = replacing(#"<!--[\s\S]*?(-->|$)"#, in: html, with: "")
+        for level in 1...6 {
+            text = replacing("<h\(level)\\b[^>]*>\\s*([\\s\\S]*?)\\s*</h\(level)\\s*>", in: text,
+                             with: "\n\n" + String(repeating: "#", count: level) + " $1\n\n")
+        }
+        text = replacing(#"<hr\b[^>]*>"#, in: text, with: "\n\n***\n\n")
+        return replacing("</?(\(blockTags))\\b[^>]*>", in: text, with: "\n\n")
+    }
+
+    /// Bold, italic, code, links and images written as HTML, turned into Markdown for Foundation's inline parser.
+    /// Code spans are left alone, so `<branch-name>` stays as written.
+    public static func inlineHTML(_ text: String) -> String {
+        guard text.contains("<") else { return text }
+        return text.components(separatedBy: "`").enumerated()
+            .map { $0.offset.isMultiple(of: 2) ? markdown(fromInlineHTML: $0.element) : $0.element }
+            .joined(separator: "`")
+    }
+
+    private static func markdown(fromInlineHTML html: String) -> String {
+        let attribute = #"=["']([^"']*)["']"#
+        let rules = [
+            (#"<!--[\s\S]*?-->"#, ""),
+            // A line separator breaks the line without starting a new paragraph and its spacing.
+            (#"\s*<br\s*/?>\s*"#, "\u{2028}"),
+            (#"<(b|strong)\b[^>]*>\s*([\s\S]*?)\s*</\1\s*>"#, "**$2**"),
+            (#"<(i|em)\b[^>]*>\s*([\s\S]*?)\s*</\1\s*>"#, "*$2*"),
+            (#"<(s|del|strike)\b[^>]*>\s*([\s\S]*?)\s*</\1\s*>"#, "~~$2~~"),
+            (#"<code\b[^>]*>([\s\S]*?)</code\s*>"#, "`$1`"),
+            // A width rides along in the fragment, since Markdown has no way to size an image.
+            (#"<img\b(?=[^>]*\bsrc"# + attribute + #")(?=[^>]*\balt"# + attribute + #")(?=[^>]*\bwidth=["']?(\d+)["']?[\s/>])[^>]*>"#,
+             "![$2]($1#width=$3)"),
+            (#"<img\b(?=[^>]*\bsrc"# + attribute + #")(?=[^>]*\balt"# + attribute + ")[^>]*>", "![$2]($1)"),
+            (#"<img\b(?=[^>]*\bsrc"# + attribute + ")[^>]*>", "![]($1)"),
+            (#"<a\b[^>]*\bhref"# + attribute + #"[^>]*>\s*([\s\S]*?)\s*</a\s*>"#, "[$2]($1)"),
+            // What's left, like a lone <b> or a <span>, goes without a trace. Unknown words in brackets, like <mode>, stay.
+            (#"</?(a|b|strong|i|em|s|del|strike|code|span|sub|sup|u|kbd|ins|mark|small|font|img|\#(blockTags))\b[^>]*>"#, ""),
+        ]
+        return rules.reduce(html) { replacing($1.0, in: $0, with: $1.1) }
+    }
+
+    private static func replacing(_ pattern: String, in text: String, with template: String) -> String {
+        text.replacingOccurrences(of: pattern, with: template, options: [.regularExpression, .caseInsensitive])
     }
 }
