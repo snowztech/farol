@@ -11,6 +11,21 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - The repo list gets a search past 8 repos, and shows the branch a repo is on when it isn't main or master, since the task branch starts from it.
 - In a task across repos, the review and graph panels show a tab per repo with its changes, and the title bar counts the changes of all of them.
 
+## [0.31.0] - 2026-10-15
+
+Pull requests open in the review panel, comments and all, and Markdown files preview in the file pane.
+
+### Added
+
+- A preview for Markdown files in the file pane: headings, lists, tasks, code, quotes, tables and links. The eye in its header switches between the source and the preview, Farol keeps your choice, and the preview follows an agent's edits. A link to another file opens it in the pane.
+- A pull request's button in the git graph shows its changes in the review panel, anyone's request, without checking it out. Right click it for its page in the browser.
+- Above a pull request's changes, its description and comments, reviews and comments on lines included, each folded to its first line. A comment on a line takes you to its file.
+- A pull request's comments on lines show under those lines in its diff. On GitHub, the "+" next to a line number writes a new one.
+
+### Fixed
+
+- A working agent no longer makes Farol run git after each of its steps, only when its turn ends or it stops to ask you something.
+
 ## [0.30.10] - 2026-10-15
 
 New Task shows the ticket before you start.
@@ -708,7 +723,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.30.10...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.31.0...HEAD
+[0.31.0]: https://github.com/snowztech/farol/releases/tag/v0.31.0
 [0.30.10]: https://github.com/snowztech/farol/releases/tag/v0.30.10
 [0.30.9]: https://github.com/snowztech/farol/releases/tag/v0.30.9
 [0.30.8]: https://github.com/snowztech/farol/releases/tag/v0.30.8

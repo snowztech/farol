@@ -208,8 +208,8 @@ private struct GitButton: View {
                         .foregroundStyle(color)
                 }
                 if counts {
-                    // Over a commit it isn't lit: a click there brings your changes back.
-                    Half(active: review.isOpen && !review.showsCommit, help: "Review changes (⌥⌘R)", palette: p, action: changes) { _ in
+                    // Over a commit or a request it isn't lit: a click there brings your changes back.
+                    Half(active: review.isOpen && review.showsYours, help: "Review changes (⌥⌘R)", palette: p, action: changes) { _ in
                         Counts(added: review.total.added, removed: review.total.removed, palette: p)
                     }
                 }

@@ -24,6 +24,13 @@ final class QuietButton: NSButton {
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
+    /// Swaps the symbol and its tip, for a button that switches between two states.
+    func show(symbol: String, help: String) {
+        tip = help
+        image = NSImage(systemSymbolName: symbol, accessibilityDescription: help)?
+            .withSymbolConfiguration(.init(pointSize: 10, weight: .semibold))
+    }
+
     func apply(background: NSColor, foreground: NSColor) {
         colors = (background.mixed(with: foreground, 0.55), foreground, background.mixed(with: foreground, 0.1))
         refresh()
@@ -35,7 +42,7 @@ final class QuietButton: NSButton {
     }
 
     private var hoverArea: NSTrackingArea?
-    private let tip: String
+    private var tip: String
 
     /// Replaces only our own area. Removing every area also dropped the ones AppKit adds for itself.
     override func updateTrackingAreas() {
