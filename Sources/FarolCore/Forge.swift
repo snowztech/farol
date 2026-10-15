@@ -414,7 +414,7 @@ public struct Forge: Equatable {
     }
 
     /// Reads either tool's JSON list: gh says number, body and url, glab says iid, description and web_url.
-    static func issues(from json: String, source: Ticket.Source = .github) -> [Ticket] {
+    static func issues(from json: String, source: Ticket.Source) -> [Ticket] {
         let list = (try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]]) ?? []
         return list.compactMap { issue in
             guard let number = (issue["number"] ?? issue["iid"]) as? Int, let title = issue["title"] as? String else { return nil }
