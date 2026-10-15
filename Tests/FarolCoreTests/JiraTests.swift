@@ -45,6 +45,13 @@ import Testing
     #expect(Forge.issues(from: "not logged in") == [])
 }
 
+@Test func readsGitLabIssues() {
+    let json = #"[{"iid": 12, "title": "Fix the pipeline", "description": "It fails.", "web_url": "https://gitlab.com/g/app/-/issues/12"}]"#
+    let issues = Forge.issues(from: json, source: .gitlab)
+    #expect(issues == [Ticket(source: .gitlab, key: "#12", summary: "Fix the pipeline", description: "It fails.",
+                              url: URL(string: "https://gitlab.com/g/app/-/issues/12"))])
+}
+
 @Test func readsTheJiraAccountsPicture() {
     let user = #"{"self": "https://x.atlassian.net/rest/api/2/user", "avatarUrls": {"48x48": "https://avatars.example/ana.png"}}"#
     #expect(Jira.avatar(fromUser: "hello\n" + user) == URL(string: "https://avatars.example/ana.png"))

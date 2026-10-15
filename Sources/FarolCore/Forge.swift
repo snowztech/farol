@@ -78,7 +78,8 @@ public struct Forge: Equatable {
     public var tool: String { kind.tool }
 
     /// Understands the forms git accepts: https://host/path, ssh://git@host:22/path and git@host:path, with or without .git.
-    public init?(remote: String) {
+    /// A host named neither github nor gitlab is one when `hosts` says so, as for a company's own domain.
+    public init?(remote: String, hosts: [String: Kind] = Forge.loggedInHosts()) {
         var rest = remote.trimmingCharacters(in: .whitespacesAndNewlines)
         if rest.hasSuffix("/") { rest.removeLast() }
         if rest.hasSuffix(".git") { rest.removeLast(4) }
@@ -103,16 +104,55 @@ public struct Forge: Equatable {
         if let at = authority.lastIndex(of: "@") { authority = String(authority[authority.index(after: at)...]) }
         guard !authority.isEmpty, !path.isEmpty else { return nil }
 
-        // ponytail: goes by the host's name, so a GitLab at git.company.com isn't recognized. A setting per host would cover it.
         let host = authority.lowercased()
         if host.contains("github") {
             kind = .github
         } else if host.contains("gitlab") {
             kind = .gitlab
+        } else if let known = hosts[String(host.prefix { $0 != ":" })] {
+            kind = known
         } else {
             return nil
         }
         web = "\(scheme)://\(authority)/\(path)"
+    }
+
+    /// The hosts gh and glab are logged into, so a GitHub or GitLab on a company's own domain is recognized.
+    /// Read from their config files, without running them, since every repo's remote is checked against it.
+    public static func loggedInHosts() -> [String: Kind] {
+        let environment = ProcessInfo.processInfo.environment
+        let config = environment["XDG_CONFIG_HOME"] ?? NSHomeDirectory() + "/.config"
+        let read = { (path: String) in (try? String(contentsOfFile: path, encoding: .utf8)) ?? "" }
+        var hosts: [String: Kind] = [:]
+        let gh = (environment["GH_CONFIG_DIR"] ?? config + "/gh") + "/hosts.yml"
+        for host in Self.hosts(inConfig: read(gh), under: nil) { hosts[host] = .github }
+        // Older glab on macOS kept its config under Application Support.
+        let glab = [environment["GLAB_CONFIG_DIR"] ?? config + "/glab-cli", NSHomeDirectory() + "/Library/Application Support/glab-cli"]
+        for folder in glab {
+            for host in Self.hosts(inConfig: read(folder + "/config.yml"), under: "hosts") { hosts[host] = .gitlab }
+        }
+        return hosts
+    }
+
+    /// The keys of a YAML config's top level, or of its `section`: the hosts in gh's and glab's files.
+    static func hosts(inConfig yaml: String, under section: String?) -> [String] {
+        var hosts: [String] = []
+        var inside = section == nil
+        var level: Int? = section == nil ? 0 : nil
+        for line in yaml.split(separator: "\n") {
+            let indent = line.prefix { $0 == " " }.count
+            let key = line.dropFirst(indent)
+            if let section, indent == 0 {
+                inside = key == section + ":"
+                level = nil
+                continue
+            }
+            // A host is a key with its settings under it, so nothing follows its colon.
+            guard inside, key.hasSuffix(":"), !key.contains(" ") else { continue }
+            if level == nil { level = indent }
+            if indent == level { hosts.append(String(key.dropLast())) }
+        }
+        return hosts
     }
 
     /// What is known about a branch's request. Asking needs the forge's own command line tool, gh or glab, installed and logged in.
@@ -360,24 +400,27 @@ public struct Forge: Equatable {
     }
 
     /// Whether this forge's issues can be listed at all, without asking it.
-    public var listsIssues: Bool { kind == .github && kind.toolPath != nil }
+    public var listsIssues: Bool { kind.toolPath != nil }
 
     /// The repo's open issues, newest first, to start a task from. Talks to the forge, so call it off the main thread.
     public func issues(in directory: String) -> [Ticket] {
-        // ponytail: GitHub only, and the newest 30. glab lists issues too, for when GitLab needs them.
-        let arguments = ["issue", "list", "--state", "open", "--json", "number,title,body,url", "--limit", "30"]
-        guard kind == .github, let path = kind.toolPath,
-              let output = try? Git.run(path, arguments, in: directory) else { return [] }
-        return Self.issues(from: output)
+        // ponytail: the newest 30. Searching on the forge's side would reach the rest.
+        let arguments = switch kind {
+        case .github: ["issue", "list", "--state", "open", "--json", "number,title,body,url", "--limit", "30"]
+        case .gitlab: ["issue", "list", "--output", "json", "--per-page", "30"]
+        }
+        guard let path = kind.toolPath, let output = try? Git.run(path, arguments, in: directory) else { return [] }
+        return Self.issues(from: output, source: kind == .github ? .github : .gitlab)
     }
 
-    static func issues(from json: String) -> [Ticket] {
+    /// Reads either tool's JSON list: gh says number, body and url, glab says iid, description and web_url.
+    static func issues(from json: String, source: Ticket.Source = .github) -> [Ticket] {
         let list = (try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]]) ?? []
         return list.compactMap { issue in
-            guard let number = issue["number"] as? Int, let title = issue["title"] as? String else { return nil }
-            let body = (issue["body"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            let url = (issue["url"] as? String).flatMap(URL.init(string:))
-            return Ticket(source: .github, key: "#\(number)", summary: title, description: body, url: url)
+            guard let number = (issue["number"] ?? issue["iid"]) as? Int, let title = issue["title"] as? String else { return nil }
+            let body = ((issue["body"] ?? issue["description"]) as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let url = ((issue["url"] ?? issue["web_url"]) as? String).flatMap(URL.init(string:))
+            return Ticket(source: source, key: "#\(number)", summary: title, description: body, url: url)
         }
     }
 
@@ -403,7 +446,7 @@ public struct Forge: Equatable {
 
     /// The forge the checked out branch pushes to, or nil when its remote isn't GitHub or GitLab.
     public static func detect(in directory: String) -> Forge? {
-        (try? Git.run(["remote", "get-url", History.pushRemote(in: directory)], in: directory)).flatMap(Forge.init(remote:))
+        (try? Git.run(["remote", "get-url", History.pushRemote(in: directory)], in: directory)).flatMap { Forge(remote: $0) }
     }
 
     /// The page that opens a pull request, or merge request, from `branch` into the default branch.

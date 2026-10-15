@@ -1,13 +1,13 @@
 import Foundation
 
-/// Something to start a task from: a Jira ticket or a GitHub issue.
+/// Something to start a task from: a Jira ticket, or a GitHub or GitLab issue.
 public struct Ticket: Equatable, Identifiable, Sendable {
     public enum Source: Sendable {
-        case jira, github
+        case jira, github, gitlab
     }
 
     public let source: Source
-    /// "CMB-12" in Jira, "#12" on GitHub.
+    /// "CMB-12" in Jira, "#12" on GitHub and GitLab.
     public let key: String
     public let summary: String
     public let description: String
