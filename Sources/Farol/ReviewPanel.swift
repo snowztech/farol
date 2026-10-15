@@ -103,6 +103,26 @@ final class ReviewModel: ObservableObject {
     private var yourScope: Diff.Scope?
     /// The request whose files are loaded. Its diff doesn't move as you work, so the forge is asked once.
     private var fetchedRequest: Int?
+    /// In a task folder, each repo and its changes, for the tabs and the title bar's total. Empty outside one.
+    @Published private(set) var taskRepos: [(path: String, stat: Diff.Stat)] = []
+    /// Your changes across every repo of a task, or just this checkout's.
+    var total: Diff.Stat {
+        guard !taskRepos.isEmpty else { return changes }
+        return taskRepos.reduce(into: Diff.Stat()) { sum, repo in
+            sum.files += repo.stat.files
+            sum.added += repo.stat.added
+            sum.removed += repo.stat.removed
+        }
+    }
+    /// Gets the first task repo with changes once they are counted, so the panels can start there.
+    var onFirstCounts: ((String) -> Void)?
+    private var countedOnce = true
+    private var taskWatcher: FolderWatcher?
+    /// The ignored folders of every task repo, so a build in one of them doesn't count everything again.
+    private var taskIgnored: [String] = []
+    private var pendingTask: DispatchWorkItem?
+    /// Each task repo's default scope, worked out once since it takes a few git calls.
+    private var defaultScopes: [String: Diff.Scope] = [:]
 
     private var files: [Diff.File] = []
     private var collapsed: Set<String> = []
@@ -167,7 +187,7 @@ final class ReviewModel: ObservableObject {
                 self.scopePending = false
                 self.refresh()
             }
-            let ignored = Files.ignored(in: root).map { $0 + "/" }
+            let ignored = Self.ignoredPrefixes(in: root)
             let forge = Forge.detect(in: root)
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root else { return }
@@ -175,6 +195,64 @@ final class ReviewModel: ObservableObject {
                 self.ignored = ignored
                 if self.discussion == nil { self.loadDiscussion() }
                 self.checkRequest()
+            }
+        }
+    }
+
+    /// Counts the changes of every repo in a task folder, or stops with no repos.
+    func follow(task repos: [String]) {
+        // Called at every prompt, which is also how a commit from the terminal shows up.
+        guard repos != taskRepos.map(\.path) else { return refreshTask() }
+        pendingTask?.cancel()
+        taskRepos = repos.map { ($0, Diff.Stat()) }
+        taskIgnored = []
+        defaultScopes = [:]
+        countedOnce = false
+        // The repos sit side by side in the task folder, so one watcher sees them all.
+        // A commit writes to the repo's own .git, outside the folder, so its counts catch up at the next prompt or turn end.
+        taskWatcher = repos.first.map { first in
+            FolderWatcher((first as NSString).deletingLastPathComponent) { [weak self] in self?.taskChanged($0) }
+        }
+        refreshTask()
+    }
+
+    private func taskChanged(_ paths: [String]) {
+        guard Self.matters(paths, ignored: taskIgnored) else { return }
+        pendingTask?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.refreshTask() }
+        pendingTask = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
+    }
+
+    private func refreshTask() {
+        let repos = taskRepos.map(\.path)
+        guard !repos.isEmpty else { return }
+        let chosen = chosenScope, known = defaultScopes
+        DispatchQueue.global(qos: .userInitiated).async {
+            var stats = [Diff.Stat](repeating: Diff.Stat(), count: repos.count)
+            var scopes = [Diff.Scope?](repeating: nil, count: repos.count)
+            var ignored = [[String]](repeating: [], count: repos.count)
+            let lock = NSLock()
+            // Each repo answers on its own, so a big one doesn't hold up the rest.
+            DispatchQueue.concurrentPerform(iterations: repos.count) { index in
+                let repo = repos[index]
+                let fallback = known[repo] ?? Diff.defaultScope(in: repo)
+                var scope = chosen[repo] ?? fallback
+                // A commit or a request you're looking at isn't your changes, which is what the counts are.
+                if !scope.isYours { scope = fallback }
+                let stat = (try? Diff.stat(in: repo, scope)) ?? Diff.Stat()
+                let repoIgnored = Self.ignoredPrefixes(in: repo)
+                lock.withLock { (stats[index], scopes[index], ignored[index]) = (stat, fallback, repoIgnored) }
+            }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.taskRepos.map(\.path) == repos else { return }
+                self.taskRepos = Array(zip(repos, stats))
+                self.taskIgnored = ignored.flatMap { $0 }
+                for (repo, scope) in zip(repos, scopes) { self.defaultScopes[repo] = scope }
+                if !self.countedOnce {
+                    self.countedOnce = true
+                    if let changed = self.taskRepos.first(where: { !$0.stat.isEmpty }) { self.onFirstCounts?(changed.path) }
+                }
             }
         }
     }
@@ -288,6 +366,7 @@ final class ReviewModel: ObservableObject {
         chosenScope[root] = scope
         self.scope = scope
         refresh()
+        refreshTask()
     }
 
     /// Opens the commit sheet when there is something to commit.
@@ -349,6 +428,7 @@ final class ReviewModel: ObservableObject {
                 self.isShipping = false
                 // What was left out of this commit is the next one's to decide.
                 if committed { self.leftOut[root] = nil }
+                self.refreshTask()
                 if let failure { failed(failure.0, failure.1) } else if let link { NSWorkspace.shared.open(link) }
                 self.refresh()
                 if let created, self.root == root, self.branch == branch { self.request = created }
@@ -475,15 +555,38 @@ final class ReviewModel: ObservableObject {
         }
     }
 
-    /// Agents write in bursts, so changes wait a moment and refresh once.
-    private func changed(_ paths: [String]) {
-        let relevant = paths.contains { path in
+    /// Whether a change on disk can change what git reports. Of `.git` only the index and HEAD do.
+    private static func matters(_ paths: [String], ignored: [String]) -> Bool {
+        paths.contains { path in
             if path.contains("/.git/") { return path.hasSuffix("/.git/index") || path.hasSuffix("/.git/HEAD") }
             return !ignored.contains { path.hasPrefix($0) }
         }
-        guard relevant else { return }
+    }
+
+    /// Git's ignored folders, as prefixes. Read again after each change, since a build or an install makes new ones.
+    private static func ignoredPrefixes(in root: String) -> [String] {
+        Files.ignored(in: root).map { $0 + "/" }
+    }
+
+    private func rereadIgnored() {
+        guard let root else { return }
+        DispatchQueue.global(qos: .utility).async {
+            let ignored = Self.ignoredPrefixes(in: root)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.root == root else { return }
+                self.ignored = ignored
+            }
+        }
+    }
+
+    /// Agents write in bursts, so changes wait a moment and refresh once.
+    private func changed(_ paths: [String]) {
+        guard Self.matters(paths, ignored: ignored) else { return }
         pending?.cancel()
-        let work = DispatchWorkItem { [weak self] in self?.refresh() }
+        let work = DispatchWorkItem { [weak self] in
+            self?.refresh()
+            self?.rereadIgnored()
+        }
         pending = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
     }
@@ -538,6 +641,8 @@ struct ReviewPanel: View {
     @ObservedObject var state: WindowState
     /// Opens a file in the file pane, at a line.
     let open: (String, Int) -> Void
+    /// Shows another of the task's repos.
+    let pick: (String) -> Void
     let close: () -> Void
     let resize: (CGFloat) -> Void
 
@@ -546,6 +651,7 @@ struct ReviewPanel: View {
     var body: some View {
         let p = state.palette
         VStack(alignment: .leading, spacing: 0) {
+            TaskRepoTabs(review: review, palette: p, pick: pick)
             header(p)
             HStack(spacing: 8) {
                 ScopeMenu(review: review, palette: p)
@@ -842,6 +948,58 @@ private struct FileHeader: View {
         case .deleted: "deleted"
         case .renamed: file.oldPath.map { "from \($0)" }
         case .modified: nil
+        }
+    }
+}
+
+/// "api +12 −3   web +4 −1": the repos of a task, to pick the one the git panels show. Nothing outside a task.
+struct TaskRepoTabs: View {
+    @ObservedObject var review: ReviewModel
+    let palette: Palette
+    /// The graph's tabs step aside while the review is open, so one row picks for both.
+    var yieldsToReview = false
+    let pick: (String) -> Void
+
+    var body: some View {
+        if review.taskRepos.count > 1, !(yieldsToReview && review.isOpen) {
+            ScrollView(.horizontal) {
+                HStack(spacing: 2) {
+                    ForEach(review.taskRepos, id: \.path) { repo in
+                        Tab(name: (repo.path as NSString).lastPathComponent, stat: repo.stat,
+                            selected: repo.path == review.root, palette: palette) { pick(repo.path) }
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+            }
+            .scrollIndicators(.hidden)
+            Rectangle().fill(palette.line).frame(height: 1)
+        }
+    }
+
+    private struct Tab: View {
+        let name: String
+        let stat: Diff.Stat
+        let selected: Bool
+        let palette: Palette
+        let pick: () -> Void
+
+        @State private var hovering = false
+
+        var body: some View {
+            Button(action: pick) {
+                HStack(spacing: 6) {
+                    Text(name).font(.system(size: 12, weight: .medium)).lineLimit(1)
+                    if !stat.isEmpty { Counts(added: stat.added, removed: stat.removed, palette: palette) }
+                }
+                .foregroundStyle(selected || hovering ? palette.text : palette.muted)
+                .padding(.horizontal, 8)
+                .frame(height: 24)
+                .background(RoundedRectangle(cornerRadius: 6).fill(selected ? palette.raised : .clear))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .onClickableHover { hovering = $0 }
         }
     }
 }

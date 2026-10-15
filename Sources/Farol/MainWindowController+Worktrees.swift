@@ -9,31 +9,40 @@ extension MainWindowController {
     }
 
     /// ⇧⌘N: a task, a branch and an agent in one sheet. The agent starts in a new worktree with the task as its prompt.
+    /// From a folder of repos, it starts in a task folder with a worktree of each repo you pick.
     func newTask() {
-        withRepo(purpose: "the new task") { [weak self] directory in
+        withRepo(purpose: "the new task", orFolderOfRepos: true) { [weak self] directory in
             guard let self, let window = self.window else { return }
-            NewTaskSheet.present(in: window, directory: directory, palette: self.state.palette) { branch, command, task in
-                self.startWorktreeSession(branch: branch, from: directory, run: command, environment: [NewTask.variable: task])
+            NewTaskSheet.present(in: window, directory: directory, palette: self.state.palette) { branch, command, task, repos in
+                self.startWorktreeSession(branch: branch, from: repos, run: command, environment: [NewTask.variable: task])
             }
         }
     }
 
     /// The current session's repo, or one the user picks when the current session isn't in a repo.
-    private func withRepo(purpose: String, then: @escaping (String) -> Void) {
+    /// With `orFolderOfRepos`, a folder with repos right inside it does too.
+    private func withRepo(purpose: String, orFolderOfRepos: Bool = false, then: @escaping (String) -> Void) {
         // With a sheet already up, a second one would queue behind it and show once the first closes.
         guard let window, window.attachedSheet == nil else { return }
-        if let directory = store.selected?.directory, Git.repoRoot(of: directory) != nil {
+        let fits = { (directory: String) in
+            Git.repoRoot(of: directory) != nil || orFolderOfRepos && !TaskFolders.repos(in: directory).isEmpty
+        }
+        if let directory = store.selected?.directory, fits(directory) {
             return then(directory)
         }
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
-        panel.message = "Choose a git repository for \(purpose)."
+        panel.message = orFolderOfRepos
+            ? "Choose a git repository for \(purpose), or a folder of repos for a task across them."
+            : "Choose a git repository for \(purpose)."
         panel.prompt = "Choose"
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let path = panel.url?.path else { return }
-            guard Git.repoRoot(of: path) != nil else {
-                self?.showError("Not a git repository", "Choose a folder inside a git repository.")
+            guard fits(path) else {
+                self?.showError("Not a git repository", orFolderOfRepos
+                    ? "Choose a folder inside a git repository, or one with git repositories in it."
+                    : "Choose a folder inside a git repository.")
                 return
             }
             then(path)
@@ -68,17 +77,19 @@ extension MainWindowController {
                 self?.showError("No branch name", "Use letters, numbers, dashes or slashes.")
                 return
             }
-            self?.startWorktreeSession(branch: branch, from: directory, run: self?.agents.startCommand)
+            self?.startWorktreeSession(branch: branch, from: [directory], run: self?.agents.startCommand)
         }
     }
 
-    private func startWorktreeSession(branch: String, from directory: String, run command: String?, environment: [String: String] = [:]) {
+    /// One repo gets a plain worktree. Several get a task folder with a worktree of each.
+    private func startWorktreeSession(branch: String, from repos: [String], run command: String?, environment: [String: String] = [:]) {
         let copyEnvironmentFiles = worktreeSettings.copyEnvironmentFiles
         // Checking out a big repo can take a moment, so keep it off the main thread.
         DispatchQueue.global(qos: .userInitiated).async {
             let result = Result {
-                try Worktrees.default.create(
-                    branch: branch, from: directory, copyEnvironmentFiles: copyEnvironmentFiles)
+                repos.count == 1
+                    ? try Worktrees.default.create(branch: branch, from: repos[0], copyEnvironmentFiles: copyEnvironmentFiles)
+                    : try TaskFolders.default.create(branch: branch, repos: repos, copyEnvironmentFiles: copyEnvironmentFiles)
             }
             DispatchQueue.main.async { [weak self] in
                 switch result {
@@ -133,34 +144,64 @@ extension MainWindowController {
         if let file = session.panes.file, file.isDirty {
             return file.confirmClose { [weak self] in self?.closeAskingAboutWorktree(session) }
         }
-        guard let worktree = session.worktree, let window else {
-            store.close(session)
-            return
+        let task = session.taskFolder
+        guard let worktree = task ?? session.worktree else { return store.close(session) }
+        // Another session still works in this folder.
+        guard !store.sessions.contains(where: { $0 !== session && ($0.taskFolder ?? $0.worktree) == worktree }) else {
+            return store.close(session)
         }
-        // Another session still works in this folder, or it holds unsaved work that git would refuse to delete.
-        let shared = store.sessions.contains { $0 !== session && $0.worktree == worktree }
-        guard !shared, !Worktrees.default.hasUncommittedChanges(worktree) else {
-            store.close(session)
-            return
+        // A task asks git about each of its repos, which shouldn't hold up the window.
+        DispatchQueue.global(qos: .userInitiated).async {
+            let dirty = task != nil
+                ? TaskFolders.default.hasUncommittedChanges(worktree)
+                : Worktrees.default.hasUncommittedChanges(worktree)
+            DispatchQueue.main.async { [weak self] in
+                // Unsaved work that git would refuse to delete.
+                guard let self, !dirty else { self?.store.close(session); return }
+                self.offerToRemove(worktree, isTask: task != nil, closing: session)
+            }
         }
+    }
+
+    private func offerToRemove(_ worktree: String, isTask: Bool, closing session: Session) {
+        guard let window else { return store.close(session) }
         let alert = NSAlert()
-        alert.messageText = "Remove the worktree too?"
-        alert.informativeText = "The branch \(session.branch.map { "\($0) " } ?? "")stays, so no commits are lost. Only the folder goes."
-        alert.addButton(withTitle: "Remove Worktree")
-        alert.addButton(withTitle: "Keep Worktree")
+        if isTask {
+            alert.messageText = "Remove the task's worktrees too?"
+            alert.informativeText = "Each repo keeps the branch, so no commits are lost. Only the folder goes."
+            alert.addButton(withTitle: "Remove Worktrees")
+            alert.addButton(withTitle: "Keep Worktrees")
+        } else {
+            alert.messageText = "Remove the worktree too?"
+            alert.informativeText = "The branch \(session.branch.map { "\($0) " } ?? "")stays, so no commits are lost. Only the folder goes."
+            alert.addButton(withTitle: "Remove Worktree")
+            alert.addButton(withTitle: "Keep Worktree")
+        }
         alert.addButton(withTitle: "Cancel")
 
         alert.beginSheetModal(for: window) { [weak self] response in
             guard let self else { return }
             switch response {
             case .alertFirstButtonReturn:
-                do {
-                    try Worktrees.default.remove(worktree)
-                } catch {
-                    // Rare now that unsaved work is checked first, so a plain note is enough.
-                    self.showError("Worktree kept", "It couldn't be removed and stays at \(worktree). Nothing was deleted.")
-                }
                 self.store.close(session)
+                DispatchQueue.global(qos: .userInitiated).async {
+                    do {
+                        if isTask {
+                            try TaskFolders.default.remove(worktree)
+                        } else {
+                            try Worktrees.default.remove(worktree)
+                        }
+                    } catch {
+                        // Rare now that unsaved work is checked first, so a plain note is enough.
+                        DispatchQueue.main.async { [weak self] in
+                            if isTask {
+                                self?.showError("Some worktrees kept", "\(error) The other repos' worktrees were removed.")
+                            } else {
+                                self?.showError("Worktree kept", "It couldn't be removed and stays at \(worktree). Nothing was deleted.")
+                            }
+                        }
+                    }
+                }
             case .alertSecondButtonReturn:
                 self.store.close(session)
             default:
