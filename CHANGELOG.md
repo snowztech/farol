@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-10-15
+
+A task can now span several repos, each with its own worktree on one branch, reviewed repo by repo.
+
 ### Added
 
 - New Task works across several repos. Start it from a folder of repos, tick the ones the task touches, and each gets a worktree on the same branch in one folder, where the agent starts. Closing the session offers to remove them all and keeps every branch.
@@ -729,7 +733,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.31.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.32.0...HEAD
+[0.32.0]: https://github.com/snowztech/farol/releases/tag/v0.32.0
 [0.31.0]: https://github.com/snowztech/farol/releases/tag/v0.31.0
 [0.30.10]: https://github.com/snowztech/farol/releases/tag/v0.30.10
 [0.30.9]: https://github.com/snowztech/farol/releases/tag/v0.30.9
