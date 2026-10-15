@@ -39,8 +39,8 @@ final class FileView: NSView {
     private static let dotSize: CGFloat = 7
     private lazy var closeButton = QuietButton(symbol: "xmark", help: "Close file (⌘W)") { [weak self] in self?.onClose?() }
     private lazy var previewButton = QuietButton(symbol: "eye", help: "Preview") { [weak self] in self?.togglePreview() }
-    /// Markdown reads rendered or as source. The choice holds for every Markdown file, until you switch back.
-    private var previewing = UserDefaults.standard.object(forKey: FileView.previewKey) as? Bool ?? true
+    /// Markdown reads as source or rendered. Source until you first pick the preview, then your choice holds for every Markdown file.
+    private var previewing = UserDefaults.standard.object(forKey: FileView.previewKey) as? Bool ?? false
     private static let previewKey = "FarolMarkdownPreview"
     private let preview = MarkdownView()
     private var themeColors: (background: NSColor, foreground: NSColor)?
