@@ -102,10 +102,18 @@ private func write(_ text: String, _ name: String, in box: Sandbox) throws {
     #expect(files.map(\.path) == ["a.txt", "b.txt"])
     #expect(files[1].status == .added)
     #expect(try Diff.stat(in: box.repo, .commit(head)) == Diff.Stat(files: 2, added: 2, removed: 0))
+    #expect(Diff.Stat(files) == Diff.Stat(files: 2, added: 2, removed: 0))
 
     // The first commit of the repo, with no parent, shows everything it added.
     let root = try Git.run(["rev-list", "--max-parents=0", "HEAD"], in: box.repo)
     #expect(try Diff.files(in: box.repo, .commit(root)).isEmpty)
     let first = try Git.run(["rev-parse", "HEAD~1"], in: box.repo)
     #expect(try Diff.files(in: box.repo, .commit(first)).map(\.path) == ["a.txt"])
+}
+
+@Test func aRequestNeedsAForge() throws {
+    let box = try Sandbox()
+    #expect(!Diff.Scope.request(1).isYours)
+    // No remote, so no forge to ask for the request's changes.
+    #expect(throws: (any Error).self) { try Diff.files(in: box.repo, .request(1)) }
 }

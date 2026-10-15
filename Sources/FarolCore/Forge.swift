@@ -169,6 +169,117 @@ public struct Forge: Equatable {
         return requests
     }
 
+    /// What request `number` changes, as its page shows it. Works for anyone's request, without checking it out.
+    /// Talks to the forge, so call it off the main thread.
+    public func files(ofRequest number: Int, in directory: String) throws -> [Diff.File] {
+        guard let path = kind.toolPath else { throw GitError(description: "\(tool) isn't installed.") }
+        let arguments = switch kind {
+        case .github: ["pr", "diff", "\(number)", "--color", "never"]
+        case .gitlab: ["mr", "diff", "\(number)", "--raw"]
+        }
+        return Diff.parse(try Git.run(path, arguments, in: directory, trimming: false))
+    }
+
+    /// What was said on a request: its description, then every comment, oldest first.
+    public struct Discussion: Equatable {
+        public struct Comment: Equatable {
+            public let author: String
+            public let date: Date?
+            public let text: String
+            /// "approved" or "requested changes", when a review said so.
+            public var verdict: String?
+            /// Where a comment on a line of the diff was left. Nil for the rest of the conversation.
+            public var path: String?
+            public var line: Int?
+            public var url: URL?
+        }
+
+        public let description: Comment
+        public let comments: [Comment]
+    }
+
+    /// Request `number`'s description and comments. Talks to the forge, so call it off the main thread.
+    /// Nil when the tool is missing or can't answer.
+    public func discussion(ofRequest number: Int, in directory: String) -> Discussion? {
+        guard let path = kind.toolPath else { return nil }
+        switch kind {
+        case .github:
+            guard let view = try? Git.run(path, ["pr", "view", "\(number)", "--json", "author,body,createdAt,url,comments,reviews"],
+                                          in: directory) else { return nil }
+            // Comments on lines of the diff aren't part of the pull request's view, only of the API.
+            // The first 100 only, here and on GitLab. Paging through the API would reach the rest of a long review.
+            let lines = try? Git.run(path, ["api", "repos/{owner}/{repo}/pulls/\(number)/comments?per_page=100"], in: directory)
+            return Self.discussion(github: view, lines: lines ?? "[]")
+        case .gitlab:
+            guard let request = try? Git.run(path, ["api", "projects/:id/merge_requests/\(number)"], in: directory) else { return nil }
+            let notes = try? Git.run(path, ["api", "projects/:id/merge_requests/\(number)/notes?sort=asc&per_page=100"], in: directory)
+            return Self.discussion(gitlab: request, notes: notes ?? "[]")
+        }
+    }
+
+    /// Reads `gh pr view`'s JSON, and the API's list of comments on lines.
+    static func discussion(github view: String, lines: String) -> Discussion? {
+        guard let request = json(view) as? [String: Any] else { return nil }
+        let login = { (item: [String: Any], key: String) in (item[key] as? [String: Any])?["login"] as? String ?? "someone" }
+        let url = { (item: [String: Any], key: String) in (item[key] as? String).flatMap(URL.init(string:)) }
+        let description = Discussion.Comment(author: login(request, "author"), date: date(request["createdAt"]),
+                                             text: request["body"] as? String ?? "", url: url(request, "url"))
+        var comments = (request["comments"] as? [[String: Any]] ?? []).map { comment in
+            Discussion.Comment(author: login(comment, "author"), date: date(comment["createdAt"]),
+                               text: comment["body"] as? String ?? "", url: url(comment, "url"))
+        }
+        for review in request["reviews"] as? [[String: Any]] ?? [] {
+            let verdict: String? = switch review["state"] as? String {
+            case "APPROVED": "approved"
+            case "CHANGES_REQUESTED": "requested changes"
+            default: nil
+            }
+            let text = review["body"] as? String ?? ""
+            // A review with nothing to say holds only its comments on lines, which come from the API.
+            guard verdict != nil || !text.isEmpty else { continue }
+            comments.append(Discussion.Comment(author: login(review, "author"), date: date(review["submittedAt"]), text: text, verdict: verdict))
+        }
+        for comment in json(lines) as? [[String: Any]] ?? [] {
+            comments.append(Discussion.Comment(author: login(comment, "user"), date: date(comment["created_at"]),
+                                               text: comment["body"] as? String ?? "",
+                                               path: comment["path"] as? String,
+                                               // An outdated comment's line is gone, so it keeps the one it was left on.
+                                               line: comment["line"] as? Int ?? comment["original_line"] as? Int,
+                                               url: url(comment, "html_url")))
+        }
+        return Discussion(description: description, comments: comments.sorted { ($0.date ?? .distantPast) < ($1.date ?? .distantPast) })
+    }
+
+    /// Reads GitLab's merge request and its notes, leaving out the ones GitLab writes itself, like "added 1 commit".
+    static func discussion(gitlab request: String, notes: String) -> Discussion? {
+        guard let request = json(request) as? [String: Any] else { return nil }
+        let username = { (item: [String: Any]) in (item["author"] as? [String: Any])?["username"] as? String ?? "someone" }
+        let page = request["web_url"] as? String
+        let description = Discussion.Comment(author: username(request), date: date(request["created_at"]),
+                                             text: request["description"] as? String ?? "", url: page.flatMap(URL.init(string:)))
+        let list: [[String: Any]] = json(notes) as? [[String: Any]] ?? []
+        let comments = list.compactMap { note -> Discussion.Comment? in
+            guard note["system"] as? Bool != true else { return nil }
+            let position = note["position"] as? [String: Any]
+            let link = page.flatMap { page in (note["id"] as? Int).flatMap { URL(string: "\(page)#note_\($0)") } }
+            return Discussion.Comment(author: username(note), date: date(note["created_at"]), text: note["body"] as? String ?? "",
+                                      path: position?["new_path"] as? String, line: position?["new_line"] as? Int,
+                                      url: link)
+        }
+        return Discussion(description: description, comments: comments)
+    }
+
+    private static func json(_ text: String) -> Any? { try? JSONSerialization.jsonObject(with: Data(text.utf8)) }
+
+    /// GitHub writes "2026-10-14T17:26:34Z", GitLab adds milliseconds.
+    private static func date(_ value: Any?) -> Date? {
+        guard let text = value as? String else { return nil }
+        let formatter = ISO8601DateFormatter()
+        if let date = formatter.date(from: text) { return date }
+        formatter.formatOptions.insert(.withFractionalSeconds)
+        return formatter.date(from: text)
+    }
+
     /// One step of a request's pipeline: a check on GitHub, a job on GitLab.
     public struct Check: Equatable {
         /// In the order they are listed: what needs you comes first.

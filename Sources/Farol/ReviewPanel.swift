@@ -27,16 +27,18 @@ final class ReviewModel: ObservableObject {
     @Published private(set) var stat = Diff.Stat()
     /// What the title bar counts: your changes, even while the panel shows a commit.
     @Published private(set) var changes = Diff.Stat()
-    var showsCommit: Bool { if case .commit = scope { true } else { false } }
+    /// False while the panel shows a commit or a request rather than your own work.
+    var showsYours: Bool { scope.isYours }
     @Published private(set) var rows: [Row] = []
     @Published private(set) var error: String?
     @Published var isOpen = false {
         didSet {
             guard isOpen != oldValue else { return }
-            // A commit is only looked at while the panel is open. Closing it brings back what the title bar counts.
-            if !isOpen, case .commit = scope, let root {
-                chosenScope[root] = scopeBeforeCommit
-                scope = scopeBeforeCommit ?? .uncommitted
+            // A commit or a request is only looked at while the panel is open. Closing it brings back what the title bar counts.
+            if !isOpen, !scope.isYours, let root {
+                chosenScope[root] = yourScope
+                scope = yourScope ?? .uncommitted
+                fetchedRequest = nil
             }
             refresh()
             if isOpen { checkRequest() }
@@ -47,6 +49,10 @@ final class ReviewModel: ObservableObject {
     private var pendingFocus: String?
     /// The subject of the commit being shown, for the compare menu.
     @Published private(set) var commitSubject: String?
+    /// The request being shown, for the compare menu and the link to its page.
+    @Published private(set) var shownRequest: Forge.Request?
+    /// Its description and comments, above its files. Nil while they are read, or without the forge's tool.
+    @Published private(set) var discussion: Forge.Discussion?
     /// While a commit or a push runs.
     @Published private(set) var isShipping = false
     /// The commit sheet is open, from the Commit button or ⌥⌘C.
@@ -70,7 +76,10 @@ final class ReviewModel: ObservableObject {
     /// False while git is stopped on a merge, a rebase or a cherry-pick, where it only takes a commit of everything.
     /// The ticks are hidden then, so nobody is led into git's refusal.
     @Published private(set) var canChooseFiles = true
-    private var scopeBeforeCommit: Diff.Scope?
+    /// What you were looking at before a commit or a request, to come back to.
+    private var yourScope: Diff.Scope?
+    /// The request whose files are loaded. Its diff doesn't move as you work, so the forge is asked once.
+    private var fetchedRequest: Int?
 
     private var files: [Diff.File] = []
     private var collapsed: Set<String> = []
@@ -117,6 +126,7 @@ final class ReviewModel: ObservableObject {
             unpushed = 0
             forge = nil
             ignored = []
+            fetchedRequest = nil
         }
         guard let root else { return }
         if rootChanged { watcher = FolderWatcher(root) { [weak self] in self?.changed($0) } }
@@ -140,6 +150,7 @@ final class ReviewModel: ObservableObject {
                 guard let self, self.root == root else { return }
                 self.forge = forge
                 self.ignored = ignored
+                if self.discussion == nil { self.loadDiscussion() }
                 self.checkRequest()
             }
         }
@@ -149,18 +160,53 @@ final class ReviewModel: ObservableObject {
     func show(commit hash: String, subject: String, file: String? = nil) {
         guard let root else { return }
         pendingFocus = file
-        if case .commit = scope {} else { scopeBeforeCommit = chosenScope[root] ?? scope }
         commitSubject = subject
-        chosenScope[root] = .commit(hash)
-        scope = .commit(hash)
+        browse(.commit(hash), in: root)
+    }
+
+    /// Shows what an open request changes, as from the git graph.
+    func show(request: Forge.Request) {
+        guard let root else { return }
+        if shownRequest?.number != request.number { discussion = nil }
+        shownRequest = request
+        // Another click reads it again, for commits pushed since.
+        fetchedRequest = nil
+        browse(.request(request.number), in: root)
+        loadDiscussion()
+    }
+
+    /// Also runs once the forge is known, for a request shown before it was.
+    private func loadDiscussion() {
+        guard let root, let forge, let request = shownRequest, scope == .request(request.number) else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let discussion = forge.discussion(ofRequest: request.number, in: root)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.root == root, self.shownRequest?.number == request.number else { return }
+                self.discussion = discussion
+            }
+        }
+    }
+
+    /// Unfolds a file and brings it into view, as from a comment left on one of its lines.
+    func reveal(_ path: String) {
+        guard files.contains(where: { $0.path == path }) else { return }
+        collapsed.remove(path)
+        rebuild()
+        focus = (path, UUID())
+    }
+
+    private func browse(_ scope: Diff.Scope, in root: String) {
+        if self.scope.isYours { yourScope = chosenScope[root] ?? self.scope }
+        chosenScope[root] = scope
+        self.scope = scope
         refresh()
     }
 
-    /// Goes back from a commit to the changes shown before it. False when no commit is shown.
-    func leaveCommit() -> Bool {
-        guard isOpen, case .commit = scope, let root else { return false }
-        chosenScope[root] = scopeBeforeCommit
-        scope = scopeBeforeCommit ?? .uncommitted
+    /// Goes back from a commit or a request to the changes shown before it. False when your own changes are shown.
+    func showYours() -> Bool {
+        guard isOpen, !scope.isYours, let root else { return false }
+        chosenScope[root] = yourScope
+        scope = yourScope ?? .uncommitted
         refresh()
         return true
     }
@@ -192,7 +238,7 @@ final class ReviewModel: ObservableObject {
 
     /// Whether a file shown in the panel has a tick: only a file with uncommitted changes can go in a commit.
     func isTicked(_ path: String) -> Bool? {
-        if case .commit = scope { return nil }
+        if !scope.isYours { return nil }
         return canChooseFiles && uncommittedPaths.contains(path) ? !excluded.contains(path) : nil
     }
 
@@ -297,16 +343,24 @@ final class ReviewModel: ObservableObject {
     func refresh() {
         pending?.cancel()
         guard let root, !scopePending else { return }
-        let scope = scope, withFiles = isOpen, base = branches.first, branch = branch
-        let yours = showsCommit ? scopeBeforeCommit ?? .uncommitted : scope
+        let scope = scope, base = branches.first, branch = branch
+        let withFiles = isOpen && scope != fetchedRequest.map(Diff.Scope.request)
+        let yours = scope.isYours ? scope : yourScope ?? .uncommitted
         DispatchQueue.global(qos: .userInitiated).async {
             // In the order you see them: the open panel's diff, the title bar's counts, then what only feeds the buttons.
-            let stat = Result { try Diff.stat(in: root, scope) }
             let files = withFiles ? Result { try Diff.files(in: root, scope) } : nil
+            // A request's counts come with its files. Asking the forge again for them would be a second network call.
+            let stat: Result<Diff.Stat, Error>? = if case .request = scope {
+                files.map { $0.map(Diff.Stat.init) }
+            } else {
+                Result { try Diff.stat(in: root, scope) }
+            }
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root, self.scope == scope else { return }
-                self.stat = (try? stat.get()) ?? Diff.Stat()
-                self.error = (try? files?.get()) == nil && files != nil ? "Couldn't read the changes." : nil
+                if let stat { self.stat = (try? stat.get()) ?? Diff.Stat() }
+                if files != nil { self.error = (try? files?.get()) == nil ? "Couldn't read the changes." : nil }
+                // Failed or not, the request isn't asked for again on every file change. Another click on it retries.
+                if files != nil, case .request(let number) = scope { self.fetchedRequest = number }
                 if let files = try? files?.get() {
                     let known = Set(self.files.map(\.path))
                     for file in files where !known.contains(file.path) && file.added + file.removed > Self.foldedAbove {
@@ -324,7 +378,7 @@ final class ReviewModel: ObservableObject {
                     }
                 }
             }
-            let changes = yours == scope ? stat : Result { try Diff.stat(in: root, yours) }
+            let changes = (yours == scope ? stat : nil) ?? Result { try Diff.stat(in: root, yours) }
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root, self.scope == scope else { return }
                 self.changes = (try? changes.get()) ?? Diff.Stat()
@@ -396,6 +450,10 @@ struct ReviewPanel: View {
                 Spacer(minLength: 0)
                 // The slot holds the next step: commit what's there, then open the request for the branch.
                 // Where there is no request to open, as on main or once the branch has one, the next step is a push.
+                if let forge = review.forge, let request = review.shownRequest, review.scope == .request(request.number) {
+                    ShipButton(title: "View on \(forge.name)", help: "Open \(forge.request) #\(request.number) in the browser",
+                               busy: false, icon: forge.kind, palette: p) { NSWorkspace.shared.open(request.url) }
+                }
                 if !isCommit {
                     RequestBadge(review: review, palette: p)
                     if review.uncommitted > 0 {
@@ -418,6 +476,9 @@ struct ReviewPanel: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 0) {
+                            if let discussion = review.discussion, review.scope == review.shownRequest.map({ .request($0.number) }) {
+                                Conversation(discussion: discussion, palette: p, reveal: review.reveal)
+                            }
                             ForEach(review.rows) { row(for: $0, p) }
                         }
                         .padding(.bottom, 12)
@@ -435,8 +496,8 @@ struct ReviewPanel: View {
         .commitSheet(review, palette: p)
     }
 
-    /// Looking at one commit, the working tree plays no part, so there is nothing to offer a commit for.
-    private var isCommit: Bool { review.showsCommit }
+    /// Looking at one commit or a request, the working tree plays no part, so there is nothing to offer a commit for.
+    private var isCommit: Bool { !review.showsYours }
 
     private func header(_ p: Palette) -> some View {
         HStack(spacing: 8) {
@@ -463,7 +524,8 @@ struct ReviewPanel: View {
             FileHeader(file: file, collapsed: collapsed, ticked: review.isTicked(file.path), palette: p,
                        tick: { review.toggleExcluded(file.path) },
                        toggle: { review.toggle(file.path) },
-                       open: { review.root.map { open(($0 as NSString).appendingPathComponent(file.path), file.firstChange) } })
+                       // A request's files are its branch's, not the ones in your checkout.
+                       open: review.scope.isRequest ? nil : { review.root.map { open(($0 as NSString).appendingPathComponent(file.path), file.firstChange) } })
         case .body(let file):
             DiffText(file: file, colors: p.diff, syntax: p.code).padding(.horizontal, 8)
         case .note(_, let text):
@@ -530,6 +592,7 @@ private struct ScopeMenu: View {
         case .uncommitted: "Uncommitted changes"
         case .branch(let base): "Changes since \(Self.name(base))"
         case .commit(let hash): "Commit \(hash.prefix(7))"
+        case .request(let number): "\(review.forge?.requestShort ?? "PR") #\(number)"
         }
     }
 
@@ -538,6 +601,11 @@ private struct ScopeMenu: View {
         if case .commit(let hash) = review.scope {
             let subject = review.commitSubject.map { ": " + ($0.count > 40 ? $0.prefix(40) + "…" : $0) } ?? ""
             menu.addItem(item("Commit \(hash.prefix(7))" + subject, review.scope))
+            menu.addItem(.separator())
+        }
+        if case .request(let number) = review.scope {
+            let title = review.shownRequest.map { ": " + ($0.title.count > 40 ? $0.title.prefix(40) + "…" : $0.title) } ?? ""
+            menu.addItem(item("\(review.forge?.requestShort ?? "PR") #\(number)" + title, review.scope))
             menu.addItem(.separator())
         }
         menu.addItem(item("Uncommitted changes", .uncommitted))
@@ -599,7 +667,7 @@ private struct FileHeader: View {
     let palette: Palette
     let tick: () -> Void
     let toggle: () -> Void
-    let open: () -> Void
+    let open: (() -> Void)?
 
     @State private var hovering = false
 
@@ -629,7 +697,7 @@ private struct FileHeader: View {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(file.path, forType: .string)
             }
-            if file.status != .deleted {
+            if let open, file.status != .deleted {
                 IconButton(symbol: "arrow.up.right.square", help: "Open in the file pane", palette: palette, action: open)
             }
         }
@@ -664,3 +732,165 @@ private struct FileHeader: View {
     }
 }
 
+/// A request's description and comments, above its files. It folds like a file.
+private struct Conversation: View {
+    let discussion: Forge.Discussion
+    let palette: Palette
+    let reveal: (String) -> Void
+
+    @State private var folded = false
+    @State private var hovering = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .bold))
+                    .rotationEffect(.degrees(folded ? 0 : 90))
+                    .foregroundStyle(palette.muted)
+                    .frame(width: 12)
+                Text("Conversation").font(.system(size: 12.5)).foregroundStyle(palette.text)
+                Text(discussion.comments.count == 1 ? "1 comment" : "\(discussion.comments.count) comments")
+                    .font(.system(size: 11))
+                    .foregroundStyle(palette.muted)
+                Spacer(minLength: 8)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 34)
+            .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised : palette.surface))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(palette.line))
+            .padding(.horizontal, 8)
+            .padding(.top, 10)
+            .padding(.bottom, 4)
+            .contentShape(Rectangle())
+            .onClickableHover { hovering = $0 }
+            .onTapGesture { folded.toggle() }
+            if !folded {
+                CommentView(comment: discussion.description, empty: "No description.", palette: palette, reveal: reveal)
+                ForEach(Array(discussion.comments.enumerated()), id: \.offset) { _, comment in
+                    CommentView(comment: comment, empty: "", palette: palette, reveal: reveal)
+                }
+            }
+        }
+        // Anyone can comment on a public request, so its links open only on the web, never a file or another app.
+        .environment(\.openURL, OpenURLAction { url in
+            ["http", "https", "mailto"].contains(url.scheme?.lowercased() ?? "") ? .systemAction : .discarded
+        })
+    }
+}
+
+private struct CommentView: View {
+    let comment: Forge.Discussion.Comment
+    /// Shown in place of the text when there is none.
+    let empty: String
+    let palette: Palette
+    let reveal: (String) -> Void
+
+    private static let age: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter
+    }()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Text(comment.author).font(.system(size: 12, weight: .semibold)).foregroundStyle(palette.text)
+                if let verdict = comment.verdict {
+                    Text(verdict).font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(verdict == "approved" ? palette.added : palette.removed)
+                }
+                if let path = comment.path {
+                    Button { reveal(path) } label: {
+                        Text((path as NSString).lastPathComponent + (comment.line.map { ":\($0)" } ?? ""))
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(palette.muted)
+                            .lineLimit(1)
+                    }
+                    .buttonStyle(.plain)
+                    .hoverTip("Show \(path) in the diff")
+                }
+                if let date = comment.date {
+                    Text(Self.age.localizedString(for: date, relativeTo: Date())).font(.system(size: 11)).foregroundStyle(palette.muted)
+                }
+                Spacer(minLength: 8)
+                if let url = comment.url {
+                    IconButton(symbol: "arrow.up.right.square", help: "Open in the browser", palette: palette) { NSWorkspace.shared.open(url) }
+                }
+            }
+            if comment.text.isEmpty {
+                if !empty.isEmpty { Text(empty).font(.system(size: 12)).foregroundStyle(palette.muted) }
+            } else {
+                MarkdownBlocks(blocks: Markdown.blocks(in: comment.text), palette: palette)
+                    .font(.system(size: 12))
+                    .foregroundStyle(palette.text)
+                    .textSelection(.enabled)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(palette.line))
+        .padding(.horizontal, 8)
+        .padding(.top, 6)
+    }
+}
+
+/// A comment's Markdown, read like the file pane's preview: headings, lists, code, quotes and tables, and bots' HTML.
+private struct MarkdownBlocks: View {
+    let blocks: [Markdown.Block]
+    let palette: Palette
+
+    private static let options = AttributedString.MarkdownParsingOptions(
+        interpretedSyntax: .inlineOnlyPreservingWhitespace, failurePolicy: .returnPartiallyParsedIfPossible)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in view(for: block) }
+        }
+    }
+
+    @ViewBuilder private func view(for block: Markdown.Block) -> some View {
+        switch block {
+        case .heading(let level, let text):
+            inline(text).font(.system(size: level <= 2 ? 14 : 12.5, weight: .semibold))
+        case .paragraph(let text):
+            inline(text).fixedSize(horizontal: false, vertical: true)
+        case .code(_, let text):
+            Text(text)
+                .font(.system(size: 11.5, design: .monospaced))
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+                .background(RoundedRectangle(cornerRadius: 5).fill(palette.surface))
+        case .quote(let blocks):
+            MarkdownBlocks(blocks: blocks, palette: palette)
+                .foregroundStyle(palette.muted)
+                .padding(.leading, 10)
+                .overlay(alignment: .leading) { Rectangle().fill(palette.line).frame(width: 3) }
+        case .list(let ordered, let start, let items):
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(item.checked.map { $0 ? "☑" : "☐" } ?? (ordered ? "\(start + index)." : "•")).foregroundStyle(palette.muted)
+                        MarkdownBlocks(blocks: item.blocks, palette: palette)
+                    }
+                }
+            }
+        case .table(let header, let rows):
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
+                GridRow { ForEach(Array(header.enumerated()), id: \.offset) { inline($1).fontWeight(.semibold) } }
+                Divider()
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, cells in
+                    GridRow { ForEach(Array(cells.enumerated()), id: \.offset) { inline($1) } }
+                }
+            }
+        case .rule:
+            Divider()
+        }
+    }
+
+    private func inline(_ text: String) -> Text {
+        let markdown = Markdown.inlineHTML(text)
+        return Text((try? AttributedString(markdown: markdown, options: Self.options)) ?? AttributedString(markdown))
+    }
+}
