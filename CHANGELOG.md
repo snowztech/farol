@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.32.1] - 2026-10-15
+
+GitLab catches up with GitHub: comments on a merge request's lines, approvals, issues in New Task, and forges on a company's own domain.
+
 ### Added
 
 - A GitHub or GitLab on your company's own domain is recognized once gh or glab is logged in there, so its requests, reviews and checks show.
@@ -738,7 +742,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.32.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.32.1...HEAD
+[0.32.1]: https://github.com/snowztech/farol/releases/tag/v0.32.1
 [0.32.0]: https://github.com/snowztech/farol/releases/tag/v0.32.0
 [0.31.0]: https://github.com/snowztech/farol/releases/tag/v0.31.0
 [0.30.10]: https://github.com/snowztech/farol/releases/tag/v0.30.10
