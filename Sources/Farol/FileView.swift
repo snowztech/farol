@@ -25,6 +25,8 @@ final class FileView: NSView {
     }
     var onFocus: (() -> Void)?
     var onClose: (() -> Void)?
+    /// Opens another file in this pane, from a link in the Markdown preview.
+    var onOpenFile: ((String) -> Void)?
 
     /// The file as last read or saved, to tell our own save from someone else's change.
     private var onDisk: String?
@@ -36,6 +38,12 @@ final class FileView: NSView {
     private let unsavedDot = NSView()
     private static let dotSize: CGFloat = 7
     private lazy var closeButton = QuietButton(symbol: "xmark", help: "Close file (⌘W)") { [weak self] in self?.onClose?() }
+    private lazy var previewButton = QuietButton(symbol: "eye", help: "Preview") { [weak self] in self?.togglePreview() }
+    /// Markdown reads rendered or as source. The choice holds for every Markdown file, until you switch back.
+    private var previewing = UserDefaults.standard.object(forKey: FileView.previewKey) as? Bool ?? true
+    private static let previewKey = "FarolMarkdownPreview"
+    private let preview = MarkdownView()
+    private var themeColors: (background: NSColor, foreground: NSColor)?
     /// Shown when the file changed on disk while you had unsaved edits.
     private let conflict = NSView()
     private let conflictText = NSTextField(labelWithString: "Changed on disk while you were editing.")
@@ -69,6 +77,7 @@ final class FileView: NSView {
         unsavedDot.toolTip = "Unsaved changes (⌘S to save)"
         header.addSubview(unsavedDot)
         header.addSubview(closeButton)
+        header.addSubview(previewButton)
 
         conflict.wantsLayer = true
         conflict.isHidden = true
@@ -113,8 +122,11 @@ final class FileView: NSView {
         message.alignment = .center
         message.isHidden = true
 
+        preview.text.onFocus = { [weak self] in self?.onFocus?() }
+        preview.onOpenFile = { [weak self] in self?.onOpenFile?($0) }
+
         gutter.onResize = { [weak self] in self?.needsLayout = true }
-        for view in [header, conflict, gutter, scroll, message] { addSubview(view) }
+        for view in [header, conflict, gutter, scroll, preview, message] { addSubview(view) }
         show(path)
     }
 
@@ -124,11 +136,37 @@ final class FileView: NSView {
 
     override var isFlipped: Bool { true }
 
-    var textView: NSTextView { text }
+    /// The text that takes the keyboard: the preview while it shows, else the source.
+    var textView: NSTextView { showsPreview ? preview.text : text }
 
     /// A click on the header or the line numbers picks this pane too, so ⌘W closes the file and not a terminal.
     override func mouseDown(with event: NSEvent) {
-        window?.makeFirstResponder(text)
+        window?.makeFirstResponder(textView)
+    }
+
+    // MARK: Markdown preview
+
+    private var showsPreview: Bool { Markdown.handles(path) && previewing && message.isHidden }
+
+    private func togglePreview() {
+        let focused = window?.firstResponder === textView
+        previewing.toggle()
+        UserDefaults.standard.set(previewing, forKey: Self.previewKey)
+        updateMode()
+        if focused { window?.makeFirstResponder(textView) }
+    }
+
+    /// Shows the source or the preview. The preview reads the text being edited, so unsaved edits show too.
+    private func updateMode() {
+        let markdown = Markdown.handles(path)
+        previewButton.isHidden = !markdown
+        previewButton.show(symbol: previewing ? "chevron.left.forwardslash.chevron.right" : "eye",
+                           help: previewing ? "Show the source" : "Preview")
+        preview.isHidden = !showsPreview
+        scroll.isHidden = !message.isHidden || showsPreview
+        gutter.isHidden = scroll.isHidden
+        if showsPreview { preview.show(text.string, path: path) }
+        needsLayout = true
     }
 
     /// Loads another file into the same pane. Callers check `isDirty` first, see confirmClose.
@@ -218,8 +256,7 @@ final class FileView: NSView {
         }
         message.stringValue = text ?? ""
         message.isHidden = text == nil
-        scroll.isHidden = text != nil
-        gutter.isHidden = text != nil
+        updateMode()
     }
 
     private func updateTitle() {
@@ -331,6 +368,9 @@ final class FileView: NSView {
         unsavedDot.layer?.backgroundColor = background.mixed(with: foreground, 0.55).cgColor
         updateTitle()
         closeButton.apply(background: background, foreground: foreground)
+        previewButton.apply(background: background, foreground: foreground)
+        themeColors = (background, foreground)
+        preview.apply(background: background, foreground: foreground, syntax: syntax)
         message.textColor = background.mixed(with: foreground, 0.55)
         scroll.backgroundColor = background
         CodeText.apply(to: text, background: background, foreground: foreground)
@@ -344,6 +384,7 @@ final class FileView: NSView {
     func highlight(with colors: SyntaxColors) {
         syntax = colors
         highlight()
+        if let themeColors { preview.apply(background: themeColors.background, foreground: themeColors.foreground, syntax: colors) }
     }
 
     /// Typing waits for a pause, so a burst of keys colors the file once.
@@ -365,7 +406,7 @@ final class FileView: NSView {
     func find(_ action: NSTextFinder.Action) {
         let item = NSMenuItem()
         item.tag = action.rawValue
-        text.performTextFinderAction(item)
+        textView.performTextFinderAction(item)
     }
 
     override func layout() {
@@ -373,8 +414,9 @@ final class FileView: NSView {
         let h = Self.headerHeight
         header.frame = NSRect(x: 0, y: 0, width: bounds.width, height: h)
         closeButton.frame = NSRect(x: bounds.width - 28, y: 3, width: 20, height: 20)
+        previewButton.frame = NSRect(x: bounds.width - 52, y: 3, width: 20, height: 20)
         // The dot follows the name, and the name gives up room first when the pane is narrow.
-        let room = max(0, bounds.width - 48 - Self.dotSize - 8)
+        let room = max(0, bounds.width - 48 - Self.dotSize - 8 - (previewButton.isHidden ? 0 : 24))
         let titleWidth = min(ceil(title.attributedStringValue.size().width) + 4, room)
         title.frame = NSRect(x: 12, y: 5, width: titleWidth, height: 16)
         unsavedDot.frame = NSRect(x: title.frame.maxX + 4, y: (h - Self.dotSize) / 2, width: Self.dotSize, height: Self.dotSize)
@@ -388,6 +430,7 @@ final class FileView: NSView {
         let body = max(0, bounds.height - h - bar)
         gutter.frame = NSRect(x: 0, y: h + bar, width: gutter.width, height: body)
         scroll.frame = NSRect(x: gutter.width, y: h + bar, width: max(0, bounds.width - gutter.width), height: body)
+        preview.frame = NSRect(x: 0, y: h + bar, width: bounds.width, height: body)
         // At least as big as the visible area, so short files still fill it and clicks land in the text.
         text.minSize = scroll.contentSize
         message.frame = NSRect(x: 12, y: bounds.midY - 10, width: max(0, bounds.width - 24), height: 20)

@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- A Markdown file opens as it reads in the file pane: headings, lists, tasks, code, quotes, tables and links. The eye in its header switches to the source and back, and the preview follows an agent's edits. A link to another file opens it in the pane.
+
 ## [0.30.10] - 2026-10-15
 
 New Task shows the ticket before you start.
