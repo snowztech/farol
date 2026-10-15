@@ -175,11 +175,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             .keyEquivalentModifierMask = [.command, .option]
         view.addItem(withTitle: "Resolve Conflicts", action: #selector(toggleMerge), keyEquivalent: "m")
             .keyEquivalentModifierMask = [.command, .option]
-        // Hidden, for contributors: answers ⌥⌘I without a place in the menu.
-        let inspector = view.addItem(withTitle: "Farol Inspector", action: #selector(toggleInspector), keyEquivalent: "i")
-        inspector.keyEquivalentModifierMask = [.command, .option]
-        inspector.isHidden = true
-        inspector.allowsKeyEquivalentWhenHidden = true
+        // Last and apart, as macOS apps keep their inspectors: there when you look for it, out of the way otherwise.
+        view.addItem(.separator())
+        view.addItem(withTitle: "Farol Inspector", action: #selector(toggleInspector), keyEquivalent: "i")
+            .keyEquivalentModifierMask = [.command, .option]
         main.addItem(submenu: view, title: "View")
 
         for menu in [app, sessions, view] {

@@ -10,7 +10,7 @@ A snappier window, fewer calls to GitHub, and an inspector to keep it that way.
 
 ### Added
 
-- ⌥⌘I opens the Farol Inspector: the programs Farol starts, freezes, memory and CPU, with a report to copy into a bug report.
+- The Farol Inspector, in the View menu or with ⌥⌘I: the programs Farol starts, freezes, memory and CPU, with a report to copy into a bug report.
 
 ### Fixed
 
