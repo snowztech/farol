@@ -122,16 +122,17 @@ final class InspectorMonitor: ObservableObject {
 
     /// What the window and the copied report both show, so they never disagree.
     func readings(at now: Date) -> [Inspector.Reading] {
-        let rates = snapshot.rate(over: Self.window, at: now)
-        let rate = rates.values.reduce(0, +)
-        let tools = rates.sorted { $0.value > $1.value }.map { "\($0.key) \(Self.decimal($0.value))" }
+        let started = snapshot.started(over: Self.window, at: now)
+        let count = started.values.reduce(0, +)
+        let tools = started.sorted { $0.value > $1.value }.map { "\($0.key) \($0.value)" }
         let blocking = snapshot.blocking
         let hangs = snapshot.hangs
         let longestHang = hangs.map(\.duration).max() ?? 0
         return [
             Inspector.Reading(
-                section: "Processes", title: "Rate", value: rate == 0 ? "0/s" : "\(Self.decimal(rate))/s", note: tools.joined(separator: " · "),
-                help: "git, gh and glab processes started a second, over the last \(Int(Self.window)) seconds. A launch or a push starts a burst. The color goes by the last minute's average, where under 2 is calm.",
+                section: "Processes", title: "Started", value: "\(count)",
+                note: (["in \(Int(Self.window)) s"] + tools).joined(separator: " · "),
+                help: "git, gh and glab processes started in the last \(Int(Self.window)) seconds. Opening a panel or pushing starts a burst. The color goes by the last minute: a loop that keeps going, over 4 a second, is what to look for.",
                 level: snapshot.processLevel(at: now)),
             Inspector.Reading(
                 section: "Main thread", title: "Blocking runs", value: blocking.isEmpty ? "none" : "\(snapshot.onMain)",
@@ -193,8 +194,6 @@ final class InspectorMonitor: ObservableObject {
         let seconds = Int(now.timeIntervalSince(date))
         return seconds < 60 ? "\(seconds) s ago" : "\(seconds / 60) min ago"
     }
-
-    private static func decimal(_ value: Double) -> String { String(format: "%.1f", value) }
 
     private static func size(_ bytes: UInt64) -> String {
         bytes < 1 << 30 ? "\(bytes >> 20) MB" : String(format: "%.1f GB", Double(bytes) / Double(1 << 30))

@@ -87,6 +87,12 @@ import Testing
     for index in 0..<100 { launch.record(Perf.Run(command: "git status", tool: "git", start: now.addingTimeInterval(-Double(index) / 20), duration: 0.02, onMain: false)) }
     #expect(launch.snapshot().processLevel(at: now) == .good)
 
+    // Opening the graph and the review panel, then working: about 2.5 a second over the minute.
+    let working = Perf()
+    for index in 0..<150 { working.record(Perf.Run(command: "git diff", tool: "git", start: now.addingTimeInterval(-Double(index) / 2.5), duration: 0.02, onMain: false)) }
+    #expect(working.snapshot().processLevel(at: now) == .good)
+    #expect(working.snapshot().started(over: 10, at: now) == ["git": 25])
+
     // 10 a second for a whole minute, as the hook loop #159 fixed was.
     let loop = Perf()
     for index in 0..<600 { loop.record(Perf.Run(command: "git status", tool: "git", start: now.addingTimeInterval(-Double(index) / 10), duration: 0.02, onMain: false)) }

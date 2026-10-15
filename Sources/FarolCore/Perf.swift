@@ -52,10 +52,15 @@ public final class Perf: @unchecked Sendable {
         }
 
         /// By the last minute's average: a launch, a session switch or a push starts a burst that's over in seconds, a loop keeps going.
-        /// Under 2 a second is calm. #159's loop ran 10 a second.
+        /// Opening panels and working averages 2 or 3 a second. #159's loop ran 10 a second, for minutes.
         public func processLevel(at now: Date) -> Level {
             let sustained = rate(over: 60, at: now).values.reduce(0, +)
-            return sustained < 2 ? .good : sustained < 5 ? .worthALook : .problem
+            return sustained < 4 ? .good : sustained < 8 ? .worthALook : .problem
+        }
+
+        /// How many runs started over the `window` seconds before `now`, by tool.
+        public func started(over window: TimeInterval, at now: Date) -> [String: Int] {
+            within(window, at: now).reduce(into: [:]) { counts, run in counts[run.tool, default: 0] += 1 }
         }
 
         /// Any run on the main thread breaks the rule. Under 100 ms nobody feels it, past that the window stutters.
