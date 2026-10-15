@@ -131,7 +131,8 @@ final class PerfMonitor: ObservableObject {
         let now = Date()
         var lines = [
             "Commands: \(Self.rate(snapshot.rate(over: Self.window, at: now)))",
-            "On the main thread: \(snapshot.onMain) since launch",
+            "On the main thread: \(snapshot.onMain) since launch"
+                + snapshot.recent.filter(\.onMain).prefix(3).map { ", \($0.command) \(Self.ms($0.duration))" }.joined(),
             "Stalls over \(Int(Self.stallAbove * 1000)) ms: \(stalls.count) in the last minute, longest \(Self.ms(stalls.map(\.duration).max() ?? 0))",
             "Memory: \(Self.megabytes(memory))   CPU: \(Int(cpu.rounded()))%",
             "Slowest over \(Int(Self.window)) s:",
@@ -148,6 +149,11 @@ final class PerfMonitor: ObservableObject {
 
     static func ms(_ seconds: TimeInterval) -> String { "\(Int((seconds * 1000).rounded())) ms" }
 
+    static func ago(_ date: Date, now: Date) -> String {
+        let seconds = Int(now.timeIntervalSince(date))
+        return seconds < 60 ? "\(seconds) s ago" : "\(seconds / 60) min ago"
+    }
+
     static func megabytes(_ bytes: UInt64) -> String { "\(bytes / 1_048_576) MB" }
 }
 
@@ -162,6 +168,11 @@ private struct DeveloperView: View {
             row("Commands", PerfMonitor.rate(snapshot.rate(over: PerfMonitor.window, at: now)))
             // Git on the main thread freezes the window, so any at all is worth fixing.
             row("On main thread", "\(snapshot.onMain)", alarm: snapshot.onMain > 0)
+            // The count alone says something is wrong. Which commands says where to look.
+            ForEach(Array(snapshot.recent.filter(\.onMain).prefix(3).enumerated()), id: \.offset) { _, run in
+                Text("\(run.command)  \(PerfMonitor.ms(run.duration))  \(PerfMonitor.ago(run.start, now: now))")
+                    .foregroundStyle(.red).padding(.leading, 110).lineLimit(1)
+            }
             row("Stalls, 1 min", monitor.stalls.isEmpty ? "none" : "\(monitor.stalls.count), longest \(PerfMonitor.ms(longest))",
                 alarm: longest > 0.25)
             row("Memory", PerfMonitor.megabytes(monitor.memory))
@@ -188,7 +199,8 @@ private struct DeveloperView: View {
         }
         .font(.system(size: 11, design: .monospaced))
         .padding(12)
-        .frame(width: 340, height: 300, alignment: .topLeading)
+        .frame(width: 340, alignment: .topLeading)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private func row(_ name: String, _ value: String, alarm: Bool = false) -> some View {

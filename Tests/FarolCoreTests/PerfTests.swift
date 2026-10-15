@@ -6,6 +6,8 @@ import Testing
     #expect(Perf.command("/usr/bin/git", ["-c", "core.quotePath=false", "diff", "--no-color", "--numstat"]) == "git diff")
     #expect(Perf.command("/opt/homebrew/bin/gh", ["pr", "view", "3", "--json", "body"]) == "gh pr view")
     #expect(Perf.command("/bin/zsh", ["-ilc", "printf %s \"$PATH\""]) == "zsh")
+    // A count like log's limit says nothing about which command it was.
+    #expect(Perf.command("/usr/bin/git", ["log", "400", "--format=%H"]) == "git log")
 }
 
 @Test func keepsTheLastRunsAndCountsThemAll() {

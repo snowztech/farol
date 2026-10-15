@@ -91,14 +91,14 @@ public final class Perf: @unchecked Sendable {
         }
     }
 
-    /// The tool and its first two words, skipping options and the values of -c and -C, like "git diff" or "gh pr view".
+    /// The tool and its first two words, like "git diff" or "gh pr view". Options, numbers and the values of -c and -C are skipped.
     static func command(_ executable: String, _ arguments: [String]) -> String {
         var words: [String] = []
         var skipValue = false
         for argument in arguments where words.count < 2 {
             if skipValue { skipValue = false; continue }
             if argument == "-c" || argument == "-C" { skipValue = true; continue }
-            if argument.hasPrefix("-") { continue }
+            if argument.hasPrefix("-") || Int(argument) != nil { continue }
             words.append(argument)
         }
         let tool = URL(fileURLWithPath: executable).lastPathComponent
