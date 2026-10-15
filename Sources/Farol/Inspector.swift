@@ -28,7 +28,8 @@ final class Inspector: NSObject, NSWindowDelegate {
 
     private func makePanel(state: WindowState) -> NSPanel {
         // A utility window in the theme's colors that never takes focus, so the terminal you are watching keeps it.
-        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 340, height: 420),
+        // About what the readings need, so there's no empty band below them when things are quiet.
+        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 340, height: 380),
                             styleMask: [.titled, .closable, .resizable, .fullSizeContentView, .nonactivatingPanel, .utilityWindow],
                             backing: .buffered, defer: true)
         panel.title = "Farol Inspector"
@@ -83,8 +84,10 @@ final class InspectorMonitor: ObservableObject {
     @Published private(set) var memory: (now: UInt64, peak: UInt64) = (0, 0)
     @Published private(set) var cpu: Double = 0
 
-    /// What the process rate and the longest processes cover.
+    /// What the process rate covers: how busy Farol is right now.
     static let window: TimeInterval = 10
+    /// What the longest processes cover: long enough to still show a burst once things go quiet.
+    static let recent: TimeInterval = 60
 
     private var timer: Timer?
     private var lastCPU: (time: TimeInterval, at: Date)?
@@ -141,7 +144,7 @@ final class InspectorMonitor: ObservableObject {
         let longestHang = hangs.map(\.duration).max() ?? 0
         return [
             Inspector.Reading(
-                section: "Processes", title: "Rate", value: rate == 0 ? "idle" : "\(Self.decimal(rate))/s", note: tools.joined(separator: " · "),
+                section: "Processes", title: "Rate", value: rate == 0 ? "0/s" : "\(Self.decimal(rate))/s", note: tools.joined(separator: " · "),
                 help: "git, gh and glab processes started a second, over the last \(Int(Self.window)) seconds. Under 2 is calm. A launch or a push starts more for a moment.",
                 // An agent at work keeps git busy, but #159 showed 10 a second is a loop, not work.
                 level: rate < 2 ? .good : rate < 5 ? .worthALook : .problem),
@@ -182,9 +185,9 @@ final class InspectorMonitor: ObservableObject {
             lines.append("  " + reading.title.padding(toLength: 15, withPad: " ", startingAt: 0) + reading.value + note + verdict)
             lines += reading.details.map { "    \($0)" }
         }
-        let longest = snapshot.longest(5, over: Self.window, at: now)
+        let longest = snapshot.longest(5, over: Self.recent, at: now)
         if !longest.isEmpty {
-            lines.append("Longest processes, last \(Int(Self.window)) s")
+            lines.append("Longest processes, last minute")
             lines += longest.map { "  " + Self.ms($0.duration).leftPadded(to: 8) + "  " + $0.command }
         }
         lines.append("\(snapshot.total) processes since launch")
@@ -293,9 +296,9 @@ private struct InspectorView: View {
     }
 
     private func longest(_ now: Date, _ p: Palette) -> some View {
-        let runs = monitor.snapshot.longest(5, over: InspectorMonitor.window, at: now)
+        let runs = monitor.snapshot.longest(5, over: InspectorMonitor.recent, at: now)
         return VStack(alignment: .leading, spacing: 6) {
-            header("Longest processes", span: "last \(Int(InspectorMonitor.window)) s", p)
+            header("Longest processes", span: "last minute", p)
                 .help("The processes that took longest lately. Each one takes some time, so only one long for its kind gets a color.")
             if runs.isEmpty { Text("none").foregroundStyle(p.muted) }
             ForEach(Array(runs.enumerated()), id: \.offset) { _, run in
