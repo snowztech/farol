@@ -78,7 +78,7 @@ final class InspectorMonitor: ObservableObject {
     private var timer: Timer?
     private var lastCPU: (time: TimeInterval, at: Date)?
 
-    /// Hangs are watched from launch by Perf, so only the snapshot, memory and CPU are read here, once a second.
+    /// Perf watches for freezes from launch, so only the snapshot, memory and CPU are read here, once a second.
     func start() {
         guard timer == nil else { return }
         sample()
@@ -134,17 +134,18 @@ final class InspectorMonitor: ObservableObject {
                 note: (["in \(Int(Self.window)) s"] + tools).joined(separator: " · "),
                 meaning: "git, gh and glab runs in the last \(Int(Self.window)) s. Bursts are normal. A minute above 4/s means a loop.",
                 level: snapshot.processLevel(at: now)),
+            // What you feel first, then what causes it, so the two read as effect and cause.
             Inspector.Reading(
-                section: "Main thread", title: "Blocking runs", value: blocking.isEmpty ? "none" : "\(snapshot.onMain)",
-                meaning: "Runs on the thread that draws the window, which freezes while they run. Should be none.",
-                level: snapshot.blockingLevel,
-                details: blocking.prefix(3).map { "\($0.command) · \(Self.ms($0.duration)) · \(Self.ago($0.start, now: now))" }),
-            Inspector.Reading(
-                section: "Main thread", title: "Hangs", value: hangs.isEmpty ? "none" : "\(hangs.count)",
+                section: "Responsiveness", title: "Freezes", value: hangs.isEmpty ? "none" : "\(hangs.count)",
                 note: hangs.count < 2 ? "" : "longest \(Self.ms(longestHang))",
-                meaning: "Times since launch the window froze for 250 ms or more.",
+                meaning: "Times since launch the window stopped responding for 250 ms or more, whatever the cause.",
                 level: snapshot.hangLevel,
                 details: hangs.prefix(3).map { "\(Self.ms($0.duration)) · \(Self.ago($0.start, now: now))" }),
+            Inspector.Reading(
+                section: "Responsiveness", title: "Blocking processes", value: blocking.isEmpty ? "none" : "\(snapshot.onMain)",
+                meaning: "git, gh or glab run where the window is drawn. Each pauses it, even too briefly to notice. Should be none.",
+                level: snapshot.blockingLevel,
+                details: blocking.prefix(3).map { "\($0.command) · \(Self.ms($0.duration)) · \(Self.ago($0.start, now: now))" }),
             Inspector.Reading(
                 section: "Resources", title: "Memory", value: Self.size(memory.now), note: "peak \(Self.size(memory.peak))",
                 meaning: "Farol's memory now, and its most since launch. A peak that keeps climbing is a leak.",
@@ -268,14 +269,14 @@ private struct InspectorView: View {
         Explained(meaning: reading.meaning, palette: p) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 0) {
-                    Text(reading.title).foregroundStyle(p.muted).frame(width: 104, alignment: .leading)
+                    Text(reading.title).foregroundStyle(p.muted).frame(width: 124, alignment: .leading)
                     Text(reading.value).monospacedDigit().foregroundStyle(color(reading.level, p))
                     if !reading.note.isEmpty {
                         Text("   " + reading.note).foregroundStyle(p.muted).lineLimit(1)
                     }
                 }
                 ForEach(reading.details, id: \.self) { detail in
-                    Text(detail).foregroundStyle(p.muted).padding(.leading, 104).lineLimit(1).truncationMode(.middle)
+                    Text(detail).foregroundStyle(p.muted).padding(.leading, 124).lineLimit(1).truncationMode(.middle)
                 }
             }
         }
@@ -292,7 +293,7 @@ private struct InspectorView: View {
                     HStack(spacing: 0) {
                         Text(InspectorMonitor.ms(run.duration)).monospacedDigit()
                             .foregroundStyle(InspectorMonitor.isLong(run) ? p.waiting : p.muted)
-                            .frame(width: 92, alignment: .leading)
+                            .frame(width: 112, alignment: .leading)
                         Text(run.command).font(.system(size: 11, design: .monospaced)).lineLimit(1).truncationMode(.tail)
                             .padding(.leading, 12)
                     }
