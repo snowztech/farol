@@ -358,7 +358,9 @@ final class RemoteBridge: ObservableObject {
         for (place, target) in activityTargets.enumerated().reversed() where target.shown != busy {
             let key = pushTargets.first { $0.device == target.device }?.key
             let state = RemoteActivityState(sessions, key: key)
-            connection.send(RelayFrame.activity(token: target.token, sandbox: target.sandbox, ending: state.isQuiet, state: state))
+            // Urgent only when one more agent waits for you. Apple caps urgent pushes, and the rest can wait for the phone's next wake.
+            let urgent = state.waiting > target.shown.filter { $0.status == .waiting || $0.status == .stopped }.count
+            connection.send(RelayFrame.activity(token: target.token, sandbox: target.sandbox, ending: state.isQuiet, urgent: urgent, state: state))
             if state.isQuiet { activityTargets.remove(at: place) } else { activityTargets[place].shown = busy }
         }
     }
