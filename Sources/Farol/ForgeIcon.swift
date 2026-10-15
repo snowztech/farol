@@ -14,7 +14,11 @@ struct ForgeIcon: View {
 
     /// The mark of where a ticket comes from.
     init(source: Ticket.Source, size: CGFloat = 12) {
-        image = source == .github ? Self.github : Self.jira
+        image = switch source {
+        case .github: Self.github
+        case .gitlab: Self.gitlab
+        case .jira: Self.jira
+        }
         self.size = size
     }
 

@@ -145,3 +145,32 @@ import Testing
     #expect(discussion.comments[1].old)
     #expect(discussion.comments[0].url?.absoluteString == "https://gitlab.com/g/a/-/merge_requests/3#note_8")
 }
+
+@Test func knowsTheHostsItsToolsAreLoggedInto() {
+    let gh = """
+    github.com:
+        git_protocol: ssh
+        user: ana
+    ghe.acme.com:
+        user: ana
+    """
+    #expect(Forge.hosts(inConfig: gh, under: nil) == ["github.com", "ghe.acme.com"])
+    let glab = """
+    git_protocol: ssh
+    hosts:
+        gitlab.com:
+            token: x
+        git.acme.com:
+            token: y
+            api_protocol: https
+    editor: vim
+    """
+    #expect(Forge.hosts(inConfig: glab, under: "hosts") == ["gitlab.com", "git.acme.com"])
+
+    // A company's own domain is a forge once its tool is logged in there, ports aside.
+    let hosts: [String: Forge.Kind] = ["git.acme.com": .gitlab, "ghe.acme.com": .github]
+    #expect(Forge(remote: "git@git.acme.com:team/app.git", hosts: hosts)?.kind == .gitlab)
+    #expect(Forge(remote: "ssh://git@git.acme.com:2222/team/app.git", hosts: hosts)?.web == "https://git.acme.com/team/app")
+    #expect(Forge(remote: "https://ghe.acme.com/team/app", hosts: hosts)?.kind == .github)
+    #expect(Forge(remote: "git@git.other.com:team/app.git", hosts: hosts) == nil)
+}
