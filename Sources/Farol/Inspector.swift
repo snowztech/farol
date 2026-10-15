@@ -56,7 +56,7 @@ extension Inspector {
         let value: String
         /// Quieter context beside the value, like which tools ran.
         var note = ""
-        /// What the reading means and what normal looks like, for someone who has never heard of a main thread. Shown on a click.
+        /// What the reading is and what normal looks like, in a line. Shown on a click.
         let meaning: String
         var level = Perf.Level.good
         /// The runs behind a value that needs a look, so it says where to look.
@@ -132,26 +132,26 @@ final class InspectorMonitor: ObservableObject {
             Inspector.Reading(
                 section: "Processes", title: "Started", value: "\(count)",
                 note: (["in \(Int(Self.window)) s"] + tools).joined(separator: " · "),
-                meaning: "Programs Farol started in the last \(Int(Self.window)) seconds: git to read your repos, gh and glab to talk to GitHub and GitLab. Opening a panel or pushing starts a short burst, which is normal. It only turns yellow when Farol keeps starting more than 4 a second for a whole minute, a sign that something runs git in a loop.",
+                meaning: "git, gh and glab runs in the last \(Int(Self.window)) s. Bursts are normal. A minute above 4/s means a loop.",
                 level: snapshot.processLevel(at: now)),
             Inspector.Reading(
                 section: "Main thread", title: "Blocking runs", value: blocking.isEmpty ? "none" : "\(snapshot.onMain)",
-                meaning: "Programs Farol ran on the main thread since launch, the one that draws the window. While one runs, the window can't redraw or react to you, so there should be none. Yellow when each was too short to feel, under 100 ms. Red from 100 ms, when the window stutters.",
+                meaning: "Runs on the thread that draws the window, which freezes while they run. Should be none.",
                 level: snapshot.blockingLevel,
                 details: blocking.prefix(3).map { "\($0.command) · \(Self.ms($0.duration)) · \(Self.ago($0.start, now: now))" }),
             Inspector.Reading(
                 section: "Main thread", title: "Hangs", value: hangs.isEmpty ? "none" : "\(hangs.count)",
                 note: hangs.count < 2 ? "" : "longest \(Self.ms(longestHang))",
-                meaning: "Times since launch the window didn't respond for a quarter of a second or more, the way Apple measures a hang. Counted even while the inspector is closed, so the one that made you open it is here.",
+                meaning: "Times since launch the window froze for 250 ms or more.",
                 level: snapshot.hangLevel,
                 details: hangs.prefix(3).map { "\(Self.ms($0.duration)) · \(Self.ago($0.start, now: now))" }),
             Inspector.Reading(
                 section: "Resources", title: "Memory", value: Self.size(memory.now), note: "peak \(Self.size(memory.peak))",
-                meaning: "What Activity Monitor shows for Farol, terminals and their scrollback included, and the most it has used since launch. 200 to 300 MB is normal with a few sessions. A peak that keeps climbing as you work means something holds on to memory.",
+                meaning: "Farol's memory now, and its most since launch. A peak that keeps climbing is a leak.",
                 level: Perf.memoryLevel(memory.now)),
             Inspector.Reading(
                 section: "Resources", title: "CPU", value: "\(Int(cpu.rounded()))%",
-                meaning: "How busy Farol itself keeps the processor, not the programs it starts. Near 0 while idle, a few percent while it draws.",
+                meaning: "Farol's own processor use. Near 0 when idle.",
                 level: Perf.cpuLevel(cpu)),
         ]
     }
@@ -283,8 +283,7 @@ private struct InspectorView: View {
 
     private func longest(_ now: Date, _ p: Palette) -> some View {
         let runs = monitor.snapshot.longest(5, over: InspectorMonitor.recent, at: now)
-        let meaning = "The programs that took longest in the last minute. Every one takes some time: git usually 10 to 100 ms, "
-            + "gh and glab up to a second or two since they go over the network. Only one slow for its kind turns yellow."
+        let meaning = "The slowest runs of the last minute. git takes 10–100 ms, gh and glab up to 2 s."
         return Explained(meaning: meaning, palette: p) {
             VStack(alignment: .leading, spacing: 6) {
                 header("Longest processes", span: "last minute", p)
