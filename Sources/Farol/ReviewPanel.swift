@@ -7,16 +7,30 @@ final class ReviewModel: ObservableObject {
     enum Row: Identifiable {
         case header(Diff.File, collapsed: Bool)
         /// The file's lines, drawn by one text view so a selection can cross them.
-        case body(Diff.File)
+        /// Comments on lines split it, and `rows` says which part this is. Nil is the whole file.
+        case body(Diff.File, rows: Range<Int>?)
         case note(file: String, String)
+        /// A request's comments on one line, under it.
+        case thread(LineRef, [Forge.Discussion.Comment])
+        /// The field for a new comment on a line.
+        case composer(LineRef)
 
         var id: String {
             switch self {
             case .header(let file, _): file.path
-            case .body(let file): "\(file.path)#body"
+            case .body(let file, let rows): "\(file.path)#body\(rows?.lowerBound ?? 0)"
             case .note(let file, _): "\(file)#note"
+            case .thread(let line, _): "\(line.path)#thread\(line.old ? "-" : "")\(line.line)"
+            case .composer(let line): "\(line.path)#composer"
             }
         }
+    }
+
+    /// A line of a request's diff: its number in the new file, or in the old one for a removed line.
+    struct LineRef: Hashable {
+        let path: String
+        let line: Int
+        let old: Bool
     }
 
     @Published private(set) var root: String?
@@ -52,7 +66,16 @@ final class ReviewModel: ObservableObject {
     /// The request being shown, for the compare menu and the link to its page.
     @Published private(set) var shownRequest: Forge.Request?
     /// Its description and comments, above its files. Nil while they are read, or without the forge's tool.
-    @Published private(set) var discussion: Forge.Discussion?
+    @Published private(set) var discussion: Forge.Discussion? {
+        didSet { rebuild() }
+    }
+    /// What the conversation lists: the comments that aren't shown under a line of the diff.
+    @Published private(set) var conversation: [Forge.Discussion.Comment] = []
+    /// The line a new comment is being written on, and its text so far.
+    @Published private(set) var composing: LineRef?
+    @Published var draft = ""
+    @Published private(set) var isSending = false
+    @Published private(set) var sendError: String?
     /// While a commit or a push runs.
     @Published private(set) var isShipping = false
     /// The commit sheet is open, from the Commit button or ⌥⌘C.
@@ -167,7 +190,11 @@ final class ReviewModel: ObservableObject {
     /// Shows what an open request changes, as from the git graph.
     func show(request: Forge.Request) {
         guard let root else { return }
-        if shownRequest?.number != request.number { discussion = nil }
+        if shownRequest?.number != request.number {
+            discussion = nil
+            composing = nil
+            draft = ""
+        }
         shownRequest = request
         // Another click reads it again, for commits pushed since.
         fetchedRequest = nil
@@ -182,6 +209,51 @@ final class ReviewModel: ObservableObject {
             let discussion = forge.discussion(ofRequest: request.number, in: root)
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root, self.shownRequest?.number == request.number else { return }
+                self.discussion = discussion
+            }
+        }
+    }
+
+    /// The request on screen takes comments on its lines from here.
+    var canComment: Bool {
+        guard let request = shownRequest, scope == .request(request.number) else { return false }
+        return forge?.takesLineComments == true && discussion?.head != nil
+    }
+
+    func startComment(on line: LineRef) {
+        if composing != line { draft = "" }
+        composing = line
+        sendError = nil
+        rebuild()
+    }
+
+    func cancelComment() {
+        composing = nil
+        sendError = nil
+        rebuild()
+    }
+
+    /// Sends the draft, then reads the conversation again so the comment shows under its line.
+    func sendComment() {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let root, let forge, let line = composing, let request = shownRequest, let head = discussion?.head,
+              !text.isEmpty, !isSending else { return NSSound.beep() }
+        isSending = true
+        sendError = nil
+        DispatchQueue.global(qos: .userInitiated).async {
+            let sent = Result {
+                try forge.comment(text, onRequest: request.number, head: head, path: line.path, line: line.line, old: line.old, in: root)
+            }
+            let discussion = (try? sent.get()) == nil ? nil : forge.discussion(ofRequest: request.number, in: root)
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.isSending = false
+                guard self.root == root, self.shownRequest?.number == request.number else { return }
+                if case .failure(let error) = sent { return self.sendError = String(describing: error) }
+                self.draft = ""
+                // Without the conversation read back, the comment wouldn't show. The field stays to say it went.
+                guard let discussion else { return self.sendError = "Sent, but couldn't read it back. View on \(forge.name) shows it." }
+                self.composing = nil
                 self.discussion = discussion
             }
         }
@@ -417,13 +489,43 @@ final class ReviewModel: ObservableObject {
     }
 
     private func rebuild() {
+        let showsRequest = shownRequest.map { scope == .request($0.number) } ?? false
+        // Comments on lines go under them. One whose line the diff no longer shows stays in the conversation.
+        var threads: [LineRef: [Forge.Discussion.Comment]] = [:]
+        var conversation: [Forge.Discussion.Comment] = []
+        for comment in showsRequest ? discussion?.comments ?? [] : [] {
+            if !comment.outdated, let path = comment.path, let line = comment.line, let file = files.first(where: { $0.path == path }),
+               DiffTextView.row(of: line, old: comment.old, in: file) != nil {
+                threads[LineRef(path: path, line: line, old: comment.old), default: []].append(comment)
+            } else {
+                conversation.append(comment)
+            }
+        }
+        self.conversation = conversation
+        let composing = showsRequest ? composing : nil
+
         var rows: [Row] = []
         for file in files {
             let folded = collapsed.contains(file.path)
             rows.append(.header(file, collapsed: folded))
             if folded { continue }
             if file.isBinary { rows.append(.note(file: file.path, "Binary file")) }
-            if !file.hunks.isEmpty { rows.append(.body(file)) }
+            if file.hunks.isEmpty { continue }
+            var lines = Set(threads.keys.filter { $0.path == file.path })
+            if let composing, composing.path == file.path { lines.insert(composing) }
+            let placed = lines.compactMap { line in DiffTextView.row(of: line.line, old: line.old, in: file).map { (row: $0, line: line) } }
+            // The diff is cut after each line with comments, so they show right under it.
+            var start = 0
+            for (row, here) in Dictionary(grouping: placed, by: \.row).sorted(by: { $0.key < $1.key }) {
+                rows.append(.body(file, rows: start..<(row + 1)))
+                start = row + 1
+                for line in here.map(\.line) {
+                    if let comments = threads[line] { rows.append(.thread(line, comments)) }
+                }
+                if let composing, here.contains(where: { $0.line == composing }) { rows.append(.composer(composing)) }
+            }
+            let count = DiffTextView.rowCount(file)
+            if start == 0 { rows.append(.body(file, rows: nil)) } else if start < count { rows.append(.body(file, rows: start..<count)) }
         }
         self.rows = rows
     }
@@ -477,7 +579,7 @@ struct ReviewPanel: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 0) {
                             if let discussion = review.discussion, review.scope == review.shownRequest.map({ .request($0.number) }) {
-                                Conversation(discussion: discussion, palette: p, reveal: review.reveal)
+                                Conversation(description: discussion.description, comments: review.conversation, palette: p, reveal: review.reveal)
                             }
                             ForEach(review.rows) { row(for: $0, p) }
                         }
@@ -526,8 +628,20 @@ struct ReviewPanel: View {
                        toggle: { review.toggle(file.path) },
                        // A request's files are its branch's, not the ones in your checkout.
                        open: review.scope.isRequest ? nil : { review.root.map { open(($0 as NSString).appendingPathComponent(file.path), file.firstChange) } })
-        case .body(let file):
-            DiffText(file: file, colors: p.diff, syntax: p.code).padding(.horizontal, 8)
+        case .body(let file, let rows):
+            DiffText(file: file, rows: rows, colors: p.diff, syntax: p.code,
+                     comment: review.canComment ? { review.startComment(on: .init(path: file.path, line: $0, old: $1)) } : nil)
+                .padding(.horizontal, 8)
+        case .thread(_, let comments):
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(comments.enumerated()), id: \.offset) { _, comment in
+                    CommentView(comment: comment, empty: "", palette: p, reveal: nil)
+                }
+            }
+            .padding(.leading, 24)
+            .padding(.bottom, 6)
+        case .composer(let line):
+            LineComposer(review: review, line: line, palette: p).padding(.leading, 24).padding(.bottom, 6)
         case .note(_, let text):
             Text(text).font(.system(size: 12)).foregroundStyle(p.muted).padding(.leading, 58).frame(height: 24)
         }
@@ -734,7 +848,8 @@ private struct FileHeader: View {
 
 /// A request's description and comments, above its files. It folds like a file.
 private struct Conversation: View {
-    let discussion: Forge.Discussion
+    let description: Forge.Discussion.Comment
+    let comments: [Forge.Discussion.Comment]
     let palette: Palette
     let reveal: (String) -> Void
 
@@ -750,7 +865,7 @@ private struct Conversation: View {
                     .foregroundStyle(palette.muted)
                     .frame(width: 12)
                 Text("Conversation").font(.system(size: 12.5)).foregroundStyle(palette.text)
-                Text(discussion.comments.count == 1 ? "1 comment" : "\(discussion.comments.count) comments")
+                Text(comments.count == 1 ? "1 comment" : "\(comments.count) comments")
                     .font(.system(size: 11))
                     .foregroundStyle(palette.muted)
                 Spacer(minLength: 8)
@@ -766,8 +881,8 @@ private struct Conversation: View {
             .onClickableHover { hovering = $0 }
             .onTapGesture { folded.toggle() }
             if !folded {
-                CommentView(comment: discussion.description, empty: "No description.", palette: palette, reveal: reveal)
-                ForEach(Array(discussion.comments.enumerated()), id: \.offset) { _, comment in
+                CommentView(comment: description, empty: "No description.", palette: palette, reveal: reveal)
+                ForEach(Array(comments.enumerated()), id: \.offset) { _, comment in
                     CommentView(comment: comment, empty: "", palette: palette, reveal: reveal)
                 }
             }
@@ -784,7 +899,29 @@ private struct CommentView: View {
     /// Shown in place of the text when there is none.
     let empty: String
     let palette: Palette
-    let reveal: (String) -> Void
+    /// Brings a commented file into view. Nil under the line itself, where the place goes without saying.
+    let reveal: ((String) -> Void)?
+
+    /// A comment starts as its first line, so a long thread stays easy to scan.
+    @State private var expanded = false
+    /// Whether the text needs more than its first line, which is when there is something to open.
+    @State private var truncated = false
+
+    private var blocks: [Markdown.Block] { Markdown.blocks(in: comment.text) }
+
+    /// The first block's text, as the folded comment's one line.
+    private var preview: Text { MarkdownBlocks.inline(blocks.first.map(Self.summary) ?? "") }
+
+    private static func summary(_ block: Markdown.Block) -> String {
+        switch block {
+        case .heading(_, let text), .paragraph(let text): text
+        case .code(_, let text): String(text.prefix { $0 != "\n" })
+        case .quote(let blocks): blocks.first.map(summary) ?? ""
+        case .list(_, _, let items): items.first?.blocks.first.map(summary) ?? ""
+        case .table(let header, _): header.joined(separator: " · ")
+        case .rule: ""
+        }
+    }
 
     private static let age: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
@@ -800,7 +937,7 @@ private struct CommentView: View {
                     Text(verdict).font(.system(size: 11, weight: .medium))
                         .foregroundStyle(verdict == "approved" ? palette.added : palette.removed)
                 }
-                if let path = comment.path {
+                if let path = comment.path, let reveal {
                     Button { reveal(path) } label: {
                         Text((path as NSString).lastPathComponent + (comment.line.map { ":\($0)" } ?? ""))
                             .font(.system(size: 11, design: .monospaced))
@@ -814,6 +951,10 @@ private struct CommentView: View {
                     Text(Self.age.localizedString(for: date, relativeTo: Date())).font(.system(size: 11)).foregroundStyle(palette.muted)
                 }
                 Spacer(minLength: 8)
+                if truncated || expanded {
+                    IconButton(symbol: expanded ? "chevron.up" : "chevron.down", help: expanded ? "Show less" : "Show all",
+                               palette: palette) { expanded.toggle() }
+                }
                 if let url = comment.url {
                     IconButton(symbol: "arrow.up.right.square", help: "Open in the browser", palette: palette) { NSWorkspace.shared.open(url) }
                 }
@@ -821,10 +962,24 @@ private struct CommentView: View {
             if comment.text.isEmpty {
                 if !empty.isEmpty { Text(empty).font(.system(size: 12)).foregroundStyle(palette.muted) }
             } else {
-                MarkdownBlocks(blocks: Markdown.blocks(in: comment.text), palette: palette)
-                    .font(.system(size: 12))
-                    .foregroundStyle(palette.text)
-                    .textSelection(.enabled)
+                if expanded {
+                    MarkdownBlocks(blocks: blocks, palette: palette)
+                        .font(.system(size: 12))
+                        .foregroundStyle(palette.text)
+                        .textSelection(.enabled)
+                } else {
+                    preview
+                        .font(.system(size: 12))
+                        .foregroundStyle(palette.text)
+                        .lineLimit(1)
+                        .background {
+                            // The first block is tried in the one line's space: when it doesn't fit, the second view is the one shown.
+                            ViewThatFits(in: .vertical) {
+                                preview.font(.system(size: 12)).hidden().onAppear { truncated = blocks.count > 1 || !blocks.allSatisfy(\.isText) }
+                                Color.clear.onAppear { truncated = true }
+                            }
+                        }
+                }
             }
         }
         .padding(10)
@@ -852,9 +1007,9 @@ private struct MarkdownBlocks: View {
     @ViewBuilder private func view(for block: Markdown.Block) -> some View {
         switch block {
         case .heading(let level, let text):
-            inline(text).font(.system(size: level <= 2 ? 14 : 12.5, weight: .semibold))
+            Self.inline(text).font(.system(size: level <= 2 ? 14 : 12.5, weight: .semibold))
         case .paragraph(let text):
-            inline(text).fixedSize(horizontal: false, vertical: true)
+            Self.inline(text).fixedSize(horizontal: false, vertical: true)
         case .code(_, let text):
             Text(text)
                 .font(.system(size: 11.5, design: .monospaced))
@@ -878,10 +1033,10 @@ private struct MarkdownBlocks: View {
             }
         case .table(let header, let rows):
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
-                GridRow { ForEach(Array(header.enumerated()), id: \.offset) { inline($1).fontWeight(.semibold) } }
+                GridRow { ForEach(Array(header.enumerated()), id: \.offset) { Self.inline($1).fontWeight(.semibold) } }
                 Divider()
                 ForEach(Array(rows.enumerated()), id: \.offset) { _, cells in
-                    GridRow { ForEach(Array(cells.enumerated()), id: \.offset) { inline($1) } }
+                    GridRow { ForEach(Array(cells.enumerated()), id: \.offset) { Self.inline($1) } }
                 }
             }
         case .rule:
@@ -889,8 +1044,58 @@ private struct MarkdownBlocks: View {
         }
     }
 
-    private func inline(_ text: String) -> Text {
+    static func inline(_ text: String) -> Text {
         let markdown = Markdown.inlineHTML(text)
         return Text((try? AttributedString(markdown: markdown, options: Self.options)) ?? AttributedString(markdown))
+    }
+}
+
+/// Writes a comment on a line of the request, under that line. ⌘↩ sends it, Escape puts it away.
+private struct LineComposer: View {
+    @ObservedObject var review: ReviewModel
+    let line: ReviewModel.LineRef
+    let palette: Palette
+
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            TextEditor(text: $review.draft)
+                .font(.system(size: 12))
+                .foregroundStyle(palette.text)
+                .scrollContentBackground(.hidden)
+                .focused($focused)
+                .frame(minHeight: 56, maxHeight: 160)
+                .padding(6)
+                .background(RoundedRectangle(cornerRadius: 6).fill(palette.background))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(palette.line))
+            if let error = review.sendError {
+                Text(error).font(.system(size: 11)).foregroundStyle(palette.removed).fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 8) {
+                Text(line.old ? "On removed line \(line.line)" : "On line \(line.line)").font(.system(size: 11)).foregroundStyle(palette.muted)
+                Spacer(minLength: 8)
+                ShipButton(title: "Cancel", busy: false, palette: palette) { review.cancelComment() }
+                ShipButton(title: "Comment", busy: review.isSending, keys: "⌘↩", palette: palette) { review.sendComment() }
+                    .keyboardShortcut(.return, modifiers: .command)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(palette.line))
+        .padding(.horizontal, 8)
+        .padding(.top, 6)
+        .onAppear { focused = true }
+        .onExitCommand { review.cancelComment() }
+    }
+}
+
+private extension Markdown.Block {
+    /// A heading or a paragraph, which a folded comment's one line shows whole when it fits.
+    var isText: Bool {
+        switch self {
+        case .heading, .paragraph: true
+        default: false
+        }
     }
 }

@@ -106,12 +106,12 @@ import Testing
 
 @Test func readsARequestsDiscussionFromGitHub() throws {
     let view = #"""
-    {"author":{"login":"ana"},"body":"Adds a thing.","createdAt":"2026-10-14T10:00:00Z","url":"https://github.com/o/r/pull/3",
+    {"author":{"login":"ana"},"body":"Adds a thing.","createdAt":"2026-10-14T10:00:00Z","url":"https://github.com/o/r/pull/3","headRefOid":"abc123",
      "comments":[{"author":{"login":"bo"},"body":"Thanks","createdAt":"2026-10-14T12:00:00Z","url":"https://github.com/o/r/pull/3#c1"}],
      "reviews":[{"author":{"login":"cy"},"body":"","state":"APPROVED","submittedAt":"2026-10-14T13:00:00Z"},
                 {"author":{"login":"cy"},"body":"","state":"COMMENTED","submittedAt":"2026-10-14T11:30:00Z"}]}
     """#
-    let lines = #"[{"user":{"login":"cy"},"body":"Why here?","created_at":"2026-10-14T11:00:00Z","path":"a.swift","line":null,"original_line":7}]"#
+    let lines = #"[{"user":{"login":"cy"},"body":"Why here?","created_at":"2026-10-14T11:00:00Z","path":"a.swift","line":null,"original_line":7,"side":"LEFT"}]"#
     let discussion = try #require(Forge.discussion(github: view, lines: lines))
     #expect(discussion.description.author == "ana")
     #expect(discussion.description.text == "Adds a thing.")
@@ -119,6 +119,10 @@ import Testing
     #expect(discussion.comments.map(\.author) == ["cy", "bo", "cy"])
     #expect(discussion.comments[0].path == "a.swift")
     #expect(discussion.comments[0].line == 7)
+    #expect(discussion.comments[0].old)
+    // Its line is gone, so it stays in the conversation rather than under a line that moved.
+    #expect(discussion.comments[0].outdated)
+    #expect(discussion.head == "abc123")
     #expect(discussion.comments[2].verdict == "approved")
     #expect(Forge.discussion(github: "not logged in", lines: "[]") == nil)
 }
@@ -127,12 +131,17 @@ import Testing
     let request = #"{"description":"Fixes it.","author":{"username":"ana"},"created_at":"2026-10-14T10:00:00.123Z","web_url":"https://gitlab.com/g/a/-/merge_requests/3"}"#
     let notes = #"""
     [{"id":7,"body":"added 1 commit","system":true,"author":{"username":"ana"}},
-     {"id":8,"body":"Why?","system":false,"author":{"username":"bo"},"created_at":"2026-10-15T08:00:00.000Z","position":{"new_path":"a.swift","new_line":12}}]
+     {"id":8,"body":"Why?","system":false,"author":{"username":"bo"},"created_at":"2026-10-15T08:00:00.000Z","position":{"new_path":"a.swift","new_line":12}},
+     {"id":9,"body":"Gone?","system":false,"author":{"username":"bo"},"position":{"new_path":"a.swift","new_line":null,"old_line":4}}]
     """#
     let discussion = try #require(Forge.discussion(gitlab: request, notes: notes))
     #expect(discussion.description.date != nil)
-    #expect(discussion.comments.count == 1)
+    #expect(discussion.comments.count == 2)
     #expect(discussion.comments[0].path == "a.swift")
     #expect(discussion.comments[0].line == 12)
+    #expect(!discussion.comments[0].old)
+    // A note on a removed line counts in the old file.
+    #expect(discussion.comments[1].line == 4)
+    #expect(discussion.comments[1].old)
     #expect(discussion.comments[0].url?.absoluteString == "https://gitlab.com/g/a/-/merge_requests/3#note_8")
 }
