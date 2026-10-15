@@ -510,6 +510,7 @@ final class PaneContainer: NSView {
             self?.applyFocus()
         }
         file.onClose = { [weak self] in self?.closeFile() }
+        file.onOpenFile = { [weak self] in self?.open($0) }
         addSubview(file)
         needsLayout = true
     }
