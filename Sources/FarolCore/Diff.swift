@@ -45,6 +45,19 @@ public enum Diff {
         public var isBinary = false
         public var hunks: [Hunk] = []
 
+        /// Where a line of the new file was in the old one, for a line the diff shows unchanged.
+        /// Nil for an added line, or one outside the diff.
+        public func oldLine(forNew line: Int) -> Int? {
+            for hunk in hunks {
+                var old = hunk.oldStart
+                for diffLine in hunk.lines {
+                    if diffLine.kind == .context, diffLine.number == line { return old }
+                    if diffLine.kind != .added { old += 1 }
+                }
+            }
+            return nil
+        }
+
         /// Where the first change is in the new file, to open it there. A removal points at the line that follows it.
         public var firstChange: Int {
             guard let hunk = hunks.first else { return 1 }

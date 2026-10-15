@@ -8,6 +8,12 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - A GitHub or GitLab on your company's own domain is recognized once gh or glab is logged in there, so its requests, reviews and checks show.
 - New Task lists a GitLab repo's open issues, as it does GitHub's.
+- On GitLab too, the "+" next to a line of a merge request's diff writes a comment on it.
+- A GitLab merge request's conversation shows who approved it or requested changes.
+
+### Fixed
+
+- A comment on an older version of a GitLab merge request's diff stays in the conversation instead of showing under a line that moved.
 
 ## [0.32.0] - 2026-10-15
 

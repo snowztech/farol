@@ -128,7 +128,7 @@ import Testing
 }
 
 @Test func readsARequestsDiscussionFromGitLab() throws {
-    let request = #"{"description":"Fixes it.","author":{"username":"ana"},"created_at":"2026-10-14T10:00:00.123Z","web_url":"https://gitlab.com/g/a/-/merge_requests/3"}"#
+    let request = #"{"description":"Fixes it.","author":{"username":"ana"},"created_at":"2026-10-14T10:00:00.123Z","web_url":"https://gitlab.com/g/a/-/merge_requests/3","diff_refs":{"base_sha":"b1","start_sha":"s1","head_sha":"h1"}}"#
     let notes = #"""
     [{"id":7,"body":"added 1 commit","system":true,"author":{"username":"ana"}},
      {"id":8,"body":"Why?","system":false,"author":{"username":"bo"},"created_at":"2026-10-15T08:00:00.000Z","position":{"new_path":"a.swift","new_line":12}},
@@ -144,6 +144,55 @@ import Testing
     #expect(discussion.comments[1].line == 4)
     #expect(discussion.comments[1].old)
     #expect(discussion.comments[0].url?.absoluteString == "https://gitlab.com/g/a/-/merge_requests/3#note_8")
+    // The three commits a new comment on a line names.
+    #expect(discussion.base == "b1")
+    #expect(discussion.start == "s1")
+    #expect(discussion.head == "h1")
+}
+
+@Test func readsGitLabApprovalsAndOutdatedComments() throws {
+    let request = #"{"description":"","author":{"username":"ana"},"diff_refs":{"base_sha":"b1","start_sha":"s1","head_sha":"h2"}}"#
+    let notes = #"""
+    [{"id":1,"body":"Why?","system":false,"author":{"username":"bo"},"created_at":"2026-10-15T08:00:00.000Z","position":{"new_path":"a.swift","new_line":3,"head_sha":"h1"}},
+     {"id":2,"body":"Here?","system":false,"author":{"username":"bo"},"created_at":"2026-10-15T09:00:00.000Z","position":{"new_path":"a.swift","new_line":5,"head_sha":"h2"}},
+     {"id":3,"body":"approved this merge request","system":true,"author":{"username":"cy"},"created_at":"2026-10-15T10:00:00.000Z"},
+     {"id":4,"body":"requested changes","system":true,"author":{"username":"di"},"created_at":"2026-10-15T11:00:00.000Z"},
+     {"id":5,"body":"added 1 commit","system":true,"author":{"username":"ana"},"created_at":"2026-10-15T12:00:00.000Z"}]
+    """#
+    let discussion = try #require(Forge.discussion(gitlab: request, notes: notes))
+    // A note left on an older diff stays in the conversation, rather than under a line that moved.
+    #expect(discussion.comments[0].outdated)
+    #expect(!discussion.comments[1].outdated)
+    // Approvals show as verdicts, GitLab's other notes about itself stay out.
+    #expect(discussion.comments.map(\.author) == ["bo", "bo", "cy", "di"])
+    #expect(discussion.comments[2].verdict == "approved")
+    #expect(discussion.comments[2].text.isEmpty)
+    #expect(discussion.comments[3].verdict == "requested changes")
+}
+
+@Test func placesAGitLabCommentOnALine() throws {
+    let request = #"{"description":"","author":{"username":"ana"},"diff_refs":{"base_sha":"b1","start_sha":"s1","head_sha":"h1"}}"#
+    let discussion = try #require(Forge.discussion(gitlab: request, notes: "[]"))
+    // A line the request leaves alone needs its number on both sides, and a renamed file both paths.
+    let unchanged = Forge.LinePlace(path: "new.swift", oldPath: "old.swift", newLine: 13, oldLine: 12)
+    let body = try #require(Forge.gitlabComment("Why?", at: unchanged, of: discussion))
+    #expect(body["body"] as? String == "Why?")
+    let position = try #require(body["position"] as? [String: Any])
+    #expect(position["position_type"] as? String == "text")
+    #expect(position["base_sha"] as? String == "b1")
+    #expect(position["start_sha"] as? String == "s1")
+    #expect(position["head_sha"] as? String == "h1")
+    #expect(position["new_path"] as? String == "new.swift")
+    #expect(position["old_path"] as? String == "old.swift")
+    #expect(position["new_line"] as? Int == 13)
+    #expect(position["old_line"] as? Int == 12)
+    // A removed line has only its old number.
+    let removed = Forge.LinePlace(path: "a.swift", oldPath: "a.swift", newLine: nil, oldLine: 4)
+    let removedPosition = try #require(Forge.gitlabComment("Gone?", at: removed, of: discussion)?["position"] as? [String: Any])
+    #expect(removedPosition["new_line"] == nil)
+    #expect(removedPosition["old_line"] as? Int == 4)
+    // Without the diff's commits there is nothing to place it against.
+    #expect(Forge.gitlabComment("x", at: removed, of: Forge.discussion(gitlab: #"{"description":""}"#, notes: "[]")!) == nil)
 }
 
 @Test func knowsTheHostsItsToolsAreLoggedInto() {

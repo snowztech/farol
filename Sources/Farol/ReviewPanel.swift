@@ -314,15 +314,19 @@ final class ReviewModel: ObservableObject {
     /// Sends the draft, then reads the conversation again so the comment shows under its line.
     func sendComment() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let root, let forge, let line = composing, let request = shownRequest, let head = discussion?.head,
-              !text.isEmpty, !isSending else { return NSSound.beep() }
+        guard let root, let forge, let line = composing, let request = shownRequest, let discussion,
+              let file = files.first(where: { $0.path == line.path }), !text.isEmpty, !isSending else { return NSSound.beep() }
+        // GitLab places a comment by both numbers when the line is unchanged, and by both paths when the file was renamed.
+        let place = Forge.LinePlace(path: line.path, oldPath: file.oldPath ?? line.path,
+                                    newLine: line.old ? nil : line.line,
+                                    oldLine: line.old ? line.line : file.oldLine(forNew: line.line))
         isSending = true
         sendError = nil
         DispatchQueue.global(qos: .userInitiated).async {
             let sent = Result {
-                try forge.comment(text, onRequest: request.number, head: head, path: line.path, line: line.line, old: line.old, in: root)
+                try forge.comment(text, onRequest: request.number, at: place, of: discussion, in: root)
             }
-            let discussion = (try? sent.get()) == nil ? nil : forge.discussion(ofRequest: request.number, in: root)
+            let updated = (try? sent.get()) == nil ? nil : forge.discussion(ofRequest: request.number, in: root)
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 self.isSending = false
@@ -330,9 +334,9 @@ final class ReviewModel: ObservableObject {
                 if case .failure(let error) = sent { return self.sendError = String(describing: error) }
                 self.draft = ""
                 // Without the conversation read back, the comment wouldn't show. The field stays to say it went.
-                guard let discussion else { return self.sendError = "Sent, but couldn't read it back. View on \(forge.name) shows it." }
+                guard let updated else { return self.sendError = "Sent, but couldn't read it back. View on \(forge.name) shows it." }
                 self.composing = nil
-                self.discussion = discussion
+                self.discussion = updated
             }
         }
     }
