@@ -191,11 +191,15 @@ public struct Forge: Equatable {
             /// Where a comment on a line of the diff was left. Nil for the rest of the conversation.
             public var path: String?
             public var line: Int?
+            /// The line is one the request removes, so `line` counts in the old file.
+            public var old = false
             public var url: URL?
         }
 
         public let description: Comment
         public let comments: [Comment]
+        /// The commit the request's branch is at, which a new comment on a line has to name. GitHub only.
+        public var head: String?
     }
 
     /// Request `number`'s description and comments. Talks to the forge, so call it off the main thread.
@@ -204,7 +208,7 @@ public struct Forge: Equatable {
         guard let path = kind.toolPath else { return nil }
         switch kind {
         case .github:
-            guard let view = try? Git.run(path, ["pr", "view", "\(number)", "--json", "author,body,createdAt,url,comments,reviews"],
+            guard let view = try? Git.run(path, ["pr", "view", "\(number)", "--json", "author,body,createdAt,url,comments,reviews,headRefOid"],
                                           in: directory) else { return nil }
             // Comments on lines of the diff aren't part of the pull request's view, only of the API.
             let lines = try? Git.run(path, ["api", "repos/{owner}/{repo}/pulls/\(number)/comments?per_page=100"], in: directory)
@@ -244,9 +248,11 @@ public struct Forge: Equatable {
                                                path: comment["path"] as? String,
                                                // An outdated comment's line is gone, so it keeps the one it was left on.
                                                line: comment["line"] as? Int ?? comment["original_line"] as? Int,
+                                               old: comment["side"] as? String == "LEFT",
                                                url: url(comment, "html_url")))
         }
-        return Discussion(description: description, comments: comments.sorted { ($0.date ?? .distantPast) < ($1.date ?? .distantPast) })
+        return Discussion(description: description, comments: comments.sorted { ($0.date ?? .distantPast) < ($1.date ?? .distantPast) },
+                          head: request["headRefOid"] as? String)
     }
 
     /// Reads GitLab's merge request and its notes, leaving out the ones GitLab writes itself, like "added 1 commit".
@@ -261,11 +267,27 @@ public struct Forge: Equatable {
             guard note["system"] as? Bool != true else { return nil }
             let position = note["position"] as? [String: Any]
             let link = page.flatMap { page in (note["id"] as? Int).flatMap { URL(string: "\(page)#note_\($0)") } }
+            // A note on a removed line has only the old line's number.
+            let new = position?["new_line"] as? Int
             return Discussion.Comment(author: username(note), date: date(note["created_at"]), text: note["body"] as? String ?? "",
-                                      path: position?["new_path"] as? String, line: position?["new_line"] as? Int,
-                                      url: link)
+                                      path: position?["new_path"] as? String, line: new ?? position?["old_line"] as? Int,
+                                      old: position != nil && new == nil, url: link)
         }
         return Discussion(description: description, comments: comments)
+    }
+
+    /// Whether this forge takes new comments on lines from Farol.
+    public var takesLineComments: Bool { kind == .github && kind.toolPath != nil }
+
+    /// Leaves `text` on a line of request `number`'s diff, at commit `head`. `old` puts it on a removed line, counted in the old file.
+    /// Talks to the forge, so call it off the main thread.
+    public func comment(_ text: String, onRequest number: Int, head: String, path: String, line: Int, old: Bool,
+                        in directory: String) throws {
+        // ponytail: GitHub only. GitLab wants the diff's three commits in a position, to add once it can be tried on a real instance.
+        guard kind == .github, let tool = kind.toolPath else { throw GitError(description: "Comments on lines need gh, on GitHub.") }
+        // -f sends text as it is, -F turns the line into a number.
+        try Git.run(tool, ["api", "repos/{owner}/{repo}/pulls/\(number)/comments", "-f", "body=\(text)", "-f", "commit_id=\(head)",
+                           "-f", "path=\(path)", "-F", "line=\(line)", "-f", "side=\(old ? "LEFT" : "RIGHT")"], in: directory)
     }
 
     private static func json(_ text: String) -> Any? { try? JSONSerialization.jsonObject(with: Data(text.utf8)) }
