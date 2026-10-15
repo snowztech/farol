@@ -80,6 +80,17 @@ struct Workspace {
     #expect(!FileManager.default.fileExists(atPath: folder + "/web"))
 }
 
+@Test func removesWhatItCanAndNamesWhatGitKept() throws {
+    let space = try Workspace()
+    let folder = try space.tasks.create(branch: "half", repos: space.repos)
+    // Git refuses to remove a worktree with changes, so web stays and the error says so.
+    try "draft".write(toFile: folder + "/web/notes.txt", atomically: true, encoding: .utf8)
+
+    #expect { try space.tasks.remove(folder) } throws: { "\($0)".contains("web") && !"\($0)".contains("api") }
+    #expect(!FileManager.default.fileExists(atPath: folder + "/api"))
+    #expect(FileManager.default.fileExists(atPath: folder + "/web/notes.txt"))
+}
+
 @Test func refusesToRemoveFoldersOutsideTasks() throws {
     let space = try Workspace()
     #expect(throws: GitError.self) { try space.tasks.remove(space.parent) }

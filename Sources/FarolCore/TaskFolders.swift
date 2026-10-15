@@ -83,16 +83,21 @@ public struct TaskFolders {
     }
 
     /// Removes every worktree in the task folder, then the folder. The branches stay, so no commit is lost.
+    /// A worktree git refuses to remove stays, and the others go anyway. The error names each one kept.
     public func remove(_ folder: String) throws {
         guard root(of: folder) == URL(fileURLWithPath: folder).resolvingSymlinksInPath().path else {
             throw GitError(description: "\(folder) is not a Farol task folder.")
         }
-        for item in contents(of: folder) where isWorktree(item) {
-            guard let repo = Git.repoRoot(of: item) else { continue }
-            try Git.run(["worktree", "remove", item], in: repo)
+        let kept = contents(of: folder).filter(isWorktree).filter { item in
+            guard let repo = Git.repoRoot(of: item) else { return true }
+            return (try? Git.run(["worktree", "remove", item], in: repo)) == nil
         }
         // Whatever isn't a worktree was left out above, and removing the folder would take it along.
         if contents(of: folder).isEmpty { try FileManager.default.removeItem(atPath: folder) }
+        guard kept.isEmpty else {
+            let names = kept.map { URL(fileURLWithPath: $0).lastPathComponent }.sorted()
+            throw GitError(description: "Kept \(names.joined(separator: ", ")) in \(folder).")
+        }
     }
 
     /// A worktree has a `.git` file pointing at its repo, where a plain folder has none.

@@ -194,7 +194,11 @@ extension MainWindowController {
                     } catch {
                         // Rare now that unsaved work is checked first, so a plain note is enough.
                         DispatchQueue.main.async { [weak self] in
-                            self?.showError("Worktree kept", "It couldn't be removed and stays at \(worktree). Nothing was deleted.")
+                            if isTask {
+                                self?.showError("Some worktrees kept", "\(error) The other repos' worktrees were removed.")
+                            } else {
+                                self?.showError("Worktree kept", "It couldn't be removed and stays at \(worktree). Nothing was deleted.")
+                            }
                         }
                     }
                 }
