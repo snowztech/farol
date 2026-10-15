@@ -6,7 +6,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [0.32.2] - 2026-10-15
 
-A snappier window and fewer calls to GitHub.
+A snappier window, fewer calls to GitHub, and an inspector to keep it that way.
+
+### Added
+
+- ⌥⌘I opens the Farol Inspector: the programs Farol starts, freezes, memory and CPU, with a report to copy into a bug report.
 
 ### Fixed
 
