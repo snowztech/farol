@@ -184,9 +184,9 @@ private struct GitButton: View {
 
     var body: some View {
         let p = state.palette
-        let counts = !review.changes.isEmpty || review.isOpen
+        let counts = !review.total.isEmpty || review.isOpen
         let stopped = merge.operation != nil
-        if !counts, !stopped, session.topLevel != nil || state.graphVisible {
+        if !counts, !stopped, session.checkout != nil || state.graphVisible {
             // Alone, the icon sits bare like the others in the title bar. A pill around it reads as switched on.
             IconButton(symbol: "point.3.filled.connected.trianglepath.dotted", help: "Git graph (⌥⌘G)", active: state.graphVisible,
                        palette: p, action: graph)
@@ -210,7 +210,7 @@ private struct GitButton: View {
                 if counts {
                     // Over a commit it isn't lit: a click there brings your changes back.
                     Half(active: review.isOpen && !review.showsCommit, help: "Review changes (⌥⌘R)", palette: p, action: changes) { _ in
-                        Counts(added: review.changes.added, removed: review.changes.removed, palette: p)
+                        Counts(added: review.total.added, removed: review.total.removed, palette: p)
                     }
                 }
             }

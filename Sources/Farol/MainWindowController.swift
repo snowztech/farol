@@ -427,13 +427,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         guard let session else {
             reviewFollow = nil
             state.remote = false
+            review.follow(task: [])
             return review.follow(nil, branch: nil)
         }
         // Over ssh the panels would show the repo on this Mac, so they get no folder, as outside a git repo.
-        reviewFollow = session.$topLevel.combineLatest(session.$branch, session.$isRemote)
-            .sink { [weak self] topLevel, branch, remote in
+        reviewFollow = session.$checkout.combineLatest(session.$branch, session.$isRemote)
+            .sink { [weak self] checkout, branch, remote in
                 self?.state.remote = remote
-                self?.review.follow(remote ? nil : topLevel, branch: remote ? nil : branch)
+                self?.review.follow(remote ? nil : checkout, branch: remote ? nil : branch)
+                self?.review.follow(task: remote ? [] : session.taskRepos)
             }
     }
 
@@ -452,8 +454,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             graphFollow = nil
             return graph.show(nil, current: nil)
         }
-        graphFollow = session.$topLevel.combineLatest(session.$branch, session.$isRemote)
-            .sink { [weak self] topLevel, branch, remote in self?.graph.show(remote ? nil : topLevel, current: remote ? nil : branch) }
+        graphFollow = session.$checkout.combineLatest(session.$branch, session.$isRemote)
+            .sink { [weak self] checkout, branch, remote in self?.graph.show(remote ? nil : checkout, current: remote ? nil : branch) }
     }
 
     /// Does what the user chose in System Settings for a title bar double-click: zoom, minimize or nothing.
@@ -711,7 +713,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             mergeFollow = nil
             return merge.follow(nil)
         }
-        mergeFollow = session.$topLevel.sink { [weak self] in self?.merge.follow($0) }
+        mergeFollow = session.$checkout.sink { [weak self] in self?.merge.follow($0) }
         // Resolving here changes what the sidebar says about the session, so it reads git again.
         mergeCount = merge.$conflicts.dropFirst().sink { [weak session] _ in session?.refreshGit() }
     }

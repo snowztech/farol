@@ -71,6 +71,21 @@ final class ReviewModel: ObservableObject {
     /// The ticks are hidden then, so nobody is led into git's refusal.
     @Published private(set) var canChooseFiles = true
     private var scopeBeforeCommit: Diff.Scope?
+    /// In a task folder, each repo and its changes, for the tabs and the title bar's total. Empty outside one.
+    @Published private(set) var taskRepos: [(path: String, stat: Diff.Stat)] = []
+    /// Your changes across every repo of a task, or just this checkout's.
+    var total: Diff.Stat {
+        guard !taskRepos.isEmpty else { return changes }
+        return taskRepos.reduce(into: Diff.Stat()) { sum, repo in
+            sum.files += repo.stat.files
+            sum.added += repo.stat.added
+            sum.removed += repo.stat.removed
+        }
+    }
+    private var taskWatcher: FolderWatcher?
+    private var pendingTask: DispatchWorkItem?
+    /// Each task repo's default scope, worked out once since it takes a few git calls.
+    private var defaultScopes: [String: Diff.Scope] = [:]
 
     private var files: [Diff.File] = []
     private var collapsed: Set<String> = []
@@ -145,6 +160,53 @@ final class ReviewModel: ObservableObject {
         }
     }
 
+    /// Counts the changes of every repo in a task folder, or stops with no repos.
+    func follow(task repos: [String]) {
+        // Called at every prompt, which is also how a commit from the terminal shows up.
+        guard repos != taskRepos.map(\.path) else { return refreshTask() }
+        pendingTask?.cancel()
+        taskRepos = repos.map { ($0, Diff.Stat()) }
+        defaultScopes = [:]
+        // The repos sit side by side in the task folder, so one watcher sees them all.
+        taskWatcher = repos.first.map { first in
+            FolderWatcher((first as NSString).deletingLastPathComponent) { [weak self] _ in self?.taskChanged() }
+        }
+        refreshTask()
+    }
+
+    private func taskChanged() {
+        pendingTask?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.refreshTask() }
+        pendingTask = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
+    }
+
+    private func refreshTask() {
+        let repos = taskRepos.map(\.path)
+        guard !repos.isEmpty else { return }
+        let chosen = chosenScope, known = defaultScopes
+        DispatchQueue.global(qos: .userInitiated).async {
+            var stats = [Diff.Stat](repeating: Diff.Stat(), count: repos.count)
+            var scopes = [Diff.Scope?](repeating: nil, count: repos.count)
+            let lock = NSLock()
+            // Each repo answers on its own, so a big one doesn't hold up the rest.
+            DispatchQueue.concurrentPerform(iterations: repos.count) { index in
+                let repo = repos[index]
+                let fallback = known[repo] ?? Diff.defaultScope(in: repo)
+                var scope = chosen[repo] ?? fallback
+                // A commit looked at in the graph isn't your changes, which is what the counts are.
+                if case .commit = scope { scope = fallback }
+                let stat = (try? Diff.stat(in: repo, scope)) ?? Diff.Stat()
+                lock.withLock { (stats[index], scopes[index]) = (stat, fallback) }
+            }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.taskRepos.map(\.path) == repos else { return }
+                self.taskRepos = Array(zip(repos, stats))
+                for (repo, scope) in zip(repos, scopes) { self.defaultScopes[repo] = scope }
+            }
+        }
+    }
+
     /// Shows what one commit changed, as from the git graph.
     func show(commit hash: String, subject: String, file: String? = nil) {
         guard let root else { return }
@@ -170,6 +232,7 @@ final class ReviewModel: ObservableObject {
         chosenScope[root] = scope
         self.scope = scope
         refresh()
+        refreshTask()
     }
 
     /// Opens the commit sheet when there is something to commit.
@@ -231,6 +294,7 @@ final class ReviewModel: ObservableObject {
                 self.isShipping = false
                 // What was left out of this commit is the next one's to decide.
                 if committed { self.leftOut[root] = nil }
+                self.refreshTask()
                 if let failure { failed(failure.0, failure.1) } else if let link { NSWorkspace.shared.open(link) }
                 self.refresh()
                 if let created, self.root == root, self.branch == branch { self.request = created }
