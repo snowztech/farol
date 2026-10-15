@@ -27,16 +27,18 @@ final class ReviewModel: ObservableObject {
     @Published private(set) var stat = Diff.Stat()
     /// What the title bar counts: your changes, even while the panel shows a commit.
     @Published private(set) var changes = Diff.Stat()
-    var showsCommit: Bool { if case .commit = scope { true } else { false } }
+    /// False while the panel shows a commit or a request rather than your own work.
+    var showsYours: Bool { scope.isYours }
     @Published private(set) var rows: [Row] = []
     @Published private(set) var error: String?
     @Published var isOpen = false {
         didSet {
             guard isOpen != oldValue else { return }
-            // A commit is only looked at while the panel is open. Closing it brings back what the title bar counts.
-            if !isOpen, case .commit = scope, let root {
-                chosenScope[root] = scopeBeforeCommit
-                scope = scopeBeforeCommit ?? .uncommitted
+            // A commit or a request is only looked at while the panel is open. Closing it brings back what the title bar counts.
+            if !isOpen, !scope.isYours, let root {
+                chosenScope[root] = yourScope
+                scope = yourScope ?? .uncommitted
+                fetchedRequest = nil
             }
             refresh()
             if isOpen { checkRequest() }
@@ -47,6 +49,8 @@ final class ReviewModel: ObservableObject {
     private var pendingFocus: String?
     /// The subject of the commit being shown, for the compare menu.
     @Published private(set) var commitSubject: String?
+    /// The request being shown, for the compare menu and the link to its page.
+    @Published private(set) var shownRequest: Forge.Request?
     /// While a commit or a push runs.
     @Published private(set) var isShipping = false
     /// The commit sheet is open, from the Commit button or ⌥⌘C.
@@ -70,7 +74,10 @@ final class ReviewModel: ObservableObject {
     /// False while git is stopped on a merge, a rebase or a cherry-pick, where it only takes a commit of everything.
     /// The ticks are hidden then, so nobody is led into git's refusal.
     @Published private(set) var canChooseFiles = true
-    private var scopeBeforeCommit: Diff.Scope?
+    /// What you were looking at before a commit or a request, to come back to.
+    private var yourScope: Diff.Scope?
+    /// The request whose files are loaded. Its diff doesn't move as you work, so the forge is asked once.
+    private var fetchedRequest: Int?
 
     private var files: [Diff.File] = []
     private var collapsed: Set<String> = []
@@ -117,6 +124,7 @@ final class ReviewModel: ObservableObject {
             unpushed = 0
             forge = nil
             ignored = []
+            fetchedRequest = nil
         }
         guard let root else { return }
         if rootChanged { watcher = FolderWatcher(root) { [weak self] in self?.changed($0) } }
@@ -149,18 +157,29 @@ final class ReviewModel: ObservableObject {
     func show(commit hash: String, subject: String, file: String? = nil) {
         guard let root else { return }
         pendingFocus = file
-        if case .commit = scope {} else { scopeBeforeCommit = chosenScope[root] ?? scope }
         commitSubject = subject
-        chosenScope[root] = .commit(hash)
-        scope = .commit(hash)
+        browse(.commit(hash), in: root)
+    }
+
+    /// Shows what an open request changes, as from the git graph.
+    func show(request: Forge.Request) {
+        guard let root else { return }
+        shownRequest = request
+        browse(.request(request.number), in: root)
+    }
+
+    private func browse(_ scope: Diff.Scope, in root: String) {
+        if self.scope.isYours { yourScope = chosenScope[root] ?? self.scope }
+        chosenScope[root] = scope
+        self.scope = scope
         refresh()
     }
 
-    /// Goes back from a commit to the changes shown before it. False when no commit is shown.
-    func leaveCommit() -> Bool {
-        guard isOpen, case .commit = scope, let root else { return false }
-        chosenScope[root] = scopeBeforeCommit
-        scope = scopeBeforeCommit ?? .uncommitted
+    /// Goes back from a commit or a request to the changes shown before it. False when your own changes are shown.
+    func showYours() -> Bool {
+        guard isOpen, !scope.isYours, let root else { return false }
+        chosenScope[root] = yourScope
+        scope = yourScope ?? .uncommitted
         refresh()
         return true
     }
@@ -192,7 +211,7 @@ final class ReviewModel: ObservableObject {
 
     /// Whether a file shown in the panel has a tick: only a file with uncommitted changes can go in a commit.
     func isTicked(_ path: String) -> Bool? {
-        if case .commit = scope { return nil }
+        if !scope.isYours { return nil }
         return canChooseFiles && uncommittedPaths.contains(path) ? !excluded.contains(path) : nil
     }
 
@@ -297,17 +316,24 @@ final class ReviewModel: ObservableObject {
     func refresh() {
         pending?.cancel()
         guard let root, !scopePending else { return }
-        let scope = scope, withFiles = isOpen, base = branches.first, branch = branch
-        let yours = showsCommit ? scopeBeforeCommit ?? .uncommitted : scope
+        let scope = scope, base = branches.first, branch = branch
+        let withFiles = isOpen && scope != fetchedRequest.map(Diff.Scope.request)
+        let yours = scope.isYours ? scope : yourScope ?? .uncommitted
         DispatchQueue.global(qos: .userInitiated).async {
             // In the order you see them: the open panel's diff, the title bar's counts, then what only feeds the buttons.
-            let stat = Result { try Diff.stat(in: root, scope) }
             let files = withFiles ? Result { try Diff.files(in: root, scope) } : nil
+            // A request's counts come with its files. Asking the forge again for them would be a second network call.
+            let stat: Result<Diff.Stat, Error>? = if case .request = scope {
+                files.map { $0.map(Diff.Stat.init) }
+            } else {
+                Result { try Diff.stat(in: root, scope) }
+            }
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root, self.scope == scope else { return }
-                self.stat = (try? stat.get()) ?? Diff.Stat()
-                self.error = (try? files?.get()) == nil && files != nil ? "Couldn't read the changes." : nil
+                if let stat { self.stat = (try? stat.get()) ?? Diff.Stat() }
+                if files != nil { self.error = (try? files?.get()) == nil ? "Couldn't read the changes." : nil }
                 if let files = try? files?.get() {
+                    if case .request(let number) = scope { self.fetchedRequest = number } else { self.fetchedRequest = nil }
                     let known = Set(self.files.map(\.path))
                     for file in files where !known.contains(file.path) && file.added + file.removed > Self.foldedAbove {
                         self.collapsed.insert(file.path)
@@ -324,7 +350,7 @@ final class ReviewModel: ObservableObject {
                     }
                 }
             }
-            let changes = yours == scope ? stat : Result { try Diff.stat(in: root, yours) }
+            let changes = (yours == scope ? stat : nil) ?? Result { try Diff.stat(in: root, yours) }
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root, self.scope == scope else { return }
                 self.changes = (try? changes.get()) ?? Diff.Stat()
@@ -396,6 +422,10 @@ struct ReviewPanel: View {
                 Spacer(minLength: 0)
                 // The slot holds the next step: commit what's there, then open the request for the branch.
                 // Where there is no request to open, as on main or once the branch has one, the next step is a push.
+                if let forge = review.forge, let request = review.shownRequest, review.scope == .request(request.number) {
+                    ShipButton(title: "View on \(forge.name)", help: "Open \(forge.request) #\(request.number) in the browser",
+                               busy: false, icon: forge.kind, palette: p) { NSWorkspace.shared.open(request.url) }
+                }
                 if !isCommit {
                     RequestBadge(review: review, palette: p)
                     if review.uncommitted > 0 {
@@ -435,8 +465,8 @@ struct ReviewPanel: View {
         .commitSheet(review, palette: p)
     }
 
-    /// Looking at one commit, the working tree plays no part, so there is nothing to offer a commit for.
-    private var isCommit: Bool { review.showsCommit }
+    /// Looking at one commit or a request, the working tree plays no part, so there is nothing to offer a commit for.
+    private var isCommit: Bool { !review.showsYours }
 
     private func header(_ p: Palette) -> some View {
         HStack(spacing: 8) {
@@ -530,6 +560,7 @@ private struct ScopeMenu: View {
         case .uncommitted: "Uncommitted changes"
         case .branch(let base): "Changes since \(Self.name(base))"
         case .commit(let hash): "Commit \(hash.prefix(7))"
+        case .request(let number): "\(review.forge?.requestShort ?? "PR") #\(number)"
         }
     }
 
@@ -538,6 +569,11 @@ private struct ScopeMenu: View {
         if case .commit(let hash) = review.scope {
             let subject = review.commitSubject.map { ": " + ($0.count > 40 ? $0.prefix(40) + "…" : $0) } ?? ""
             menu.addItem(item("Commit \(hash.prefix(7))" + subject, review.scope))
+            menu.addItem(.separator())
+        }
+        if case .request(let number) = review.scope {
+            let title = review.shownRequest.map { ": " + ($0.title.count > 40 ? $0.title.prefix(40) + "…" : $0.title) } ?? ""
+            menu.addItem(item("\(review.forge?.requestShort ?? "PR") #\(number)" + title, review.scope))
             menu.addItem(.separator())
         }
         menu.addItem(item("Uncommitted changes", .uncommitted))

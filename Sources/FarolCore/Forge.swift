@@ -169,6 +169,17 @@ public struct Forge: Equatable {
         return requests
     }
 
+    /// What request `number` changes, as its page shows it. Works for anyone's request, without checking it out.
+    /// Talks to the forge, so call it off the main thread.
+    public func files(ofRequest number: Int, in directory: String) throws -> [Diff.File] {
+        guard let path = kind.toolPath else { throw GitError(description: "\(tool) isn't installed.") }
+        let arguments = switch kind {
+        case .github: ["pr", "diff", "\(number)", "--color", "never"]
+        case .gitlab: ["mr", "diff", "\(number)", "--raw"]
+        }
+        return Diff.parse(try Git.run(path, arguments, in: directory, trimming: false))
+    }
+
     /// One step of a request's pipeline: a check on GitHub, a job on GitLab.
     public struct Check: Equatable {
         /// In the order they are listed: what needs you comes first.

@@ -32,6 +32,8 @@ final class GraphModel: ObservableObject {
     var onRunInTerminal: ((String) -> Void)?
     /// Opens the review panel on a commit.
     var onShowInReview: ((History.Commit, _ file: String?) -> Void)?
+    /// Opens the review panel on an open request.
+    var onShowRequest: ((Forge.Request) -> Void)?
     private var watcher: FolderWatcher?
     private var pending: DispatchWorkItem?
 
@@ -482,6 +484,7 @@ private struct BranchList: View {
                                   palette: palette,
                                   update: { graph.update(entry.name, failed: gitError("Couldn't update \(entry.name)")) },
                                   push: { graph.push(entry.name, failed: gitError("Couldn't push \(entry.name)")) },
+                                  showRequest: { graph.onShowRequest?($0) },
                                   hover: { inside in
                                       if inside { graph.hoveredBranch = entry.name } else if graph.hoveredBranch == entry.name { graph.hoveredBranch = nil }
                                   }) {
@@ -608,6 +611,7 @@ private struct BranchRow: View {
     let palette: Palette
     var update: () -> Void = {}
     var push: () -> Void = {}
+    var showRequest: (Forge.Request) -> Void = { _ in }
     var hover: (Bool) -> Void = { _ in }
     let checkout: () -> Void
 
@@ -639,7 +643,7 @@ private struct BranchRow: View {
                 }
             }
             if let request {
-                PullRequestButton(request: request, palette: palette)
+                PullRequestButton(request: request, palette: palette) { showRequest(request) }
             }
             if current {
                 Image(systemName: "checkmark").font(.system(size: 10, weight: .semibold)).foregroundStyle(palette.text)
@@ -666,15 +670,16 @@ private struct BranchRow: View {
     }
 }
 
-/// Opens the branch's pull request in the browser.
+/// Shows the branch's pull request in the review panel. Its page in the browser is a right click away.
 private struct PullRequestButton: View {
     let request: Forge.Request
     let palette: Palette
+    let show: () -> Void
 
     @State private var hovering = false
 
     var body: some View {
-        Button { NSWorkspace.shared.open(request.url) } label: {
+        Button(action: show) {
             HStack(spacing: 3) {
                 PullRequestGlyph()
                     .stroke(style: StrokeStyle(lineWidth: 1.15, lineCap: .round, lineJoin: .round))
@@ -689,7 +694,8 @@ private struct PullRequestButton: View {
         }
         .buttonStyle(.plain)
         .onClickableHover { hovering = $0 }
-        .hoverTip("#\(request.number) \(request.title)\nOpen in the browser")
+        .hoverTip("#\(request.number) \(request.title)\nShow its changes")
+        .contextMenu { Button("Open in the Browser") { NSWorkspace.shared.open(request.url) } }
     }
 }
 
