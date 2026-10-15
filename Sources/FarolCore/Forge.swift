@@ -126,7 +126,7 @@ public struct Forge: Equatable {
         var hosts: [String: Kind] = [:]
         let gh = (environment["GH_CONFIG_DIR"] ?? config + "/gh") + "/hosts.yml"
         for host in Self.hosts(inConfig: read(gh), under: nil) { hosts[host] = .github }
-        // Older glab on macOS kept its config under Application Support.
+        // glab keeps its config under Application Support on macOS, and under the XDG folder when one is set.
         let glab = [environment["GLAB_CONFIG_DIR"] ?? config + "/glab-cli", NSHomeDirectory() + "/Library/Application Support/glab-cli"]
         for folder in glab {
             for host in Self.hosts(inConfig: read(folder + "/config.yml"), under: "hosts") { hosts[host] = .gitlab }
