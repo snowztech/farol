@@ -118,6 +118,8 @@ final class ReviewModel: ObservableObject {
     var onFirstCounts: ((String) -> Void)?
     private var countedOnce = true
     private var taskWatcher: FolderWatcher?
+    /// The ignored folders of every task repo, so a build in one of them doesn't count everything again.
+    private var taskIgnored: [String] = []
     private var pendingTask: DispatchWorkItem?
     /// Each task repo's default scope, worked out once since it takes a few git calls.
     private var defaultScopes: [String: Diff.Scope] = [:]
@@ -185,7 +187,7 @@ final class ReviewModel: ObservableObject {
                 self.scopePending = false
                 self.refresh()
             }
-            let ignored = Files.ignored(in: root).map { $0 + "/" }
+            let ignored = Self.ignoredPrefixes(in: root)
             let forge = Forge.detect(in: root)
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root else { return }
@@ -203,16 +205,19 @@ final class ReviewModel: ObservableObject {
         guard repos != taskRepos.map(\.path) else { return refreshTask() }
         pendingTask?.cancel()
         taskRepos = repos.map { ($0, Diff.Stat()) }
+        taskIgnored = []
         defaultScopes = [:]
         countedOnce = false
         // The repos sit side by side in the task folder, so one watcher sees them all.
+        // A commit writes to the repo's own .git, outside the folder, so its counts catch up at the next prompt or turn end.
         taskWatcher = repos.first.map { first in
-            FolderWatcher((first as NSString).deletingLastPathComponent) { [weak self] _ in self?.taskChanged() }
+            FolderWatcher((first as NSString).deletingLastPathComponent) { [weak self] in self?.taskChanged($0) }
         }
         refreshTask()
     }
 
-    private func taskChanged() {
+    private func taskChanged(_ paths: [String]) {
+        guard Self.matters(paths, ignored: taskIgnored) else { return }
         pendingTask?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.refreshTask() }
         pendingTask = work
@@ -226,6 +231,7 @@ final class ReviewModel: ObservableObject {
         DispatchQueue.global(qos: .userInitiated).async {
             var stats = [Diff.Stat](repeating: Diff.Stat(), count: repos.count)
             var scopes = [Diff.Scope?](repeating: nil, count: repos.count)
+            var ignored = [[String]](repeating: [], count: repos.count)
             let lock = NSLock()
             // Each repo answers on its own, so a big one doesn't hold up the rest.
             DispatchQueue.concurrentPerform(iterations: repos.count) { index in
@@ -235,11 +241,13 @@ final class ReviewModel: ObservableObject {
                 // A commit or a request you're looking at isn't your changes, which is what the counts are.
                 if !scope.isYours { scope = fallback }
                 let stat = (try? Diff.stat(in: repo, scope)) ?? Diff.Stat()
-                lock.withLock { (stats[index], scopes[index]) = (stat, fallback) }
+                let repoIgnored = Self.ignoredPrefixes(in: repo)
+                lock.withLock { (stats[index], scopes[index], ignored[index]) = (stat, fallback, repoIgnored) }
             }
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.taskRepos.map(\.path) == repos else { return }
                 self.taskRepos = Array(zip(repos, stats))
+                self.taskIgnored = ignored.flatMap { $0 }
                 for (repo, scope) in zip(repos, scopes) { self.defaultScopes[repo] = scope }
                 if !self.countedOnce {
                     self.countedOnce = true
@@ -547,15 +555,38 @@ final class ReviewModel: ObservableObject {
         }
     }
 
-    /// Agents write in bursts, so changes wait a moment and refresh once.
-    private func changed(_ paths: [String]) {
-        let relevant = paths.contains { path in
+    /// Whether a change on disk can change what git reports. Of `.git` only the index and HEAD do.
+    private static func matters(_ paths: [String], ignored: [String]) -> Bool {
+        paths.contains { path in
             if path.contains("/.git/") { return path.hasSuffix("/.git/index") || path.hasSuffix("/.git/HEAD") }
             return !ignored.contains { path.hasPrefix($0) }
         }
-        guard relevant else { return }
+    }
+
+    /// Git's ignored folders, as prefixes. Read again after each change, since a build or an install makes new ones.
+    private static func ignoredPrefixes(in root: String) -> [String] {
+        Files.ignored(in: root).map { $0 + "/" }
+    }
+
+    private func rereadIgnored() {
+        guard let root else { return }
+        DispatchQueue.global(qos: .utility).async {
+            let ignored = Self.ignoredPrefixes(in: root)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.root == root else { return }
+                self.ignored = ignored
+            }
+        }
+    }
+
+    /// Agents write in bursts, so changes wait a moment and refresh once.
+    private func changed(_ paths: [String]) {
+        guard Self.matters(paths, ignored: ignored) else { return }
         pending?.cancel()
-        let work = DispatchWorkItem { [weak self] in self?.refresh() }
+        let work = DispatchWorkItem { [weak self] in
+            self?.refresh()
+            self?.rereadIgnored()
+        }
         pending = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
     }
