@@ -19,10 +19,15 @@ public struct Worktrees {
     /// The worktree folder a path is in, even from a subfolder, or nil outside Farol's worktrees.
     public func root(of path: String) -> String? {
         guard contains(path) else { return nil }
+        return Self.folder(of: path, under: base, depth: 2)
+    }
+
+    /// The folder `depth` levels under `base` that `path` is in, or nil when `path` isn't that deep.
+    static func folder(of path: String, under base: URL, depth: Int) -> String? {
         let base = base.resolvingSymlinksInPath().pathComponents
         let parts = URL(fileURLWithPath: path).resolvingSymlinksInPath().pathComponents
-        guard parts.count >= base.count + 2 else { return nil }
-        return NSString.path(withComponents: Array(parts.prefix(base.count + 2)))
+        guard parts.count >= base.count + depth else { return nil }
+        return NSString.path(withComponents: Array(parts.prefix(base.count + depth)))
     }
 
     /// Turns what the user typed into a branch name git accepts, or nil if nothing usable is left.
@@ -44,10 +49,20 @@ public struct Worktrees {
         guard let root = Git.repoRoot(of: directory) else {
             throw GitError(description: "\(directory) is not inside a git repository.")
         }
-        let source = Git.topLevel(of: directory) ?? root
-        let repoName = URL(fileURLWithPath: root).lastPathComponent
-        let path = base.appendingPathComponent(repoName)
-            .appendingPathComponent(branch.replacingOccurrences(of: "/", with: "-")).path
+        let path = base.appendingPathComponent(URL(fileURLWithPath: root).lastPathComponent)
+            .appendingPathComponent(Self.folderName(for: branch)).path
+        try Self.add(branch: branch, from: directory, at: path, copyEnvironmentFiles: copyEnvironmentFiles)
+        return path
+    }
+
+    /// A branch as one folder name, since its slashes would nest folders.
+    static func folderName(for branch: String) -> String {
+        branch.replacingOccurrences(of: "/", with: "-")
+    }
+
+    /// Checks out `branch` of the repo containing `directory` at `path`, creating the branch when it doesn't exist.
+    static func add(branch: String, from directory: String, at path: String, copyEnvironmentFiles: Bool) throws {
+        let source = Git.topLevel(of: directory) ?? directory
         guard !FileManager.default.fileExists(atPath: path) else {
             throw GitError(description: "A worktree already exists at \(path).")
         }
@@ -68,11 +83,10 @@ public struct Worktrees {
                 throw error
             }
         }
-        return path
     }
 
     /// Copies local environment files so a worktree can run like the checkout it came from.
-    private func inheritEnvironmentFiles(from source: String, to destination: String) throws {
+    private static func inheritEnvironmentFiles(from source: String, to destination: String) throws {
         let files = try FileManager.default.contentsOfDirectory(
             at: URL(fileURLWithPath: source), includingPropertiesForKeys: nil)
         for file in files {
