@@ -4,7 +4,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
-## [0.32.2] - 2026-10-15
+## [0.33.0] - 2026-10-15
 
 A snappier window, fewer calls to GitHub, and an inspector to keep it that way.
 
@@ -755,8 +755,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.32.2...HEAD
-[0.32.2]: https://github.com/snowztech/farol/releases/tag/v0.32.2
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.33.0...HEAD
+[0.33.0]: https://github.com/snowztech/farol/releases/tag/v0.33.0
 [0.32.1]: https://github.com/snowztech/farol/releases/tag/v0.32.1
 [0.32.0]: https://github.com/snowztech/farol/releases/tag/v0.32.0
 [0.31.0]: https://github.com/snowztech/farol/releases/tag/v0.31.0
