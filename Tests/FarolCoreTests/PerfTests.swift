@@ -39,7 +39,7 @@ import Testing
 
     let snapshot = perf.snapshot()
     #expect(snapshot.rate(over: 10, at: now) == ["git": 0.2, "gh": 0.1])
-    #expect(snapshot.slowest(2, over: 10, at: now).map(\.duration) == [0.30, 0.10])
+    #expect(snapshot.longest(2, over: 10, at: now).map(\.duration) == [0.30, 0.10])
 }
 
 @Test func measuresWhatItWraps() throws {

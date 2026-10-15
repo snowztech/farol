@@ -30,7 +30,7 @@ public final class Perf: @unchecked Sendable {
         }
 
         /// The `count` longest runs over the `window` seconds before `now`, longest first.
-        public func slowest(_ count: Int, over window: TimeInterval, at now: Date) -> [Run] {
+        public func longest(_ count: Int, over window: TimeInterval, at now: Date) -> [Run] {
             Array(within(window, at: now).sorted { $0.duration > $1.duration }.prefix(count))
         }
 
