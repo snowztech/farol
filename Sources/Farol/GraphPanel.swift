@@ -207,6 +207,9 @@ struct GraphPanel: View {
 
     @ObservedObject var graph: GraphModel
     @ObservedObject var state: WindowState
+    /// For the task's repo tabs, which the review panel shows too.
+    let review: ReviewModel
+    let pick: (String) -> Void
     let resize: (CGFloat) -> Void
 
     @State private var dragStart: CGFloat?
@@ -218,6 +221,7 @@ struct GraphPanel: View {
     var body: some View {
         let p = state.palette
         VStack(alignment: .leading, spacing: 0) {
+            TaskRepoTabs(review: review, palette: p, pick: pick)
             if graph.root != nil, graph.error == nil {
                 BranchList(graph: graph, query: $query, colors: branchColors, palette: p)
                 Rectangle().fill(p.line).frame(height: 1)

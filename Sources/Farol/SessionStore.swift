@@ -26,7 +26,7 @@ final class Session: ObservableObject, Identifiable {
     @Published private(set) var repoRoot: String?
     /// The top of the checkout the session is in, a worktree's own folder for worktrees. The files panel starts there.
     @Published private(set) var topLevel: String?
-    /// The checkout the git panels and the branch follow: the one you are in, or at a task folder's root the repo you picked.
+    /// The checkout the git panels and the branch follow: the one you are in, or in a task the repo you picked.
     @Published private(set) var checkout: String?
     /// A merge, rebase, cherry-pick or revert git stopped on in this checkout, often one an agent started.
     @Published private(set) var stopped: Merge.Operation?
@@ -42,7 +42,7 @@ final class Session: ObservableObject, Identifiable {
     let taskFolder: String?
     /// The worktrees in the task folder, in order. Empty outside one.
     let taskRepos: [String]
-    /// The task repo the panels show from the task folder's root. The first until you pick or `cd` into another.
+    /// The task repo the git panels show. The first until you pick or `cd` into another.
     private var pickedRepo: String?
     private var refreshingGit = false
     private var refreshGitAgain = false
@@ -64,7 +64,7 @@ final class Session: ObservableObject, Identifiable {
         refreshGit()
     }
 
-    /// Shows another of the task's repos in the git panels, while the session is at the task folder's root.
+    /// Shows another of the task's repos in the git panels.
     func pick(_ repo: String) {
         pickedRepo = repo
         refreshGit()
@@ -102,12 +102,13 @@ final class Session: ObservableObject, Identifiable {
         guard !refreshingGit else { return refreshGitAgain = true }
         refreshingGit = true
         let directory = directory
-        let picked = pickedRepo ?? taskRepos.first
+        let taskRepos = taskRepos, before = topLevel, picked = pickedRepo ?? taskRepos.first
         DispatchQueue.global(qos: .userInitiated).async {
             let root = Git.repoRoot(of: directory)
             let topLevel = Git.topLevel(of: directory)
-            // The task folder itself isn't a repo, so git answers for the picked one there.
-            let checkout = topLevel ?? picked
+            // In a task the panels follow the last repo you went into or clicked, so a click wins until the next `cd`.
+            let moved = topLevel != before && topLevel.map(taskRepos.contains) == true
+            let checkout = taskRepos.isEmpty ? topLevel : moved ? topLevel : picked
             let branch = Git.branch(of: checkout ?? directory)
             let operation = checkout.flatMap { Merge.operation(in: $0) }
             let conflicts = checkout.flatMap { top in operation.map { Merge.conflicts(in: top, $0.kind).count } } ?? 0
@@ -126,8 +127,8 @@ final class Session: ObservableObject, Identifiable {
                 self.branch = branch
                 if self.topLevel != topLevel { self.topLevel = topLevel }
                 if self.checkout != checkout { self.checkout = checkout }
-                // Back at the task folder's root, the panels stay on the repo you were last in.
-                if let topLevel, self.taskRepos.contains(topLevel) { self.pickedRepo = topLevel }
+                // Only a `cd` moves the pick here, so a click made while git was answering isn't undone.
+                if moved { self.pickedRepo = topLevel }
                 self.repoName = root.map { URL(fileURLWithPath: $0).lastPathComponent }
                 if self.repoRoot != root {
                     self.repoRoot = root

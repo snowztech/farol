@@ -105,7 +105,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             self?.open(path)
         })
         filesPanel.clipsToBounds = true
-        let graphPanel = hosting(GraphPanel(graph: graph, state: state) { [weak self] in self?.setGraphWidth($0) })
+        let graphPanel = hosting(GraphPanel(
+            graph: graph, state: state, review: review,
+            pick: { [weak self] in self?.store.selected?.pick($0) },
+            resize: { [weak self] in self?.setGraphWidth($0) }))
         graphPanel.clipsToBounds = true
         let reviewPanel = hosting(ReviewPanel(
             review: review, state: state,

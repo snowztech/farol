@@ -728,3 +728,53 @@ private struct FileHeader: View {
     }
 }
 
+
+/// "api +12 −3   web +4 −1": the repos of a task, to pick the one the git panels show. Nothing outside a task.
+struct TaskRepoTabs: View {
+    @ObservedObject var review: ReviewModel
+    let palette: Palette
+    let pick: (String) -> Void
+
+    var body: some View {
+        if review.taskRepos.count > 1 {
+            ScrollView(.horizontal) {
+                HStack(spacing: 2) {
+                    ForEach(review.taskRepos, id: \.path) { repo in
+                        Tab(name: (repo.path as NSString).lastPathComponent, stat: repo.stat,
+                            selected: repo.path == review.root, palette: palette) { pick(repo.path) }
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+            }
+            .scrollIndicators(.hidden)
+            Rectangle().fill(palette.line).frame(height: 1)
+        }
+    }
+
+    private struct Tab: View {
+        let name: String
+        let stat: Diff.Stat
+        let selected: Bool
+        let palette: Palette
+        let pick: () -> Void
+
+        @State private var hovering = false
+
+        var body: some View {
+            Button(action: pick) {
+                HStack(spacing: 6) {
+                    Text(name).font(.system(size: 12, weight: .medium)).lineLimit(1)
+                    if !stat.isEmpty { Counts(added: stat.added, removed: stat.removed, palette: palette) }
+                }
+                .foregroundStyle(selected || hovering ? palette.text : palette.muted)
+                .padding(.horizontal, 8)
+                .frame(height: 24)
+                .background(RoundedRectangle(cornerRadius: 6).fill(selected ? palette.raised : .clear))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .onClickableHover { hovering = $0 }
+        }
+    }
+}
