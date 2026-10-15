@@ -278,7 +278,10 @@ extension DiffTextView {
 
     override func mouseMoved(with event: NSEvent) {
         super.mouseMoved(with: event)
-        hoveredRow = commentable(at: convert(event.locationInWindow, from: nil)).map(\.row.minY)
+        let point = convert(event.locationInWindow, from: nil)
+        hoveredRow = commentable(at: point).map(\.row.minY)
+        // The text view has just set its I-beam. Over the gutter, where a click starts a comment, it's a hand.
+        if hoveredRow != nil, point.x < Self.gutter { NSCursor.pointingHand.set() }
     }
 
     override func mouseExited(with event: NSEvent) {
