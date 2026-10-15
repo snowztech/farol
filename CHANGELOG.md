@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.30.10] - 2026-10-15
+
+New Task shows the ticket before you start.
+
 ### Changed
 
 - New Task shows the picked ticket's text before you start, and sends its link along so the agent can read the comments.
@@ -697,7 +701,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.30.9...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.30.10...HEAD
+[0.30.10]: https://github.com/snowztech/farol/releases/tag/v0.30.10
 [0.30.9]: https://github.com/snowztech/farol/releases/tag/v0.30.9
 [0.30.8]: https://github.com/snowztech/farol/releases/tag/v0.30.8
 [0.30.7]: https://github.com/snowztech/farol/releases/tag/v0.30.7
