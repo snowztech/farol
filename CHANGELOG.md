@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-10-15
+
+Pull requests open in the review panel, comments and all, and Markdown files preview in the file pane.
+
 ### Added
 
 - A preview for Markdown files in the file pane: headings, lists, tasks, code, quotes, tables and links. The eye in its header switches between the source and the preview, Farol keeps your choice, and the preview follows an agent's edits. A link to another file opens it in the pane.
@@ -712,7 +716,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.30.10...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.31.0...HEAD
+[0.31.0]: https://github.com/snowztech/farol/releases/tag/v0.31.0
 [0.30.10]: https://github.com/snowztech/farol/releases/tag/v0.30.10
 [0.30.9]: https://github.com/snowztech/farol/releases/tag/v0.30.9
 [0.30.8]: https://github.com/snowztech/farol/releases/tag/v0.30.8
