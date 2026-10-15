@@ -4,6 +4,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- A GitHub or GitLab on your company's own domain is recognized once gh or glab is logged in there, so its requests, reviews and checks show.
+- New Task lists a GitLab repo's open issues, as it does GitHub's.
+
 ## [0.32.0] - 2026-10-15
 
 A task can now span several repos, each with its own worktree on one branch, reviewed repo by repo.
@@ -14,8 +19,6 @@ A task can now span several repos, each with its own worktree on one branch, rev
 - Started from inside a repo, New Task offers Add repos to pick the repos beside it.
 - The repo list gets a search past 8 repos, and shows the branch a repo is on when it isn't main or master, since the task branch starts from it.
 - In a task across repos, the review and graph panels show a tab per repo with its changes, and the title bar counts the changes of all of them.
-- A GitHub or GitLab on your company's own domain is recognized once gh or glab is logged in there, so its requests, reviews and checks show.
-- New Task lists a GitLab repo's open issues, as it does GitHub's.
 
 ## [0.31.0] - 2026-10-15
 
