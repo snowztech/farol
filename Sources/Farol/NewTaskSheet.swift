@@ -11,6 +11,9 @@ struct NewTaskSheet: View {
     let base: String
     /// The repos inside `directory` when it is a folder of them rather than a repo. Empty for a repo.
     let repos: [String]
+    /// From inside a repo: its main checkout, and the repos beside it that "Add repos" offers.
+    let root: String?
+    let siblings: [String]
     /// A tool that lists tickets is set up, so the select is worth holding a place for while they load.
     let expectsTickets: Bool
     let palette: Palette
@@ -35,6 +38,7 @@ struct NewTaskSheet: View {
     private var tickets: [Ticket] { loaded ?? Self.remembered[directory] ?? [] }
     @State private var picked: Ticket?
     @State private var chosen: Set<String> = []
+    @State private var addingRepos = false
     @State private var pickingTicket = false
     @State private var pickingAgent = false
     @State private var query = ""
@@ -45,6 +49,7 @@ struct NewTaskSheet: View {
         DispatchQueue.global(qos: .userInitiated).async {
             let root = Git.repoRoot(of: directory)
             let repos = root == nil ? TaskFolders.repos(in: directory) : []
+            let siblings = root.map { TaskFolders.repos(in: ($0 as NSString).deletingLastPathComponent) } ?? []
             let repo = URL(fileURLWithPath: root ?? directory).lastPathComponent
             let base = Git.branch(of: directory) ?? "the current commit"
             let expectsTickets = Jira.isSetUp || Forge.detect(in: directory)?.listsIssues == true
@@ -53,7 +58,7 @@ struct NewTaskSheet: View {
                 guard let window, window.attachedSheet == nil else { return }
                 let sheet = NSWindow(contentRect: .zero, styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: true)
                 let view = NewTaskSheet(
-                    directory: directory, repo: repo, base: base, repos: repos, expectsTickets: expectsTickets,
+                    directory: directory, repo: repo, base: base, repos: repos, root: root, siblings: siblings, expectsTickets: expectsTickets,
                     palette: palette, start: start,
                     close: { [weak window, weak sheet] in sheet.map { window?.endSheet($0) } })
                 let host = NSHostingController(rootView: view)
@@ -72,10 +77,14 @@ struct NewTaskSheet: View {
     }
     private var name: String? { Worktrees.branchName(from: branch) }
     private var choice: AgentFolder { AgentFolder.choice(agent, in: folders) ?? folders[0] }
-    /// Where the worktrees come from: this repo, or the repos picked from the folder, in the folder's order.
-    private var sources: [String] { repos.isEmpty ? [directory] : repos.filter(chosen.contains) }
+    /// The checklist: the folder's repos, or the current repo's neighbours once you ask to add some.
+    private var listed: [String] { !repos.isEmpty ? repos : addingRepos ? siblings : [] }
+    /// Where the worktrees come from, in the folder's order. The current repo keeps its own checkout, so its branch is the base.
+    private var sources: [String] {
+        listed.isEmpty ? [directory] : listed.filter(chosen.contains).map { $0 == root ? directory : $0 }
+    }
     private var subtitle: String {
-        if repos.isEmpty { return "The agent starts in its own worktree, on a new branch from \(base)." }
+        if repos.isEmpty, sources.count < 2 { return "The agent starts in its own worktree, on a new branch from \(base)." }
         return "Each repo you pick gets its own worktree on the same branch, side by side in one folder. The agent starts there and sees them all."
     }
 
@@ -109,7 +118,11 @@ struct NewTaskSheet: View {
                     .onChange(of: task) { _, task in
                         if !branchEdited { branch = NewTask.branchName(for: task) }
                     }
-                if !repos.isEmpty { repoChecklist(p) }
+                if !listed.isEmpty {
+                    repoChecklist(p)
+                } else if siblings.count > 1, let root {
+                    addReposLink(beside: root, p)
+                }
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
                         Image(systemName: "arrow.triangle.branch").foregroundStyle(p.muted)
@@ -251,7 +264,7 @@ struct NewTaskSheet: View {
     /// The repos in the folder, to tick the ones the task touches.
     private func repoChecklist(_ p: Palette) -> some View {
         let list = VStack(spacing: 1) {
-            ForEach(repos, id: \.self) { repo in
+            ForEach(listed, id: \.self) { repo in
                 SheetChoice(palette: p) {
                     if chosen.contains(repo) { chosen.remove(repo) } else { chosen.insert(repo) }
                 } label: {
@@ -263,10 +276,10 @@ struct NewTaskSheet: View {
         }
         return VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(chosen.isEmpty ? "Repos" : "Repos · \(chosen.count) of \(repos.count)").foregroundStyle(p.muted)
+                Text(chosen.isEmpty ? "Repos" : "Repos · \(chosen.count) of \(listed.count)").foregroundStyle(p.muted)
                 Spacer()
-                Button(chosen.count == repos.count ? "None" : "All") {
-                    chosen = chosen.count == repos.count ? [] : Set(repos)
+                Button(chosen.count == listed.count ? "None" : "All") {
+                    chosen = chosen.count == listed.count ? [] : Set(listed)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(p.muted)
@@ -281,6 +294,19 @@ struct NewTaskSheet: View {
             .padding(-4)
             .sheetField(p, focused: false)
         }
+    }
+
+    /// One quiet line, since most tasks stay in one repo. It opens the checklist with this repo already ticked.
+    private func addReposLink(beside root: String, _ p: Palette) -> some View {
+        let folder = ((root as NSString).deletingLastPathComponent as NSString).lastPathComponent
+        return Button {
+            chosen = [root]
+            addingRepos = true
+        } label: {
+            Label("Add repos from \(folder)", systemImage: "plus").font(.system(size: 12))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(p.muted)
     }
 
     /// The mark of where it comes from, its key, then as much of its title as fits on the line.
