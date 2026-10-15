@@ -13,7 +13,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Fixed
 
-- A working agent no longer makes Farol run git after each of its steps, only when its turn ends.
+- A working agent no longer makes Farol run git after each of its steps, only when its turn ends or it stops to ask you something.
 
 ## [0.30.10] - 2026-10-15
 
