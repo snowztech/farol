@@ -52,7 +52,12 @@ final class RemoteBridge: ObservableObject {
         var notices: [RemoteNotice]?
         /// Seals which session a notification is about, so only this phone reads it. Nil for a phone that sent none.
         var key: Data?
+        /// Where Apple can start a Live Activity on this phone with the app closed. Nil before iOS 17.2.
+        var starts: Data?
     }
+
+    /// Phones sent a start and not yet the started activity's address. Another start would only stack a second one.
+    private var starting: Set<Data> = []
 
     private var pushTargets: [PushTarget] = [] {
         didSet { UserDefaults.standard.set(try? JSONEncoder().encode(pushTargets), forKey: Self.pushKey) }
@@ -280,10 +285,11 @@ final class RemoteBridge: ObservableObject {
             phones[id]?.watching = session
             phones[id]?.screen = nil
             tick()
-        case .notify(let token, let sandbox, let notices, let key):
+        case .notify(let token, let sandbox, let notices, let key, let starts):
             pushTargets.removeAll { $0.device == device.key }
-            pushTargets.append(PushTarget(device: device.key, token: token, sandbox: sandbox, notices: notices, key: key))
+            pushTargets.append(PushTarget(device: device.key, token: token, sandbox: sandbox, notices: notices, key: key, starts: starts))
         case .activity(let token, let sandbox):
+            starting.remove(device.key)
             activityTargets.removeAll { $0.device == device.key }
             activityTargets.append(ActivityTarget(device: device.key, token: token, sandbox: sandbox))
             updateActivities()
@@ -349,10 +355,11 @@ final class RemoteBridge: ObservableObject {
         }
     }
 
-    /// Has the relay update the Live Activity on each phone that started one, when what it shows changed.
-    /// Once nothing waits or works it is ended, and the phone starts a new one the next time it is opened.
+    /// Has the relay update the Live Activity on each phone that has one, when what it shows changed.
+    /// Once nothing waits or works it is ended. When something gets busy again, it is started on each phone that is not open,
+    /// and an open one starts its own.
     private func updateActivities() {
-        guard let connection, !activityTargets.isEmpty else { return }
+        guard let connection else { return }
         let sessions = remoteSessions
         let busy = sessions.filter { $0.status == .waiting || $0.status == .stopped || $0.status == .working }
         for (place, target) in activityTargets.enumerated().reversed() where target.shown != busy {
@@ -360,8 +367,16 @@ final class RemoteBridge: ObservableObject {
             let state = RemoteActivityState(sessions, key: key)
             // Urgent only when one more agent waits for you. Apple caps urgent pushes, and the rest can wait for the phone's next wake.
             let urgent = state.waiting > target.shown.filter { $0.status == .waiting || $0.status == .stopped }.count
-            connection.send(RelayFrame.activity(token: target.token, sandbox: target.sandbox, ending: state.isQuiet, urgent: urgent, state: state))
+            connection.send(RelayFrame.activity(token: target.token, sandbox: target.sandbox, event: state.isQuiet ? .end : .update, urgent: urgent, state: state))
             if state.isQuiet { activityTargets.remove(at: place) } else { activityTargets[place].shown = busy }
+        }
+        if busy.isEmpty { return starting.removeAll() }
+        for target in pushTargets {
+            guard let starts = target.starts, !connected.contains(target.device), !starting.contains(target.device),
+                  !activityTargets.contains(where: { $0.device == target.device }) else { continue }
+            starting.insert(target.device)
+            let state = RemoteActivityState(sessions, key: target.key)
+            connection.send(RelayFrame.activity(token: starts, sandbox: target.sandbox, event: .start, urgent: true, state: state))
         }
     }
 
