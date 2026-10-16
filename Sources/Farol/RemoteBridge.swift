@@ -296,7 +296,7 @@ final class RemoteBridge: ObservableObject {
             updateActivities()
         case .options:
             let agents = AgentFolder.find()
-            tell(.options(projects: projects.map { RemoteChoice(id: $0, name: URL(fileURLWithPath: $0).lastPathComponent) },
+            tell(.options(projects: projects.map { RemoteChoice(id: $0, name: $0 == NSHomeDirectory() ? "Home" : URL(fileURLWithPath: $0).lastPathComponent) },
                           agents: agents.map { RemoteChoice(id: $0.id, name: $0.label) }, agent: agents.first?.id), id)
         case .open(let project, let agent):
             open(command, by: device, in: project, with: agent, from: id)
@@ -342,10 +342,11 @@ final class RemoteBridge: ObservableObject {
 
     // MARK: New sessions
 
-    /// The folders a session is open in, its repository's when it has one. A phone opens a session in one of these, never any folder on the Mac.
+    /// The folders a session is open in, its repository's when it has one, then the home folder, where a new tab opens anyway.
+    /// Home is there so a phone can open the first session when none is. A phone opens a session in one of these, never any folder on the Mac.
     private var projects: [String] {
         var seen = Set<String>()
-        return store.ordered.map { $0.repoRoot ?? $0.directory }.filter { seen.insert($0).inserted }
+        return (store.ordered.map { $0.repoRoot ?? $0.directory } + [NSHomeDirectory()]).filter { seen.insert($0).inserted }
     }
 
     /// The session each `open` made, so one a phone sends again after a dropped connection is answered and not opened twice.
