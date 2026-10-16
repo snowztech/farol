@@ -46,13 +46,25 @@ private func home(_ files: [String: String]) throws -> URL {
     #expect(commands.first { $0.name == "model" }?.menu == true)
 }
 
-@Test func codexListsItsOwnAndYourPrompts() throws {
-    let home = try home([".codex/prompts/standup.md": "---\ndescription: Write my standup\n---\n"])
+@Test func codexListsItsOwnYourPromptsAndItsSkillsToMention() throws {
+    let home = try home([
+        ".codex/prompts/standup.md": "---\ndescription: Write my standup\n---\n",
+        ".agents/skills/archify/SKILL.md": "---\nname: archify\ndescription: Draw the architecture\n---\n",
+        ".codex/skills/farol/SKILL.md": "---\nname: farol\n---\n",
+        ".codex/skills/.system/plan/SKILL.md": "---\nname: plan\n---\n",
+        ".codex/skills/quiet/SKILL.md": "---\nname: quiet\n---\n",
+        "shelf/.agents/skills/release/SKILL.md": "---\nname: release\n---\n",
+    ])
+    let quiet = home.appendingPathComponent(".codex/skills/quiet/SKILL.md").path
+    try Data("model = \"gpt-5\"\n\n[[skills.config]]\npath = \"\(quiet)\"\nenabled = false\n".utf8)
+        .write(to: home.appendingPathComponent(".codex/config.toml"))
     let log = home.appendingPathComponent(".codex/sessions/2026/10/16/rollout.jsonl").path
-    let names = AgentCommands.list(log: log, project: nil, home: home).map(\.name)
-    #expect(names.contains("prompts:standup"))
-    #expect(names.contains("approvals"))
-    #expect(!names.contains("plugin"))
+    let commands = AgentCommands.list(log: log, project: home.appendingPathComponent("shelf").path, home: home)
+    let slash = commands.filter { !$0.mention }.map(\.name), mentions = commands.filter(\.mention).map(\.name)
+    #expect(slash.contains("prompts:standup"))
+    #expect(slash.contains("approvals"))
+    #expect(!slash.contains("plugin"))
+    #expect(Set(mentions) == ["archify", "farol", "plan", "release"])
 }
 
 @Test func withoutALogItIsClaudeCodeInItsDefaultFolder() throws {

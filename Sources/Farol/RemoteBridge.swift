@@ -565,7 +565,7 @@ final class RemoteBridge: ObservableObject {
         }
         let log = session.conversation?.log, project = session.repoRoot ?? session.directory
         DispatchQueue.global(qos: .userInitiated).async {
-            let commands = AgentCommands.list(log: log, project: project).map { RemoteAgentCommand(name: $0.name, detail: $0.detail, menu: $0.menu) }
+            let commands = AgentCommands.list(log: log, project: project).map { RemoteAgentCommand(name: $0.name, detail: $0.detail, menu: $0.menu, mention: $0.mention) }
             DispatchQueue.main.async { [weak self] in self?.tell(.commands(session: id, commands: commands), phone) }
         }
     }

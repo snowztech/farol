@@ -7,11 +7,14 @@ public struct AgentCommand: Equatable, Sendable {
     public var detail: String?
     /// It opens a picker in the agent's terminal, like /model.
     public var menu: Bool
+    /// Called with a dollar sign rather than a slash, as Codex mentions a skill: `$name`.
+    public var mention: Bool
 
-    public init(name: String, detail: String? = nil, menu: Bool = false) {
+    public init(name: String, detail: String? = nil, menu: Bool = false, mention: Bool = false) {
         self.name = name
         self.detail = detail
         self.menu = menu
+        self.mention = mention
     }
 }
 
@@ -33,9 +36,19 @@ public enum AgentCommands {
             all += plugins(in: folder.directory)
         case .codex:
             all = codex + markdown(in: folder.directory.appendingPathComponent("prompts"), prefix: "prompts:")
+            // Codex mentions skills with a dollar sign. They are yours, the project's, the older place in its own folder, and its own.
+            let roots = [home.appendingPathComponent(".agents/skills"), folder.directory.appendingPathComponent("skills"),
+                         folder.directory.appendingPathComponent("skills/.system")]
+                + (project.map { [URL(fileURLWithPath: $0).appendingPathComponent(".agents/skills")] } ?? [])
+            let off = disabledSkills(in: folder.directory)
+            all += roots.flatMap { skills(in: $0, skipping: off) }.map { skill in
+                var skill = skill
+                skill.mention = true
+                return skill
+            }
         }
         var seen = Set<String>()
-        return all.filter { seen.insert($0.name).inserted }.sorted { $0.name < $1.name }
+        return all.filter { seen.insert(($0.mention ? "$" : "/") + $0.name).inserted }.sorted { $0.name < $1.name }
     }
 
     /// Claude Code keeps its logs under `projects` in its config folder, and Codex under `sessions`.
@@ -62,10 +75,11 @@ public enum AgentCommands {
     }
 
     /// A folder per skill, each with a SKILL.md. One that says it is not for people to call is left out.
-    static func skills(in directory: URL, prefix: String = "") -> [AgentCommand] {
+    static func skills(in directory: URL, prefix: String = "", skipping off: Set<String> = []) -> [AgentCommand] {
         let folders = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
         return folders.compactMap { folder in
-            guard let text = head(of: folder.appendingPathComponent("SKILL.md")) else { return nil }
+            let file = folder.appendingPathComponent("SKILL.md")
+            guard !off.contains(file.resolvingSymlinksInPath().path), let text = head(of: file) else { return nil }
             let fields = frontmatter(text)
             if fields["user-invocable"] == "false" { return nil }
             return AgentCommand(name: prefix + (fields["name"] ?? folder.lastPathComponent), detail: describe(text))
@@ -82,6 +96,18 @@ public enum AgentCommands {
             let root = URL(fileURLWithPath: path)
             return markdown(in: root.appendingPathComponent("commands"), prefix: name) + skills(in: root.appendingPathComponent("skills"), prefix: name)
         }
+    }
+
+    /// The skills Codex's config turns off, by their SKILL.md: a `[[skills.config]]` table with its `path` and `enabled = false`.
+    static func disabledSkills(in folder: URL) -> Set<String> {
+        guard let config = try? String(contentsOf: folder.appendingPathComponent("config.toml"), encoding: .utf8) else { return [] }
+        var off = Set<String>()
+        for table in config.components(separatedBy: "[[skills.config]]").dropFirst() {
+            let lines = table.split(separator: "\n").prefix { !$0.hasPrefix("[") }.map { $0.replacingOccurrences(of: " ", with: "") }
+            guard lines.contains("enabled=false"), let path = lines.first(where: { $0.hasPrefix("path=") }) else { continue }
+            off.insert(URL(fileURLWithPath: path.dropFirst(5).trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))).resolvingSymlinksInPath().path)
+        }
+        return off
     }
 
     /// The `key: value` lines between the `---` that open a file.
