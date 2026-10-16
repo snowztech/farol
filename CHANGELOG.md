@@ -4,9 +4,14 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-10-16
+
+More of the Mac from the phone: close a session, and switch Claude Code's mode.
+
 ### Added
 
-- Remote: close a session from the phone, and press Shift-Tab there to switch Claude Code's mode. Farol keeps its last session open.
+- Remote: close a session from the phone. Farol keeps its last session open, since closing it would quit Farol and cut the phone off.
+- Remote: press Shift-Tab from the phone, to switch Claude Code between its normal, auto-accept and plan modes.
 
 ## [0.34.0] - 2026-10-16
 
