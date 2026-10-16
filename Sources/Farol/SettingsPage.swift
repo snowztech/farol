@@ -548,6 +548,19 @@ struct SettingsPage: View {
                 palette: p) {
                 toggle($agents.remoteKeepAwake)
             }
+            // The phone reads an agent's conversation and what it asks through Farol's hooks, so an agent without the current ones shows less there.
+            ForEach(agentSetups.filter { setups[$0.id] != .connected }, id: \.id) { agent in
+                let outdated = setups[agent.id] == .outdated
+                Row(title: "\(outdated ? "Update" : "Connect") \(agent.name) for your phone",
+                    detail: outdated
+                        ? "Its hooks are from an older Farol. Updated, your phone shows what it asks, with the answers as buttons."
+                        : "Connected, your phone shows its conversation and what it asks, and tells you when it waits or is done.",
+                    palette: p) {
+                    ShipButton(title: outdated ? "Update" : "Connect", busy: false, palette: p) {
+                        outdated ? change(agent, connect: true) : (agentChange = AgentChange(agent: agent, connect: true))
+                    }
+                }
+            }
             GroupTitle(title: "Phones", palette: p)
             ForEach(remote.devices, id: \.key) { device in
                 Row(title: device.name,
