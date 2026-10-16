@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-10-16
+
+Read more from the phone: an agent's earlier output, and what it changed.
+
 ### Added
 
 - Remote: scroll a session back from the phone, so the earlier output of a full-screen agent like Claude Code or Codex can be read there.
