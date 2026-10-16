@@ -343,6 +343,10 @@ final class RemoteBridge: ObservableObject {
             phones[id]?.screen = nil
             retime()
             tick()
+        case .commands(let session):
+            commands(command, of: session, from: id)
+        case .attach(let session, let attachment, let part, let parts, let data):
+            attach(command, session: session, attachment: attachment, part: part, of: parts, data: data, from: id)
         case .control(let session, let key):
             guard key.count == 1, let letter = key.first, ("a"..."z").contains(letter) else {
                 return tell(.refused(command: command.id, reason: "Only Control with a letter can be sent."), id)
@@ -554,6 +558,50 @@ final class RemoteBridge: ObservableObject {
         return RemoteMessage(id: message.id, role: role, text: message.text, tool: message.tool, detail: message.detail)
     }
 
+    // MARK: Commands
+
+    /// What the agent in a session takes after a slash, read off the main thread since it reads a few dozen small files.
+    private func commands(_ command: RemoteCommand, of id: UUID, from phone: UInt32) {
+        guard let session = store.sessions.first(where: { $0.id == id }) else {
+            return tell(.refused(command: command.id, reason: "That session is closed."), phone)
+        }
+        let log = session.conversation?.log, project = session.repoRoot ?? session.directory
+        DispatchQueue.global(qos: .userInitiated).async {
+            let commands = AgentCommands.list(log: log, project: project).map { RemoteAgentCommand(name: $0.name, detail: $0.detail, menu: $0.menu, mention: $0.mention) }
+            DispatchQueue.main.async { [weak self] in self?.tell(.commands(session: id, commands: commands), phone) }
+        }
+    }
+
+    // MARK: Pictures
+
+    /// Pictures from phones, in the caches folder, where macOS may also clear them.
+    private lazy var inbox: AttachmentInbox = {
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        let inbox = AttachmentInbox(folder: caches.appendingPathComponent("Farol/Attachments"), maxSize: RemoteAttachment.maxSize)
+        inbox.sweep()
+        return inbox
+    }()
+
+    /// One part of a picture. Each is answered, so the phone sends the next, and the last with where the picture is.
+    private func attach(_ command: RemoteCommand, session: UUID, attachment: UUID, part: Int, of parts: Int, data: Data, from id: UInt32) {
+        guard store.sessions.contains(where: { $0.id == session }) else {
+            return tell(.refused(command: command.id, reason: "That session is closed."), id)
+        }
+        do {
+            if let file = try inbox.take(attachment, part: part, of: parts, data: data) {
+                tell(.attached(command: command.id, attachment: attachment, path: file.path), id)
+            } else {
+                tell(.done(command: command.id), id)
+            }
+        } catch AttachmentInbox.Problem.notAnImage {
+            tell(.refused(command: command.id, reason: "Only a photo or a screenshot can be attached."), id)
+        } catch AttachmentInbox.Problem.tooLarge {
+            tell(.refused(command: command.id, reason: "That picture is too large to attach."), id)
+        } catch {
+            tell(.refused(command: command.id, reason: "The Mac could not keep that picture. Attach it again."), id)
+        }
+    }
+
     // MARK: Changes
 
     /// The repository a session works in, and what the review panel compares it with. Nil outside git.
@@ -698,6 +746,12 @@ final class RemoteBridge: ObservableObject {
             if let (session, log, _) = phone.conversation, phone.watching == session,
                let now = store.sessions.first(where: { $0.id == session })?.conversation?.log, now != log {
                 openConversation(of: session, log: now, for: id)
+            }
+            // The log is known only once a hook names it: Codex names it after its first turn, and Claude Code after its first prompt.
+            // The phone shows the terminal until then, so it is sent the conversation as soon as there is one rather than waiting to ask.
+            if phone.conversation == nil, let watching = phone.watching,
+               let log = store.sessions.first(where: { $0.id == watching })?.conversation?.log {
+                openConversation(of: watching, log: log, for: id)
             }
             if phone.sessions != sessions {
                 phones[id]?.sessions = sessions

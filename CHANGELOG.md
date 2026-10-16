@@ -4,6 +4,15 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Remote: typing `/` on the phone lists what the agent takes: its own commands, your skills and commands, the project's, and those of your plugins that are on. In Codex, `$` lists its skills. A command that opens a picker, like `/model`, shows the terminal once sent.
+- Remote: attach photos and screenshots to a reply from the phone, for the agent to look at. The Mac takes only images, keeps them in a folder only you can read, and removes them after a week.
+
+### Fixed
+
+- Remote: a Codex session shows as its conversation on the phone as soon as Codex names its log, instead of staying on the terminal until the phone asked again.
+
 ## [0.38.0] - 2026-10-16
 
 Answer your agents from the phone with a tap, and a terminal there that keeps up.
