@@ -79,3 +79,36 @@ private func file(_ lines: [String]) throws -> URL {
     #expect(AgentConversation(hookInput: Data(#"{"hook_event_name":"Stop"}"#.utf8)) == nil)
     #expect(AgentConversation(hookInput: Data("not json".utf8)) == nil)
 }
+
+/// Lines shaped like Codex's log.
+private let codexLog = [
+    #"{"type":"session_meta","payload":{"id":"s1","cwd":"/Users/me/shelf"}}"#,
+    #"{"type":"response_item","payload":{"type":"message","id":"m0","role":"user","content":[{"type":"input_text","text":"<environment_context>\n  <cwd>/Users/me/shelf</cwd>\n</environment_context>"}]}}"#,
+    #"{"type":"response_item","payload":{"type":"message","id":"m1","role":"user","content":[{"type":"input_text","text":"why does the order test fail?"}]}}"#,
+    #"{"type":"response_item","payload":{"type":"message","id":"d1","role":"developer","content":[{"type":"input_text","text":"instructions"}]}}"#,
+    #"{"type":"response_item","payload":{"type":"reasoning","id":"r1","summary":[]}}"#,
+    #"{"type":"response_item","payload":{"type":"custom_tool_call","call_id":"c1","name":"exec","input":"const r = await tools.exec_command({\"cmd\":\"npm test -- store\"})"}}"#,
+    #"{"type":"response_item","payload":{"type":"custom_tool_call","call_id":"c2","name":"exec","input":"const patch = \"*** Begin Patch\\n*** Update File: /Users/me/shelf/tests/store.test.ts\\n@@\\n-  await sleep(1)\\n+  const clock = fixedClock()\\n*** End Patch\""}}"#,
+    #"{"type":"response_item","payload":{"type":"function_call","call_id":"c3","name":"wait","arguments":"{}"}}"#,
+    #"{"type":"response_item","payload":{"type":"message","id":"m2","role":"assistant","content":[{"type":"output_text","text":"Fixed: the test now uses a **fixed clock**."}]}}"#,
+    #"{"type":"event_msg","payload":{"type":"token_count"}}"#,
+]
+
+@Test func readsACodexConversation() throws {
+    let transcript = Transcript(url: try file(codexLog))
+    #expect(transcript.refresh())
+    let messages = transcript.messages
+    #expect(messages.map(\.role) == [.you, .tool, .tool, .agent])
+    #expect(messages[0].text == "why does the order test fail?")
+    #expect(messages[1].text == "npm test -- store" && messages[1].tool == "Bash")
+    #expect(messages[2].text == "tests/store.test.ts" && messages[2].tool == "Edit")
+    #expect(messages[2].detail == "@@ tests/store.test.ts\n@@\n-  await sleep(1)\n+  const clock = fixedClock()\n")
+    #expect(messages[3].text == "Fixed: the test now uses a **fixed clock**.")
+}
+
+@Test func describesSeveralCodexCommandsAsTheFirstAndACount() {
+    let input = #"const results = await Promise.all([ tools.exec_command({"cmd":"git status"}), tools.exec_command({"cmd":"git diff"}) ])"#
+    let message = Transcript.codexTool(input, in: nil, id: "x")
+    #expect(message?.text == "git status and 1 more")
+    #expect(message?.detail == "git status\ngit diff")
+}
