@@ -1,4 +1,6 @@
+import CoreImage.CIFilterBuiltins
 import FarolCore
+import FarolRemote
 import SwiftUI
 import UserNotifications
 import GhosttyTerminal
@@ -10,11 +12,14 @@ struct SettingsPage: View {
     @ObservedObject var worktrees: WorktreeSettings
     @ObservedObject var state: WindowState
     @ObservedObject var updates: UpdateChecker
+    @ObservedObject var remote: RemoteBridge
     /// Opens a session with a command typed in, for setting up a tool that asks questions.
     let runInTerminal: (String) -> Void
 
     @AppStorage(AppIcon.key) private var appIcon = AppIcon.default.rawValue
     @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = false
+    /// The relay field, shown only once you ask to use your own.
+    @State private var relayDraft: String?
     @State private var versionCopied = false
     /// One setup per Claude Code and Codex config folder, with each one's state by id.
     @State private var agentSetups: [AgentSetup] = []
@@ -54,6 +59,7 @@ struct SettingsPage: View {
         case agents = "Agents"
         case worktrees = "Worktrees"
         case integrations = "Integrations"
+        case remote = "Remote"
         case shortcuts = "Shortcuts"
         case about = "About"
     }
@@ -87,6 +93,7 @@ struct SettingsPage: View {
                         case .agents: agentsSection(p)
                         case .worktrees: worktreesSection(p)
                         case .integrations: integrationsSection(p)
+                        case .remote: remoteSection(p)
                         case .shortcuts: shortcuts(p)
                         case .about: EmptyView()
                         }
@@ -525,6 +532,102 @@ struct SettingsPage: View {
         refreshAgents()
     }
 
+    @ViewBuilder private func remoteSection(_ p: Palette) -> some View {
+        Heading(title: "Remote", detail: "Answer your agents from your phone when you are away from the Mac.", palette: p, beta: true)
+        Row(title: "Let a paired phone in",
+            detail: "It sees your sessions and types into them. The Mac has to stay on, since the agents run on it.",
+            palette: p) {
+            toggle($agents.remote)
+        }
+        if let problem = remote.problem {
+            Text(problem).font(.system(size: 12)).foregroundStyle(p.waiting).padding(.top, 6)
+        }
+        if agents.remote {
+            Row(title: "Keep the Mac awake for agents",
+                detail: "While an agent works or waits for you, the Mac does not go to sleep by itself. Closing the lid still puts it to sleep.",
+                palette: p) {
+                toggle($agents.remoteKeepAwake)
+            }
+            GroupTitle(title: "Phones", palette: p)
+            ForEach(remote.devices, id: \.key) { device in
+                Row(title: device.name,
+                    detail: remote.connected.contains(device.key) ? "Connected now" : "Not connected",
+                    palette: p) {
+                    ShipButton(title: "Remove", help: "It is cut off at once, and has to scan a new code to come back.", busy: false, palette: p) {
+                        remote.remove(device)
+                    }
+                }
+            }
+            // The app comes before the code, since the code is only read from inside it.
+            Row(title: "Farol for iPhone", detail: "The app that scans the code and shows your sessions. Remote needs an iPhone for now.", palette: p) {
+                ShipButton(title: "Get the app", busy: false, palette: p) {
+                    if let page = URL(string: RemoteBridge.iPhoneApp) { NSWorkspace.shared.open(page) }
+                }
+            }
+            Row(title: remote.devices.isEmpty ? "Pair your phone" : "Pair another phone",
+                detail: remote.offer == nil
+                    ? "Shows a code to scan from the app. It works once, for two minutes."
+                    : "Scan this from the app. Whoever scans it can type into your sessions, so show it to nobody else.",
+                palette: p) {
+                ShipButton(title: remote.offer == nil ? "Show code" : "Hide", busy: false, palette: p) {
+                    remote.offer == nil ? remote.showOffer() : remote.hideOffer()
+                }
+            }
+            if let link = remote.link, let code = Self.qrCode(link.absoluteString) {
+                Image(nsImage: code)
+                    .interpolation(.none)
+                    .resizable()
+                    .frame(width: 200, height: 200)
+                    .padding(12)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .padding(.vertical, 12)
+            }
+
+            GroupTitle(title: "Connection", palette: p)
+            let whose = remote.ownRelay == nil ? "Farol's relay" : remote.relayHost
+            Row(title: remote.online ? "Connected through \(whose)" : "Not connected to \(whose)",
+                detail: relayDraft == nil
+                    ? "The relay joins this Mac with your phone. Everything is encrypted between the two, so the relay cannot read it."
+                    : "The address of a relay you run, like relay.example.com. Phones you already paired have to scan a new code after a change.",
+                palette: p) {
+                if let draft = relayDraft {
+                    HStack(spacing: 8) {
+                        TextField("relay.example.com", text: Binding(get: { draft }, set: { relayDraft = $0 }))
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 200)
+                            .onSubmit(saveRelay)
+                            // Escape leaves the relay as it was.
+                            .onExitCommand { relayDraft = nil }
+                        ShipButton(title: "Cancel", busy: false, palette: p) { relayDraft = nil }
+                        ShipButton(title: "Use it", busy: false, palette: p, action: saveRelay)
+                    }
+                    // Without this the row squeezes the buttons until their titles are cut to dots.
+                    .fixedSize()
+                } else if remote.ownRelay == nil {
+                    ShipButton(title: "Use your own", help: "For a relay you run yourself.", busy: false, palette: p) { relayDraft = "" }
+                } else {
+                    ShipButton(title: "Use Farol's", busy: false, palette: p) { remote.useRelay("") }
+                }
+            }
+        }
+    }
+
+    /// An empty field changes nothing, so leaving it blank is the same as Cancel.
+    private func saveRelay() {
+        if let draft = relayDraft, !draft.trimmingCharacters(in: .whitespaces).isEmpty { remote.useRelay(draft) }
+        relayDraft = nil
+    }
+
+    /// Black on white whatever the theme, since that is what a camera reads best.
+    private static func qrCode(_ text: String) -> NSImage? {
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = Data(text.utf8)
+        guard let output = filter.outputImage,
+              let image = CIContext().createCGImage(output, from: output.extent) else { return nil }
+        return NSImage(cgImage: image, size: NSSize(width: output.extent.width, height: output.extent.height))
+    }
+
     @ViewBuilder private func shortcuts(_ p: Palette) -> some View {
         Heading(title: "Shortcuts", detail: "Standard terminal shortcuts, plus Farol's own for sessions.", palette: p)
         ForEach(Self.shortcutGroups, id: \.title) { group in
@@ -685,10 +788,21 @@ private struct Heading: View {
     let title: String
     let detail: String?
     let palette: Palette
+    var beta = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.system(size: 20, weight: .semibold))
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(title).font(.system(size: 20, weight: .semibold))
+                if beta {
+                    Text("Beta")
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundStyle(palette.muted)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .overlay(Capsule().strokeBorder(palette.muted.opacity(0.4)))
+                }
+            }
             if let detail {
                 Text(detail).font(.system(size: 12.5)).foregroundStyle(palette.muted)
             }

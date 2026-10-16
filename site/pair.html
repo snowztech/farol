@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pair your iPhone with Farol</title>
+  <meta name="description" content="Scan the pairing code from Farol for iPhone to answer your coding agents from your phone.">
+  <!-- The address of this page carries a pairing code after the #. Nothing here may pass it on, and search engines have no use for the page. -->
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex">
+  <link rel="canonical" href="https://farol.sh/pair">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Farol">
+  <meta property="og:url" content="https://farol.sh/pair">
+  <meta property="og:title" content="Pair your iPhone with Farol">
+  <meta property="og:description" content="Answer your coding agents from your phone.">
+  <meta property="og:image" content="https://farol.sh/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="icon.png">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.2/dist/snowztech-ui.min.css">
+  <script>
+    if (matchMedia("(prefers-color-scheme: light)").matches) document.documentElement.dataset.theme = "light";
+  </script>
+  <style>
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0; background: var(--sn-bg); color: var(--sn-fg);
+      font-family: var(--sn-font-mono); font-size: var(--sn-text-base);
+      line-height: var(--sn-leading-normal);
+    }
+    a { color: inherit; }
+    .wide { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+    .skip {
+      position: absolute; left: 20px; top: -60px; z-index: 10; padding: 8px 12px;
+      border-radius: 6px; background: var(--sn-fg); color: var(--sn-bg);
+    }
+    .skip:focus { top: 12px; }
+
+    .topbar {
+      min-height: 64px; display: flex; align-items: center; justify-content: space-between;
+      gap: 24px;
+    }
+    .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; text-decoration: none; }
+    .brand img { width: 30px; height: 30px; }
+    .download { color: var(--sn-fg-muted); font-size: var(--sn-text-sm); text-decoration: none; }
+    .download:hover { color: var(--sn-fg); }
+
+    .docs-hero { position: relative; padding: 48px 0 64px; overflow: hidden; }
+    .docs-hero::before {
+      content: ""; position: absolute; inset: -80% 5% auto; height: 180%; z-index: 0;
+      background: radial-gradient(ellipse at center, var(--sn-accent-soft), transparent 68%);
+      filter: blur(32px); opacity: 0.55;
+    }
+    .docs-hero > div { position: relative; z-index: 1; max-width: 720px; }
+    .eyebrow { margin: 0 0 10px; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); text-transform: uppercase; letter-spacing: 0.12em; }
+    h1 { margin: 0 0 12px; font-size: 34px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.2; }
+    .lede { margin: 0; max-width: 620px; color: var(--sn-fg-muted); font-size: var(--sn-text-md); }
+
+    .docs-layout { display: grid; grid-template-columns: 210px minmax(0, 720px); gap: 64px; align-items: start; }
+    .toc { position: sticky; top: 28px; }
+    .toc b { display: block; margin-bottom: 12px; font-size: var(--sn-text-sm); font-weight: 500; }
+    .toc ul { list-style: none; margin: 0; padding: 0; }
+    .toc li + li { margin-top: 8px; }
+    .toc a { color: var(--sn-fg-subtle); font-size: var(--sn-text-sm); text-decoration: none; }
+    .toc a:hover { color: var(--sn-fg); }
+
+    .content section { scroll-margin-top: 28px; }
+    .content section + section { margin-top: 72px; padding-top: 72px; border-top: 1px solid var(--sn-border-subtle); }
+    h2 { margin: 0 0 18px; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+    h3 { margin: 32px 0 10px; font-size: 16px; font-weight: 600; }
+    p { margin: 0 0 16px; }
+    .content p, .content li { color: var(--sn-fg-muted); }
+    .content strong { color: var(--sn-fg); font-weight: 500; }
+    .content ol, .content ul { margin: 0 0 20px; padding-left: 22px; }
+    .content li + li { margin-top: 8px; }
+    .content a { color: var(--sn-fg); text-underline-offset: 3px; }
+    code, kbd {
+      border: 1px solid var(--sn-border-subtle); border-radius: 4px;
+      background: var(--sn-bg-raised); color: var(--sn-fg); font: inherit;
+    }
+    code { padding: 1px 5px; }
+    kbd { display: inline-block; min-width: 1.3em; padding: 0 5px; text-align: center; box-shadow: 0 1px 0 var(--sn-border-strong); }
+    pre {
+      margin: 18px 0; padding: 16px 18px; overflow-x: auto;
+      border: 1px solid var(--sn-border-subtle); border-radius: 8px;
+      background: var(--sn-bg-raised); color: var(--sn-fg-muted);
+    }
+    pre code { padding: 0; border: 0; background: none; }
+    pre.command { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 10px 10px 18px; color: var(--sn-fg); }
+    .note {
+      margin: 22px 0; padding: 15px 17px; border: 1px solid var(--sn-border-subtle);
+      border-left: 3px solid var(--sn-accent); border-radius: 8px; background: var(--sn-bg-raised);
+    }
+    .note p { margin: 0; }
+    .status-table, .shortcuts { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    .status-table th, .status-table td, .shortcuts th, .shortcuts td {
+      padding: 11px 12px; border-bottom: 1px solid var(--sn-border-subtle); text-align: left;
+      color: var(--sn-fg-muted); font-size: var(--sn-text-sm); vertical-align: top;
+    }
+    .status-table th, .shortcuts th { color: var(--sn-fg); font-weight: 500; }
+    .dot { display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: currentColor; }
+    .dot-idle { border: 1px solid var(--sn-fg-subtle); background: transparent; color: var(--sn-fg-subtle); }
+    .dot-working { color: #67e8f9; box-shadow: 0 0 8px currentColor; }
+    .dot-waiting { color: #fde68a; box-shadow: 0 0 8px currentColor; }
+    .dot-done { color: #86efac; }
+    .doc-shot {
+      display: block; width: 100%; height: auto; margin: 24px 0 0;
+      border: 1px solid var(--sn-border-strong); border-radius: 10px;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.3);
+    }
+
+    footer {
+      margin: 96px auto 0; padding: 20px 20px 40px; max-width: 1040px;
+      border-top: 1px solid var(--sn-border-subtle); display: flex;
+      justify-content: space-between; flex-wrap: wrap; gap: 8px;
+      color: var(--sn-fg-subtle); font-size: var(--sn-text-xs);
+    }
+    footer a { color: var(--sn-fg-muted); text-decoration: none; }
+    footer a:hover { color: var(--sn-fg); }
+
+    @media (max-width: 760px) {
+      .docs-hero { padding: 36px 0 44px; }
+      h1 { font-size: 29px; }
+      .docs-layout { display: block; }
+      .toc { position: static; margin-bottom: 56px; padding-bottom: 24px; border-bottom: 1px solid var(--sn-border-subtle); }
+      .toc ul { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+      .toc li + li { margin-top: 0; }
+      .content section + section { margin-top: 56px; padding-top: 56px; }
+      .status-table, .shortcuts { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#content">Skip to the text</a>
+
+  <header class="topbar wide">
+    <a class="brand" href="./"><img src="icon.png" alt="">Farol</a>
+    <a class="download" href="iphone">Get Farol for iPhone</a>
+  </header>
+
+  <main>
+    <header class="docs-hero wide">
+      <div>
+        <h1>Scan this code from the Farol app</h1>
+        <p class="lede">The code on your Mac pairs your iPhone with Farol, and it has to be scanned from inside the app. Your phone's camera brought you here instead.</p>
+      </div>
+    </header>
+
+    <div class="docs-layout wide">
+      <article id="content">
+        <section id="pair">
+          <h2>Pair your iPhone</h2>
+          <ol>
+            <li>Install <a href="iphone">Farol for iPhone</a>. It is in beta on TestFlight for now.</li>
+            <li>Open it and tap Scan the code.</li>
+            <li>Point it at the code in Farol's settings on your Mac, under Remote. A code lasts two minutes, so press Show code again if it has gone.</li>
+          </ol>
+        </section>
+
+        <section id="secret">
+          <h2>Keep this link to yourself</h2>
+          <p>The address of this page holds the pairing code. Whoever has it can pair with your Mac until the code runs out, so do not share or screenshot it. This page reads nothing from it and sends it nowhere.</p>
+        </section>
+
+        <section id="more">
+          <h2>What it is for</h2>
+          <p>With a phone paired, you see which of your agents is working, waiting for you or done, and you answer from wherever you are. Everything between your Mac and your phone is encrypted end to end. See <a href="privacy">what Farol sends and keeps</a>.</p>
+        </section>
+      </article>
+    </div>
+  </main>
+
+</body>
+</html>

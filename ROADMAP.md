@@ -98,6 +98,23 @@ A session over ssh says where you are, and shows nothing that belongs to another
 - [ ] A `TERM` the server knows, so colors and keys work on hosts without Ghostty's terminfo
 - [ ] Hosts whose shell sets no title, which still look local
 
+## From your phone
+
+Answer your agents when you are away from the Mac. Turn Remote on in settings, scan a code with your phone, and your sessions are there. The Mac has to stay on, since the agents run on it.
+
+With Remote off, Farol runs as it does today. The messages, their encryption and the relay live in [farol-remote](https://github.com/snowztech/farol-remote), and the relay cannot read what it passes.
+
+It needs an iPhone for now. For Android or the web, [say so in an issue](https://github.com/snowztech/farol/issues/new?title=Remote%20on%20Android%20or%20the%20web), since that decides what comes next.
+
+- [x] The Mac side: the switch, pairing with a QR code, the paired devices, and one bridge that sends the sessions and types the replies
+- [x] The encrypted protocol and the relay, in farol-remote
+- [x] The iPhone app: the sessions with their status, a session's screen and its earlier output, a reply bar with the keys a phone lacks, and dictation
+- [x] A notification when a session waits or finishes, naming the session and opening it
+- [x] The Mac kept awake while agents work, as a setting
+- [ ] Answering from the notification itself
+- [ ] Agents on a machine of your own that stays on, so the Mac can be off. A preview is in farol-remote as `farol-host`
+- [ ] Android or the web, if people ask
+
 ## Hardening
 
 - [ ] Checksum for the prebuilt libghostty, checked before every release
@@ -109,6 +126,7 @@ A session over ssh says where you are, and shows nothing that belongs to another
 - Linear as a ticket source
 - The server's repo in the panels over ssh, which needs git run on the server
 - Command palette: Farol's actions, like push, commit or new task, in the ⌘P list
+- A live terminal on the phone, with colors, once libghostty lets the app around it read a pane's output. Until then the phone shows a pane as text
 
 ## Not planned
 

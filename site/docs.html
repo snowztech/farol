@@ -85,6 +85,11 @@
       background: var(--sn-bg-raised); color: var(--sn-fg-muted);
     }
     pre code { padding: 0; border: 0; background: none; }
+    .beta {
+      margin-left: 8px; padding: 1px 7px; vertical-align: middle;
+      border: 1px solid var(--sn-border-subtle); border-radius: 999px;
+      color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); font-weight: 500; letter-spacing: 0;
+    }
     pre.command { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 10px 10px 18px; color: var(--sn-fg); }
     .note {
       margin: 22px 0; padding: 15px 17px; border: 1px solid var(--sn-border-subtle);
@@ -156,6 +161,7 @@
           <li><a href="#status">Agent status</a></li>
           <li><a href="#review">Review and ship</a></li>
           <li><a href="#outside">From any app</a></li>
+          <li><a href="#remote">From your phone</a></li>
           <li><a href="#configuration">Configuration</a></li>
           <li><a href="#shortcuts">Shortcuts</a></li>
           <li><a href="#troubleshooting">Troubleshooting</a></li>
@@ -251,6 +257,13 @@
           <p>In <strong>Settings → Agents → Outside Farol</strong>, turn on the menu bar lighthouse or the small status panel. The panel can sit at the notch or on a screen edge, and you can drag it along that edge.</p>
           <p>Both show which sessions are working, waiting or done. Open a session directly from either one. When an agent waits or finishes in the background, Farol sends a notification and counts waiting sessions on the Dock icon.</p>
           <img class="doc-shot" src="features/menu-bar.png" width="620" height="410" alt="Farol's menu bar lighthouse listing sessions and their current status">
+        </section>
+
+        <section id="remote">
+          <h2>From your phone<span class="beta">Beta</span></h2>
+          <p>Remote lets you answer your agents when you are away from the Mac. Install <a href="iphone">Farol for iPhone</a>, in beta on TestFlight for now. Then turn Remote on in <strong>Settings → Remote</strong>, press <strong>Show code</strong> and scan it from the app.</p>
+          <p>The phone lists your sessions with their status, shows a session's screen and types your replies. It notifies you when an agent waits or finishes. Everything between the Mac and the phone is encrypted end to end, so the relay that joins them cannot read it.</p>
+          <p>The agents run on the Mac, so it has to stay on. <strong>Keep the Mac awake for agents</strong> stops it from sleeping by itself while an agent works or waits for you.</p>
         </section>
 
         <section id="configuration">
