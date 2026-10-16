@@ -298,6 +298,28 @@ public final class TerminalView: NSView {
         }
     }
 
+    /// A letter with Control held, like Control-D, as the keyboard would send it. Nothing for anything but a to z.
+    public func pressControl(_ letter: Character) {
+        guard let surface, let code = Self.letterKeys[letter], let scalar = letter.unicodeScalars.first else { return }
+        var input = ghostty_input_key_s()
+        input.keycode = code
+        input.unshifted_codepoint = scalar.value
+        input.mods = GHOSTTY_MODS_CTRL
+        for action in [GHOSTTY_ACTION_PRESS, GHOSTTY_ACTION_RELEASE] {
+            input.action = action
+            (action == GHOSTTY_ACTION_PRESS ? String(letter) : nil).withOptionalCString { pointer in
+                input.text = pointer
+                _ = ghostty_surface_key(surface, input)
+            }
+        }
+    }
+
+    /// The Mac's key code of each letter, where it is on a US keyboard.
+    private static let letterKeys: [Character: UInt32] = [
+        "a": 0, "b": 11, "c": 8, "d": 2, "e": 14, "f": 3, "g": 5, "h": 4, "i": 34, "j": 38, "k": 40, "l": 37, "m": 46,
+        "n": 45, "o": 31, "p": 35, "q": 12, "r": 15, "s": 1, "t": 17, "u": 32, "v": 9, "w": 13, "x": 7, "y": 16, "z": 6,
+    ]
+
     // MARK: Drops
 
     public override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {

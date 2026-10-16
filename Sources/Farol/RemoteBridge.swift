@@ -34,7 +34,10 @@ final class RemoteBridge: ObservableObject {
     private var key: DeviceKey?
     private var connection: RelayConnection?
     private var phones: [UInt32: Phone] = [:] {
-        didSet { followLogs() }
+        didSet {
+            followLogs()
+            retime()
+        }
     }
     /// Kept per device and across its connections, since a phone resends on a new one.
     private var seen: [Data: SeenCommands] = [:]
@@ -86,6 +89,10 @@ final class RemoteBridge: ObservableObject {
         /// What it was last sent, so only a change is sent again.
         var sessions: [RemoteSession]?
         var screen: String?
+        /// The session whose terminal it shows, which then gets its screen often. Nil while it shows a conversation.
+        var terminal: UUID?
+        /// It said when it shows a terminal, so its screen goes only then. An older phone never says, and always gets it.
+        var saysTerminal = false
         /// What it was told the watched session waits on. Nil until told, so the first tick always says, even that it waits on nothing.
         var request: RemoteRequest??
         /// The conversation it reads, and the last message it has, so only what follows is sent.
@@ -199,6 +206,16 @@ final class RemoteBridge: ObservableObject {
         connected = []
         timer?.invalidate()
         timer = nil
+    }
+
+    /// How often phones are sent what changed: often while one shows a terminal, so typing there feels live, and less the rest of the time.
+    private var interval: TimeInterval { phones.values.contains { $0.terminal != nil } ? 0.12 : 0.4 }
+
+    private func retime() {
+        guard let timer, timer.timeInterval != interval else { return }
+        timer.invalidate()
+        self.timer = nil
+        watch()
     }
 
     // MARK: Pairing
@@ -328,6 +345,17 @@ final class RemoteBridge: ObservableObject {
             conversation(command, of: session, before: before, from: id)
         case .answer(let session, let request, let choice):
             answer(command, by: device, session: session, request: request, choice: choice, from: id)
+        case .terminal(let session, let open):
+            phones[id]?.saysTerminal = true
+            if open { phones[id]?.terminal = session } else if phones[id]?.terminal == session { phones[id]?.terminal = nil }
+            phones[id]?.screen = nil
+            retime()
+            tick()
+        case .control(let session, let key):
+            guard key.count == 1, let letter = key.first, ("a"..."z").contains(letter) else {
+                return tell(.refused(command: command.id, reason: "Only Control with a letter can be sent."), id)
+            }
+            act(command, by: device, on: session, from: id) { $0.pressControl(letter) }
         case .changes(let session):
             changes(command, in: session, from: id)
         case .diff(let session, let path):
@@ -667,7 +695,7 @@ final class RemoteBridge: ObservableObject {
     private func watch() {
         guard timer == nil else { return }
         // ponytail: asks a few times a second while a phone is connected. Observing the store would send sooner and ask less.
-        timer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { [weak self] _ in self?.tick() }
+        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in self?.tick() }
     }
 
     /// Sends each phone what changed: the list, and the screen of the session it has open. Always in full.
@@ -690,9 +718,10 @@ final class RemoteBridge: ObservableObject {
                     tell(.request(session: watching, request: request), id)
                 }
             }
-            guard let watching = phone.watching,
-                  let text = store.sessions.first(where: { $0.id == watching })?.panes.focused.screenText,
-                  text != phone.screen else { continue }
+            // A phone reading the conversation needs the screen only for a question the hooks did not describe.
+            guard let watching = phone.watching, let session = store.sessions.first(where: { $0.id == watching }),
+                  !phone.saysTerminal || phone.terminal == watching || session.activity == .waiting,
+                  case let text = session.panes.focused.screenText, text != phone.screen else { continue }
             phones[id]?.screen = text
             tell(.screen(session: watching, text: text), id)
         }
