@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-10-16
+
+Read an agent's whole conversation from the phone, from its first message.
+
 ### Added
 
 - Remote: the phone shows a Claude Code or Codex session as a conversation, read from the agent's own log: your messages, its answers and the tools it ran, from the very first message. The terminal is still one tap away.
