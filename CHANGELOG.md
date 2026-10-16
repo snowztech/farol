@@ -8,6 +8,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - Remote, in beta: answer your agents from your phone. Turn it on in Settings → Remote, scan the code with Farol for iPhone (on TestFlight for now), and the phone lists your sessions, shows a session's screen, types your replies and tells you when an agent waits or finishes. Everything between the Mac and the phone is encrypted end to end.
 - Remote: keeps the iPhone's Live Activity up to date while the app is closed, on the lock screen and in the Dynamic Island: how many agents wait and work, and which. Apple and the relay see only the two counts.
+- Remote: open a new session from the phone, in a project that already has one open, as a plain shell or with Claude Code or Codex running.
 - Remote: an option to keep the Mac awake while an agent works or waits for you, so the phone can still reach it. Closing the lid still puts the Mac to sleep.
 
 ## [0.33.0] - 2026-10-15

@@ -1,4 +1,5 @@
 import AppKit
+import FarolCore
 import FarolRemote
 import GhosttyTerminal
 import UserNotifications
@@ -293,8 +294,14 @@ final class RemoteBridge: ObservableObject {
             activityTargets.removeAll { $0.device == device.key }
             activityTargets.append(ActivityTarget(device: device.key, token: token, sandbox: sandbox))
             updateActivities()
-        case .options, .task:
-            // Starting a task from the phone, which this version does not do. The phone is told so, and says to update.
+        case .options:
+            let agents = AgentFolder.find()
+            tell(.options(projects: projects.map { RemoteChoice(id: $0, name: URL(fileURLWithPath: $0).lastPathComponent) },
+                          agents: agents.map { RemoteChoice(id: $0.id, name: $0.label) }, agent: agents.first?.id), id)
+        case .open(let project, let agent):
+            open(command, by: device, in: project, with: agent, from: id)
+        case .task:
+            // Starting a task in a new worktree from the phone, which this version does not do. The phone is told so, and says to update.
             tell(.refused(command: command.id, reason: "This version of Farol cannot start tasks from the phone."), id)
         case .history(let session):
             // Read once, when the phone asks. Reading it on every change would cost the Mac for something rarely looked at.
@@ -331,6 +338,30 @@ final class RemoteBridge: ObservableObject {
     private func send(_ frame: WireFrame, to id: UInt32) {
         guard let payload = try? JSONEncoder().encode(frame) else { return }
         connection?.send(RelayFrame.encode(payload, to: id))
+    }
+
+    // MARK: New sessions
+
+    /// The folders a session is open in, its repository's when it has one. A phone opens a session in one of these, never any folder on the Mac.
+    private var projects: [String] {
+        var seen = Set<String>()
+        return store.ordered.map { $0.repoRoot ?? $0.directory }.filter { seen.insert($0).inserted }
+    }
+
+    /// The session each `open` made, so one a phone sends again after a dropped connection is answered and not opened twice.
+    private var opened: [UUID: UUID] = [:]
+
+    /// A new session in a project, like a new tab: the agent running in it, or a plain shell.
+    private func open(_ command: RemoteCommand, by device: PairedDevice, in project: String, with agent: String?, from id: UInt32) {
+        if let session = opened[command.id] { return tell(.opened(command: command.id, session: session), id) }
+        let folder = agent.flatMap { agent in AgentFolder.find().first { $0.id == agent } }
+        guard projects.contains(project), agent == nil || folder != nil else {
+            return tell(.refused(command: command.id, reason: "The Mac could not open that session. Pick the project again and retry."), id)
+        }
+        let session = store.create(directory: project, run: folder?.command())
+        opened[command.id] = session.id
+        tell(.opened(command: command.id, session: session.id), id)
+        tick()
     }
 
     // MARK: Notifications
