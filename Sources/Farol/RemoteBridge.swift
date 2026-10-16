@@ -302,6 +302,12 @@ final class RemoteBridge: ObservableObject {
             open(command, by: device, in: project, with: agent, from: id)
         case .close(let session):
             close(command, by: device, session: session, from: id)
+        case .scroll(let session, let lines):
+            act(command, by: device, on: session, from: id) { $0.scroll(lines: lines) }
+        case .changes(let session):
+            changes(command, in: session, from: id)
+        case .diff(let session, let path):
+            diff(command, of: path, in: session, from: id)
         case .task:
             // Starting a task in a new worktree from the phone, which this version does not do. The phone is told so, and says to update.
             tell(.refused(command: command.id, reason: "This version of Farol cannot start tasks from the phone."), id)
@@ -378,6 +384,80 @@ final class RemoteBridge: ObservableObject {
         store.close(session)
         tell(.done(command: command.id), phone)
         tick()
+    }
+
+    // MARK: Changes
+
+    /// The repository a session works in, and what the review panel compares it with. Nil outside git.
+    private func repository(of session: UUID) -> (directory: String, scope: Diff.Scope)? {
+        guard let session = store.sessions.first(where: { $0.id == session }) else { return nil }
+        let directory = session.repoRoot ?? session.directory
+        return (directory, Diff.defaultScope(in: directory))
+    }
+
+    /// The changed files, as the review panel lists them. Git runs off the main thread, as it does for the panel.
+    private func changes(_ command: RemoteCommand, in session: UUID, from id: UInt32) {
+        guard let (directory, scope) = repository(of: session) else {
+            return tell(.refused(command: command.id, reason: "That session is closed."), id)
+        }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let files = try? Diff.files(in: directory, scope)
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                guard let files else {
+                    return tell(.refused(command: command.id, reason: "This session is not in a git repository."), id)
+                }
+                tell(.changes(session: session, scope: Self.label(scope), files: files.map(Self.change)), id)
+            }
+        }
+    }
+
+    /// One file as a unified diff, cut short so a message stays under the relay's limit.
+    private func diff(_ command: RemoteCommand, of path: String, in session: UUID, from id: UInt32) {
+        guard let (directory, scope) = repository(of: session) else {
+            return tell(.refused(command: command.id, reason: "That session is closed."), id)
+        }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let file = (try? Diff.files(in: directory, scope))?.first { $0.path == path }
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                guard let file else { return tell(.refused(command: command.id, reason: "That file has no changes any more."), id) }
+                tell(.diff(session: session, path: path, text: Self.unified(file)), id)
+            }
+        }
+    }
+
+    private static func label(_ scope: Diff.Scope) -> String {
+        switch scope {
+        case .uncommitted: "Uncommitted"
+        case .branch(let base): "Since \(base)"
+        case .commit(let hash): "Commit \(hash.prefix(7))"
+        case .request(let number): "Pull request #\(number)"
+        }
+    }
+
+    private static func change(_ file: Diff.File) -> RemoteChange {
+        let status: RemoteChange.Status = switch file.status {
+        case .modified: .modified
+        case .added: .added
+        case .deleted: .deleted
+        case .renamed: .renamed
+        }
+        return RemoteChange(path: file.path, oldPath: file.oldPath, status: status, added: file.added, removed: file.removed, binary: file.isBinary)
+    }
+
+    private static func unified(_ file: Diff.File, limit: Int = 120_000) -> String {
+        if file.isBinary { return "Binary file" }
+        var text = ""
+        for hunk in file.hunks {
+            text += "@@ -\(hunk.oldStart) +\(hunk.newStart) @@\n"
+            for line in hunk.lines {
+                let sign = switch line.kind { case .added: "+"; case .removed: "-"; case .context: " " }
+                text += sign + line.text + "\n"
+                if text.utf8.count > limit { return text + "… cut short, open it on the Mac for the rest" }
+            }
+        }
+        return text
     }
 
     // MARK: Notifications
