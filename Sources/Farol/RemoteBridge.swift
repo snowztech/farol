@@ -367,15 +367,25 @@ final class RemoteBridge: ObservableObject {
             guard let pane = store.sessions.first(where: { $0.id == session })?.panes.focused else { return }
             tell(.history(session: session, text: pane.historyText()), id)
         case .send(let session, let text):
-            act(command, by: device, on: session, from: id) { $0.pasteText(text) }
+            act(command, by: device, on: session, from: id) { pane in
+                pane.pasteText(text)
+                pasted[ObjectIdentifier(pane)] = (.now, text.split(separator: "\n", omittingEmptySubsequences: false).count)
+            }
         case .type(let session, let text):
             act(command, by: device, on: session, from: id) { $0.type(text) }
         case .key(let session, let key):
-            act(command, by: device, on: session, from: id) { pane in
-                TerminalView.Key(rawValue: key.rawValue).map { pane.press($0) }
+            act(command, by: device, on: session, from: id) { [weak self] pane in
+                guard let key = TerminalView.Key(rawValue: key.rawValue) else { return }
+                // Return right after a paste waits for the agent to take the paste in, or it is lost and the reply stays unsent.
+                guard key == .enter, let paste = self?.pasted.removeValue(forKey: ObjectIdentifier(pane)) else { return pane.press(key) }
+                let wait = RemoteTyping.returnDelay(afterPasteOf: paste.lines, elapsed: Date.now.timeIntervalSince(paste.at))
+                DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [weak pane] in pane?.press(.enter) }
             }
         }
     }
+
+    /// The last paste from a phone into each pane, and how many lines it had, until the Return that sends it.
+    private var pasted: [ObjectIdentifier: (at: Date, lines: Int)] = [:]
 
     /// Types into a session once, however many times the command arrives.
     private func act(_ command: RemoteCommand, by device: PairedDevice, on session: UUID, from id: UInt32, _ type: (TerminalView) -> Void) {
