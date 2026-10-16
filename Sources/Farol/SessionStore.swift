@@ -16,6 +16,8 @@ final class Session: ObservableObject, Identifiable {
     @Published private(set) var agents: [UUID: AgentActivity] = [:]
     /// The agent's own conversation, as its hooks last named it. A phone reads it, and a restored session can resume it.
     var conversation: AgentConversation?
+    /// What a waiting agent asks, and the pane it waits in, so an answer from a phone goes there and nowhere else.
+    var request: (pane: UUID, asked: AgentRequest)?
     /// The program rang the bell or sent a notification while you were elsewhere. Covers agents without hooks.
     @Published var bellRang = false
     /// The host each pane is on over ssh, kept apart from the title so it outlives a program retitling the pane.
@@ -93,8 +95,14 @@ final class Session: ObservableObject, Identifiable {
         return .idle
     }
 
-    func apply(_ event: AgentEvent, pane: UUID) {
+    func apply(_ event: AgentEvent, pane: UUID, request: AgentRequest? = nil) {
         agents[pane, default: AgentActivity()].apply(event)
+        switch event {
+        // A notification that the agent still waits says nothing new, so what it asks is kept.
+        case .waiting: if let request { self.request = (pane, request) }
+        case .working, .done, .clear: if self.request?.pane == pane { self.request = nil }
+        case .subagentStart, .subagentStop: break
+        }
     }
 
     /// An agent in one of the panes waits for your approval or answer, as opposed to a bell or terminal notification.
@@ -251,7 +259,7 @@ final class SessionStore: ObservableObject {
               let session = sessions.first(where: { $0.panes.terminals.contains { $0.id == pane } }) else { return }
         let before = session.activity
         if let conversation = message.conversation { session.conversation = conversation }
-        session.apply(message.event, pane: pane)
+        session.apply(message.event, pane: pane, request: message.request)
         // An agent can end its turn, or stop to ask you, on a rebase git stopped, so every session's checkout is looked at again.
         // Not on "working": it comes after every tool call, and each lookup also refreshes the review panel.
         if message.event == .done || message.event == .waiting { session.refreshGit() }

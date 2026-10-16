@@ -22,7 +22,7 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
     ]
     let settings = AgentHooks.claude.install(into: mine)
     #expect(settings["model"] as? String == "opus")
-    #expect(commands(settings, "PreToolUse") == ["my-guard.sh"])
+    #expect(commands(settings, "PreToolUse") == ["my-guard.sh", AgentHooks.command("waiting")])
     #expect(commands(settings, "Stop") == ["say done", AgentHooks.command("done")])
 }
 
@@ -106,7 +106,7 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
     #expect(AgentHooks.claude.isInstalled(in: connected))
     // Farol's hook comes after the user's own, never in place of them.
     #expect(commands(connected, "Stop") == ["say done", "afplay ~/ding.aiff", AgentHooks.command("done")])
-    #expect(commands(connected, "PreToolUse") == ["~/guard.sh"])
+    #expect(commands(connected, "PreToolUse") == ["~/guard.sh", AgentHooks.command("waiting")])
     var withoutFarol = AgentHooks.claude.remove(from: connected)
     #expect((withoutFarol as NSDictionary).isEqual(to: before as! [AnyHashable: Any]))
 

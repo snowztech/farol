@@ -86,6 +86,8 @@ final class RemoteBridge: ObservableObject {
         /// What it was last sent, so only a change is sent again.
         var sessions: [RemoteSession]?
         var screen: String?
+        /// What it was told the watched session waits on. Nil until told, so the first tick always says, even that it waits on nothing.
+        var request: RemoteRequest??
         /// The conversation it reads, and the last message it has, so only what follows is sent.
         var conversation: (session: UUID, log: String, last: String?)?
     }
@@ -295,6 +297,7 @@ final class RemoteBridge: ObservableObject {
         case .watch(let session):
             phones[id]?.watching = session
             phones[id]?.screen = nil
+            phones[id]?.request = nil
             phones[id]?.conversation = nil
             tick()
         case .notify(let token, let sandbox, let notices, let key, let starts):
@@ -323,6 +326,8 @@ final class RemoteBridge: ObservableObject {
             act(command, by: device, on: session, from: id) { $0.scroll(lines: lines) }
         case .conversation(let session, let before):
             conversation(command, of: session, before: before, from: id)
+        case .answer(let session, let request, let choice):
+            answer(command, by: device, session: session, request: request, choice: choice, from: id)
         case .changes(let session):
             changes(command, in: session, from: id)
         case .diff(let session, let path):
@@ -354,6 +359,21 @@ final class RemoteBridge: ObservableObject {
             type(pane)
         }
         tell(.done(command: command.id), id)
+        tick()
+    }
+
+    /// Types the answer's number into the pane that asked, once, and only while it still asks the same thing.
+    /// A tap that arrives after the question was answered on the Mac, or replaced by another, is refused rather than typed into it.
+    private func answer(_ command: RemoteCommand, by device: PairedDevice, session id: UUID, request: String, choice: Int, from phone: UInt32) {
+        guard seen[device.key, default: SeenCommands()].insert(command.id) else { return tell(.done(command: command.id), phone) }
+        guard let session = store.sessions.first(where: { $0.id == id }), let (pane, asked) = session.request, asked.id == request,
+              session.agentIsWaiting, let terminal = session.panes.terminals.first(where: { $0.id == pane }) else {
+            return tell(.refused(command: command.id, reason: "That was already answered."), phone)
+        }
+        // Gone at once, so a second tap is refused rather than typed into whatever the agent asks next.
+        session.request = nil
+        terminal.type(String(choice))
+        tell(.done(command: command.id), phone)
         tick()
     }
 
@@ -498,6 +518,11 @@ final class RemoteBridge: ObservableObject {
             start -= 1
         }
         return start
+    }
+
+    private static func remote(_ request: AgentRequest) -> RemoteRequest {
+        RemoteRequest(id: request.id, tool: request.tool, title: request.title, detail: request.detail,
+                      choices: request.choices.map { RemoteRequest.Choice(label: $0.label, detail: $0.detail) })
     }
 
     private static func remote(_ message: Transcript.Message) -> RemoteMessage {
@@ -657,6 +682,13 @@ final class RemoteBridge: ObservableObject {
             if phone.sessions != sessions {
                 phones[id]?.sessions = sessions
                 tell(.sessions(sessions), id)
+            }
+            if let watching = phone.watching {
+                let request = store.sessions.first { $0.id == watching }?.request.map { Self.remote($0.asked) }
+                if phone.request != .some(request) {
+                    phones[id]?.request = .some(request)
+                    tell(.request(session: watching, request: request), id)
+                }
             }
             guard let watching = phone.watching,
                   let text = store.sessions.first(where: { $0.id == watching })?.panes.focused.screenText,
