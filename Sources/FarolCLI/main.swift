@@ -2,7 +2,7 @@ import FarolCore
 import Foundation
 
 let usage = """
-usage: farol status working|waiting|done|clear|subagent-start|subagent-stop
+usage: farol status working|waiting|done|clear|start|subagent-start|subagent-stop
 
 Reports what the agent in this pane is doing, so Farol's sidebar can show it.
 subagent-start and subagent-stop keep the pane working while a background agent runs.

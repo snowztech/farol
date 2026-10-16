@@ -26,6 +26,9 @@ public struct AgentHooks {
     }
 
     private static let claudeEvents = [
+        // Names the conversation's log the moment the agent starts, so a phone shows it before the first message.
+        // Compaction also starts a session event in the middle of a turn, so it must not clear the dot.
+        Event(name: "SessionStart", status: "start", matcher: "startup|resume|clear"),
         Event(name: "UserPromptSubmit", status: "working", matcher: nil),
         Event(name: "PostToolUse", status: "working", matcher: nil),
         Event(name: "Notification", status: "waiting", matcher: "permission_prompt|elicitation_dialog"),
@@ -49,7 +52,8 @@ public struct AgentHooks {
 
     private static let codexEvents = [
         // Compaction also starts a session event in the middle of a turn, so it must not clear the dot.
-        Event(name: "SessionStart", status: "clear", matcher: "startup|resume|clear"),
+        // Codex writes no log before the first message, so this only says an agent is there.
+        Event(name: "SessionStart", status: "start", matcher: "startup|resume|clear"),
         Event(name: "UserPromptSubmit", status: "working", matcher: nil),
         Event(name: "PostToolUse", status: "working", matcher: nil),
         Event(name: "PermissionRequest", status: "waiting", matcher: nil),

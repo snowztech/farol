@@ -11,7 +11,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Fixed
 
-- Remote: a Codex session shows as its conversation on the phone as soon as Codex names its log, instead of staying on the terminal until the phone asked again.
+- Remote: a Claude Code or Codex session shows as its conversation on the phone from the moment the agent starts, instead of staying on the terminal until its first turn. Update the agent's hooks in Settings to get this.
 
 ## [0.38.0] - 2026-10-16
 

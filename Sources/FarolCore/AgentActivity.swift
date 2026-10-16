@@ -1,6 +1,8 @@
 /// One agent activity event, reported by a hook or an interactive terminal title.
 public enum AgentEvent: String, Codable, CaseIterable, Sendable {
     case working, waiting, done, clear
+    /// An agent started in the pane, before it has said anything. It clears the dot as `clear` does, and says an agent is there.
+    case start
     case subagentStart = "subagent-start"
     case subagentStop = "subagent-stop"
 }
@@ -26,7 +28,7 @@ public struct AgentActivity: Equatable, Sendable {
         case .waiting: main = .waiting
         case .done: main = .done
         // Also what makes a missed subagent stop harmless: the session ending resets the count.
-        case .clear: self = AgentActivity()
+        case .clear, .start: self = AgentActivity()
         case .subagentStart: subagents += 1
         case .subagentStop: subagents = max(0, subagents - 1)
         }
