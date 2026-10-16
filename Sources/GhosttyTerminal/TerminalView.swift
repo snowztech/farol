@@ -259,7 +259,7 @@ public final class TerminalView: NSView {
 
     /// A key that isn't text.
     public enum Key: String {
-        case enter, escape, tab, up, down, left, right, backspace, interrupt
+        case enter, escape, tab, shiftTab, up, down, left, right, backspace, interrupt
     }
 
     /// Types text as the keyboard would, one key after the other, where `pasteText` hands it over whole.
@@ -275,6 +275,8 @@ public final class TerminalView: NSView {
         case .enter: (36, "\r", 0x0D)
         case .escape: (53, "\u{1B}", 0x1B)
         case .tab: (48, "\t", 0x09)
+        // Tab with Shift held, and no text, so the terminal sends the back-tab sequence a program like Claude Code reads.
+        case .shiftTab: (48, nil, 0x09)
         case .up: (126, nil, 0xF700)
         case .down: (125, nil, 0xF701)
         case .left: (123, nil, 0xF702)
@@ -286,6 +288,7 @@ public final class TerminalView: NSView {
         input.keycode = code
         input.unshifted_codepoint = character
         if key == .interrupt { input.mods = GHOSTTY_MODS_CTRL }
+        if key == .shiftTab { input.mods = GHOSTTY_MODS_SHIFT }
         for action in [GHOSTTY_ACTION_PRESS, GHOSTTY_ACTION_RELEASE] {
             input.action = action
             (action == GHOSTTY_ACTION_PRESS ? typed : nil).withOptionalCString { pointer in
