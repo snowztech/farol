@@ -47,8 +47,7 @@ public final class Transcript {
         }
         try? handle.seek(toOffset: offset)
         var changed = false
-        // Foundation leaves the chunks it reads and the objects JSONSerialization makes to an autorelease pool,
-        // which would otherwise hold a whole log's worth until the read ends.
+        // Foundation leaves the chunks it reads and the objects JSONSerialization makes to an autorelease pool, which would otherwise hold a whole log's worth until the read ends.
         while let more = autoreleasepool(invoking: { (try? handle.read(upToCount: 1 << 20)).flatMap { $0.isEmpty ? nil : take($0) } }) {
             if more { changed = true }
         }

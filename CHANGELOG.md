@@ -8,6 +8,12 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - Remote: the phone shows a Claude Code or Codex session as a conversation, read from the agent's own log: your messages, its answers and the tools it ran, from the very first message. The terminal is still one tap away.
 
+## [0.36.1] - 2026-10-16
+
+### Fixed
+
+- Remote: scrolling back from the phone no longer types arrow keys into a full-screen program that does not read the mouse, which in Claude Code walked through the prompt history. Such a program now says it does not scroll from the phone.
+
 ## [0.36.0] - 2026-10-16
 
 Read more from the phone: an agent's earlier output, and what it changed.
