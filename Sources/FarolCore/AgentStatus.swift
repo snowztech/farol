@@ -13,10 +13,33 @@ public enum AgentStatus: String, Codable, CaseIterable, Sendable {
 public struct StatusMessage: Codable, Equatable, Sendable {
     public var pane: String
     public var event: AgentEvent
+    /// The agent's own conversation, when its hook says which: what a phone reads, and what a restored session resumes.
+    public var conversation: AgentConversation?
 
-    public init(pane: String, event: AgentEvent) {
+    public init(pane: String, event: AgentEvent, conversation: AgentConversation? = nil) {
         self.pane = pane
         self.event = event
+        self.conversation = conversation
+    }
+}
+
+/// The conversation an agent keeps, as Claude Code's hooks name it on their input.
+public struct AgentConversation: Codable, Equatable, Sendable {
+    /// What `claude --resume` takes.
+    public var id: String
+    /// The file the agent logs the conversation to.
+    public var log: String
+
+    public init(id: String, log: String) {
+        self.id = id
+        self.log = log
+    }
+
+    /// From a hook's input, which Claude Code writes as JSON with `session_id` and `transcript_path`. Nil for anything else.
+    public init?(hookInput: Data) {
+        guard let input = (try? JSONSerialization.jsonObject(with: hookInput)) as? [String: Any],
+              let id = input["session_id"] as? String, let log = input["transcript_path"] as? String, !id.isEmpty, !log.isEmpty else { return nil }
+        self.init(id: id, log: log)
     }
 }
 

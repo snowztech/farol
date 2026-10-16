@@ -14,6 +14,8 @@ final class Session: ObservableObject, Identifiable {
     @Published var directory: String
     /// Reported per pane by agent hooks or interactive terminal titles.
     @Published private(set) var agents: [UUID: AgentActivity] = [:]
+    /// The agent's own conversation, as its hooks last named it. A phone reads it, and a restored session can resume it.
+    var conversation: AgentConversation?
     /// The program rang the bell or sent a notification while you were elsewhere. Covers agents without hooks.
     @Published var bellRang = false
     /// The host each pane is on over ssh, kept apart from the title so it outlives a program retitling the pane.
@@ -248,6 +250,7 @@ final class SessionStore: ObservableObject {
         guard let pane = UUID(uuidString: message.pane),
               let session = sessions.first(where: { $0.panes.terminals.contains { $0.id == pane } }) else { return }
         let before = session.activity
+        if let conversation = message.conversation { session.conversation = conversation }
         session.apply(message.event, pane: pane)
         // An agent can end its turn, or stop to ask you, on a rebase git stopped, so every session's checkout is looked at again.
         // Not on "working": it comes after every tool call, and each lookup also refreshes the review panel.

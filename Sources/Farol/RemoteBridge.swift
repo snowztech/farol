@@ -33,7 +33,9 @@ final class RemoteBridge: ObservableObject {
     private let store: SessionStore
     private var key: DeviceKey?
     private var connection: RelayConnection?
-    private var phones: [UInt32: Phone] = [:]
+    private var phones: [UInt32: Phone] = [:] {
+        didSet { followLogs() }
+    }
     /// Kept per device and across its connections, since a phone resends on a new one.
     private var seen: [Data: SeenCommands] = [:]
     private var timer: Timer?
@@ -84,7 +86,15 @@ final class RemoteBridge: ObservableObject {
         /// What it was last sent, so only a change is sent again.
         var sessions: [RemoteSession]?
         var screen: String?
+        /// The conversation it reads, and the last message it has, so only what follows is sent.
+        var conversation: (session: UUID, log: String, last: String?)?
     }
+
+    /// The agents' logs, read where they were left. Only on `reading`, since the first read of a long log takes a second.
+    private var transcripts: [String: Transcript] = [:]
+    private let reading = DispatchQueue(label: "sh.farol.remote.transcripts", qos: .utility)
+    /// The logs phones read, watched so a change is read when the agent writes and nothing is done while it does not.
+    private var logWatches: [String: DispatchSourceFileSystemObject] = [:]
 
     init(store: SessionStore) {
         self.store = store
@@ -285,6 +295,7 @@ final class RemoteBridge: ObservableObject {
         case .watch(let session):
             phones[id]?.watching = session
             phones[id]?.screen = nil
+            phones[id]?.conversation = nil
             tick()
         case .notify(let token, let sandbox, let notices, let key, let starts):
             pushTargets.removeAll { $0.device == device.key }
@@ -310,6 +321,8 @@ final class RemoteBridge: ObservableObject {
                 return tell(.refused(command: command.id, reason: "This program does not scroll from the phone."), id)
             }
             act(command, by: device, on: session, from: id) { $0.scroll(lines: lines) }
+        case .conversation(let session, let before):
+            conversation(command, of: session, before: before, from: id)
         case .changes(let session):
             changes(command, in: session, from: id)
         case .diff(let session, let path):
@@ -390,6 +403,110 @@ final class RemoteBridge: ObservableObject {
         store.close(session)
         tell(.done(command: command.id), phone)
         tick()
+    }
+
+    // MARK: Conversation
+
+    /// Reads a log off the main thread, then hands its messages back on it.
+    private func read(_ log: String, then use: @escaping ([Transcript.Message]) -> Void) {
+        reading.async { [weak self] in
+            guard let self else { return }
+            let transcript = transcripts[log] ?? Transcript(url: URL(fileURLWithPath: log))
+            transcripts[log] = transcript
+            transcript.refresh()
+            let messages = transcript.messages
+            DispatchQueue.main.async { use(messages) }
+        }
+    }
+
+    /// The latest page of a session's conversation, then what follows while it is watched, or a page further back.
+    private func conversation(_ command: RemoteCommand, of session: UUID, before: String?, from id: UInt32) {
+        guard let log = store.sessions.first(where: { $0.id == session })?.conversation?.log else {
+            return tell(.refused(command: command.id, reason: "This session has no agent conversation to show."), id)
+        }
+        guard let before else { return openConversation(of: session, log: log, for: id) }
+        read(log) { [weak self] messages in
+            guard let self, phones[id] != nil else { return }
+            guard let end = messages.firstIndex(where: { $0.id == before }) else {
+                return tell(.refused(command: command.id, reason: "That part of the conversation was rewound."), id)
+            }
+            let start = Self.pageStart(messages, end: end)
+            tell(.conversation(session: session, messages: messages[start..<end].map(Self.remote), place: .before(before), more: start > 0), id)
+        }
+    }
+
+    private func openConversation(of session: UUID, log: String, for id: UInt32) {
+        phones[id]?.conversation = (session, log, nil)
+        read(log) { [weak self] messages in
+            guard let self, phones[id]?.conversation?.log == log else { return }
+            sendLatest(messages, of: session, to: id)
+        }
+    }
+
+    private func sendLatest(_ messages: [Transcript.Message], of session: UUID, to id: UInt32) {
+        let start = Self.pageStart(messages, end: messages.count)
+        phones[id]?.conversation?.last = messages.last?.id
+        tell(.conversation(session: session, messages: messages[start...].map(Self.remote), place: .latest, more: start > 0), id)
+    }
+
+    /// Sends the phones reading a log what the agent just wrote. After a rewind, or more than a page, they get the latest page instead.
+    private func logChanged(_ log: String, _ messages: [Transcript.Message]) {
+        for (id, phone) in phones {
+            guard let (session, current, last) = phone.conversation, current == log, phone.watching == session else { continue }
+            if let last, let index = messages.lastIndex(where: { $0.id == last }), Self.pageStart(messages, end: messages.count) <= index + 1 {
+                guard index + 1 < messages.count else { continue }
+                phones[id]?.conversation?.last = messages.last?.id
+                tell(.conversation(session: session, messages: messages[(index + 1)...].map(Self.remote), place: .after(last), more: false), id)
+            } else {
+                sendLatest(messages, of: session, to: id)
+            }
+        }
+    }
+
+    /// Watches the logs phones read, and only those. A few logs read last stay in memory, so opening a session again is quick.
+    private func followLogs() {
+        let read = Set(phones.values.compactMap { phone in phone.conversation.flatMap { phone.watching == $0.session ? $0.log : nil } })
+        for (log, watch) in logWatches where !read.contains(log) {
+            watch.cancel()
+            logWatches[log] = nil
+            reading.async { [weak self] in
+                if let self, transcripts.count > 8 { transcripts[log] = nil }
+            }
+        }
+        for log in read where logWatches[log] == nil {
+            let file = Darwin.open(log, O_EVTONLY)
+            guard file >= 0 else { continue }
+            let watch = DispatchSource.makeFileSystemObjectSource(fileDescriptor: file, eventMask: [.extend, .write], queue: reading)
+            watch.setEventHandler { [weak self] in
+                guard let self, let transcript = transcripts[log], transcript.refresh() else { return }
+                let messages = transcript.messages
+                DispatchQueue.main.async { self.logChanged(log, messages) }
+            }
+            watch.setCancelHandler { Darwin.close(file) }
+            watch.resume()
+            logWatches[log] = watch
+        }
+    }
+
+    /// Where a page ending at `end` starts: up to 60 messages, and well under the relay's 256 KB a message.
+    private static func pageStart(_ messages: [Transcript.Message], end: Int) -> Int {
+        var start = end, bytes = 0
+        while start > 0, end - start < 60 {
+            let message = messages[start - 1]
+            bytes += message.text.utf8.count + (message.detail?.utf8.count ?? 0) + 100
+            if bytes > 150_000, start < end { break }
+            start -= 1
+        }
+        return start
+    }
+
+    private static func remote(_ message: Transcript.Message) -> RemoteMessage {
+        let role: RemoteMessage.Role = switch message.role {
+        case .you: .you
+        case .agent: .agent
+        case .tool: .tool
+        }
+        return RemoteMessage(id: message.id, role: role, text: message.text, tool: message.tool, detail: message.detail)
     }
 
     // MARK: Changes
@@ -532,6 +649,11 @@ final class RemoteBridge: ObservableObject {
     private func tick() {
         let sessions = remoteSessions
         for (id, phone) in phones where phone.device != nil {
+            // Claude Code starts a new log after /clear, and its next hook says so.
+            if let (session, log, _) = phone.conversation, phone.watching == session,
+               let now = store.sessions.first(where: { $0.id == session })?.conversation?.log, now != log {
+                openConversation(of: session, log: now, for: id)
+            }
             if phone.sessions != sessions {
                 phones[id]?.sessions = sessions
                 tell(.sessions(sessions), id)
