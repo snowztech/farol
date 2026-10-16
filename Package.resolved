@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/snowztech/farol-remote",
       "state" : {
-        "revision" : "d641c338e9dfd2b64a54fc2b970b4993afd0ee0d",
-        "version" : "0.9.0"
+        "revision" : "eef0ad509eda16e7ada8772e0b526abaf6687ca9",
+        "version" : "0.10.0"
       }
     }
   ],
