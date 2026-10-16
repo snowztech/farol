@@ -471,6 +471,10 @@ public final class TerminalView: NSView {
         ghostty_surface_mouse_scroll(surface, x, y, mods)
     }
 
+    /// The program in the terminal reads the mouse, so the wheel reaches it as scrolling.
+    /// One that does not, on a full screen, gets the wheel as arrow keys instead, which an agent takes as its prompt history.
+    public var takesMouse: Bool { surface.map(ghostty_surface_mouse_captured) ?? false }
+
     /// Scrolls as the mouse wheel would, by lines, positive going back.
     /// A full-screen program like an agent scrolls its own view, and a shell scrolls the terminal's history.
     public func scroll(lines: Int) {
