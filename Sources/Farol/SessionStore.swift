@@ -18,6 +18,8 @@ final class Session: ObservableObject, Identifiable {
     var conversation: AgentConversation?
     /// What a waiting agent asks, and the pane it waits in, so an answer from a phone goes there and nowhere else.
     var request: (pane: UUID, asked: AgentRequest)?
+    /// An agent started here and has not ended. Before its first message it may have no log, and a phone shows it as an empty conversation.
+    var agentStarted = false
     /// The program rang the bell or sent a notification while you were elsewhere. Covers agents without hooks.
     @Published var bellRang = false
     /// The host each pane is on over ssh, kept apart from the title so it outlives a program retitling the pane.
@@ -100,9 +102,11 @@ final class Session: ObservableObject, Identifiable {
         switch event {
         // A notification that the agent still waits says nothing new, so what it asks is kept.
         case .waiting: if let request { self.request = (pane, request) }
-        case .working, .done, .clear: if self.request?.pane == pane { self.request = nil }
+        case .working, .done, .clear, .start: if self.request?.pane == pane { self.request = nil }
         case .subagentStart, .subagentStop: break
         }
+        if event == .start { agentStarted = true }
+        if event == .clear { agentStarted = false }
     }
 
     /// An agent in one of the panes waits for your approval or answer, as opposed to a bell or terminal notification.

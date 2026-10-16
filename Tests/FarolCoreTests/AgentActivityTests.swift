@@ -47,3 +47,11 @@ private func status(after events: [AgentEvent]) -> AgentStatus? {
     activity.acknowledge()
     #expect(activity.status == .working)
 }
+
+@Test func anAgentStartingClearsWhatWasShown() {
+    var activity = AgentActivity()
+    activity.apply(.done)
+    activity.apply(.subagentStart)
+    activity.apply(.start)
+    #expect(activity.status == nil)
+}

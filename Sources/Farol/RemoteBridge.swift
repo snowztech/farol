@@ -93,6 +93,8 @@ final class RemoteBridge: ObservableObject {
         var terminal: UUID?
         /// It said when it shows a terminal, so its screen goes only then. An older phone never says, and always gets it.
         var saysTerminal = false
+        /// The session it was told is an empty conversation, an agent started there with no log yet, so it is told once.
+        var toldEmpty: UUID?
         /// What it was told the watched session waits on. Nil until told, so the first tick always says, even that it waits on nothing.
         var request: RemoteRequest??
         /// The conversation it reads, and the last message it has, so only what follows is sent.
@@ -315,6 +317,7 @@ final class RemoteBridge: ObservableObject {
             phones[id]?.watching = session
             phones[id]?.screen = nil
             phones[id]?.request = nil
+            phones[id]?.toldEmpty = nil
             phones[id]?.conversation = nil
             tick()
         case .notify(let token, let sandbox, let notices, let key, let starts):
@@ -364,15 +367,25 @@ final class RemoteBridge: ObservableObject {
             guard let pane = store.sessions.first(where: { $0.id == session })?.panes.focused else { return }
             tell(.history(session: session, text: pane.historyText()), id)
         case .send(let session, let text):
-            act(command, by: device, on: session, from: id) { $0.pasteText(text) }
+            act(command, by: device, on: session, from: id) { pane in
+                pane.pasteText(text)
+                pasted[ObjectIdentifier(pane)] = (.now, text)
+            }
         case .type(let session, let text):
             act(command, by: device, on: session, from: id) { $0.type(text) }
         case .key(let session, let key):
-            act(command, by: device, on: session, from: id) { pane in
-                TerminalView.Key(rawValue: key.rawValue).map { pane.press($0) }
+            act(command, by: device, on: session, from: id) { [weak self] pane in
+                guard let key = TerminalView.Key(rawValue: key.rawValue) else { return }
+                // Return right after a paste waits for the agent to take the paste in, or it is lost and the reply stays unsent.
+                guard key == .enter, let paste = self?.pasted.removeValue(forKey: ObjectIdentifier(pane)) else { return pane.press(key) }
+                let wait = RemoteTyping.returnDelay(afterPasteOf: paste.text, elapsed: Date.now.timeIntervalSince(paste.at))
+                DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [weak pane] in pane?.press(.enter) }
             }
         }
     }
+
+    /// The last paste from a phone into each pane, until the Return that sends it.
+    private var pasted: [ObjectIdentifier: (at: Date, text: String)] = [:]
 
     /// Types into a session once, however many times the command arrives.
     private func act(_ command: RemoteCommand, by device: PairedDevice, on session: UUID, from id: UInt32, _ type: (TerminalView) -> Void) {
@@ -465,7 +478,13 @@ final class RemoteBridge: ObservableObject {
 
     /// The latest page of a session's conversation, then what follows while it is watched, or a page further back.
     private func conversation(_ command: RemoteCommand, of session: UUID, before: String?, from id: UInt32) {
-        guard let log = store.sessions.first(where: { $0.id == session })?.conversation?.log else {
+        let asked = store.sessions.first { $0.id == session }
+        guard let log = asked?.conversation?.log else {
+            // An agent that has not said anything yet has no log, and its conversation is empty rather than missing.
+            if asked?.agentStarted == true, before == nil {
+                phones[id]?.toldEmpty = session
+                return tell(.conversation(session: session, messages: [], place: .latest, more: false), id)
+            }
             return tell(.refused(command: command.id, reason: "This session has no agent conversation to show."), id)
         }
         guard let before else { return openConversation(of: session, log: log, for: id) }
@@ -518,6 +537,7 @@ final class RemoteBridge: ObservableObject {
             }
         }
         for log in read where logWatches[log] == nil {
+            // Claude Code names its log before writing it. Until the file is there, this is tried again at every tick.
             let file = Darwin.open(log, O_EVTONLY)
             guard file >= 0 else { continue }
             let watch = DispatchSource.makeFileSystemObjectSource(fileDescriptor: file, eventMask: [.extend, .write], queue: reading)
@@ -529,6 +549,15 @@ final class RemoteBridge: ObservableObject {
             watch.setCancelHandler { Darwin.close(file) }
             watch.resume()
             logWatches[log] = watch
+            // What was written before the watch began.
+            reading.async { [weak self] in
+                guard let self else { return }
+                let transcript = transcripts[log] ?? Transcript(url: URL(fileURLWithPath: log))
+                transcripts[log] = transcript
+                guard transcript.refresh() else { return }
+                let messages = transcript.messages
+                DispatchQueue.main.async { self.logChanged(log, messages) }
+            }
         }
     }
 
@@ -740,6 +769,8 @@ final class RemoteBridge: ObservableObject {
 
     /// Sends each phone what changed: the list, and the screen of the session it has open. Always in full.
     private func tick() {
+        // A log named before it was written gets its watch once it is.
+        followLogs()
         let sessions = remoteSessions
         for (id, phone) in phones where phone.device != nil {
             // Claude Code starts a new log after /clear, and its next hook says so.
@@ -749,9 +780,14 @@ final class RemoteBridge: ObservableObject {
             }
             // The log is known only once a hook names it: Codex names it after its first turn, and Claude Code after its first prompt.
             // The phone shows the terminal until then, so it is sent the conversation as soon as there is one rather than waiting to ask.
-            if phone.conversation == nil, let watching = phone.watching,
-               let log = store.sessions.first(where: { $0.id == watching })?.conversation?.log {
-                openConversation(of: watching, log: log, for: id)
+            if phone.conversation == nil, let watching = phone.watching, let session = store.sessions.first(where: { $0.id == watching }) {
+                if let log = session.conversation?.log {
+                    openConversation(of: watching, log: log, for: id)
+                } else if session.agentStarted, phone.toldEmpty != watching {
+                    // An agent just started, with nothing said: the phone leaves the terminal for its empty conversation.
+                    phones[id]?.toldEmpty = watching
+                    tell(.conversation(session: watching, messages: [], place: .latest, more: false), id)
+                }
             }
             if phone.sessions != sessions {
                 phones[id]?.sessions = sessions

@@ -135,7 +135,7 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
 
 @Test func codexInstallsEveryStatusHook() {
     let settings = AgentHooks.codex.install(into: [:])
-    #expect(commands(settings, "SessionStart") == [AgentHooks.command("clear")])
+    #expect(commands(settings, "SessionStart") == [AgentHooks.command("start")])
     #expect(commands(settings, "UserPromptSubmit") == [AgentHooks.command("working")])
     #expect(commands(settings, "PostToolUse") == [AgentHooks.command("working")])
     #expect(commands(settings, "PermissionRequest") == [AgentHooks.command("waiting")])
@@ -158,7 +158,7 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
         "SessionStart": [["hooks": [["type": "command", "command": "bash ~/.codex/herdr-agent-state.sh session", "timeout": 10]]]],
     ]]
     let connected = AgentHooks.codex.install(into: theirs)
-    #expect(commands(connected, "SessionStart") == ["bash ~/.codex/herdr-agent-state.sh session", AgentHooks.command("clear")])
+    #expect(commands(connected, "SessionStart") == ["bash ~/.codex/herdr-agent-state.sh session", AgentHooks.command("start")])
     let disconnected = AgentHooks.codex.remove(from: connected) as NSDictionary
     #expect(disconnected.isEqual(to: theirs))
 }
@@ -168,13 +168,18 @@ private func commands(_ settings: [String: Any], _ event: String) -> [String] {
     #expect(AgentHooks.codex.file.path.hasSuffix(".codex/hooks.json"))
 }
 
-/// An older Farol hooked SessionStart, which the current one doesn't use. Updating must clear it anyway.
-@Test func updateRemovesHooksOnEventsFarolNoLongerUses() {
+/// An older Farol hooked SessionStart in a form the current one no longer uses. Updating replaces it, and leaves yours.
+@Test func updateReplacesHooksFarolNoLongerUses() {
     let old: [String: Any] = ["hooks": [
         "SessionStart": [["hooks": [["type": "command", "command": "bash herdr.sh"]]],
                          ["hooks": [["type": "command", "command": "\"$FAROL_CLI\" status clear --agent claude"]]]],
     ]]
     let updated = AgentHooks.claude.install(into: old)
-    #expect(commands(updated, "SessionStart") == ["bash herdr.sh"])
+    #expect(commands(updated, "SessionStart") == ["bash herdr.sh", AgentHooks.command("start")])
     #expect(AgentHooks.claude.isInstalled(in: updated))
+}
+
+@Test func claudeNamesItsLogTheMomentItStarts() {
+    let settings = AgentHooks.claude.install(into: [:])
+    #expect(commands(settings, "SessionStart") == [AgentHooks.command("start")])
 }
