@@ -84,7 +84,13 @@ final class RemoteBridge: ObservableObject {
         /// What it was last sent, so only a change is sent again.
         var sessions: [RemoteSession]?
         var screen: String?
+        /// The conversation it reads, and how many of its messages it has, so only new ones are sent.
+        var conversation: (session: UUID, log: String, sent: Int)?
     }
+
+    /// The agents' logs, read where they were left. Only on `reading`, since the first read of a long log takes a second.
+    private var transcripts: [String: Transcript] = [:]
+    private let reading = DispatchQueue(label: "sh.farol.remote.transcripts")
 
     init(store: SessionStore) {
         self.store = store
@@ -285,6 +291,7 @@ final class RemoteBridge: ObservableObject {
         case .watch(let session):
             phones[id]?.watching = session
             phones[id]?.screen = nil
+            phones[id]?.conversation = nil
             tick()
         case .notify(let token, let sandbox, let notices, let key, let starts):
             pushTargets.removeAll { $0.device == device.key }
@@ -304,6 +311,8 @@ final class RemoteBridge: ObservableObject {
             close(command, by: device, session: session, from: id)
         case .scroll(let session, let lines):
             act(command, by: device, on: session, from: id) { $0.scroll(lines: lines) }
+        case .conversation(let session, let before):
+            conversation(command, of: session, before: before, from: id)
         case .changes(let session):
             changes(command, in: session, from: id)
         case .diff(let session, let path):
@@ -384,6 +393,66 @@ final class RemoteBridge: ObservableObject {
         store.close(session)
         tell(.done(command: command.id), phone)
         tick()
+    }
+
+    // MARK: Conversation
+
+    /// Reads a log off the main thread, then hands its messages back on it.
+    private func read(_ log: String, then use: @escaping ([Transcript.Message]) -> Void) {
+        reading.async { [weak self] in
+            guard let self else { return }
+            let transcript = transcripts[log] ?? Transcript(url: URL(fileURLWithPath: log))
+            transcripts[log] = transcript
+            transcript.refresh()
+            let messages = transcript.messages
+            DispatchQueue.main.async { use(messages) }
+        }
+    }
+
+    /// The latest page of a session's conversation, then new messages as they come while it is watched, or a page further back.
+    private func conversation(_ command: RemoteCommand, of session: UUID, before: Int?, from id: UInt32) {
+        guard let log = store.sessions.first(where: { $0.id == session })?.conversation?.log else {
+            return tell(.refused(command: command.id, reason: "This session has no agent conversation to show."), id)
+        }
+        read(log) { [weak self] messages in
+            guard let self, phones[id] != nil else { return }
+            let end = min(before ?? messages.count, messages.count)
+            let start = Self.pageStart(messages, end: end)
+            tell(.conversation(session: session, from: start, total: messages.count, messages: messages[start..<end].map(Self.remote)), id)
+            if before == nil { phones[id]?.conversation = (session, log, messages.count) }
+        }
+    }
+
+    /// Sends a watching phone what its agent added since. Called with the screen, a few times a second.
+    private func followConversation(of phone: Phone, _ id: UInt32) {
+        guard let (session, log, _) = phone.conversation, phone.watching == session else { return }
+        read(log) { [weak self] messages in
+            guard let self, let current = phones[id]?.conversation, current.session == session, messages.count > current.sent else { return }
+            let start = current.sent
+            phones[id]?.conversation?.sent = messages.count
+            tell(.conversation(session: session, from: start, total: messages.count, messages: messages[start...].map(Self.remote)), id)
+        }
+    }
+
+    /// Where a page ending at `end` starts: up to 60 messages, and well under the relay's 256 KB a message.
+    private static func pageStart(_ messages: [Transcript.Message], end: Int) -> Int {
+        var start = end, bytes = 0
+        while start > 0, end - start < 60 {
+            let message = messages[start - 1]
+            bytes += message.text.utf8.count + (message.detail?.utf8.count ?? 0) + 100
+            if bytes > 150_000, start < end { break }
+            start -= 1
+        }
+        return start
+    }
+
+    private static func remote(_ message: Transcript.Message) -> RemoteMessage {
+        let role: RemoteMessage.Role = switch message.role {
+        case .you: .you
+        case .agent: .agent
+        case .tool: .tool
+        }
+        return RemoteMessage(id: message.id, role: role, text: message.text, tool: message.tool, detail: message.detail)
     }
 
     // MARK: Changes
@@ -526,6 +595,7 @@ final class RemoteBridge: ObservableObject {
     private func tick() {
         let sessions = remoteSessions
         for (id, phone) in phones where phone.device != nil {
+            followConversation(of: phone, id)
             if phone.sessions != sessions {
                 phones[id]?.sessions = sessions
                 tell(.sessions(sessions), id)

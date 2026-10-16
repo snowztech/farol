@@ -24,8 +24,21 @@ guard let event = AgentEvent(rawValue: arguments[1]) else {
 let environment = ProcessInfo.processInfo.environment
 guard let pane = environment["FAROL_PANE"], let socket = environment["FAROL_SOCKET"] else { exit(0) }
 
+/// What the hook was given on its input, when it was given one. Claude Code writes JSON there and closes it.
+/// A terminal or an input left open is never waited on for more than a moment, since a hook must not hold the agent up.
+func hookInput() -> Data? {
+    guard isatty(FileHandle.standardInput.fileDescriptor) == 0 else { return nil }
+    var input: Data?
+    let read = DispatchSemaphore(value: 0)
+    DispatchQueue.global().async {
+        input = FileHandle.standardInput.readDataToEndOfFile()
+        read.signal()
+    }
+    return read.wait(timeout: .now() + 0.3) == .success ? input : nil
+}
+
 do {
-    try StatusClient.send(StatusMessage(pane: pane, event: event), to: socket)
+    try StatusClient.send(StatusMessage(pane: pane, event: event, conversation: hookInput().flatMap(AgentConversation.init(hookInput:))), to: socket)
 } catch {
     // Farol may have quit while the agent kept running. A hook must never fail the agent over that.
     exit(0)

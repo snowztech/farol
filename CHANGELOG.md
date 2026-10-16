@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Remote: the phone shows a Claude Code session as a conversation, read from Claude's own log: your messages, its answers and the tools it ran, from the very first message. The terminal is still one tap away.
+
 ## [0.36.0] - 2026-10-16
 
 Read more from the phone: an agent's earlier output, and what it changed.
