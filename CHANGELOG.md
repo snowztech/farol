@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-10-16
+
+Slash commands and pictures from the phone.
+
 ### Added
 
 - Remote: typing `/` on the phone lists what the agent takes: its own commands, your skills and commands, the project's, and those of your plugins that are on. In Codex, `$` lists its skills. A command that opens a picker, like `/model`, shows the terminal once sent.
