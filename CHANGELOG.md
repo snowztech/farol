@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Remote: close a session from the phone, and press Shift-Tab there to switch Claude Code's mode. Farol keeps its last session open.
+
 ## [0.34.0] - 2026-10-16
 
 Your agents in your pocket: Remote, in beta, with Farol for iPhone.

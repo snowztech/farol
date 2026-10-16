@@ -300,6 +300,8 @@ final class RemoteBridge: ObservableObject {
                           agents: agents.map { RemoteChoice(id: $0.id, name: $0.label) }, agent: agents.first?.id), id)
         case .open(let project, let agent):
             open(command, by: device, in: project, with: agent, from: id)
+        case .close(let session):
+            close(command, by: device, session: session, from: id)
         case .task:
             // Starting a task in a new worktree from the phone, which this version does not do. The phone is told so, and says to update.
             tell(.refused(command: command.id, reason: "This version of Farol cannot start tasks from the phone."), id)
@@ -362,6 +364,19 @@ final class RemoteBridge: ObservableObject {
         let session = store.create(directory: project, run: folder?.command())
         opened[command.id] = session.id
         tell(.opened(command: command.id, session: session.id), id)
+        tick()
+    }
+
+    /// Closes a session as its tab's close button would, but never the last one: closing that quits Farol, and the phone with it.
+    /// A worktree session keeps its worktree. Removing that asks questions only the Mac's own close button answers.
+    private func close(_ command: RemoteCommand, by device: PairedDevice, session id: UUID, from phone: UInt32) {
+        guard seen[device.key, default: SeenCommands()].insert(command.id) else { return tell(.done(command: command.id), phone) }
+        guard let session = store.sessions.first(where: { $0.id == id }) else { return tell(.done(command: command.id), phone) }
+        guard store.sessions.count > 1 else {
+            return tell(.refused(command: command.id, reason: "Farol keeps its last session open. Open another one first."), phone)
+        }
+        store.close(session)
+        tell(.done(command: command.id), phone)
         tick()
     }
 
