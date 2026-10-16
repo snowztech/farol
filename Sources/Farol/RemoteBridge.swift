@@ -715,6 +715,12 @@ final class RemoteBridge: ObservableObject {
                let now = store.sessions.first(where: { $0.id == session })?.conversation?.log, now != log {
                 openConversation(of: session, log: now, for: id)
             }
+            // The log is known only once a hook names it: Codex names it after its first turn, and Claude Code after its first prompt.
+            // The phone shows the terminal until then, so it is sent the conversation as soon as there is one rather than waiting to ask.
+            if phone.conversation == nil, let watching = phone.watching,
+               let log = store.sessions.first(where: { $0.id == watching })?.conversation?.log {
+                openConversation(of: watching, log: log, for: id)
+            }
             if phone.sessions != sessions {
                 phones[id]?.sessions = sessions
                 tell(.sessions(sessions), id)
