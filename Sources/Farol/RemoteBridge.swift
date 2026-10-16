@@ -345,6 +345,8 @@ final class RemoteBridge: ObservableObject {
             tick()
         case .commands(let session):
             commands(command, of: session, from: id)
+        case .attach(let session, let attachment, let part, let parts, let data):
+            attach(command, session: session, attachment: attachment, part: part, of: parts, data: data, from: id)
         case .control(let session, let key):
             guard key.count == 1, let letter = key.first, ("a"..."z").contains(letter) else {
                 return tell(.refused(command: command.id, reason: "Only Control with a letter can be sent."), id)
@@ -567,6 +569,36 @@ final class RemoteBridge: ObservableObject {
         DispatchQueue.global(qos: .userInitiated).async {
             let commands = AgentCommands.list(log: log, project: project).map { RemoteAgentCommand(name: $0.name, detail: $0.detail, menu: $0.menu, mention: $0.mention) }
             DispatchQueue.main.async { [weak self] in self?.tell(.commands(session: id, commands: commands), phone) }
+        }
+    }
+
+    // MARK: Pictures
+
+    /// Pictures from phones, in the caches folder, where macOS may also clear them.
+    private lazy var inbox: AttachmentInbox = {
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        let inbox = AttachmentInbox(folder: caches.appendingPathComponent("Farol/Attachments"), maxSize: RemoteAttachment.maxSize)
+        inbox.sweep()
+        return inbox
+    }()
+
+    /// One part of a picture. Each is answered, so the phone sends the next, and the last with where the picture is.
+    private func attach(_ command: RemoteCommand, session: UUID, attachment: UUID, part: Int, of parts: Int, data: Data, from id: UInt32) {
+        guard store.sessions.contains(where: { $0.id == session }) else {
+            return tell(.refused(command: command.id, reason: "That session is closed."), id)
+        }
+        do {
+            if let file = try inbox.take(attachment, part: part, of: parts, data: data) {
+                tell(.attached(command: command.id, attachment: attachment, path: file.path), id)
+            } else {
+                tell(.done(command: command.id), id)
+            }
+        } catch AttachmentInbox.Problem.notAnImage {
+            tell(.refused(command: command.id, reason: "Only a photo or a screenshot can be attached."), id)
+        } catch AttachmentInbox.Problem.tooLarge {
+            tell(.refused(command: command.id, reason: "That picture is too large to attach."), id)
+        } catch {
+            tell(.refused(command: command.id, reason: "The Mac could not keep that picture. Attach it again."), id)
         }
     }
 
