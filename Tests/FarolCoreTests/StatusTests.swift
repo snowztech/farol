@@ -78,3 +78,29 @@ final class Listening {
         try StatusClient.send(StatusMessage(pane: "x", event: .working), to: "/tmp/farol-nobody-\(UUID().uuidString.prefix(8)).sock")
     }
 }
+
+@Test func aPermissionRequestSaysWhatTheToolWouldDo() throws {
+    let input = Data(#"{"hook_event_name":"PermissionRequest","cwd":"/Users/me/shelf","tool_use_id":"toolu_1","tool_name":"Bash","tool_input":{"command":"npm test -- --watch=false","description":"Run the tests"}}"#.utf8)
+    let request = try #require(AgentRequest(hookInput: input))
+    #expect(request.id == "toolu_1")
+    #expect(request.tool == "Bash")
+    #expect(request.title == "Run the tests")
+    #expect(request.detail == "npm test -- --watch=false")
+    #expect(request.choices.isEmpty)
+}
+
+@Test func aQuestionKeepsItsAnswersInOrder() throws {
+    let input = Data(#"{"hook_event_name":"PreToolUse","tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"Which database?","header":"Storage","options":[{"label":"SQLite","description":"One file"},{"label":"Postgres"}]}]}}"#.utf8)
+    let request = try #require(AgentRequest(hookInput: input))
+    #expect(request.tool == nil)
+    #expect(request.title == "Which database?")
+    #expect(request.choices == [AgentRequest.Choice(label: "SQLite", detail: "One file"), AgentRequest.Choice(label: "Postgres", detail: nil)])
+}
+
+@Test func onlyARequestOrASingleQuestionIsARequest() {
+    let two = Data(#"{"hook_event_name":"PreToolUse","tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"A?"},{"question":"B?"}]}}"#.utf8)
+    #expect(AgentRequest(hookInput: two) == nil)
+    #expect(AgentRequest(hookInput: Data(#"{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{}}"#.utf8)) == nil)
+    #expect(AgentRequest(hookInput: Data(#"{"hook_event_name":"Notification","message":"Claude needs your permission"}"#.utf8)) == nil)
+    #expect(AgentRequest(hookInput: Data("not json".utf8)) == nil)
+}

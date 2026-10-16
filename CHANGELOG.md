@@ -4,6 +4,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Remote: a waiting agent's question or permission prompt shows on the phone as it was asked, with its answers as buttons. An answer goes to the pane that asked, and only while it still asks, so a late tap never lands in the next prompt. Connect Claude Code again in Settings to get the new hooks.
+- Remote: the terminal on the phone updates several times a second while it is open, and takes Control letters like Control-D or Control-R.
+
 ## [0.37.0] - 2026-10-16
 
 Read an agent's whole conversation from the phone, from its first message.

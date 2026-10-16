@@ -43,7 +43,9 @@ func hookInput() -> Data? {
 }
 
 do {
-    try StatusClient.send(StatusMessage(pane: pane, event: event, conversation: hookInput().flatMap(AgentConversation.init(hookInput:))), to: socket)
+    let input = hookInput()
+    let request = event == .waiting ? input.flatMap(AgentRequest.init(hookInput:)) : nil
+    try StatusClient.send(StatusMessage(pane: pane, event: event, conversation: input.flatMap(AgentConversation.init(hookInput:)), request: request), to: socket)
 } catch {
     // Farol may have quit while the agent kept running. A hook must never fail the agent over that.
     exit(0)

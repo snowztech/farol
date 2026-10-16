@@ -15,11 +15,59 @@ public struct StatusMessage: Codable, Equatable, Sendable {
     public var event: AgentEvent
     /// The agent's own conversation, when its hook says which: what a phone reads, and what a restored session resumes.
     public var conversation: AgentConversation?
+    /// What a waiting agent asks, when its hook says.
+    public var request: AgentRequest?
 
-    public init(pane: String, event: AgentEvent, conversation: AgentConversation? = nil) {
+    public init(pane: String, event: AgentEvent, conversation: AgentConversation? = nil, request: AgentRequest? = nil) {
         self.pane = pane
         self.event = event
         self.conversation = conversation
+        self.request = request
+    }
+}
+
+/// What an agent waits on you for, from its hook rather than its screen: a tool it asks to run, or a question with its answers.
+public struct AgentRequest: Codable, Equatable, Sendable {
+    public var id: String
+    /// The tool asking, like "Bash". Nil for a question.
+    public var tool: String?
+    /// The command, the file, or the question, in one line.
+    public var title: String
+    /// What the tool would do in full: a script, or an edit as a unified diff.
+    public var detail: String?
+    /// A question's answers, in the order the agent numbers them. Empty for a tool, whose answers only its screen shows.
+    public var choices: [Choice]
+
+    public struct Choice: Codable, Equatable, Sendable {
+        public var label: String
+        public var detail: String?
+    }
+
+    /// From Claude Code's or Codex's `PermissionRequest` input, or Claude Code's `PreToolUse` for `AskUserQuestion`. Nil for anything else.
+    public init?(hookInput: Data) {
+        guard let input = (try? JSONSerialization.jsonObject(with: hookInput)) as? [String: Any],
+              let name = input["tool_name"] as? String else { return nil }
+        let arguments = input["tool_input"] as? [String: Any] ?? [:]
+        id = input["tool_use_id"] as? String ?? UUID().uuidString
+        if name == "AskUserQuestion" {
+            // Several questions are asked one after another on the same screen, which one request cannot follow.
+            guard let questions = arguments["questions"] as? [[String: Any]], questions.count == 1,
+                  let question = questions[0]["question"] as? String else { return nil }
+            tool = nil
+            title = question
+            detail = nil
+            choices = (questions[0]["options"] as? [[String: Any]] ?? []).compactMap { option in
+                (option["label"] as? String).map { Choice(label: $0, detail: option["description"] as? String) }
+            }
+        } else if input["hook_event_name"] as? String == "PermissionRequest" {
+            let call = ClaudeLog.tool(name, arguments, in: input["cwd"] as? String, id: id)
+            tool = name
+            title = call.text
+            detail = call.detail
+            choices = []
+        } else {
+            return nil
+        }
     }
 }
 

@@ -298,6 +298,28 @@ public final class TerminalView: NSView {
         }
     }
 
+    /// A letter with Control held, like Control-D, as the keyboard would send it. Nothing for anything but a to z.
+    public func pressControl(_ letter: Character) {
+        guard let surface, let code = Self.letterKeys[letter], let scalar = letter.unicodeScalars.first else { return }
+        var input = ghostty_input_key_s()
+        input.keycode = code
+        input.unshifted_codepoint = scalar.value
+        input.mods = GHOSTTY_MODS_CTRL
+        for action in [GHOSTTY_ACTION_PRESS, GHOSTTY_ACTION_RELEASE] {
+            input.action = action
+            (action == GHOSTTY_ACTION_PRESS ? String(letter) : nil).withOptionalCString { pointer in
+                input.text = pointer
+                _ = ghostty_surface_key(surface, input)
+            }
+        }
+    }
+
+    /// The Mac's key code of each letter, where it is on a US keyboard.
+    private static let letterKeys: [Character: UInt32] = [
+        "a": 0, "b": 11, "c": 8, "d": 2, "e": 14, "f": 3, "g": 5, "h": 4, "i": 34, "j": 38, "k": 40, "l": 37, "m": 46,
+        "n": 45, "o": 31, "p": 35, "q": 12, "r": 15, "s": 1, "t": 17, "u": 32, "v": 9, "w": 13, "x": 7, "y": 16, "z": 6,
+    ]
+
     // MARK: Drops
 
     public override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
@@ -469,17 +491,6 @@ public final class TerminalView: NSView {
             y *= 2
         }
         ghostty_surface_mouse_scroll(surface, x, y, mods)
-    }
-
-    /// The program in the terminal reads the mouse, so the wheel reaches it as scrolling.
-    /// One that does not, on a full screen, gets the wheel as arrow keys instead, which an agent takes as its prompt history.
-    public var takesMouse: Bool { surface.map(ghostty_surface_mouse_captured) ?? false }
-
-    /// Scrolls as the mouse wheel would, by lines, positive going back.
-    /// A full-screen program like an agent scrolls its own view, and a shell scrolls the terminal's history.
-    public func scroll(lines: Int) {
-        guard let surface else { return }
-        ghostty_surface_mouse_scroll(surface, 0, Double(lines), 0)
     }
 
     /// True when the program in the terminal took the click.
