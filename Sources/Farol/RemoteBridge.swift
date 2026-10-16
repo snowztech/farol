@@ -303,6 +303,12 @@ final class RemoteBridge: ObservableObject {
         case .close(let session):
             close(command, by: device, session: session, from: id)
         case .scroll(let session, let lines):
+            // Scrolling a full-screen program that does not read the mouse would type arrow keys into it, like Claude Code's prompt history.
+            // Only a program that reads the mouse, or a shell with history to scroll, gets it.
+            guard let pane = store.sessions.first(where: { $0.id == session })?.panes.focused,
+                  pane.takesMouse || !pane.historyText(lines: 1).isEmpty else {
+                return tell(.refused(command: command.id, reason: "This program does not scroll from the phone."), id)
+            }
             act(command, by: device, on: session, from: id) { $0.scroll(lines: lines) }
         case .changes(let session):
             changes(command, in: session, from: id)
