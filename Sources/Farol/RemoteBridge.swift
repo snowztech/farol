@@ -343,6 +343,8 @@ final class RemoteBridge: ObservableObject {
             phones[id]?.screen = nil
             retime()
             tick()
+        case .commands(let session):
+            commands(command, of: session, from: id)
         case .control(let session, let key):
             guard key.count == 1, let letter = key.first, ("a"..."z").contains(letter) else {
                 return tell(.refused(command: command.id, reason: "Only Control with a letter can be sent."), id)
@@ -552,6 +554,20 @@ final class RemoteBridge: ObservableObject {
         case .tool: .tool
         }
         return RemoteMessage(id: message.id, role: role, text: message.text, tool: message.tool, detail: message.detail)
+    }
+
+    // MARK: Commands
+
+    /// What the agent in a session takes after a slash, read off the main thread since it reads a few dozen small files.
+    private func commands(_ command: RemoteCommand, of id: UUID, from phone: UInt32) {
+        guard let session = store.sessions.first(where: { $0.id == id }) else {
+            return tell(.refused(command: command.id, reason: "That session is closed."), phone)
+        }
+        let log = session.conversation?.log, project = session.repoRoot ?? session.directory
+        DispatchQueue.global(qos: .userInitiated).async {
+            let commands = AgentCommands.list(log: log, project: project).map { RemoteAgentCommand(name: $0.name, detail: $0.detail, menu: $0.menu) }
+            DispatchQueue.main.async { [weak self] in self?.tell(.commands(session: id, commands: commands), phone) }
+        }
     }
 
     // MARK: Changes
