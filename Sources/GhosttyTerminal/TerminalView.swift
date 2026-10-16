@@ -471,8 +471,8 @@ public final class TerminalView: NSView {
         ghostty_surface_mouse_scroll(surface, x, y, mods)
     }
 
-    /// Scrolls as the mouse wheel would, by lines, positive going back. A full-screen program, like an agent,
-    /// scrolls its own view; a shell scrolls the terminal's history.
+    /// Scrolls as the mouse wheel would, by lines, positive going back.
+    /// A full-screen program like an agent scrolls its own view, and a shell scrolls the terminal's history.
     public func scroll(lines: Int) {
         guard let surface else { return }
         ghostty_surface_mouse_scroll(surface, 0, Double(lines), 0)
