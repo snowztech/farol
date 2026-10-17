@@ -4,17 +4,14 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.40.1] - 2026-10-17
+
+Stopping an agent, or answering it from the phone, no longer leaves its session working or waiting.
+
 ### Fixed
 
 - A session no longer stays "Working" after you stop Claude Code with Esc or Control-C, here or from the phone. Claude Code runs no hook when it is stopped, so Farol now reads the stop from its log.
 - Remote: a phone that forgets this Mac is removed here too, and is no longer notified or sent Live Activity updates.
-
-## [0.40.1] - 2026-10-17
-
-Answering an agent from the phone no longer leaves its session waiting.
-
-### Fixed
-
 - Remote: a session no longer stays "Waiting for you" after you answer an agent from the phone. Claude Code and Codex ring when they wait or finish, and that ring counted until you looked at the session on the Mac.
 
 ## [0.40.0] - 2026-10-17
