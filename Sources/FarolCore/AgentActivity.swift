@@ -1,3 +1,5 @@
+import Foundation
+
 /// One agent activity event, reported by a hook or an interactive terminal title.
 public enum AgentEvent: String, Codable, CaseIterable, Sendable {
     case working, waiting, done, clear
@@ -16,6 +18,8 @@ public struct AgentActivity: Equatable, Sendable {
     /// The agent says what it does, through hooks or its title, from its first report until it ends.
     /// Its bell or notification then says nothing more, like Claude Code's when a question waits, and it would outlast the answer.
     public private(set) var reports = false
+    /// When the main agent last said what it does, to tell a stop written after it from one before.
+    public private(set) var since: Date?
 
     public init() {}
 
@@ -36,6 +40,12 @@ public struct AgentActivity: Equatable, Sendable {
         case .subagentStop: subagents = max(0, subagents - 1)
         }
         reports = event != .clear
+        if event == .working || event == .waiting || event == .done { since = .now }
+    }
+
+    /// You stopped the agent, which Claude Code runs no hook for. A subagent left running still counts.
+    public mutating func stop() {
+        main = nil
     }
 
     /// Looking at the session is the acknowledgement, so a finished turn stops showing.

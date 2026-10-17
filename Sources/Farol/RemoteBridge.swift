@@ -356,6 +356,9 @@ final class RemoteBridge: ObservableObject {
             commands(command, of: session, from: id)
         case .attach(let session, let attachment, let part, let parts, let data):
             attach(command, session: session, attachment: attachment, part: part, of: parts, data: data, from: id)
+        case .forget:
+            tell(.done(command: command.id), id)
+            remove(device)
         case .control(let session, let key):
             guard key.count == 1, let letter = key.first, ("a"..."z").contains(letter) else {
                 return tell(.refused(command: command.id, reason: "Only Control with a letter can be sent."), id)
