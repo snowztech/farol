@@ -264,6 +264,12 @@
           <p>Remote lets you answer your agents when you are away from the Mac. Install <a href="iphone">Farol for iPhone</a>, in beta on TestFlight for now. Then turn Remote on in <strong>Settings → Remote</strong>, press <strong>Show code</strong> and scan it from the app.</p>
           <p>The phone lists your sessions with their status, shows a session's screen and types your replies. It notifies you when an agent waits or finishes. Everything between the Mac and the phone is encrypted end to end, so the relay that joins them cannot read it.</p>
           <p>The agents run on the Mac, so it has to stay on. <strong>Keep the Mac awake for agents</strong> stops it from sleeping by itself while an agent works or waits for you.</p>
+
+          <h3>On a server</h3>
+          <p>To keep agents going with the Mac closed, run them on a machine that stays on, with tmux. <code>farol-host</code> lets the phone see and answer every tmux session there. It is experimental.</p>
+          <pre><code>curl -fsSL https://farol.sh/host.sh | sh
+farol-host setup</code></pre>
+          <p>Setup connects Claude Code and Codex, keeps <code>farol-host</code> running, and shows a code to scan from the app. Start agents in tmux, like <code>tmux new -s api</code> then <code>claude</code>. The server shows next to your Mac on the phone. <a href="https://github.com/snowztech/farol-remote/tree/main/host">The README</a> has the rest.</p>
         </section>
 
         <section id="configuration">
