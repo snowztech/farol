@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Remote: the phone lists this Mac by its name, next to any other Mac or server paired with it, and knows everything this Mac can do.
+
 ## [0.39.1] - 2026-10-16
 
 An agent's conversation on the phone from the moment it starts, and replies that are always sent.
