@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- Remote: a session no longer stays "Waiting for you" after you answer an agent from the phone. Claude Code and Codex ring when they wait or finish, and that ring counted until you looked at the session on the Mac.
+
 ## [0.40.0] - 2026-10-17
 
 The phone knows this Mac by its name.

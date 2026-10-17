@@ -55,3 +55,16 @@ private func status(after events: [AgentEvent]) -> AgentStatus? {
     activity.apply(.start)
     #expect(activity.status == nil)
 }
+
+/// Claude Code rings when a question waits. Answered from a phone, that bell must not keep the session waiting.
+@Test func anAgentThatReportsItselfIsToldFromOneThatOnlyRings() {
+    var activity = AgentActivity()
+    #expect(!activity.reports)
+    activity.apply(.start)
+    #expect(activity.reports)
+    activity.apply(.waiting)
+    activity.apply(.done)
+    #expect(activity.reports)
+    activity.apply(.clear)
+    #expect(!activity.reports, "a program after the agent ends rings for itself")
+}

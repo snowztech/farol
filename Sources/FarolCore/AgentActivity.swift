@@ -13,6 +13,9 @@ public struct AgentActivity: Equatable, Sendable {
     /// What the main agent last reported. Nil before anything is reported, and after it's cleared or acknowledged.
     private var main: AgentStatus?
     private var subagents = 0
+    /// The agent says what it does, through hooks or its title, from its first report until it ends.
+    /// Its bell or notification then says nothing more, like Claude Code's when a question waits, and it would outlast the answer.
+    public private(set) var reports = false
 
     public init() {}
 
@@ -32,6 +35,7 @@ public struct AgentActivity: Equatable, Sendable {
         case .subagentStart: subagents += 1
         case .subagentStop: subagents = max(0, subagents - 1)
         }
+        reports = event != .clear
     }
 
     /// Looking at the session is the acknowledgement, so a finished turn stops showing.

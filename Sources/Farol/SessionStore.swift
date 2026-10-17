@@ -20,7 +20,7 @@ final class Session: ObservableObject, Identifiable {
     var request: (pane: UUID, asked: AgentRequest)?
     /// An agent started here and has not ended. Before its first message it may have no log, and a phone shows it as an empty conversation.
     var agentStarted = false
-    /// The program rang the bell or sent a notification while you were elsewhere. Covers agents without hooks.
+    /// The program rang the bell or sent a notification while you were elsewhere. Covers agents that report nothing themselves.
     @Published var bellRang = false
     /// The host each pane is on over ssh, kept apart from the title so it outlives a program retitling the pane.
     @Published private var remotes: [UUID: RemoteTitle] = [:]
@@ -366,8 +366,8 @@ final class SessionStore: ObservableObject {
             session.refreshGit()
             self?.save()
         }
-        terminal.onBell = { [weak self, weak session] in self?.flag(session) }
-        terminal.onNotification = { [weak self, weak session] _, _ in self?.flag(session) }
+        terminal.onBell = { [weak self, weak session, weak terminal] in self?.flag(session, pane: terminal?.id) }
+        terminal.onNotification = { [weak self, weak session, weak terminal] _, _ in self?.flag(session, pane: terminal?.id) }
         terminal.onClose = { [weak self, weak session, weak terminal] in
             if let session, let terminal { self?.onPaneExit?(session, terminal) }
         }
@@ -461,8 +461,8 @@ final class SessionStore: ObservableObject {
         }
     }
 
-    private func flag(_ session: Session?) {
-        guard let session, session.id != selectedID else { return }
+    private func flag(_ session: Session?, pane: UUID?) {
+        guard let session, session.id != selectedID, let pane, session.agents[pane]?.reports != true else { return }
         let before = session.activity
         session.bellRang = true
         report(session, from: before)
