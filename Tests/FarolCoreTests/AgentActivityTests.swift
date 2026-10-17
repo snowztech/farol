@@ -68,3 +68,16 @@ private func status(after events: [AgentEvent]) -> AgentStatus? {
     activity.apply(.clear)
     #expect(!activity.reports, "a program after the agent ends rings for itself")
 }
+
+/// You stopped it. A background agent it handed off to still keeps the pane working.
+@Test func aStopEndsTheMainAgentOnly() {
+    var activity = AgentActivity()
+    activity.apply(.waiting)
+    #expect(activity.since != nil)
+    activity.stop()
+    #expect(activity.status == nil)
+    activity.apply(.subagentStart)
+    activity.apply(.working)
+    activity.stop()
+    #expect(activity.status == .working)
+}
