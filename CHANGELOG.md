@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- Agents: the Farol skill for Claude Code and Codex knows the Worktrees and Remote settings, how other agents report their status, and the newer shortcuts. It updates itself at the next launch.
+
 ## [0.40.1] - 2026-10-17
 
 Stopping an agent, or answering it from the phone, no longer leaves its session working or waiting.
