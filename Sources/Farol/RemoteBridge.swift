@@ -2,6 +2,7 @@ import AppKit
 import FarolCore
 import FarolRemote
 import GhosttyTerminal
+import SystemConfiguration
 import UserNotifications
 
 /// The only code that joins `FarolRemote` to the sessions. It holds nothing and connects to nothing until Remote is turned on.
@@ -169,6 +170,11 @@ final class RemoteBridge: ObservableObject {
         refreshAwake()
     }
 
+    /// What a phone calls this Mac: its name in System Settings, like "Lucas's MacBook Pro". Read without asking the network, unlike `Host`.
+    private static var computerName: String? {
+        SCDynamicStoreCopyComputerName(nil, nil) as String?
+    }
+
     /// The Mac stays awake only while Remote is on and a session needs it. The screen may still sleep, and closing the lid still sleeps the Mac.
     func refreshAwake() {
         let needed = keepAwake && connection != nil && store.sessions.contains { $0.activity == .working || $0.activity == .waiting }
@@ -311,7 +317,7 @@ final class RemoteBridge: ObservableObject {
         guard let device = phones[id]?.device else { return }
         switch command.action {
         case .hello(let version):
-            tell(.hello(version: RemoteProtocol.version), id)
+            tell(.hello(version: RemoteProtocol.version, features: RemoteFeature.allCases.map(\.rawValue), name: Self.computerName), id)
             if RemoteProtocol.accepts(version) { tick() } else { phones[id] = nil }
         case .watch(let session):
             phones[id]?.watching = session
