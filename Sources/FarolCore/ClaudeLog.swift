@@ -4,6 +4,9 @@ import Foundation
 /// tools run side by side each hang off the call that started them, and a prompt you rewound to sits beside the one it replaced.
 /// Messages are shown in the order they were written, without what a rewind left behind.
 final class ClaudeLog: AgentLog {
+    /// How Claude Code writes, as your turn, that you stopped it.
+    static let stopMark = "[Request interrupted by user"
+
     /// The records that gave messages, in the order they were written.
     private var records: [(id: String, messages: [Transcript.Message])] = []
     private var children: [String: [String]] = [:]
@@ -70,8 +73,9 @@ final class ClaudeLog: AgentLog {
             switch (type, block["type"] as? String) {
             case ("user", "text"):
                 // What Claude Code adds to a turn by itself, like a command it ran or a notice, comes wrapped in a tag.
+                // A stop comes in brackets, and the pane going idle says it already.
                 guard let text = (block["text"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty,
-                      !text.hasPrefix("<") else { return nil }
+                      !text.hasPrefix("<"), !text.hasPrefix(stopMark) else { return nil }
                 return Transcript.Message(id: id, role: .you, text: text)
             case ("user", "image"):
                 return Transcript.Message(id: id, role: .you, text: "An image")
@@ -118,5 +122,28 @@ final class ClaudeLog: AgentLog {
         default:
             return Transcript.Message(id: id, role: .tool, text: string("skill") ?? string("description") ?? name, tool: name)
         }
+    }
+
+    /// True when the last turn in a Claude Code log is you stopping it, after `since`.
+    /// Claude Code runs no hook when you stop it, so this is how Farol learns the agent no longer works.
+    static func stopped(log: String, since: Date) -> Bool {
+        guard let file = FileHandle(forReadingAtPath: log) else { return false }
+        defer { try? file.close() }
+        // What comes after the mark, like the permission mode, is short.
+        guard let end = try? file.seekToEnd() else { return false }
+        try? file.seek(toOffset: end > 16 << 10 ? end - 16 << 10 : 0)
+        guard let tail = try? file.readToEnd() else { return false }
+        let dates = ISO8601DateFormatter()
+        dates.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        for line in tail.split(separator: UInt8(ascii: "\n")).reversed() {
+            // The first line may be cut in two, and is then skipped like any other line that is not a turn.
+            guard line.range(of: Data(#""parentUuid""#.utf8)) != nil,
+                  let record = (try? JSONSerialization.jsonObject(with: Data(line))) as? [String: Any],
+                  record["isSidechain"] as? Bool != true, let type = record["type"] as? String, type == "user" || type == "assistant" else { continue }
+            guard type == "user", let written = (record["timestamp"] as? String).flatMap(dates.date(from:)), written > since,
+                  let blocks = (record["message"] as? [String: Any])?["content"] as? [[String: Any]] else { return false }
+            return blocks.contains { $0["type"] as? String == "text" && ($0["text"] as? String)?.hasPrefix(stopMark) == true }
+        }
+        return false
     }
 }

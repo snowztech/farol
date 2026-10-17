@@ -109,6 +109,19 @@ final class Session: ObservableObject, Identifiable {
         if event == .clear { agentStarted = false }
     }
 
+    /// Claude Code runs no hook when you stop it, so a stop at the end of its log ends what its pane showed. True when one did.
+    func noticeStop() -> Bool {
+        guard let log = conversation?.log else { return false }
+        var stopped = false
+        for (pane, agent) in agents where agent.status == .working || agent.status == .waiting {
+            guard let since = agent.since, Transcript.stopped(log: log, since: since) else { continue }
+            agents[pane]?.stop()
+            if request?.pane == pane { request = nil }
+            stopped = true
+        }
+        return stopped
+    }
+
     /// An agent in one of the panes waits for your approval or answer, as opposed to a bell or terminal notification.
     var agentIsWaiting: Bool { agents.values.contains { $0.status == .waiting } }
 
@@ -233,6 +246,7 @@ final class SessionStore: ObservableObject {
 
     private let statusServer: StatusServer
     private let cliPath: String
+    private var stops: Timer?
 
     /// `socketPath` is where `farol status` reports. Each app build gets its own, so dev builds never mix with yours.
     init(runtime: TerminalRuntime, socketPath: String) {
@@ -244,6 +258,14 @@ final class SessionStore: ObservableObject {
             try statusServer.start()
         } catch {
             NSLog("Farol: agent status is off, the socket failed to start: \(error)")
+        }
+        // Reads the end of the log of each agent that works or waits, a few kilobytes, and nothing while none does.
+        stops = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            for session in sessions {
+                let before = session.activity
+                if session.noticeStop() { report(session, from: before) }
+            }
         }
     }
 

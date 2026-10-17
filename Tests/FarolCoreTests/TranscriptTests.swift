@@ -146,3 +146,24 @@ private let codexLog = [
     #expect(transcript.refresh())
     #expect(transcript.messages.map(\.role) == [.you, .agent])
 }
+
+/// Claude Code writes a stop as your turn, and runs no hook for it. The same lines as farol-host's test.
+@Test func aStopCountsOnlyAtTheEndOfTheLogAndAfterTheStatus() throws {
+    let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jsonl")
+    defer { try? FileManager.default.removeItem(at: file) }
+    func write(_ lines: String...) throws { try (lines.joined(separator: "\n") + "\n").write(to: file, atomically: true, encoding: .utf8) }
+    let answer = #"{"parentUuid":"u1","type":"assistant","uuid":"a1","timestamp":"2026-10-17T10:00:01Z","message":{"role":"assistant","content":[{"type":"text","text":"Lighthouses"}]}}"#
+    let stop = #"{"parentUuid":"a1","type":"user","uuid":"u2","timestamp":"2026-10-17T10:00:05.250Z","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user]"}]}}"#
+    let before = try #require(ISO8601DateFormatter().date(from: "2026-10-17T10:00:00Z"))
+    let after = try #require(ISO8601DateFormatter().date(from: "2026-10-17T10:00:09Z"))
+
+    try write(answer, stop, #"{"type":"permission-mode","permissionMode":"default"}"#)
+    #expect(Transcript.stopped(log: file.path, since: before))
+    #expect(!Transcript.stopped(log: file.path, since: after))
+    try write(answer, stop, #"{"parentUuid":"u2","type":"user","uuid":"u3","timestamp":"2026-10-17T10:00:08.000Z","message":{"role":"user","content":"go on"}}"#)
+    #expect(!Transcript.stopped(log: file.path, since: before))
+    try write(answer)
+    #expect(!Transcript.stopped(log: file.path, since: before))
+    #expect(!Transcript.stopped(log: file.path + ".gone", since: before))
+    #expect(ClaudeLog.messages(in: ["type": "user", "message": ["content": [["type": "text", "text": "[Request interrupted by user for tool use]"]]]], id: "u2").isEmpty)
+}
