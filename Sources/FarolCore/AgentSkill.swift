@@ -28,12 +28,12 @@ public struct AgentSkill {
     static let text = """
     ---
     name: farol
-    description: Farol terminal settings. Use when the user asks to change a terminal setting such as the theme, the font or a shortcut, to add a theme, or how Farol works.
+    description: Farol terminal settings. Use when the user asks to change a terminal setting such as the theme, the font or a shortcut, to add a theme, where a Farol setting lives, or how Farol works, like tasks, worktrees, agent status, review or answering agents from the phone.
     ---
 
     # Farol
 
-    Farol is a macOS terminal for coding agents, built on libghostty. Its README at https://github.com/snowztech/farol#readme covers what this file leaves out. Read it when the user asks for that.
+    Farol is a macOS terminal for coding agents, built on libghostty. Its docs at https://farol.sh/docs and its README at https://github.com/snowztech/farol#readme cover what this file leaves out, like the phone app and running agents on a server. Read them when the user asks for that.
 
     ## Settings
 
@@ -54,14 +54,26 @@ public struct AgentSkill {
 
     `~/.config/ghostty/config` loads first when it exists and Farol's file wins, so make every change in Farol's file.
 
-    Everything else is kept by the app, where only the user can change it, in Settings (⌘,): the app icon, panel style and grouping by project under Appearance, the agent connections and the menu bar or notch panel under Agents, and the `gh`, `glab` and jira-cli accounts under Integrations. For these, tell the user where to click.
+    When a saved change does not show, ⇧⌘, reloads the config by hand.
+
+    Everything else is kept by the app, where only the user can change it, in Settings (⌘,). For these, tell the user where to click:
+
+    - Appearance: the app icon, the panel style and grouping sessions by project.
+    - Agents: connecting Claude Code and Codex, one row per account, notifications, the Dock badge, the menu bar lighthouse or the status panel at the notch or screen edge, and what new sessions start with.
+    - Worktrees: copying ignored `.env` files into each new worktree.
+    - Integrations: the `gh`, `glab` and jira-cli accounts, and which Jira tickets New Task lists.
+    - Remote: letting a paired phone in, pairing a phone with Show code, removing one, keeping the Mac awake for agents, and the relay.
+
+    ## Agent status
+
+    Claude Code and Codex report working, waiting and done through the hooks that Settings → Agents adds. Any other agent or script in a Farol session can report with `"$FAROL_CLI" status working`, `waiting`, `done` or `clear`. `$FAROL_CLI` is unset outside Farol. A session that stays idle usually needs its agent connected in Settings → Agents, then restarted.
 
     ## Shortcuts
 
     A `keybind` line adds or changes one, with Ghostty's key and action names: `keybind = cmd+shift+enter=toggle_split_zoom`.
 
     - Rebindable: everything inside the terminal, like copy, paste, clear, font size and scrolling, and these app actions: `new_tab` (a new session), `close_tab`, `goto_tab`, `next_tab`, `previous_tab`, `new_split`, `goto_split`, `resize_split`, `equalize_splits`, `toggle_split_zoom`, `toggle_fullscreen`, `reload_config`, `open_config` (Settings) and `quit`.
-    - Fixed: Farol's own menu shortcuts, like New Task (⇧⌘N), Files (⇧⌘E), Review Changes (⌥⌘R) and Git Graph (⌥⌘G). Tell the user these stay as they are.
+    - Fixed: Farol's own menu shortcuts, like New Task (⇧⌘N), New Worktree Session (⇧⌘T), Switch Session (⌘P), Files (⇧⌘E), Review Changes (⌥⌘R), Commit (⌥⌘C), Push (⌥⌘P), Git Graph (⌥⌘G), Resolve Conflicts (⌥⌘M) and the Farol Inspector (⌥⌘I). Tell the user these stay as they are.
 
     Every shortcut is listed in Settings → Shortcuts and in the README.
 
