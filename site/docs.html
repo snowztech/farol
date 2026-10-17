@@ -112,6 +112,7 @@
       border: 1px solid var(--sn-border-strong); border-radius: 10px;
       box-shadow: 0 18px 48px rgba(0, 0, 0, 0.3);
     }
+    .phone-shot { width: 300px; max-width: 100%; border-radius: 28px; }
 
     footer {
       margin: 96px auto 0; padding: 20px 20px 40px; max-width: 1040px;
@@ -161,7 +162,7 @@
           <li><a href="#status">Agent status</a></li>
           <li><a href="#review">Review and ship</a></li>
           <li><a href="#outside">From any app</a></li>
-          <li><a href="#remote">Remote</a></li>
+          <li><a href="#remote">From your phone</a></li>
           <li><a href="#configuration">Configuration</a></li>
           <li><a href="#shortcuts">Shortcuts</a></li>
           <li><a href="#troubleshooting">Troubleshooting</a></li>
@@ -260,16 +261,18 @@
         </section>
 
         <section id="remote">
-          <h2>Remote<span class="beta">Beta</span></h2>
+          <h2>From your phone<span class="beta">Beta</span></h2>
           <p>Remote lets you answer your agents when you are away from the Mac. Install <a href="iphone">Farol for iPhone</a>, in beta on TestFlight for now. Then turn Remote on in <strong>Settings → Remote</strong>, press <strong>Show code</strong> and scan it from the app.</p>
-          <p>The phone lists your sessions with their status, shows a session's screen and types your replies. It notifies you when an agent waits or finishes. Everything between the Mac and the phone is encrypted end to end, so the relay that joins them cannot read it.</p>
+          <p>The phone lists your sessions with their status and opens each as its agent's conversation, with the terminal one tap away. Approve or answer an agent with a tap, reply with a slash command or a picture, open a new session, and look over what changed. It notifies you when an agent waits or finishes, and a Live Activity keeps count while the app is closed. Everything between the Mac and the phone is encrypted end to end, so the relay that joins them cannot read it.</p>
           <p>The agents run on the Mac, so it has to stay on. <strong>Keep the Mac awake for agents</strong> stops it from sleeping by itself while an agent works or waits for you.</p>
+          <img class="doc-shot phone-shot" src="features/phone-session.png" width="600" height="1304" alt="Farol for iPhone showing a Claude Code session waiting for you, with its question and two answers to pick with a tap">
 
           <h3>On a server</h3>
-          <p>To keep agents going with the Mac closed, run them on a machine that stays on, with tmux. <code>farol-host</code> lets the phone see and answer every tmux session there. It is experimental.</p>
+          <p>To keep agents going with the Mac closed, run them on a machine that stays on, with tmux. <a href="https://github.com/snowztech/farol-remote/tree/main/host"><code>farol-host</code></a> lets the phone see and answer every tmux session there. It is experimental.</p>
           <pre><code>curl -fsSL https://farol.sh/host.sh | sh
 farol-host setup</code></pre>
-          <p>Setup connects Claude Code and Codex, keeps <code>farol-host</code> running, and shows a code to scan from the app. Start agents in tmux, like <code>tmux new -s api</code> then <code>claude</code>. The server shows next to your Mac on the phone. <a href="https://github.com/snowztech/farol-remote/tree/main/host">The README</a> has the rest.</p>
+          <p>Setup connects Claude Code and Codex, keeps <code>farol-host</code> running, and shows a code to scan from the app. Start agents in tmux, like <code>tmux new -s api</code> then <code>claude</code>. The server shows next to your Mac on the phone.</p>
+          <img class="doc-shot phone-shot" src="features/phone-hosts.png" width="600" height="975" alt="Farol for iPhone listing sessions from a MacBook Pro and a server, each row naming the machine it runs on">
         </section>
 
         <section id="configuration">
