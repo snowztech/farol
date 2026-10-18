@@ -40,7 +40,7 @@ brew install --cask snowztech/tap/farol
 
 It needs a Mac with Apple Silicon and macOS 14 or later. Releases are signed and notarized, so macOS opens Farol without warnings. To build from source instead, see [Build from source](#build-from-source).
 
-When a new version is out, an Update button shows in the title bar and downloads it. If you installed with Homebrew, run `brew upgrade --cask farol` instead.
+When a new version is out, an Update button shows in the title bar. Click it and Farol installs the update and relaunches, with your sessions and agents back. `brew upgrade --cask farol` works too.
 
 ## Features
 
