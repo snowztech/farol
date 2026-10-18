@@ -306,9 +306,8 @@ final class SessionStore: ObservableObject {
     /// Codex's interactive TUI runs no hooks, so once a turn ends its conversation is looked up in its logs, for the next launch to resume.
     private func findCodexConversation(of terminal: TerminalView, in session: Session) {
         guard let program = terminal.foregroundProgram, program.name == "codex", let folder = terminal.workingDirectory else { return }
-        let accounts = AgentFolder.find()
         DispatchQueue.global(qos: .utility).async { [weak self, weak session, weak terminal] in
-            let found = AgentFolder.lastCodexConversation(in: accounts, startedIn: folder, since: program.started)
+            let found = AgentFolder.lastCodexConversation(in: AgentFolder.find(), startedIn: folder, since: program.started)
             DispatchQueue.main.async {
                 guard let self, let session, let terminal, let found, session.conversations[terminal.id] != found else { return }
                 session.conversations[terminal.id] = found
@@ -453,7 +452,8 @@ final class SessionStore: ObservableObject {
             create()
             return
         }
-        let resume = defaults.bool(forKey: AgentSettings.resumeKey)
+        // On unless turned off, without counting on Settings to have registered the default first.
+        let resume = defaults.object(forKey: AgentSettings.resumeKey) as? Bool ?? true
         for entry in usable {
             var resumed: [UUID: AgentConversation] = [:]
             let panes = PaneContainer(entry.layout) { directory, conversation in
@@ -470,7 +470,6 @@ final class SessionStore: ObservableObject {
             session.customName = entry.name
             // Kept before the agent reports again, so quitting right away still resumes it next time.
             session.conversations = resumed
-            session.conversation = resumed.values.first
         }
         select(index: min(selected, sessions.count - 1))
     }

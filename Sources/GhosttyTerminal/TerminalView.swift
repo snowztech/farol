@@ -38,18 +38,16 @@ public final class TerminalView: NSView {
     /// The program in front, like `codex` while it runs or the shell at its prompt, and when it started.
     public var foregroundProgram: (name: String, started: Date)? {
         guard let info = foreground else { return nil }
-        let name = withUnsafeBytes(of: info.kp_proc.p_comm) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
         let start = info.kp_proc.p_un.__p_starttime
-        return (name, Date(timeIntervalSince1970: TimeInterval(start.tv_sec) + TimeInterval(start.tv_usec) / 1_000_000))
+        return (Self.name(of: info), Date(timeIntervalSince1970: TimeInterval(start.tv_sec) + TimeInterval(start.tv_usec) / 1_000_000))
     }
 
     /// A program the shell started is in front, rather than the shell at its prompt.
     /// Asks the process tree, since `hasRunningProcess` can stay true at the prompt after a program like Codex exits.
     public var runsProgram: Bool {
-        // The shell is the app's child, or its grandchild when macOS starts it through `login`.
-        guard let info = foreground, let parent = Self.process(info.kp_eproc.e_ppid) else { return false }
-        let app = getpid()
-        return info.kp_eproc.e_ppid != app && parent.kp_eproc.e_ppid != app
+        // The shell's parent is the app, or `login` when macOS starts it through that. A program's parent is the shell.
+        guard let info = foreground, info.kp_eproc.e_ppid != getpid(), let parent = Self.process(info.kp_eproc.e_ppid) else { return false }
+        return Self.name(of: parent) != "login"
     }
 
     private var foreground: kinfo_proc? {
@@ -64,6 +62,10 @@ public final class TerminalView: NSView {
         var query: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
         guard sysctl(&query, 4, &info, &size, nil, 0) == 0, size > 0 else { return nil }
         return info
+    }
+
+    private static func name(of info: kinfo_proc) -> String {
+        withUnsafeBytes(of: info.kp_proc.p_comm) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
     }
 
     private var cursor = NSCursor.iBeam

@@ -19,7 +19,7 @@ final class AgentSettings: ObservableObject {
     @Published var startCommand: String { didSet { Self.defaults.set(startCommand, forKey: "agents.startCommand") } }
     @Published var resume: Bool { didSet { Self.defaults.set(resume, forKey: Self.resumeKey) } }
 
-    /// Read by the session store at launch, before any settings page exists.
+    /// Also read by the session store at launch.
     static let resumeKey = "agents.resume"
 
     init() {
