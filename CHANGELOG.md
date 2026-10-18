@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- ⌘-clicking a file path in the terminal opens it next to the terminal, at the line when it says one, like `src/app.ts:42` from an agent. Paths with a line number used to open nothing, and the others opened in another app.
+
 ## [0.41.0] - 2026-10-18
 
 Agents pick up where they left off when Farol opens.

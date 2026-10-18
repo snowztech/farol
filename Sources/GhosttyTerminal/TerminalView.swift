@@ -10,6 +10,8 @@ public final class TerminalView: NSView {
     public var onWorkingDirectoryChange: ((String) -> Void)?
     public var onNotification: ((_ title: String, _ body: String) -> Void)?
     public var onBell: (() -> Void)?
+    /// A ⌘-clicked link or path, offered to the app first. Returns false to let the Mac open it.
+    public var onOpenLink: ((String) -> Bool)?
     /// Asks the user to approve a clipboard access. Without it, such requests are denied.
     public var onClipboardRequest: ((ClipboardRequest, @escaping (Bool) -> Void) -> Void)?
     public var onClose: (() -> Void)?
@@ -168,7 +170,8 @@ public final class TerminalView: NSView {
         case GHOSTTY_ACTION_OPEN_URL:
             let link = action.action.open_url
             guard let ptr = link.url else { return false }
-            open(String(decoding: Data(bytes: ptr, count: Int(link.len)), as: UTF8.self))
+            let text = String(decoding: Data(bytes: ptr, count: Int(link.len)), as: UTF8.self)
+            if onOpenLink?(text) != true { open(text) }
         case GHOSTTY_ACTION_MOUSE_SHAPE:
             cursor = .ghostty(action.action.mouse_shape)
             if let window, bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil)) {

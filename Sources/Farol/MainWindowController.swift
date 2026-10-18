@@ -680,6 +680,20 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private func configure(_ terminal: TerminalView) {
         terminal.onClipboardRequest = { [weak self] request, reply in self?.confirm(request, reply: reply) }
         terminal.onRequest = { [weak self] in self?.handle($0) }
+        terminal.onOpenLink = { [weak self, weak terminal] link in
+            guard let self, let terminal else { return false }
+            return openLink(link, from: terminal)
+        }
+    }
+
+    /// A file an agent names, like `src/app.ts:42`, opens next to the terminal at that line.
+    /// Over ssh the path is on the server, so the Mac handles it as before.
+    private func openLink(_ link: String, from terminal: TerminalView) -> Bool {
+        guard let session = store.sessions.first(where: { $0.panes.terminals.contains { $0 === terminal } }), !session.isRemote,
+              let file = OpenPath.file(link: link, in: terminal.workingDirectory) else { return false }
+        if session !== store.selected { store.select(session) }
+        open(file.path, line: file.line)
+        return true
     }
 
     private func confirm(_ request: ClipboardRequest, reply: @escaping (Bool) -> Void) {
