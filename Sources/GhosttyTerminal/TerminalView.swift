@@ -35,6 +35,37 @@ public final class TerminalView: NSView {
         surface.map { ghostty_surface_needs_confirm_quit($0) } ?? false
     }
 
+    /// The program in front, like `codex` while it runs or the shell at its prompt, and when it started.
+    public var foregroundProgram: (name: String, started: Date)? {
+        guard let info = foreground else { return nil }
+        let name = withUnsafeBytes(of: info.kp_proc.p_comm) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
+        let start = info.kp_proc.p_un.__p_starttime
+        return (name, Date(timeIntervalSince1970: TimeInterval(start.tv_sec) + TimeInterval(start.tv_usec) / 1_000_000))
+    }
+
+    /// A program the shell started is in front, rather than the shell at its prompt.
+    /// Asks the process tree, since `hasRunningProcess` can stay true at the prompt after a program like Codex exits.
+    public var runsProgram: Bool {
+        // The shell is the app's child, or its grandchild when macOS starts it through `login`.
+        guard let info = foreground, let parent = Self.process(info.kp_eproc.e_ppid) else { return false }
+        let app = getpid()
+        return info.kp_eproc.e_ppid != app && parent.kp_eproc.e_ppid != app
+    }
+
+    private var foreground: kinfo_proc? {
+        guard let surface else { return nil }
+        let pid = ghostty_surface_foreground_pid(surface)
+        return pid > 0 ? Self.process(pid_t(pid)) : nil
+    }
+
+    private static func process(_ pid: pid_t) -> kinfo_proc? {
+        var info = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.stride
+        var query: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
+        guard sysctl(&query, 4, &info, &size, nil, 0) == 0, size > 0 else { return nil }
+        return info
+    }
+
     private var cursor = NSCursor.iBeam
 
     /// Stable for the life of the terminal. The app hands it to the shell so the shell can report back.

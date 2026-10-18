@@ -93,6 +93,51 @@ public struct AgentFolder: Equatable, Hashable {
         }
     }
 
+    /// Codex's interactive TUI runs no hooks, so its conversation is read from its logs: of those it started in `folder`, the one written last since `since`.
+    /// Asked as a turn ends, that's the log Codex just wrote, which also follows `/new` and `codex resume`.
+    /// ponytail: two Codex in the same folder ending turns at the same moment could be swapped. A hook from the TUI would end the guess.
+    public static func lastCodexConversation(in folders: [AgentFolder], startedIn folder: String, since: Date,
+                                             now: Date = Date()) -> AgentConversation? {
+        let calendar = Calendar.current
+        let wanted = URL(fileURLWithPath: folder).resolvingSymlinksInPath().path
+        var best: (log: URL, modified: Date, id: String)?
+        for codex in folders where codex.kind == .codex {
+            // Codex keeps a folder per day, so only the days since `since` are looked at.
+            var day = calendar.startOfDay(for: since)
+            while day <= now {
+                let parts = calendar.dateComponents([.year, .month, .day], from: day)
+                let logs = codex.directory.appendingPathComponent(String(format: "sessions/%04d/%02d/%02d", parts.year!, parts.month!, parts.day!))
+                let files = (try? FileManager.default.contentsOfDirectory(at: logs, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+                for file in files where file.pathExtension == "jsonl" {
+                    guard let modified = try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+                          modified >= since, modified > best?.modified ?? .distantPast,
+                          let start = codexStart(of: file), URL(fileURLWithPath: start.folder).resolvingSymlinksInPath().path == wanted else { continue }
+                    best = (file, modified, start.id)
+                }
+                day = calendar.date(byAdding: .day, value: 1, to: day)!
+            }
+        }
+        return best.map { AgentConversation(id: $0.id, log: $0.log.path) }
+    }
+
+    /// The conversation's id and folder, from the first line of a Codex log.
+    static func codexStart(of log: URL) -> (id: String, folder: String)? {
+        guard let handle = try? FileHandle(forReadingFrom: log) else { return nil }
+        defer { try? handle.close() }
+        var line = Data()
+        // The first line carries Codex's instructions too, some tens of kilobytes.
+        while line.count < 1 << 20, let chunk = try? handle.read(upToCount: 65_536), !chunk.isEmpty {
+            if let end = chunk.firstIndex(of: UInt8(ascii: "\n")) {
+                line.append(chunk[..<end])
+                break
+            }
+            line.append(chunk)
+        }
+        guard let record = (try? JSONSerialization.jsonObject(with: line)) as? [String: Any], record["type"] as? String == "session_meta",
+              let payload = record["payload"] as? [String: Any], let id = payload["id"] as? String, let folder = payload["cwd"] as? String else { return nil }
+        return (id, folder)
+    }
+
     /// The folder saved as the last choice. Older versions saved just "claude" or "codex".
     public static func choice(_ saved: String, in folders: [AgentFolder]) -> AgentFolder? {
         folders.first { $0.id == saved } ?? folders.first { $0.isDefault && $0.kind.rawValue == saved } ?? folders.first

@@ -303,6 +303,29 @@ final class SessionStore: ObservableObject {
         report(session, from: before)
     }
 
+    /// Codex's interactive TUI runs no hooks, so once a turn ends its conversation is looked up in its logs, for the next launch to resume.
+    private func findCodexConversation(of terminal: TerminalView, in session: Session) {
+        guard let program = terminal.foregroundProgram, program.name == "codex", let folder = terminal.workingDirectory else { return }
+        let accounts = AgentFolder.find()
+        DispatchQueue.global(qos: .utility).async { [weak self, weak session, weak terminal] in
+            let found = AgentFolder.lastCodexConversation(in: accounts, startedIn: folder, since: program.started)
+            DispatchQueue.main.async {
+                guard let self, let session, let terminal, let found, session.conversations[terminal.id] != found else { return }
+                session.conversations[terminal.id] = found
+                self.save()
+            }
+        }
+    }
+
+    /// An agent still running keeps its conversation for the next launch.
+    /// A pane back at its shell prompt had its agent end, which Codex's interactive TUI never reports, and an agent killed outright couldn't.
+    func prepareToQuit() {
+        for session in sessions {
+            for terminal in session.panes.terminals where !terminal.runsProgram { session.conversations[terminal.id] = nil }
+        }
+        save()
+    }
+
     private func report(_ session: Session, from before: Session.Activity) {
         let after = session.activity
         if after != before { onActivityChange?(session, before, after) }
@@ -381,6 +404,7 @@ final class SessionStore: ObservableObject {
             guard let self, let session, let terminal else { return }
             if let event = AgentTitle.event(from: previousTitle, to: $0) {
                 receive(StatusMessage(pane: terminal.id.uuidString, event: event))
+                if event == .done || event == .waiting { findCodexConversation(of: terminal, in: session) }
             }
             previousTitle = $0
             session.noteTitle($0, pane: terminal.id)
