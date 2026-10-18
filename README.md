@@ -45,6 +45,7 @@ It needs a Mac with Apple Silicon and macOS 14 or later. Releases are signed and
 - **New task.** ⇧⌘N asks what to do, then starts Claude Code or Codex on it in a new worktree, with the task as its first prompt. Or pick one of your open Jira tickets or the repo's GitHub issues, and the branch is named after it and the agent gets the ticket in full. With more than one Claude Code or Codex account, each one is a choice. From a folder of repos, or with Add repos from inside one, tick the ones the task touches, with a search when there are many: each gets a worktree on the same branch, side by side in one folder, and the agent starts there. The review and graph panels get a tab per repo with its changes, and the title bar counts them all.
 - **Agent status.** Each session shows whether its agent is working, waiting for you or done, with a notification when it waits in the background. See [Agent status](#agent-status).
 - **Agents from any app.** Farol's lighthouse in the menu bar lights up while agents work, wait or finish, and its menu opens any session. Or pick a small status panel at the notch or on the screen edge, which you can drag anywhere along the side.
+- **From your phone.** Farol for iPhone lists your sessions and opens each one as its agent's conversation. Approve or answer with a tap, get a notification when an agent waits, and keep count on the lock screen. End-to-end encrypted. See [From your phone](#from-your-phone).
 - **Worktree sessions.** ⇧⌘T asks for a branch and opens a session in its own git worktree, so parallel agents never touch each other's files. Closing it offers to remove the worktree and always keeps the branch.
 - **Sessions in a sidebar.** Open as many as you like. Hidden sessions keep running but stop rendering, so twenty background agents cost no GPU time. Each row shows its git branch, and Settings → Appearance can group sessions under each project's name. Double-click to rename, drag to reorder. Click the window title or press ⌘P to search every session and switch, even with the sidebar closed. Keep typing to find a file or a folder around you: a file opens next to the terminal, a folder opens as a new session.
 - **Files next to the terminal.** ⇧⌘E opens the session's project as a tree, with ignored files dimmed. Click a file to open it in a pane beside the terminal, with syntax colors from your theme, line numbers and ⌘F, and make a quick fix with ⌘S to save. When an agent changes the file you have open, it reloads, or asks first if you have unsaved edits. The tree updates as agents add files, and costs nothing while it is closed.
@@ -136,6 +137,28 @@ In `~/.codex/hooks.json`:
 These hooks complement the terminal-title status used by interactive Codex sessions. Outside Farol `$FAROL_CLI` is unset, so the hooks do nothing. Codex 0.159.2 or later is required because earlier versions did not pass Farol's pane environment to hooks.
 
 </details>
+
+## From your phone
+
+Farol for iPhone, in beta on [TestFlight](https://farol.sh/iphone), lets you answer your agents when you are away from the Mac. In Farol, open Settings → Remote, turn it on, press **Show code** and scan it from the app.
+
+The phone lists your sessions with their status and opens each one as its agent's conversation, with the terminal one tap away. Approvals and questions show up as buttons. You can reply with a slash command or a picture, look over what changed and start a new session. It notifies you when an agent waits or finishes, and widgets and a Live Activity keep count while the app is closed.
+
+Everything between the Mac and the phone is encrypted end to end, so the relay that joins them cannot read it. The protocol, the relay and `farol-host` live in [farol-remote](https://github.com/snowztech/farol-remote).
+
+<p align="center">
+  <img src="site/features/phone-hosts.png" width="260" alt="Farol for iPhone listing sessions from a MacBook Pro and a server, each with its status">
+  <img src="site/features/phone-session.png" width="260" alt="Farol for iPhone showing a Claude Code session waiting for you, with its question and two answers to pick with a tap">
+</p>
+
+The agents run on the Mac, so it has to stay on. To close the laptop, run them in tmux on a server with [`farol-host`](https://github.com/snowztech/farol-remote/tree/main/host):
+
+```sh
+curl -fsSL https://farol.sh/host.sh | sh
+farol-host setup
+```
+
+Each tmux window there shows up on the phone next to your Mac's sessions. `farol-host` is still experimental, and [the farol-remote roadmap](https://github.com/snowztech/farol-remote/blob/main/ROADMAP.md#not-done-yet) lists what is left. More on [farol.sh/remote](https://farol.sh/remote) and in the [docs](https://farol.sh/docs#remote).
 
 ## Shortcuts
 

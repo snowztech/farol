@@ -100,7 +100,7 @@ A session over ssh says where you are, and shows nothing that belongs to another
 
 ## From your phone
 
-Answer your agents when you are away from the Mac. Turn Remote on in settings, scan a code with your phone, and your sessions are there. The Mac has to stay on, since the agents run on it.
+Answer your agents when you are away from the Mac. Turn Remote on in settings, scan a code with your phone, and your sessions are there. The agents run on the Mac, so it stays on, or on a server of your own with `farol-host`.
 
 With Remote off, Farol runs as it does today. The messages, their encryption and the relay live in [farol-remote](https://github.com/snowztech/farol-remote), and the relay cannot read what it passes.
 
@@ -108,11 +108,15 @@ It needs an iPhone for now. For Android or the web, [say so in an issue](https:/
 
 - [x] The Mac side: the switch, pairing with a QR code, the paired devices, and one bridge that sends the sessions and types the replies
 - [x] The encrypted protocol and the relay, in farol-remote
-- [x] The iPhone app: the sessions with their status, a session's screen and its earlier output, a reply bar with the keys a phone lacks, and dictation
+- [x] The iPhone app: the sessions with their status, each opened as its agent's conversation with the terminal one tap away, a reply bar with the keys a phone lacks, and dictation
+- [x] Approvals and questions as buttons, answered with a tap
+- [x] Replies with a slash command or a picture, a look at what changed, and a new session in any project
 - [x] A notification when a session waits or finishes, naming the session and opening it
+- [x] Answering from the notification itself
+- [x] Widgets and a Live Activity that keep count while the app is closed
 - [x] The Mac kept awake while agents work, as a setting
-- [ ] Answering from the notification itself
-- [ ] Agents on a machine of your own that stays on, so the Mac can be off. A preview is in farol-remote as `farol-host`
+- [x] Agents on a machine of your own that stays on, so the Mac can be off: `farol-host` in farol-remote makes each tmux window a session. Still experimental until [what farol-remote lists](https://github.com/snowztech/farol-remote/blob/main/ROADMAP.md#not-done-yet) is done
+- [x] Several Macs and servers in one list on the phone
 - [ ] Android or the web, if people ask
 
 ## Hardening
