@@ -14,3 +14,9 @@ import Testing
     #expect(Ports.ports(fromLsof: output, of: [13]) == [3000, 5173])
     #expect(Ports.ports(fromLsof: output, of: [12]).isEmpty)
 }
+
+@Test func leavesOutThePortsAgentsPickForThemselves() {
+    // Codex listening on a port macOS picked, next to the dev server it started.
+    let output = "p12\nf8\nn127.0.0.1:55150\np13\nf20\nn*:3000\n"
+    #expect(Ports.ports(fromLsof: output, of: [12, 13]) == [3000])
+}
