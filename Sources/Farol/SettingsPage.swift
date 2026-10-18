@@ -428,28 +428,20 @@ struct SettingsPage: View {
         let shared = agentFolders.filter { $0.kind == folder.kind }.count > 1
         // ponytail: looks only where installers put the command. One installed elsewhere, as with nvm, reads as not found and still connects.
         let path = folder.kind.executable.map { ($0 as NSString).abbreviatingWithTildeInPath }
-        return HoverRow { hovering in
-            Row(title: agent.name, subtitle: shared ? (folder.directory.path as NSString).abbreviatingWithTildeInPath : nil,
-                detail: path ?? "Not found", mono: path != nil, icon: ForgeIcon(agent: folder.kind, size: 13), palette: p) {
-                switch state {
-                case .connected:
-                    // Like an account in Integrations, a connected agent shows only its state. Disconnect takes its place under the mouse.
-                    ZStack(alignment: .trailing) {
-                        SetupState(state: state, palette: p).opacity(hovering ? 0 : 1)
-                        ShipButton(title: "Disconnect", busy: false, palette: p) { agentChange = AgentChange(agent: agent, connect: false) }
-                            .opacity(hovering ? 1 : 0)
-                            .allowsHitTesting(hovering)
-                    }
-                case .outdated:
-                    HStack(spacing: 12) {
-                        SetupState(state: state, palette: p)
-                        ShipButton(title: "Update", busy: false, palette: p) { change(agent, connect: true) }
-                    }
-                case .disconnected:
-                    HStack(spacing: 12) {
-                        SetupState(state: state, palette: p)
-                        ShipButton(title: "Connect", busy: false, palette: p) { agentChange = AgentChange(agent: agent, connect: true) }
-                    }
+        return Row(title: agent.name, subtitle: shared ? (folder.directory.path as NSString).abbreviatingWithTildeInPath : nil,
+                   detail: path ?? "Not found", mono: path != nil, icon: ForgeIcon(agent: folder.kind, size: 13), palette: p) {
+            switch state {
+            case .connected:
+                ConnectedPill(palette: p) { agentChange = AgentChange(agent: agent, connect: false) }
+            case .outdated:
+                HStack(spacing: 12) {
+                    SetupState(state: state, palette: p)
+                    ShipButton(title: "Update", busy: false, palette: p) { change(agent, connect: true) }
+                }
+            case .disconnected:
+                HStack(spacing: 12) {
+                    SetupState(state: state, palette: p)
+                    ShipButton(title: "Connect", busy: false, palette: p) { agentChange = AgentChange(agent: agent, connect: true) }
                 }
             }
         }
@@ -888,18 +880,6 @@ private struct Row<Control: View>: View {
     }
 }
 
-/// A row that knows when the mouse is over any part of it, for a control that only shows then.
-private struct HoverRow<Content: View>: View {
-    @ViewBuilder let content: (Bool) -> Content
-    @State private var hovering = false
-
-    var body: some View {
-        content(hovering)
-            .contentShape(Rectangle())
-            .onHover { inside in withAnimation(.easeOut(duration: 0.12)) { hovering = inside } }
-    }
-}
-
 /// Words that read as the text around them until the mouse is over them, then as a link.
 private struct QuietLink: View {
     let words: String
@@ -945,6 +925,32 @@ private struct SetupState: View {
                 .font(.system(size: 12))
                 .foregroundStyle(palette.muted)
         }
+    }
+}
+
+/// A connected agent, in the same pill as an account in Integrations. Disconnecting is rare, so it's behind a click on it, which asks first.
+private struct ConnectedPill: View {
+    let palette: Palette
+    let disconnect: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: disconnect) {
+            HStack(spacing: 6) {
+                Circle().fill(palette.done).frame(width: 6, height: 6)
+                Text("Connected").font(.system(size: 12, weight: .medium))
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 26)
+            .background(hovering ? palette.raised : palette.surface, in: Capsule())
+            .overlay(Capsule().strokeBorder(palette.line))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onClickableHover { hovering = $0 }
+        .hoverTip("Disconnect…")
+        .accessibilityLabel("Connected. Disconnect")
     }
 }
 
