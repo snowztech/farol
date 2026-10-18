@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-10-18
+
+Files an agent names open at their line, and each session shows its ports and what its agent waits for.
+
 ### Added
 
 - Sidebar: a session shows the ports its programs listen on after its branch, like `:3000` for a dev server an agent started. Click one to open it in your browser. They are read at a prompt, when an agent finishes and when you switch sessions, never on a timer.
