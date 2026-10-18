@@ -428,19 +428,18 @@ struct SettingsPage: View {
         let shared = agentFolders.filter { $0.kind == folder.kind }.count > 1
         // ponytail: looks only where installers put the command. One installed elsewhere, as with nvm, reads as not found and still connects.
         let path = folder.kind.executable.map { ($0 as NSString).abbreviatingWithTildeInPath }
-        // While the alert asks, the switch shows what you asked for, so it doesn't flick back and forth.
-        let on = Binding(
-            get: { agentChange.flatMap { $0.agent.id == agent.id ? $0.connect : nil } ?? (state != .disconnected) },
-            set: { agentChange = AgentChange(agent: agent, connect: $0) })
         return Row(title: agent.name, subtitle: shared ? (folder.directory.path as NSString).abbreviatingWithTildeInPath : nil,
-                   detail: path ?? "Not found", mono: path != nil, palette: p) {
+                   detail: path ?? "Not found", mono: path != nil, icon: ForgeIcon(agent: folder.kind, size: 13), palette: p) {
             HStack(spacing: 12) {
-                if state == .outdated {
-                    ShipButton(title: "Update", help: "Farol's hooks changed since you connected.", busy: false, palette: p) {
-                        change(agent, connect: true)
-                    }
+                SetupState(state: state, palette: p)
+                switch state {
+                case .outdated:
+                    ShipButton(title: "Update", busy: false, palette: p) { change(agent, connect: true) }
+                case .connected:
+                    ShipButton(title: "Disconnect", busy: false, palette: p) { agentChange = AgentChange(agent: agent, connect: false) }
+                case .disconnected:
+                    ShipButton(title: "Connect", busy: false, palette: p) { agentChange = AgentChange(agent: agent, connect: true) }
                 }
-                toggle(on)
             }
         }
     }
@@ -906,6 +905,23 @@ private struct GroupTitle: View {
             .foregroundStyle(palette.muted)
             .padding(.top, 22)
             .padding(.bottom, 2)
+    }
+}
+
+/// "Connected" with a green dot, "Needs update" with a yellow one, or a muted "Not connected".
+private struct SetupState: View {
+    let state: AgentSetup.State
+    let palette: Palette
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(state == .connected ? palette.done : state == .outdated ? palette.waiting : palette.muted.opacity(0.5))
+                .frame(width: 6, height: 6)
+            Text(state == .connected ? "Connected" : state == .outdated ? "Needs update" : "Not connected")
+                .font(.system(size: 12))
+                .foregroundStyle(palette.muted)
+        }
     }
 }
 
