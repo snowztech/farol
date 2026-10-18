@@ -2,5 +2,6 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://farol.sh/</loc></url>
   <url><loc>https://farol.sh/docs</loc></url>
+  <url><loc>https://farol.sh/remote</loc></url>
   <url><loc>https://farol.sh/privacy</loc></url>
 </urlset>
