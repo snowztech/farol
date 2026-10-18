@@ -4,14 +4,17 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-10-18
+
+Agents pick up where they left off when Farol opens.
+
 ### Added
 
-- Agents: Claude Code and Codex conversations come back when Farol opens, each in the pane it ran in, on the same account. Turn it off in Settings → Agents → When Farol opens.
+- Agents: Claude Code and Codex conversations come back when Farol opens, each in the pane it ran in, on the same account. An agent you exited before quitting stays closed. Turn it off in Settings → Agents → When Farol opens.
 
 ### Changed
 
-- Settings → Agents shows each agent's mark and where its command is installed.
-
+- Settings → Agents shows each agent's mark and where its command is installed. A connected agent shows as a pill, and clicking it asks to disconnect.
 - Agents: the Farol skill for Claude Code and Codex knows the Worktrees and Remote settings, how other agents report their status, and the newer shortcuts. It updates itself at the next launch.
 
 ## [0.40.1] - 2026-10-17
