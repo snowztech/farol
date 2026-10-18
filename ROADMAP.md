@@ -115,7 +115,7 @@ It needs an iPhone for now. For Android or the web, [say so in an issue](https:/
 - [x] Answering from the notification itself
 - [x] Widgets and a Live Activity that keep count while the app is closed
 - [x] The Mac kept awake while agents work, as a setting
-- [x] Agents on a machine of your own that stays on, so the Mac can be off: `farol-host` in farol-remote makes each tmux window a session
+- [x] Agents on a machine of your own that stays on, so the Mac can be off: `farol-host` in farol-remote makes each tmux window a session. Still experimental until [what farol-remote lists](https://github.com/snowztech/farol-remote/blob/main/ROADMAP.md#not-done-yet) is done
 - [x] Several Macs and servers in one list on the phone
 - [ ] Android or the web, if people ask
 

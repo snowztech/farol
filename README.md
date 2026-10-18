@@ -158,7 +158,7 @@ curl -fsSL https://farol.sh/host.sh | sh
 farol-host setup
 ```
 
-Each tmux window there shows up on the phone next to your Mac's sessions. More on [farol.sh/remote](https://farol.sh/remote) and in the [docs](https://farol.sh/docs#remote).
+Each tmux window there shows up on the phone next to your Mac's sessions. `farol-host` is still experimental, and [the farol-remote roadmap](https://github.com/snowztech/farol-remote/blob/main/ROADMAP.md#not-done-yet) lists what is left. More on [farol.sh/remote](https://farol.sh/remote) and in the [docs](https://farol.sh/docs#remote).
 
 ## Shortcuts
 
