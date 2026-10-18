@@ -52,6 +52,18 @@ public final class TerminalView: NSView {
         return Self.name(of: parent) != "login"
     }
 
+    /// The pane's first process, the app's own child. Everything the pane runs, in front or in the background, is under it.
+    public var rootProcess: pid_t? {
+        guard var info = foreground else { return nil }
+        let app = getpid()
+        // A few steps up: from what runs in front to the shell, then `login`.
+        while info.kp_eproc.e_ppid != app {
+            guard info.kp_eproc.e_ppid > 1, let parent = Self.process(info.kp_eproc.e_ppid) else { return nil }
+            info = parent
+        }
+        return info.kp_proc.p_pid
+    }
+
     private var foreground: kinfo_proc? {
         guard let surface else { return nil }
         let pid = ghostty_surface_foreground_pid(surface)

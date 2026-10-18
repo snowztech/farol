@@ -49,7 +49,7 @@ Most of the time with parallel agents goes into checking what they did. That wor
 - [x] Push the branch and open a merge request or pull request from the session
 - [ ] Pipeline status and open review comments in the sidebar, with a notification when a pipeline fails
 - [ ] Send review comments or a failed job's log back to the agent in one action
-- [ ] The ports a session's programs listen on, under its branch in the sidebar, so a dev server an agent started is easy to find. Read at each prompt, never polled
+- [x] The ports a session's programs listen on, under its branch in the sidebar, so a dev server an agent started is easy to find. Read at each prompt, never polled
 
 ## Then: integrations
 

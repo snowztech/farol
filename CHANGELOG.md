@@ -4,6 +4,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Sidebar: a session shows the ports its programs listen on after its branch, like `:3000` for a dev server an agent started. Click one to open it in your browser. They are read at a prompt, when an agent finishes and when you switch sessions, never on a timer.
+- Sidebar: while an agent waits, its row says what for, like the question it asks or the command it wants to run.
+
 ### Changed
 
 - ⌘-clicking a file path in the terminal opens it next to the terminal, at the line when it says one, like `src/app.ts:42` from an agent. Paths with a line number used to open nothing, and the others opened in another app.
