@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Farol blog: coding with Claude Code, Codex and other agents</title>
+  <meta name="description" content="Notes from building Farol, the macOS terminal for AI coding agents: how it works, how to set things up, and what I learned along the way.">
+  <link rel="canonical" href="https://farol.sh/blog/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Farol">
+  <meta property="og:url" content="https://farol.sh/blog/">
+  <meta property="og:title" content="Farol blog">
+  <meta property="og:description" content="Notes from building Farol, the macOS terminal for AI coding agents.">
+  <meta property="og:image" content="https://farol.sh/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/icon.png">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.2/dist/snowztech-ui.min.css">
+  <script>
+    if (matchMedia("(prefers-color-scheme: light)").matches) document.documentElement.dataset.theme = "light";
+  </script>
+  <style>
+    body {
+      margin: 0; background: var(--sn-bg); color: var(--sn-fg);
+      font-family: var(--sn-font-mono); font-size: var(--sn-text-base);
+      line-height: var(--sn-leading-normal);
+    }
+    a { color: inherit; }
+    .column { max-width: 680px; margin: 0 auto; padding: 0 20px; }
+    .wide { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+
+    .topbar { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; text-decoration: none; }
+    .brand img { width: 30px; height: 30px; }
+    .topbar nav { display: flex; gap: 18px; font-size: var(--sn-text-sm); }
+    .topbar nav a { color: var(--sn-fg-muted); text-decoration: none; }
+    .topbar nav a:hover { color: var(--sn-fg); }
+
+    main { padding-top: 48px; }
+    h1 { margin: 0 0 8px; font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }
+    .lede { margin: 0 0 48px; color: var(--sn-fg-muted); }
+    .posts { list-style: none; margin: 0; padding: 0; }
+    .posts li + li { margin-top: 32px; padding-top: 32px; border-top: 1px solid var(--sn-border-subtle); }
+    .posts time { color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); }
+    .posts h2 { margin: 6px 0 8px; font-size: 18px; font-weight: 500; }
+    .posts h2 a { text-decoration: none; }
+    .posts h2 a:hover { text-decoration: underline; text-underline-offset: 3px; }
+    .posts p { margin: 0; color: var(--sn-fg-muted); font-size: var(--sn-text-sm); }
+
+    footer {
+      margin: 96px auto 0; padding: 20px 20px 40px; max-width: 1040px;
+      border-top: 1px solid var(--sn-border-subtle);
+      display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+      color: var(--sn-fg-subtle); font-size: var(--sn-text-xs);
+    }
+    footer a { color: var(--sn-fg-muted); text-decoration: none; }
+    footer a:hover { color: var(--sn-fg); }
+  </style>
+</head>
+<body>
+  <header class="topbar wide">
+    <a class="brand" href="/"><img src="/icon.png" alt="">Farol</a>
+    <nav><a href="/remote">Remote</a><a href="/docs">Docs</a></nav>
+  </header>
+
+  <main class="column">
+    <h1>Blog</h1>
+    <p class="lede">Notes from building Farol, the macOS terminal for coding agents.</p>
+
+    <ul class="posts">
+      <li>
+        <time datetime="2026-10-18">October 18, 2026</time>
+        <h2><a href="claude-code-from-your-phone">I Built a Remote to Answer Claude Code From My Phone</a></h2>
+        <p>Answering Claude Code and Codex from an iPhone, through a relay that can't read a thing: QR pairing, HPKE streams, push notifications and a Go server for tmux.</p>
+      </li>
+    </ul>
+  </main>
+
+  <footer>
+    <span>© 2026 Lucas Neves Pereira, <a href="https://github.com/snowztech">snowztech</a></span>
+    <span><a href="/">Home</a> · <a href="/docs">Docs</a> · <a href="https://discord.gg/XGY4jHU29d">Discord</a></span>
+  </footer>
+</body>
+</html>

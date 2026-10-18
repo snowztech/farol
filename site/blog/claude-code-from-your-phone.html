@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>I Built a Remote to Answer Claude Code From My Phone · Farol</title>
+  <meta name="description" content="How Farol Remote lets you answer Claude Code and Codex from your iPhone, through a relay that can't read your messages: QR pairing, HPKE, push notifications and a Go server for tmux.">
+  <link rel="canonical" href="https://farol.sh/blog/claude-code-from-your-phone">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Farol">
+  <meta property="og:url" content="https://farol.sh/blog/claude-code-from-your-phone">
+  <meta property="og:title" content="I Built a Remote to Answer Claude Code From My Phone">
+  <meta property="og:description" content="Answer your coding agents from your phone, through a relay that can't read a thing.">
+  <meta property="og:image" content="https://farol.sh/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="article:published_time" content="2026-10-18">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/icon.png">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": "I Built a Remote to Answer Claude Code From My Phone",
+    "description": "How Farol Remote lets you answer Claude Code and Codex from your iPhone, through a relay that can't read your messages.",
+    "url": "https://farol.sh/blog/claude-code-from-your-phone",
+    "image": "https://farol.sh/og.png",
+    "datePublished": "2026-10-18",
+    "author": { "@type": "Person", "name": "Lucas Neves Pereira", "url": "https://github.com/lucasnevespereira" },
+    "publisher": { "@type": "Organization", "name": "Farol", "url": "https://farol.sh/" }
+  }
+  </script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.2/dist/snowztech-ui.min.css">
+  <script>
+    if (matchMedia("(prefers-color-scheme: light)").matches) document.documentElement.dataset.theme = "light";
+  </script>
+  <style>
+    body {
+      margin: 0; background: var(--sn-bg); color: var(--sn-fg);
+      font-family: var(--sn-font-mono); font-size: var(--sn-text-base);
+      line-height: var(--sn-leading-normal);
+    }
+    a { color: inherit; }
+    .column { max-width: 680px; margin: 0 auto; padding: 0 20px; }
+    .wide { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+
+    .topbar { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; text-decoration: none; }
+    .brand img { width: 30px; height: 30px; }
+    .topbar nav { display: flex; gap: 18px; font-size: var(--sn-text-sm); }
+    .topbar nav a { color: var(--sn-fg-muted); text-decoration: none; }
+    .topbar nav a:hover { color: var(--sn-fg); }
+
+    article { padding-top: 48px; }
+    .meta { margin: 0 0 12px; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); }
+    h1 { margin: 0 0 32px; font-size: 28px; font-weight: 600; line-height: 1.25; letter-spacing: -0.02em; }
+    h2 { margin: 48px 0 16px; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+    p { margin: 0 0 16px; color: var(--sn-fg-muted); }
+    article a { color: var(--sn-fg); text-underline-offset: 3px; }
+    blockquote { margin: 0 0 16px; padding-left: 16px; border-left: 2px solid var(--sn-border-strong); color: var(--sn-fg); }
+    code {
+      padding: 1px 5px; border: 1px solid var(--sn-border-subtle); border-radius: 4px;
+      background: var(--sn-bg-raised); color: var(--sn-fg); font: inherit;
+    }
+    pre {
+      margin: 0 0 20px; padding: 16px 18px; overflow-x: auto;
+      border: 1px solid var(--sn-border-subtle); border-radius: 8px;
+      background: var(--sn-bg-raised); color: var(--sn-fg); font-size: var(--sn-text-sm); line-height: 1.6;
+    }
+    pre code { padding: 0; border: 0; background: none; }
+    .shot { display: block; width: 300px; max-width: 100%; height: auto; margin: 8px auto 24px; border: 1px solid var(--sn-border-strong); border-radius: 28px; }
+    .try { margin-top: 48px; padding: 20px; border: 1px solid var(--sn-border-subtle); border-radius: 10px; }
+    .try p:last-child { margin: 0; }
+
+    footer {
+      margin: 96px auto 0; padding: 20px 20px 40px; max-width: 1040px;
+      border-top: 1px solid var(--sn-border-subtle);
+      display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+      color: var(--sn-fg-subtle); font-size: var(--sn-text-xs);
+    }
+    footer a { color: var(--sn-fg-muted); text-decoration: none; }
+    footer a:hover { color: var(--sn-fg); }
+  </style>
+</head>
+<body>
+  <header class="topbar wide">
+    <a class="brand" href="/"><img src="/icon.png" alt="">Farol</a>
+    <nav><a href="/remote">Remote</a><a href="/docs">Docs</a><a href="/blog/">Blog</a></nav>
+  </header>
+
+  <main>
+    <article class="column">
+      <p class="meta"><time datetime="2026-10-18">October 18, 2026</time> · Lucas Neves Pereira</p>
+      <h1>I Built a Remote to Answer Claude Code From My Phone</h1>
+
+      <p>Hello there!</p>
+      <p>If you run Claude Code or Codex for real work, you know the moment. You start a task, it runs for a while, and you go make a coffee. When you come back, the agent has been waiting ten minutes for you to answer one question.</p>
+      <blockquote>The fix is in. What should I do with it?</blockquote>
+      <p>That question is why I built Farol Remote. It lets you answer your coding agents from your phone, wherever you are, while the work keeps running on your Mac or on your own server.</p>
+
+      <h2>A bit of context</h2>
+      <p><a href="/">Farol</a> is a macOS terminal I made for coding agents. Its sidebar shows every session with a small dot: hollow when idle, breathing while the agent works, rippling when it waits for you, filled when it's done.</p>
+      <p>It tells you when an agent needs you. But only if you're at your Mac.</p>
+      <p>So the idea was simple. Put that sidebar in my pocket. See the sessions, read the conversation, and answer with a tap.</p>
+
+      <h2>What the phone does</h2>
+      <p>The iPhone app lists your sessions with their status and opens each one as its agent's conversation, not as a wall of terminal text.</p>
+      <img class="shot" src="/features/phone-session.png" width="600" height="1304" loading="lazy"
+           alt="Farol for iPhone showing a Claude Code session waiting for you, with its question and two answers to pick with a tap">
+      <p>When the agent asks for an approval or a question, the answers show up as buttons. One tap and it carries on. You can also reply with a slash command, send a screenshot for the agent to look at, review what changed file by file, and start a new session in a project.</p>
+      <p>It notifies you when an agent waits or finishes. And a Live Activity on the lock screen keeps count of the agents that work or wait, even with the app closed.</p>
+      <p>One phone can know several Macs and servers at once. Your work Mac and a server you run agents on show up in the same list, each session labeled with its host.</p>
+
+      <h2>The hard part: the middle</h2>
+      <p>A phone and a Mac don't talk to each other directly over the internet. Your Mac sits behind a home router, your phone is on 4G, and neither can reach the other.</p>
+      <p>So there's a relay in between. Both sides connect out to it, and it passes messages along.</p>
+      <p>That raises the obvious question. If everything goes through a server, what can that server see? These messages are your code, your prompts, and a phone that can type into your terminal. I didn't want the answer to be "trust me".</p>
+      <p>The goal became this: the relay passes messages it cannot read, and keeps none of them.</p>
+
+      <h2>Pairing, once</h2>
+      <p>It all starts with a QR code. On the Mac you turn on Remote in Settings and press Show code. On the phone you scan it.</p>
+      <p>The code carries three things: the relay's address, the Mac's public key, and a secret made just for that code. It's a link, and everything rides after the <code>#</code>.</p>
+      <pre><code>func (o offer) link() string {
+	text, _ := json.Marshal(o)
+	return "https://farol.sh/pair#" + base64.RawURLEncoding.EncodeToString(text)
+}</code></pre>
+      <p>The part after the <code>#</code> is never sent to a server. So the secret never reaches the relay, which means the relay can't pair a device of its own.</p>
+      <p>The phone answers with one sealed message that proves two things at once: it holds the key it claims, and it saw the secret. A code works once and lasts two minutes. After that, the Mac knows the phone's key and the phone knows the Mac's.</p>
+
+      <h2>Every connection</h2>
+      <p>Each time they connect, both sides say hello in the clear with their public key and a random number made for this connection.</p>
+      <p>Then each direction becomes its own HPKE stream, sealed to the other side's key and signed with ours. I used CryptoKit's <code>Curve25519_SHA256_ChachaPoly</code> suite. Here's the sending side on the Mac and the phone:</p>
+      <pre><code>public mutating func connect(to peer: ChannelHello, trusting trusted: [Data]) throws -&gt; Data {
+    guard trusted.contains(peer.key) else { throw RemoteError.unknownDevice }
+    let sender = try HPKE.Sender(
+        recipientKey: Curve25519.KeyAgreement.PublicKey(rawRepresentation: peer.key), ciphersuite: Pairing.suite,
+        info: info(from: side, with: peer), authenticatedBy: me.secret)
+    self.peer = peer
+    self.sender = sender
+    return sender.encapsulatedKey
+}</code></pre>
+      <p>The <code>info</code> includes both hello numbers. So a recording of an older connection doesn't open on a new one, and messages only open in the order they were sealed. If one fails to open, the connection ends.</p>
+
+      <h2>What the relay actually sees</h2>
+      <p>Mostly bytes.</p>
+      <p>It sees a public key, and a room name that's the hash of the host's key. That's how a Mac and its phones find each other without the relay learning who they are.</p>
+      <pre><code>func room(public []byte) string {
+	sum := sha256.Sum256(public)
+	return hex.EncodeToString(sum[:])
+}</code></pre>
+      <p>Then it sees encrypted messages and how big they are. It stores none of it, and its log holds totals only.</p>
+
+      <h2>Notifications without reading anything</h2>
+      <p>This one was fun. I wanted a notification when an agent waits, even with the app closed. That means Apple has to push it, and something has to ask Apple.</p>
+      <p>The Mac asks the relay to forward a push. The relay sees the phone's notification token and one word: waiting or done. Which session it's about travels sealed, for the phone alone.</p>
+      <p>The Live Activity works the same way. The host keeps it current through the relay, so the counts on your lock screen move while the app sleeps.</p>
+
+      <h2>Running Claude Code on a server with tmux</h2>
+      <p>Some people run their agents on a machine that stays on, so they can close the laptop. For them there's <code>farol-host</code>, a small Go CLI.</p>
+      <pre><code>curl -fsSL https://farol.sh/host.sh | sh
+farol-host setup</code></pre>
+      <p>Setup connects the hooks for Claude Code and Codex, keeps <code>farol-host</code> running with systemd, and shows a QR code to scan. Then every tmux window on that machine is a session on your phone, like a tab in Farol on the Mac.</p>
+      <pre><code>tmux new -s api -c ~/code/api
+claude</code></pre>
+
+      <h2>One protocol, two languages</h2>
+      <p>The Mac and the iPhone share a Swift package. The server speaks the same protocol, written again in Go.</p>
+      <p>Two implementations of the same crypto and messages is a great way to have bugs that only show up on a real phone. So they check each other.</p>
+      <p>The Swift tests write sample messages and a sealed conversation to JSON files. The Go tests open those files and must read them exactly. When a message changes, I regenerate them:</p>
+      <pre><code>FAROL_WRITE_WIRE=1 swift test</code></pre>
+      <p>If Go and Swift disagree on a single field, a test fails before any phone sees it.</p>
+
+      <h2>What's not covered yet</h2>
+      <p>I'd rather say this upfront.</p>
+      <p>If a host's key were stolen later, traffic recorded from a phone to that host could be read. A host also doesn't prove itself to the relay yet, so someone who learned a room's name could knock the real host off. They couldn't read or send anything, but it's still on my list.</p>
+      <p>And the pairing and the encryption haven't had an outside review. If that's your thing, I'd love a second pair of eyes. It's all in one small repo, on purpose.</p>
+
+      <h2>Try it</h2>
+      <p>Farol is free and open source. The iPhone app is free too, in beta on TestFlight. In Farol, open Settings, choose Remote, turn it on, press Show code, and scan it from the app.</p>
+      <p>The security parts live in <a href="https://github.com/snowztech/farol-remote">farol-remote</a>: the Swift package, the relay, and <code>farol-host</code>. The <a href="https://github.com/snowztech/farol-remote/blob/main/docs/security.md">security page</a> goes deeper than this post.</p>
+      <p>Hope you find it useful! Feel free to open an issue or contribute. And next time your agent asks you a question while you're out, you can just answer it. ☕</p>
+
+      <div class="try">
+        <p><a href="/iphone">Join the iPhone beta</a> · <a href="/remote">What Remote does</a> · <a href="/docs#remote">Set it up</a></p>
+      </div>
+    </article>
+  </main>
+
+  <footer>
+    <span>© 2026 Lucas Neves Pereira, <a href="https://github.com/snowztech">snowztech</a></span>
+    <span><a href="/">Home</a> · <a href="/docs">Docs</a> · <a href="/blog/">Blog</a> · <a href="https://discord.gg/XGY4jHU29d">Discord</a></span>
+  </footer>
+</body>
+</html>
