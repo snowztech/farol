@@ -40,6 +40,8 @@ brew install --cask snowztech/tap/farol
 
 It needs a Mac with Apple Silicon and macOS 14 or later. Releases are signed and notarized, so macOS opens Farol without warnings. To build from source instead, see [Build from source](#build-from-source).
 
+When a new version is out, an Update button shows in the title bar and downloads it. If you installed with Homebrew, run `brew upgrade --cask farol` instead.
+
 ## Features
 
 - **New task.** ⇧⌘N asks what to do, then starts Claude Code or Codex on it in a new worktree, with the task as its first prompt. Or pick one of your open Jira tickets or the repo's GitHub issues, and the branch is named after it and the agent gets the ticket in full. With more than one Claude Code or Codex account, each one is a choice. From a folder of repos, or with Add repos from inside one, tick the ones the task touches, with a search when there are many: each gets a worktree on the same branch, side by side in one folder, and the agent starts there. The review and graph panels get a tab per repo with its changes, and the title bar counts them all.
