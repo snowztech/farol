@@ -4,6 +4,14 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.43.1] - 2026-10-19
+
+A session shows only the ports you would open, and the Farol menu lines up on macOS 26.
+
+### Changed
+
+- On macOS 26, Check for Updates, Settings and Reload Configuration in the Farol menu have icons, like About and Quit.
+
 ### Fixed
 
 - Sidebar: a session's ports leave out the ones agents like Codex and Claude Code open for their own use, so only servers you would open show, like `:3000`.
