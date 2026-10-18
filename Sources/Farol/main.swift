@@ -115,17 +115,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
     }
 
+    /// macOS 26 gives standard items like About and Quit an icon, so Farol's own get one there too and the menu lines up.
+    /// Earlier versions show no icons in menus.
+    private func symbol(_ item: NSMenuItem, _ name: String) {
+        if #available(macOS 26, *) { item.image = NSImage(systemSymbolName: name, accessibilityDescription: nil) }
+    }
+
     private func makeMenu() -> NSMenu {
         let main = NSMenu()
 
         let app = NSMenu()
         app.addItem(withTitle: "About Farol", action: #selector(showAbout), keyEquivalent: "")
-        app.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
+        symbol(app.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: ""), "arrow.down.circle")
         app.addItem(.separator())
-        app.addItem(withTitle: "Settings…", action: #selector(toggleSettings), keyEquivalent: ",")
+        symbol(app.addItem(withTitle: "Settings…", action: #selector(toggleSettings), keyEquivalent: ","), "gearshape")
         // "," with Shift rather than "<", which is only Shift-comma on some layouts, so every keyboard shows ⇧⌘,.
-        app.addItem(withTitle: "Reload Configuration", action: #selector(reloadConfig), keyEquivalent: ",")
-            .keyEquivalentModifierMask = [.command, .shift]
+        let reload = app.addItem(withTitle: "Reload Configuration", action: #selector(reloadConfig), keyEquivalent: ",")
+        reload.keyEquivalentModifierMask = [.command, .shift]
+        symbol(reload, "arrow.clockwise")
         app.addItem(.separator())
         app.addItem(withTitle: "Quit Farol", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         main.addItem(submenu: app, title: "Farol")
