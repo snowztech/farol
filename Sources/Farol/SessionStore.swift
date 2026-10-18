@@ -19,7 +19,7 @@ final class Session: ObservableObject, Identifiable {
     /// Each pane's conversation while its agent runs, saved so the next launch resumes it there.
     var conversations: [UUID: AgentConversation] = [:]
     /// What a waiting agent asks, and the pane it waits in, so an answer from a phone goes there and nowhere else.
-    var request: (pane: UUID, asked: AgentRequest)?
+    @Published var request: (pane: UUID, asked: AgentRequest)?
     /// An agent started here and has not ended. Before its first message it may have no log, and a phone shows it as an empty conversation.
     var agentStarted = false
     /// The program rang the bell or sent a notification while you were elsewhere. Covers agents that report nothing themselves.
@@ -56,6 +56,10 @@ final class Session: ObservableObject, Identifiable {
     private var pickedRepo: String?
     private var refreshingGit = false
     private var refreshGitAgain = false
+    /// The ports the session's programs listen on, like a dev server an agent started. Empty over ssh, where they would be the server's.
+    @Published private(set) var ports: [Int] = []
+    private var refreshingPorts = false
+    private var refreshPortsAgain = false
 
     init(panes: PaneContainer, directory: String) {
         self.panes = panes
@@ -72,6 +76,26 @@ final class Session: ObservableObject, Identifiable {
         syncRemote()
         if let folder = terminal.workingDirectory { directory = folder }
         refreshGit()
+        refreshPorts()
+    }
+
+    /// Read at a prompt, when an agent ends a turn and when the session is shown, never on a timer.
+    func refreshPorts() {
+        guard !refreshingPorts else { return refreshPortsAgain = true }
+        let roots = isRemote ? [] : panes.terminals.compactMap(\.rootProcess)
+        refreshingPorts = true
+        DispatchQueue.global(qos: .utility).async {
+            let found = roots.isEmpty ? [] : Ports.listening(under: roots)
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                refreshingPorts = false
+                if ports != found { ports = found }
+                if refreshPortsAgain {
+                    refreshPortsAgain = false
+                    refreshPorts()
+                }
+            }
+        }
     }
 
     /// Shows another of the task's repos in the git panels.
@@ -126,6 +150,12 @@ final class Session: ObservableObject, Identifiable {
 
     /// An agent in one of the panes waits for your approval or answer, as opposed to a bell or terminal notification.
     var agentIsWaiting: Bool { agents.values.contains { $0.status == .waiting } }
+
+    /// What a waiting agent asks, as one line for its row: the question, or the tool and what it would do.
+    var waitingFor: String? {
+        guard activity == .waiting, let asked = request?.asked else { return nil }
+        return asked.tool.map { "\($0) · \(asked.title)" } ?? asked.title
+    }
 
     /// Looking at the session is the acknowledgement, so the bell and "done" clear.
     func acknowledge() {
@@ -297,7 +327,11 @@ final class SessionStore: ObservableObject {
         session.apply(message.event, pane: pane, request: message.request)
         // An agent can end its turn, or stop to ask you, on a rebase git stopped, so every session's checkout is looked at again.
         // Not on "working": it comes after every tool call, and each lookup also refreshes the review panel.
-        if message.event == .done || message.event == .waiting { session.refreshGit() }
+        if message.event == .done || message.event == .waiting {
+            session.refreshGit()
+            // The turn may have started a dev server in the background.
+            session.refreshPorts()
+        }
         // A "done" you are already looking at needs no light.
         if session.id == selectedID && NSApp.isActive { session.acknowledge() }
         report(session, from: before)
@@ -415,6 +449,8 @@ final class SessionStore: ObservableObject {
             if !glyphOnly { session.refreshGit() }
         }
         terminal.onWorkingDirectoryChange = { [weak self, weak session, weak terminal] in
+            // A prompt in any pane, since a server started in one is the whole session's.
+            session?.refreshPorts()
             guard let session, terminal === session.panes.focused else { return }
             session.directory = $0
             session.refreshGit()
@@ -485,6 +521,8 @@ final class SessionStore: ObservableObject {
     }
 
     func select(_ session: Session) {
+        // A server started in the session you leave is usually up by now.
+        if let left = selected, left !== session { left.refreshPorts() }
         let before = session.activity
         session.acknowledge()
         report(session, from: before)

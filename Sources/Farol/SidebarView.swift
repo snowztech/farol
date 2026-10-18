@@ -109,17 +109,28 @@ private struct SessionRow: View {
                     .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
             }
-            if let branch = gitLine {
-                Label(branch, systemImage: "arrow.triangle.branch")
-                    .labelStyle(BranchLabelStyle())
-                    .font(.system(size: 10.5, design: .monospaced))
+            if let waiting = session.waitingFor {
+                // In place of the branch while the agent waits, so the row says what for without being opened.
+                Text(waiting)
+                    .font(.system(size: 10.5))
                     .foregroundStyle(palette.muted)
-                    .truncationMode(.middle)
-            } else if let location = session.remoteLocation ?? session.location {
-                Text(location)
-                    .font(.system(size: 10.5, design: .monospaced))
-                    .foregroundStyle(palette.muted)
-                    .truncationMode(.head)
+                    .truncationMode(.tail)
+                    .hoverTip(waiting)
+            } else {
+                HStack(spacing: 6) {
+                    if let branch = gitLine {
+                        Label(branch, systemImage: "arrow.triangle.branch")
+                            .labelStyle(BranchLabelStyle())
+                            .truncationMode(.middle)
+                    } else if let location = session.remoteLocation ?? session.location {
+                        Text(location).truncationMode(.head)
+                    }
+                    // The branch gives way first, so a port is always whole.
+                    ForEach(session.ports.prefix(2), id: \.self) { PortLink(port: $0, palette: palette) }
+                    if session.ports.count > 2 { Text(verbatim: "+\(session.ports.count - 2)").fixedSize() }
+                }
+                .font(.system(size: 10.5, design: .monospaced))
+                .foregroundStyle(palette.muted)
             }
         }
     }
@@ -296,6 +307,28 @@ private struct Ripple: View {
                 guard !reduceMotion else { return }
                 withAnimation(.easeOut(duration: 1.8).repeatForever(autoreverses: false)) { out = true }
             }
+    }
+}
+
+/// A port the session's programs listen on, muted like the branch until hovered, and opened in the browser on click.
+private struct PortLink: View {
+    let port: Int
+    let palette: Palette
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button {
+            NSWorkspace.shared.open(URL(string: "http://localhost:\(port)")!)
+        } label: {
+            Text(verbatim: ":\(port)")
+                .foregroundStyle(hovering ? palette.text : palette.muted)
+                .underline(hovering)
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .onClickableHover { hovering = $0 }
+        .hoverTip("Open localhost:\(port)")
     }
 }
 
