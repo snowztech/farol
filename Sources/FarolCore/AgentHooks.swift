@@ -36,6 +36,8 @@ public struct AgentHooks {
         Event(name: "PermissionRequest", status: "waiting", matcher: nil),
         Event(name: "PreToolUse", status: "waiting", matcher: "^AskUserQuestion$"),
         Event(name: "Stop", status: "done", matcher: nil),
+        // Runs instead of Stop when an API error, like a usage limit, ends the turn.
+        Event(name: "StopFailure", status: "done", matcher: nil),
         Event(name: "SessionEnd", status: "clear", matcher: nil),
         // A background agent keeps working after the main agent's Stop, so the pane stays working until it ends.
         Event(name: "SubagentStart", status: "subagent-start", matcher: nil),

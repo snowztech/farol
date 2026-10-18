@@ -35,6 +35,17 @@ private func file(_ lines: [String]) throws -> URL {
     #expect(messages[3].detail == "@@\n-await sleep(1)\n+const clock = fixedClock()\n+const store = createStore({ clock })\n")
 }
 
+@Test func readsAMessageSentWhileTheAgentWorks() throws {
+    let transcript = Transcript(url: try file(Array(log.prefix(5)) + [
+        #"{"parentUuid":"a1","type":"attachment","uuid":"q1","attachment":{"type":"queued_command","prompt":"open a pr for the fix","commandMode":"prompt"}}"#,
+        #"{"parentUuid":"q1","type":"attachment","uuid":"q2","attachment":{"type":"edited_text_file","filename":"/Users/me/shelf/a.ts"}}"#,
+        #"{"parentUuid":"q2","type":"assistant","uuid":"a5","message":{"role":"assistant","content":[{"type":"text","text":"Opening it."}]}}"#,
+    ]))
+    #expect(transcript.refresh())
+    #expect(transcript.messages.map(\.role) == [.you, .agent, .you, .agent])
+    #expect(transcript.messages[2].text == "open a pr for the fix")
+}
+
 @Test func readsOnlyWhatWasAdded() throws {
     let url = try file(Array(log.prefix(2)))
     let transcript = Transcript(url: url)
