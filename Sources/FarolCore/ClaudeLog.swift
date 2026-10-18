@@ -57,6 +57,12 @@ final class ClaudeLog: AgentLog {
 
     /// The messages in one record: your prompt, or the agent's answer and the tools it called.
     static func messages(in record: [String: Any], id: String) -> [Transcript.Message] {
+        // A message sent while the agent works joins its turn as an attachment, not a prompt of its own.
+        if record["type"] as? String == "attachment" {
+            guard let attached = record["attachment"] as? [String: Any], attached["type"] as? String == "queued_command",
+                  let text = (attached["prompt"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return [] }
+            return [Transcript.Message(id: "\(id).0", role: .you, text: text)]
+        }
         // Claude Code writes notes to itself as your turn, and its summary of a compacted conversation, and marks them.
         guard let type = record["type"] as? String, type == "user" || type == "assistant",
               record["isMeta"] as? Bool != true, record["isCompactSummary"] as? Bool != true,
