@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Farol Remote: answer Claude Code and Codex from your iPhone</title>
+  <meta name="description" content="Control Claude Code and Codex from your iPhone. See every agent session on your Macs and servers, answer with a tap and get notified when one needs you. End-to-end encrypted and free.">
+  <link rel="canonical" href="https://farol.sh/remote">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Farol">
+  <meta property="og:url" content="https://farol.sh/remote">
+  <meta property="og:title" content="Farol Remote: your coding agents on your iPhone">
+  <meta property="og:description" content="See which agent needs you and answer it from your phone. End-to-end encrypted and free.">
+  <meta property="og:image" content="https://farol.sh/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="icon.png">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Farol for iPhone",
+    "description": "An iPhone app to see and answer AI coding agents like Claude Code and Codex running in Farol on a Mac or in tmux on a server. End-to-end encrypted.",
+    "url": "https://farol.sh/remote",
+    "image": "https://farol.sh/og.png",
+    "screenshot": "https://farol.sh/features/phone-session.png",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "iOS 17 or later",
+    "isAccessibleForFree": true,
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "author": { "@type": "Person", "name": "Lucas Neves Pereira" },
+    "sameAs": ["https://github.com/snowztech/farol-remote"]
+  }
+  </script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.2/dist/snowztech-ui.min.css">
+  <script>
+    if (matchMedia("(prefers-color-scheme: light)").matches) document.documentElement.dataset.theme = "light";
+  </script>
+  <style>
+    body {
+      margin: 0;
+      background: var(--sn-bg);
+      color: var(--sn-fg);
+      font-family: var(--sn-font-mono);
+      font-size: var(--sn-text-base);
+      line-height: var(--sn-leading-normal);
+    }
+    a { color: inherit; }
+    .column { max-width: 640px; margin: 0 auto; padding: 0 20px; }
+    .wide { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+
+    .topbar { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; text-decoration: none; }
+    .brand img { width: 30px; height: 30px; }
+    .topbar nav { display: flex; gap: 18px; font-size: var(--sn-text-sm); }
+    .topbar nav a { color: var(--sn-fg-muted); text-decoration: none; }
+    .topbar nav a:hover { color: var(--sn-fg); }
+
+    .hero { text-align: center; padding-top: 48px; }
+    .eyebrow { margin: 0 0 10px; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); text-transform: uppercase; letter-spacing: 0.12em; }
+    h1 { font-size: 30px; font-weight: 600; margin: 0 0 6px; letter-spacing: -0.02em; }
+    .tagline { color: var(--sn-fg-muted); margin: 6px 0 30px; font-size: var(--sn-text-md); }
+    .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .actions .sn-btn { text-decoration: none; transition: opacity var(--sn-base) var(--sn-ease), border-color var(--sn-base) var(--sn-ease); }
+    /* ui-css colors every a:hover with the accent, which wins over the button's own text color. */
+    .actions a.sn-btn--primary:hover { color: var(--sn-fg-inverse); background: var(--sn-fg); border-color: var(--sn-fg); opacity: 0.85; }
+    .actions a.sn-btn--secondary:hover { color: var(--sn-fg); }
+    .fine { color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); margin: 14px 0 0; }
+
+    .phones { position: relative; display: flex; gap: 28px; justify-content: center; align-items: flex-start; flex-wrap: wrap; margin: 48px auto 88px; }
+    .phones::before {
+      content: ""; position: absolute; inset: -8% 15% auto; height: 70%; z-index: 0;
+      background: radial-gradient(ellipse at center, var(--sn-accent-soft), transparent 70%);
+      filter: blur(24px); pointer-events: none;
+    }
+    .phones img {
+      position: relative; z-index: 1; width: 300px; max-width: 100%; height: auto;
+      border: 1px solid var(--sn-border-strong); border-radius: 28px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+    }
+
+    .features { list-style: none; margin: 0 auto; display: grid; gap: 28px; }
+    @media (min-width: 760px) { .features { grid-template-columns: repeat(2, 1fr); } }
+    @media (min-width: 980px) { .features { grid-template-columns: repeat(3, 1fr); } }
+    .features h2 { font-size: inherit; font-weight: 500; margin: 0 0 6px; }
+    .features p { color: var(--sn-fg-muted); font-size: var(--sn-text-sm); margin: 0; }
+
+    .steps { margin-top: 96px; }
+    .steps h2, .faq h2 { font-size: 20px; font-weight: 500; margin: 0 0 20px; letter-spacing: -0.01em; text-align: center; }
+    .steps h3, .faq h3 { font-size: inherit; font-weight: 500; margin: 28px 0 6px; }
+    .steps p, .steps li, .faq p { color: var(--sn-fg-muted); font-size: var(--sn-text-sm); margin: 0; }
+    .steps ol { margin: 0; padding-left: 20px; }
+    .steps li + li { margin-top: 6px; }
+    strong { color: var(--sn-fg); font-weight: 500; }
+    code {
+      padding: 1px 5px; border: 1px solid var(--sn-border-subtle); border-radius: 4px;
+      background: var(--sn-bg-raised); color: var(--sn-fg); font: inherit;
+    }
+    pre {
+      margin: 14px 0; padding: 16px 18px; overflow-x: auto;
+      border: 1px solid var(--sn-border-subtle); border-radius: 8px;
+      background: var(--sn-bg-raised); color: var(--sn-fg); font-size: var(--sn-text-sm);
+    }
+    pre code { padding: 0; border: 0; background: none; }
+    pre.command { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 10px 10px 18px; }
+    a code { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    .faq { margin-top: 96px; }
+
+    footer {
+      margin: 96px auto 0; padding: 20px 20px 40px; max-width: 1040px;
+      border-top: 1px solid var(--sn-border-subtle);
+      display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+      color: var(--sn-fg-subtle); font-size: var(--sn-text-xs);
+    }
+    footer a { color: var(--sn-fg-muted); text-decoration: none; }
+    footer a:hover { color: var(--sn-fg); }
+  </style>
+</head>
+<body>
+  <header class="topbar wide">
+    <a class="brand" href="./"><img src="icon.png" alt="">Farol</a>
+    <nav><a href="./">Mac app</a><a href="docs">Docs</a></nav>
+  </header>
+
+  <main>
+    <section class="hero column">
+      <p class="eyebrow">Farol Remote · Beta</p>
+      <h1>Your coding agents, on your iPhone</h1>
+      <p class="tagline">See which Claude Code or Codex session needs you and answer it from your phone, away from your Mac.</p>
+      <div class="actions">
+        <a class="sn-btn sn-btn--primary sn-btn--lg" href="iphone">Join the iPhone beta</a>
+        <a class="sn-btn sn-btn--secondary sn-btn--lg" href="docs#remote">Set it up</a>
+      </div>
+      <p class="fine">iOS 17+, on TestFlight. Works with Farol for Mac and Linux servers. Free.</p>
+    </section>
+
+    <div class="phones wide">
+      <img src="features/phone-hosts.png" width="600" height="1304" fetchpriority="high"
+           alt="Farol for iPhone listing agent sessions from a MacBook Pro and a server, each with its status">
+      <img src="features/phone-session.png" width="600" height="1304" loading="lazy"
+           alt="Farol for iPhone showing a Claude Code session waiting for you, with its question and two answers to pick with a tap">
+    </div>
+
+    <ul class="features wide">
+      <li><h2>Every session in one list</h2><p>Agents on your Macs and servers, side by side. Each row says which machine it runs on and whether the agent is working, waiting or done.</p></li>
+      <li><h2>Answer with a tap</h2><p>Approvals and questions show up as buttons. Tap one and the agent carries on.</p></li>
+      <li><h2>Know when it needs you</h2><p>A notification when an agent waits or finishes. Widgets and a Live Activity keep count while the app is closed.</p></li>
+      <li><h2>More than yes or no</h2><p>Reply with a slash command or a screenshot, look over the diff, or start a new session in any project.</p></li>
+      <li><h2>The full terminal</h2><p>Each session opens as the agent's conversation, with the real terminal one tap away when you need it.</p></li>
+      <li><h2>Encrypted end to end</h2><p>Only your Mac and your phone hold the keys. The relay between them passes messages along but can't read them.</p></li>
+    </ul>
+
+    <section class="steps column" aria-labelledby="steps-title">
+      <h2 id="steps-title">Set it up</h2>
+
+      <h3>With Farol on your Mac</h3>
+      <ol>
+        <li>Install <a href="iphone">Farol for iPhone</a> from TestFlight.</li>
+        <li>In Farol, open <strong>Settings → Remote</strong> and turn it on.</li>
+        <li>Press <strong>Show code</strong> and scan it from the app.</li>
+      </ol>
+
+      <h3>On a server</h3>
+      <p>Run agents in tmux on a machine that stays on, and they keep going with your Mac closed. <a href="https://github.com/snowztech/farol-remote/tree/main/host"><code>farol-host</code></a> lets the phone see and answer every tmux window there.</p>
+      <pre class="command"><code>curl -fsSL https://farol.sh/host.sh | sh</code><button class="sn-copy-btn" type="button" aria-label="Copy the command"><svg class="sn-icon sn-copy-btn__idle" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><svg class="sn-icon sn-copy-btn__copied" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg></button></pre>
+      <pre class="command"><code>farol-host setup</code><button class="sn-copy-btn" type="button" aria-label="Copy the command"><svg class="sn-icon sn-copy-btn__idle" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><svg class="sn-icon sn-copy-btn__copied" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg></button></pre>
+      <p>Setup connects Claude Code and Codex, keeps <code>farol-host</code> running and shows a code to scan. The server appears next to your Macs on the phone. More in the <a href="docs#remote">docs</a> and the <a href="https://github.com/snowztech/farol-remote/tree/main/host">farol-host README</a>.</p>
+    </section>
+
+    <section class="faq column" aria-labelledby="faq-title">
+      <h2 id="faq-title">Questions</h2>
+
+      <h3>Can I use Claude Code from my phone?</h3>
+      <p>Yes. Claude Code keeps running on your Mac or server, and Farol for iPhone shows its conversation, lets you answer its questions and approvals, and sends you a notification when it waits for you.</p>
+
+      <h3>Does it work with Codex too?</h3>
+      <p>Yes. Claude Code and Codex both report their status and show up as conversations. Any other agent in a Farol session or a tmux window is still there as a terminal.</p>
+
+      <h3>Can the relay read my code?</h3>
+      <p>No. Messages are encrypted on the Mac or server and decrypted on the phone. The relay only sees encrypted bytes, and for notifications, a push token and whether an agent is waiting or done. The <a href="https://github.com/snowztech/farol-remote/blob/main/docs/security.md">security notes</a> cover the details.</p>
+
+      <h3>Does my Mac need to stay on?</h3>
+      <p>Yes, the agents run there. Farol can keep the Mac awake while an agent works or waits. To close the laptop, run your agents on a server with <a href="https://github.com/snowztech/farol-remote/tree/main/host"><code>farol-host</code></a>.</p>
+
+      <h3>Is there an Android app?</h3>
+      <p>Not yet. Remote is iPhone only for now. If you'd use it on Android or the web, say so on <a href="https://github.com/snowztech/farol/issues">GitHub</a> or <a href="https://discord.gg/XGY4jHU29d">Discord</a>.</p>
+
+      <h3>Is it free?</h3>
+      <p>Yes, the iPhone app is free. Farol for Mac, the relay, the encryption and <code>farol-host</code> are open source under the MIT license.</p>
+    </section>
+  </main>
+
+  <footer>
+    <span>© 2026 Lucas Neves Pereira, <a href="https://github.com/snowztech">snowztech</a></span>
+    <span><a href="./">Home</a> · <a href="docs">Docs</a> · <a href="https://discord.gg/XGY4jHU29d">Discord</a> · <a href="https://github.com/snowztech/farol-remote">Source</a></span>
+  </footer>
+  <script>
+    for (const button of document.querySelectorAll(".sn-copy-btn")) {
+      button.addEventListener("click", async () => {
+        await navigator.clipboard.writeText(button.previousElementSibling.textContent);
+        button.dataset.copied = "true";
+        setTimeout(() => delete button.dataset.copied, 1500);
+      });
+    }
+  </script>
+</body>
+</html>
