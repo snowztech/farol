@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- Sidebar: a session's ports leave out the ones agents like Codex and Claude Code open for their own use, so only servers you would open show, like `:3000`.
+
 ## [0.43.0] - 2026-10-18
 
 Farol updates itself.
