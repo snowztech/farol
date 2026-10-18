@@ -14,8 +14,10 @@ final class Session: ObservableObject, Identifiable {
     @Published var directory: String
     /// Reported per pane by agent hooks or interactive terminal titles.
     @Published private(set) var agents: [UUID: AgentActivity] = [:]
-    /// The agent's own conversation, as its hooks last named it. A phone reads it, and a restored session can resume it.
+    /// The agent's own conversation, as its hooks last named it. A phone reads it.
     var conversation: AgentConversation?
+    /// Each pane's conversation while its agent runs, saved so the next launch resumes it there.
+    var conversations: [UUID: AgentConversation] = [:]
     /// What a waiting agent asks, and the pane it waits in, so an answer from a phone goes there and nowhere else.
     var request: (pane: UUID, asked: AgentRequest)?
     /// An agent started here and has not ended. Before its first message it may have no log, and a phone shows it as an empty conversation.
@@ -284,7 +286,14 @@ final class SessionStore: ObservableObject {
         guard let pane = UUID(uuidString: message.pane),
               let session = sessions.first(where: { $0.panes.terminals.contains { $0.id == pane } }) else { return }
         let before = session.activity
-        if let conversation = message.conversation { session.conversation = conversation }
+        let resumable = session.conversations[pane]
+        if let conversation = message.conversation {
+            session.conversation = conversation
+            session.conversations[pane] = conversation
+        }
+        // The agent ended, so there is nothing to resume. Codex also sends this when you interrupt a turn, and its next prompt brings it back.
+        if message.event == .clear { session.conversations[pane] = nil }
+        if session.conversations[pane] != resumable { save() }
         session.apply(message.event, pane: pane, request: message.request)
         // An agent can end its turn, or stop to ask you, on a rebase git stopped, so every session's checkout is looked at again.
         // Not on "working": it comes after every tool call, and each lookup also refreshes the review panel.
@@ -420,11 +429,24 @@ final class SessionStore: ObservableObject {
             create()
             return
         }
+        let resume = defaults.bool(forKey: AgentSettings.resumeKey)
         for entry in usable {
-            let panes = PaneContainer(entry.layout) { directory in
-                self.makeTerminal(in: exists(directory) ? directory : NSHomeDirectory())
+            var resumed: [UUID: AgentConversation] = [:]
+            let panes = PaneContainer(entry.layout) { directory, conversation in
+                // Only in its own folder, where the agent finds the conversation, and only while its log is still there.
+                guard resume, exists(directory), let conversation, exists(conversation.log),
+                      let agent = AgentFolder(log: conversation.log) else {
+                    return self.makeTerminal(in: exists(directory) ? directory : NSHomeDirectory())
+                }
+                let terminal = self.makeTerminal(in: directory, run: agent.resume(conversation.id))
+                resumed[terminal.id] = conversation
+                return terminal
             }
-            create(panes, directory: panes.focused.workingDirectory ?? NSHomeDirectory()).customName = entry.name
+            let session = create(panes, directory: panes.focused.workingDirectory ?? NSHomeDirectory())
+            session.customName = entry.name
+            // Kept before the agent reports again, so quitting right away still resumes it next time.
+            session.conversations = resumed
+            session.conversation = resumed.values.first
         }
         select(index: min(selected, sessions.count - 1))
     }
@@ -432,7 +454,7 @@ final class SessionStore: ObservableObject {
     /// Saved on every change rather than at quit, so a crash keeps the sessions too.
     private func save() {
         let defaults = UserDefaults.standard
-        let saved = sessions.map { SavedSession(layout: $0.panes.layoutSnapshot, name: $0.customName) }
+        let saved = sessions.map { SavedSession(layout: $0.panes.layoutSnapshot(conversations: $0.conversations), name: $0.customName) }
         defaults.set(try? JSONEncoder().encode(saved), forKey: Self.savedSessions)
         defaults.removeObject(forKey: Self.savedLayouts)
         defaults.removeObject(forKey: Self.savedDirectories)

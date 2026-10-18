@@ -9,6 +9,13 @@ public struct AgentFolder: Equatable, Hashable {
         var environmentVariable: String { self == .claude ? "CLAUDE_CONFIG_DIR" : "CODEX_HOME" }
         /// The file whose presence says a look-alike folder really is a config folder.
         var configFile: String { self == .claude ? "settings.json" : "config.toml" }
+
+        /// An app opened from the Finder doesn't get the shell's PATH, so the agent is looked for where its installers put it.
+        static let installFolders = [NSHomeDirectory() + "/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", NSHomeDirectory() + "/.claude/local"]
+
+        public var executable: String? {
+            Self.installFolders.map { "\($0)/\(rawValue)" }.first(where: FileManager.default.isExecutableFile(atPath:))
+        }
     }
 
     public let kind: Kind
@@ -17,6 +24,17 @@ public struct AgentFolder: Equatable, Hashable {
     public init(kind: Kind, directory: URL) {
         self.kind = kind
         self.directory = directory
+    }
+
+    /// The folder a conversation's log is in. Claude Code keeps its logs under `projects` in its config folder, and Codex under `sessions`.
+    public init?(log: String) {
+        if let range = log.range(of: "/projects/") {
+            self.init(kind: .claude, directory: URL(fileURLWithPath: String(log[..<range.lowerBound])))
+        } else if let range = log.range(of: "/sessions/") {
+            self.init(kind: .codex, directory: URL(fileURLWithPath: String(log[..<range.lowerBound])))
+        } else {
+            return nil
+        }
     }
 
     private var name: String { directory.lastPathComponent.drop { $0 == "." }.description }
@@ -36,10 +54,16 @@ public struct AgentFolder: Equatable, Hashable {
     /// Starts the agent on this folder, with `task` as its first prompt when there is one.
     /// The default folder starts plainly, since the agent finds it by itself.
     public func command(task: String? = nil) -> String {
-        var parts = [kind.rawValue]
-        if !isDefault { parts.insert("\(kind.environmentVariable)=\(NewTask.shellQuoted(directory.path))", at: 0) }
-        if let task { parts.append(NewTask.shellQuoted(task)) }
-        return parts.joined(separator: " ")
+        ([launcher] + (task.map { [NewTask.shellQuoted($0)] } ?? [])).joined(separator: " ")
+    }
+
+    /// Picks up the conversation `id` where it stopped. Run in the folder it started in, where Claude Code looks for it.
+    public func resume(_ id: String) -> String {
+        [launcher, kind == .claude ? "--resume" : "resume", NewTask.shellQuoted(id)].joined(separator: " ")
+    }
+
+    private var launcher: String {
+        isDefault ? kind.rawValue : "\(kind.environmentVariable)=\(NewTask.shellQuoted(directory.path)) \(kind.rawValue)"
     }
 
     /// The default folder, every `<default>-*` folder that holds the agent's config file, and the folder the environment names.

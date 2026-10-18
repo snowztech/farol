@@ -54,6 +54,22 @@ private func home(_ folders: [String: [String]]) throws -> URL {
     #expect(codex.command(task: "Fix") == "CODEX_HOME='/h/.codex-work' codex 'Fix'")
 }
 
+@Test func aLogNamesItsAgentAndAccount() {
+    let claude = AgentFolder(log: "/h/.claude-work/projects/-h-app/8258e980.jsonl")
+    let codex = AgentFolder(log: "/h/.codex/sessions/2026/10/18/rollout-1.jsonl")
+    #expect(claude == AgentFolder(kind: .claude, directory: URL(fileURLWithPath: "/h/.claude-work")))
+    #expect(codex == AgentFolder(kind: .codex, directory: URL(fileURLWithPath: "/h/.codex")))
+    #expect(AgentFolder(log: "/tmp/notes.jsonl") == nil)
+}
+
+@Test func resumePicksUpTheConversationOnItsAccount() {
+    let home = URL(fileURLWithPath: "/h")
+    #expect(AgentFolder(kind: .claude, directory: home.appendingPathComponent(".claude")).resume("8258e980") == "claude --resume '8258e980'")
+    #expect(AgentFolder(kind: .claude, directory: home.appendingPathComponent(".claude-work")).resume("8258e980")
+        == "CLAUDE_CONFIG_DIR='/h/.claude-work' claude --resume '8258e980'")
+    #expect(AgentFolder(kind: .codex, directory: home.appendingPathComponent(".codex")).resume("019a") == "codex resume '019a'")
+}
+
 @Test func theSavedChoiceSurvivesTheOldFormat() {
     let folders = [".claude", ".claude-work", ".codex"].map {
         AgentFolder(kind: $0.hasPrefix(".claude") ? .claude : .codex, directory: URL(fileURLWithPath: "/h/\($0)"))

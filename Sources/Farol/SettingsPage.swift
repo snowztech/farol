@@ -258,6 +258,13 @@ struct SettingsPage: View {
         GroupTitle(title: "Status", palette: p)
         ForEach(Array(agentSetups.enumerated()), id: \.element.id) { agentRow($0.element, in: agentFolders[$0.offset], p) }
 
+        GroupTitle(title: "When Farol opens", palette: p)
+        Row(title: "Resume agent conversations",
+            detail: "Agents that were running when Farol quit pick up where they left off, in the same panes. Needs the agent connected above.",
+            palette: p) {
+            toggle($agents.resume)
+        }
+
         GroupTitle(title: "Notifications", palette: p)
         if notificationsBlocked {
             Row(title: "macOS is blocking Farol's notifications",
@@ -419,18 +426,21 @@ struct SettingsPage: View {
         let state = setups[agent.id] ?? .disconnected
         // The folder tells accounts apart, so it shows only when an agent has more than one.
         let shared = agentFolders.filter { $0.kind == folder.kind }.count > 1
-        let summary = state == .connected ? agent.summaryWhenConnected : agent.summaryWhenDisconnected
-        return Row(title: agent.name, subtitle: shared ? (folder.directory.path as NSString).abbreviatingWithTildeInPath : nil, detail: summary, palette: p) {
+        // ponytail: looks only where installers put the command. One installed elsewhere, as with nvm, reads as not found and still connects.
+        let path = folder.kind.executable.map { ($0 as NSString).abbreviatingWithTildeInPath }
+        // While the alert asks, the switch shows what you asked for, so it doesn't flick back and forth.
+        let on = Binding(
+            get: { agentChange.flatMap { $0.agent.id == agent.id ? $0.connect : nil } ?? (state != .disconnected) },
+            set: { agentChange = AgentChange(agent: agent, connect: $0) })
+        return Row(title: agent.name, subtitle: shared ? (folder.directory.path as NSString).abbreviatingWithTildeInPath : nil,
+                   detail: path ?? "Not found", mono: path != nil, palette: p) {
             HStack(spacing: 12) {
-                SetupState(state: state, palette: p)
-                switch state {
-                case .outdated:
-                    ShipButton(title: "Update", busy: false, palette: p) { change(agent, connect: true) }
-                case .connected:
-                    ShipButton(title: "Disconnect", busy: false, palette: p) { agentChange = AgentChange(agent: agent, connect: false) }
-                case .disconnected:
-                    ShipButton(title: "Connect", busy: false, palette: p) { agentChange = AgentChange(agent: agent, connect: true) }
+                if state == .outdated {
+                    ShipButton(title: "Update", help: "Farol's hooks changed since you connected.", busy: false, palette: p) {
+                        change(agent, connect: true)
+                    }
                 }
+                toggle(on)
             }
         }
     }
@@ -829,6 +839,8 @@ private struct Row<Control: View>: View {
     /// Muted after the title, like the folder of one of several accounts.
     var subtitle: String? = nil
     var detail: String? = nil
+    /// The detail is a path or a command, set in the terminal's kind of type.
+    var mono = false
     var icon: ForgeIcon? = nil
     /// Words of the detail that open a page, like a tool's name and its documentation.
     var link: (words: String, url: String)? = nil
@@ -854,7 +866,7 @@ private struct Row<Control: View>: View {
                             Text(detail)
                         }
                     }
-                    .font(.system(size: 11.5))
+                    .font(.system(size: 11.5, design: mono ? .monospaced : .default))
                     .foregroundStyle(palette.muted)
                 }
             }
@@ -894,23 +906,6 @@ private struct GroupTitle: View {
             .foregroundStyle(palette.muted)
             .padding(.top, 22)
             .padding(.bottom, 2)
-    }
-}
-
-/// "Connected" with a green dot, "Needs update" with a yellow one, or a muted "Not connected".
-private struct SetupState: View {
-    let state: AgentSetup.State
-    let palette: Palette
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(state == .connected ? palette.done : state == .outdated ? palette.waiting : palette.muted.opacity(0.5))
-                .frame(width: 6, height: 6)
-            Text(state == .connected ? "Connected" : state == .outdated ? "Needs update" : "Not connected")
-                .font(.system(size: 12))
-                .foregroundStyle(palette.muted)
-        }
     }
 }
 
