@@ -705,7 +705,7 @@ struct SettingsPage: View {
             .padding(.top, 20)
 
             if let version = updates.available {
-                Button("Farol \(version) is available. Download it.", action: updates.install)
+                Button("Farol \(version) is available. Install it.", action: updates.install)
                     .buttonStyle(.link)
                     .font(.system(size: 12))
                     .tint(p.text)

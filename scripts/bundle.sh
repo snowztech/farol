@@ -37,6 +37,21 @@ cp "$root/assets/Farol.icns" "$app/Contents/Resources/"
 mkdir -p "$app/Contents/Resources/icons"
 cp "$root"/assets/icons/*.png "$app/Contents/Resources/icons/"
 
+# Sparkle installs updates. Its XPC services are only for sandboxed apps, which Farol isn't.
+sparkle="$app/Contents/Frameworks/Sparkle.framework"
+mkdir -p "$app/Contents/Frameworks"
+ditto "$root/.build/$config/Sparkle.framework" "$sparkle"
+rm -rf "$sparkle/XPCServices" "$sparkle/Versions/B/XPCServices"
+install_name_tool -add_rpath @executable_path/../Frameworks "$app/Contents/MacOS/Farol"
+
+# Only release builds update themselves. A dev build would otherwise offer to replace itself with the latest release.
+updates=""
+if [ "$config" = "release" ]; then
+  updates="<key>SUFeedURL</key><string>https://github.com/snowztech/farol/releases/latest/download/appcast.xml</string>
+  <key>SUPublicEDKey</key><string>W35LvPDPqwRFtl8eT1HqPkOjqOv/XU7bwVd9e5CbADs=</string>
+  <key>SUEnableAutomaticChecks</key><true/>"
+fi
+
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -52,6 +67,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>FarolVersion</key><string>$version</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>NSHighResolutionCapable</key><true/>
+  $updates
   <key>CFBundleDocumentTypes</key>
   <array>
     <dict>
@@ -77,5 +93,6 @@ cat > "$app/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-codesign --force --sign - "$app" >/dev/null
+# Deep, since removing Sparkle's XPC services broke its own signature. dist.sh signs each part for release.
+codesign --force --deep --sign - "$app" >/dev/null
 echo "built $app ($version)"

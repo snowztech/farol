@@ -19,6 +19,14 @@ zip="$root/build/Farol-$version.zip"
 sign() {
   codesign --force --timestamp --options runtime --entitlements "$root/assets/Farol.entitlements" --sign "$identity" "$1"
 }
+# Sparkle's own programs, inside out, without Farol's entitlements, which are for what runs in a session.
+sign_plain() {
+  codesign --force --timestamp --options runtime --sign "$identity" "$1"
+}
+sparkle="$app/Contents/Frameworks/Sparkle.framework"
+sign_plain "$sparkle/Versions/B/Autoupdate"
+sign_plain "$sparkle/Versions/B/Updater.app"
+sign_plain "$sparkle"
 sign "$app/Contents/Resources/bin/farol"
 sign "$app"
 codesign --verify --strict --deep "$app"

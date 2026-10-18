@@ -495,6 +495,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         if !state.showingSettings { toggleSettings() }
     }
 
+    func checkForUpdates() { updates.install() }
+
+    /// Off in dev builds, which don't update themselves.
+    var canCheckForUpdates: Bool { updates.canCheck }
+
     /// Back to the terminal, with the tests running in a new pane under it. The title bar brings the merge view back.
     private func runAfterMerge(_ command: String) {
         guard let session = store.selected else { return }
