@@ -1,5 +1,5 @@
 {
-  "originHash" : "97ff08c386ec46eabf9736ec02f7999a97588e428e7ff211e3451f3549e571b2",
+  "originHash" : "379682d8381cc7b51a80e7a12a7cd83aeac8705f4a36f7d3dc30b0b8b91c2eee",
   "pins" : [
     {
       "identity" : "farol-remote",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "d777630e93df72114d5de5bde3cf9eb6f017fef3",
         "version" : "0.16.0"
+      }
+    },
+    {
+      "identity" : "sparkle",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/sparkle-project/Sparkle",
+      "state" : {
+        "revision" : "eef1a539a373c1f1a320624b1130fc5de7b2e100",
+        "version" : "2.10.0"
       }
     }
   ],

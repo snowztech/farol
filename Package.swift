@@ -7,6 +7,7 @@ let package = Package(
     dependencies: [
         // What a paired phone and the Mac say to each other, shared with the iOS app.
         .package(url: "https://github.com/snowztech/farol-remote", from: "0.16.0"),
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.10.0"),
     ],
     targets: [
         .binaryTarget(name: "GhosttyKit", path: "vendor/GhosttyKit.xcframework"),
@@ -26,7 +27,10 @@ let package = Package(
         .executableTarget(name: "FarolCLI", dependencies: ["FarolCore"]),
         .executableTarget(
             name: "Farol",
-            dependencies: ["GhosttyTerminal", "FarolCore", .product(name: "FarolRemote", package: "farol-remote")]),
+            dependencies: [
+                "GhosttyTerminal", "FarolCore", .product(name: "FarolRemote", package: "farol-remote"),
+                .product(name: "Sparkle", package: "Sparkle"),
+            ]),
     ],
     swiftLanguageModes: [.v5]
 )

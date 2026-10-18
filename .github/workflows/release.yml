@@ -53,6 +53,17 @@ jobs:
           NOTARY_KEY_PATH="$RUNNER_TEMP/notary.p8" ./scripts/dist.sh
           rm "$RUNNER_TEMP/notary.p8"
 
+      # The feed installed copies read at releases/latest/download/appcast.xml, with the zip signed so they can trust it.
+      - name: Sign the update
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          [ -n "$SPARKLE_PRIVATE_KEY" ] || { echo "The SPARKLE_PRIVATE_KEY secret is missing. Export it with Sparkle's generate_keys -x." >&2; exit 1; }
+          version="${GITHUB_REF_NAME#v}"
+          (umask 077 && echo "$SPARKLE_PRIVATE_KEY" > "$RUNNER_TEMP/sparkle.key")
+          SPARKLE_KEY_FILE="$RUNNER_TEMP/sparkle.key" ./scripts/appcast.sh "$version" build/Farol-"$version".zip > build/appcast.xml
+          rm "$RUNNER_TEMP/sparkle.key"
+
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -64,7 +75,7 @@ jobs:
           # Fixed names keep releases/latest/download/Farol.dmg working as a direct link.
           cp build/Farol-"$version".dmg build/Farol.dmg
           cp build/Farol-"$version".zip build/Farol.zip
-          gh release create "$GITHUB_REF_NAME" build/Farol.dmg build/Farol.zip \
+          gh release create "$GITHUB_REF_NAME" build/Farol.dmg build/Farol.zip build/appcast.xml \
             --title "Farol $version" --notes-file "$RUNNER_TEMP/notes.md" $prerelease
 
   # A job of its own, so a failed bump can be re-run without publishing the release again.

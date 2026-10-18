@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- Farol installs its own updates. The Update button in the title bar, or Check for Updates in the Farol menu, downloads the new version, checks its signature and relaunches Farol on it, and your sessions and agents come back. This release still has to be installed the old way once.
+
 ## [0.42.0] - 2026-10-18
 
 Files an agent names open at their line, and each session shows its ports and what its agent waits for.

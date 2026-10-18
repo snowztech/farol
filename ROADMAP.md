@@ -34,7 +34,7 @@ Someone who downloads Farol understands what it is for in the first minute.
 - [x] Agent status in the menu bar: a lamp with the most urgent state across sessions, and a menu to jump to any of them, so you see agents working from any app
 - [x] Agent status around the notch, as another option next to the menu bar
 - [x] Farol themes in the colors of the app icons, with Farol Beam as the default
-- [ ] Install updates in place (Sparkle), behind the same button
+- [x] Install updates in place (Sparkle), behind the same button
 - [x] Homebrew cask
 
 ## Next: review

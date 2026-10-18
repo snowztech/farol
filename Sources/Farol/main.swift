@@ -81,6 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     @objc func toggleSettings(_ sender: Any?) { windowController.toggleSettings() }
     @objc func showAbout(_ sender: Any?) { windowController.showAbout() }
+    @objc func checkForUpdates(_ sender: Any?) { windowController.checkForUpdates() }
     @objc func toggleSidebar(_ sender: Any?) { windowController.toggleSidebar() }
     @objc func toggleFiles(_ sender: Any?) { windowController.toggleFiles() }
     @objc func toggleGraph(_ sender: Any?) { windowController.toggleGraph() }
@@ -105,8 +106,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     /// ⌘S only means something while a file has focus, and stays free for the terminal otherwise.
+    /// Check for Updates is there only in builds that update themselves.
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
-        item.action == #selector(saveFile) ? windowController.canSaveFile : true
+        switch item.action {
+        case #selector(saveFile): windowController.canSaveFile
+        case #selector(checkForUpdates): windowController.canCheckForUpdates
+        default: true
+        }
     }
 
     private func makeMenu() -> NSMenu {
@@ -114,6 +120,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
         let app = NSMenu()
         app.addItem(withTitle: "About Farol", action: #selector(showAbout), keyEquivalent: "")
+        app.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
         app.addItem(.separator())
         app.addItem(withTitle: "Settings…", action: #selector(toggleSettings), keyEquivalent: ",")
         // "," with Shift rather than "<", which is only Shift-comma on some layouts, so every keyboard shows ⇧⌘,.
