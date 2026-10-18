@@ -337,13 +337,16 @@ final class SessionStore: ObservableObject {
         report(session, from: before)
     }
 
-    /// Codex's interactive TUI runs no hooks, so once a turn ends its conversation is looked up in its logs, for the next launch to resume.
+    /// Codex's interactive TUI runs no hooks, so once a turn ends its conversation is looked up in its logs, for a phone to read and the next launch to resume.
     private func findCodexConversation(of terminal: TerminalView, in session: Session) {
         guard let program = terminal.foregroundProgram, program.name == "codex", let folder = terminal.workingDirectory else { return }
         DispatchQueue.global(qos: .utility).async { [weak self, weak session, weak terminal] in
             let found = AgentFolder.lastCodexConversation(in: AgentFolder.find(), startedIn: folder, since: program.started)
             DispatchQueue.main.async {
-                guard let self, let session, let terminal, let found, session.conversations[terminal.id] != found else { return }
+                guard let self, let session, let terminal, let found else { return }
+                // Also for a session restored with this conversation already saved, which a phone could not read until now.
+                session.conversation = found
+                guard session.conversations[terminal.id] != found else { return }
                 session.conversations[terminal.id] = found
                 self.save()
             }
