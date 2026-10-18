@@ -1,4 +1,5 @@
 import AppKit
+import FarolCore
 import GhosttyTerminal
 
 /// A session's terminals and at most one open file, split into panes. Each split holds two children and the share the first one gets.
@@ -70,14 +71,14 @@ final class PaneContainer: NSView {
         adopt(terminal)
     }
 
-    /// Rebuilds saved panes. `make` creates a terminal in a folder. A file that is gone leaves its space to its neighbor.
-    init(_ layout: PaneLayout, make: (String) -> TerminalView) {
+    /// Rebuilds saved panes. `make` creates a terminal in a folder, given the conversation its agent had. A file that is gone leaves its space to its neighbor.
+    init(_ layout: PaneLayout, make: (String, AgentConversation?) -> TerminalView) {
         var names: [(TerminalView, String)] = []
         var file: FileView?
         func build(_ layout: PaneLayout) -> Node? {
             switch layout {
-            case .terminal(let directory, let name):
-                let terminal = make(directory)
+            case .terminal(let directory, let name, let conversation):
+                let terminal = make(directory, conversation)
                 if let name { names.append((terminal, name)) }
                 return Node(terminal)
             case .file(let path):
@@ -96,7 +97,7 @@ final class PaneContainer: NSView {
             }
         }
         // A layout always has a terminal, since closing the last one closes the session.
-        root = build(layout) ?? Node(make(NSHomeDirectory()))
+        root = build(layout) ?? Node(make(NSHomeDirectory(), nil))
         focused = root.leaves[0]
         super.init(frame: .zero)
         root.leaves.forEach(adopt)
@@ -107,10 +108,11 @@ final class PaneContainer: NSView {
         for (terminal, name) in names { labels[terminal.id] = makeLabel(for: terminal, name: name) }
     }
 
-    var layoutSnapshot: PaneLayout {
+    func layoutSnapshot(conversations: [UUID: AgentConversation]) -> PaneLayout {
         func snapshot(_ node: Node) -> PaneLayout {
             if let terminal = node.terminal {
-                return .terminal(directory: terminal.workingDirectory ?? NSHomeDirectory(), name: labels[terminal.id]?.name)
+                return .terminal(directory: terminal.workingDirectory ?? NSHomeDirectory(), name: labels[terminal.id]?.name,
+                                 conversation: conversations[terminal.id])
             }
             if let file = node.file { return .file(path: file.path) }
             return .split(horizontal: node.axis == .horizontal, ratio: Double(node.ratio),
@@ -553,16 +555,16 @@ final class PaneContainer: NSView {
     }
 }
 
-/// A session's panes as saved between launches: each terminal's folder and name, the open file, and each split's direction and share.
+/// A session's panes as saved between launches: each terminal's folder, name and agent conversation, the open file, and each split's direction and share.
 indirect enum PaneLayout: Codable {
-    /// `name` is optional, so layouts saved before panes had names still load.
-    case terminal(directory: String, name: String? = nil)
+    /// `name` and `conversation` are optional, so layouts saved before them still load.
+    case terminal(directory: String, name: String? = nil, conversation: AgentConversation? = nil)
     case file(path: String)
     case split(horizontal: Bool, ratio: Double, first: PaneLayout, second: PaneLayout)
 
     var directories: [String] {
         switch self {
-        case .terminal(let directory, _): [directory]
+        case .terminal(let directory, _, _): [directory]
         case .file: []
         case .split(_, _, let first, let second): first.directories + second.directories
         }

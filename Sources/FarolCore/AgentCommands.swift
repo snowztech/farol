@@ -51,15 +51,8 @@ public enum AgentCommands {
         return all.filter { seen.insert(($0.mention ? "$" : "/") + $0.name).inserted }.sorted { $0.name < $1.name }
     }
 
-    /// Claude Code keeps its logs under `projects` in its config folder, and Codex under `sessions`.
     static func folder(of log: String?, home: URL) -> AgentFolder {
-        if let log, let range = log.range(of: "/projects/") {
-            return AgentFolder(kind: .claude, directory: URL(fileURLWithPath: String(log[..<range.lowerBound])))
-        }
-        if let log, let range = log.range(of: "/sessions/") {
-            return AgentFolder(kind: .codex, directory: URL(fileURLWithPath: String(log[..<range.lowerBound])))
-        }
-        return AgentFolder(kind: .claude, directory: home.appendingPathComponent(".claude"))
+        log.flatMap(AgentFolder.init(log:)) ?? AgentFolder(kind: .claude, directory: home.appendingPathComponent(".claude"))
     }
 
     /// Markdown files, each one a command named by its path, with a colon for each folder.

@@ -10,7 +10,7 @@ public enum CommitMessage {
     /// `started` gets the process, to stop it when the sheet closes.
     public static func generate(with agent: AgentFolder, paths: [String]?, in directory: String,
                                 started: (Process) -> Void = { _ in }) throws -> String {
-        guard let executable = executable(of: agent.kind) else {
+        guard let executable = agent.kind.executable else {
             throw GitError(description: "\(agent.kind.title) isn't installed.")
         }
         let diff = try self.diff(of: paths, in: directory)
@@ -81,16 +81,9 @@ public enum CommitMessage {
         }
     }
 
-    /// An app opened from the Finder doesn't get the shell's PATH, so the agent is looked for where its installers put it.
-    private static let folders = [NSHomeDirectory() + "/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", NSHomeDirectory() + "/.claude/local"]
-
-    static func executable(of kind: AgentFolder.Kind) -> String? {
-        folders.map { "\($0)/\(kind.rawValue)" }.first(where: FileManager.default.isExecutableFile(atPath:))
-    }
-
     private static func environment(for agent: AgentFolder) -> [String: String] {
         var environment = ProcessInfo.processInfo.environment
-        environment["PATH"] = (folders + [environment["PATH"] ?? "/usr/bin:/bin"]).joined(separator: ":")
+        environment["PATH"] = (AgentFolder.Kind.installFolders + [environment["PATH"] ?? "/usr/bin:/bin"]).joined(separator: ":")
         if !agent.isDefault { environment[agent.kind.environmentVariable] = agent.directory.path }
         return environment
     }

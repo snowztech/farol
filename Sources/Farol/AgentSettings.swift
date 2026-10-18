@@ -17,10 +17,14 @@ final class AgentSettings: ObservableObject {
     @Published var remoteKeepAwake: Bool { didSet { Self.defaults.set(remoteKeepAwake, forKey: "remote.keepAwake") } }
     /// Typed into the shell of each new session, for example "claude". Empty starts a plain shell.
     @Published var startCommand: String { didSet { Self.defaults.set(startCommand, forKey: "agents.startCommand") } }
+    @Published var resume: Bool { didSet { Self.defaults.set(resume, forKey: Self.resumeKey) } }
+
+    /// Also read by the session store at launch.
+    static let resumeKey = "agents.resume"
 
     init() {
         Self.defaults.register(defaults: [
-            "agents.notifyWaiting": true, "agents.notifyDone": true, "agents.dockBadge": true,
+            "agents.notifyWaiting": true, "agents.notifyDone": true, "agents.dockBadge": true, Self.resumeKey: true,
         ])
         notifyWaiting = Self.defaults.bool(forKey: "agents.notifyWaiting")
         notifyDone = Self.defaults.bool(forKey: "agents.notifyDone")
@@ -29,6 +33,7 @@ final class AgentSettings: ObservableObject {
         notchStatus = Self.defaults.bool(forKey: "agents.notchStatus")
         statusPanelPlace = Self.defaults.string(forKey: "agents.statusPanelPlace") ?? "notch"
         startCommand = Self.defaults.string(forKey: "agents.startCommand") ?? ""
+        resume = Self.defaults.bool(forKey: Self.resumeKey)
         remote = Self.defaults.bool(forKey: RemoteBridge.enabledKey)
         remoteKeepAwake = Self.defaults.bool(forKey: "remote.keepAwake")
     }

@@ -59,7 +59,7 @@ public struct AgentSkill {
     Everything else is kept by the app, where only the user can change it, in Settings (⌘,). For these, tell the user where to click:
 
     - Appearance: the app icon, the panel style and grouping sessions by project.
-    - Agents: connecting Claude Code and Codex, one row per account, notifications, the Dock badge, the menu bar lighthouse or the status panel at the notch or screen edge, and what new sessions start with.
+    - Agents: connecting Claude Code and Codex, one row per account, notifications, the Dock badge, the menu bar lighthouse or the status panel at the notch or screen edge, what new sessions start with, and whether agent conversations resume when Farol opens.
     - Worktrees: copying ignored `.env` files into each new worktree.
     - Integrations: the `gh`, `glab` and jira-cli accounts, and which Jira tickets New Task lists.
     - Remote: letting a paired phone in, pairing a phone with Show code, removing one, keeping the Mac awake for agents, and the relay.

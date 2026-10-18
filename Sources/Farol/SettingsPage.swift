@@ -258,6 +258,13 @@ struct SettingsPage: View {
         GroupTitle(title: "Status", palette: p)
         ForEach(Array(agentSetups.enumerated()), id: \.element.id) { agentRow($0.element, in: agentFolders[$0.offset], p) }
 
+        GroupTitle(title: "When Farol opens", palette: p)
+        Row(title: "Resume agent conversations",
+            detail: "Agents that were running when Farol quit pick up where they left off, in the same panes. Needs the agent connected above.",
+            palette: p) {
+            toggle($agents.resume)
+        }
+
         GroupTitle(title: "Notifications", palette: p)
         if notificationsBlocked {
             Row(title: "macOS is blocking Farol's notifications",
@@ -419,16 +426,21 @@ struct SettingsPage: View {
         let state = setups[agent.id] ?? .disconnected
         // The folder tells accounts apart, so it shows only when an agent has more than one.
         let shared = agentFolders.filter { $0.kind == folder.kind }.count > 1
-        let summary = state == .connected ? agent.summaryWhenConnected : agent.summaryWhenDisconnected
-        return Row(title: agent.name, subtitle: shared ? (folder.directory.path as NSString).abbreviatingWithTildeInPath : nil, detail: summary, palette: p) {
-            HStack(spacing: 12) {
-                SetupState(state: state, palette: p)
-                switch state {
-                case .outdated:
+        // ponytail: looks only where installers put the command. One installed elsewhere, as with nvm, reads as not found and still connects.
+        let path = folder.kind.executable.map { ($0 as NSString).abbreviatingWithTildeInPath }
+        return Row(title: agent.name, subtitle: shared ? (folder.directory.path as NSString).abbreviatingWithTildeInPath : nil,
+                   detail: path ?? "Not found", mono: path != nil, icon: ForgeIcon(agent: folder.kind, size: 13), palette: p) {
+            switch state {
+            case .connected:
+                ConnectedPill(palette: p) { agentChange = AgentChange(agent: agent, connect: false) }
+            case .outdated:
+                HStack(spacing: 12) {
+                    SetupState(state: state, palette: p)
                     ShipButton(title: "Update", busy: false, palette: p) { change(agent, connect: true) }
-                case .connected:
-                    ShipButton(title: "Disconnect", busy: false, palette: p) { agentChange = AgentChange(agent: agent, connect: false) }
-                case .disconnected:
+                }
+            case .disconnected:
+                HStack(spacing: 12) {
+                    SetupState(state: state, palette: p)
                     ShipButton(title: "Connect", busy: false, palette: p) { agentChange = AgentChange(agent: agent, connect: true) }
                 }
             }
@@ -829,6 +841,8 @@ private struct Row<Control: View>: View {
     /// Muted after the title, like the folder of one of several accounts.
     var subtitle: String? = nil
     var detail: String? = nil
+    /// The detail is a path or a command, set in the terminal's kind of type.
+    var mono = false
     var icon: ForgeIcon? = nil
     /// Words of the detail that open a page, like a tool's name and its documentation.
     var link: (words: String, url: String)? = nil
@@ -854,7 +868,7 @@ private struct Row<Control: View>: View {
                             Text(detail)
                         }
                     }
-                    .font(.system(size: 11.5))
+                    .font(.system(size: 11.5, design: mono ? .monospaced : .default))
                     .foregroundStyle(palette.muted)
                 }
             }
@@ -911,6 +925,32 @@ private struct SetupState: View {
                 .font(.system(size: 12))
                 .foregroundStyle(palette.muted)
         }
+    }
+}
+
+/// A connected agent, in the same pill as an account in Integrations. Disconnecting is rare, so it's behind a click on it, which asks first.
+private struct ConnectedPill: View {
+    let palette: Palette
+    let disconnect: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: disconnect) {
+            HStack(spacing: 6) {
+                Circle().fill(palette.done).frame(width: 6, height: 6)
+                Text("Connected").font(.system(size: 12, weight: .medium))
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 26)
+            .background(hovering ? palette.raised : palette.surface, in: Capsule())
+            .overlay(Capsule().strokeBorder(palette.line))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onClickableHover { hovering = $0 }
+        .hoverTip("Disconnect…")
+        .accessibilityLabel("Connected. Disconnect")
     }
 }
 

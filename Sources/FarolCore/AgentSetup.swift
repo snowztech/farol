@@ -14,8 +14,6 @@ public struct AgentSetup {
     public let id: String
     /// The file Connect and Disconnect change.
     public let file: URL
-    public let summaryWhenDisconnected: String
-    public let summaryWhenConnected: String
     /// What connecting changes, shown before it does.
     public let connectMessage: String
     /// What disconnecting takes away, first, then what changes on disk.
@@ -48,8 +46,6 @@ public struct AgentSetup {
             name: hooks.name,
             id: hooks.file.path,
             file: hooks.file,
-            summaryWhenDisconnected: "Show in the sidebar when Claude Code is working, waiting for you or done.",
-            summaryWhenConnected: "The sidebar shows when Claude Code is working, waiting for you or done.",
             connectMessage: "Farol adds hooks for \(hooks.events.count) events to \(tilde(hooks.file)), and a skill in \(tilde(skill.file.deletingLastPathComponent())) so Claude Code can change Farol's settings when you ask. Your other settings stay as they are, though the file may be reformatted. The current file is kept as \(backup(hooks.file)).",
             disconnectMessage: "The sidebar stops showing when Claude Code is working, waiting or done, and Farol stops notifying you. Claude Code keeps working as before. Farol removes only its own hooks from \(tilde(hooks.file)) and keeps a backup, and removes its skill.",
             state: {
@@ -82,8 +78,6 @@ public struct AgentSetup {
             name: hooks.name,
             id: hooks.file.path,
             file: hooks.file,
-            summaryWhenDisconnected: "Interactive Codex sessions already show status. Connect hooks for non-interactive runs and background agents.",
-            summaryWhenConnected: "Codex sessions show when they are working, waiting for you or done, including non-interactive runs.",
             connectMessage: "Interactive Codex sessions report through their terminal title. Farol adds hooks for \(hooks.events.count) events to \(tilde(hooks.file)) for non-interactive runs and background agents, and a skill in \(tilde(skill.file.deletingLastPathComponent())) so Codex can change Farol's settings when you ask. Your other settings stay as they are, though the file may be reformatted. The current file is kept as \(backup(hooks.file)). Codex sessions that are already open need a restart to use the hooks.",
             disconnectMessage: "Interactive Codex sessions keep showing status through their terminal title, but non-interactive runs and background agents stop reporting. Farol removes only its own hooks from \(tilde(hooks.file)) and keeps a backup, and removes its skill.",
             state: {

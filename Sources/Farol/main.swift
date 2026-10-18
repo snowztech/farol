@@ -65,6 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         if quitConfirmed { return .terminateNow }
         windowController.confirmQuit { ok in
             self.quitConfirmed = ok
+            if ok { self.store.prepareToQuit() }
             NSApp.reply(toApplicationShouldTerminate: ok)
         }
         return .terminateLater
