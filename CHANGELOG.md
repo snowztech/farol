@@ -4,9 +4,19 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-10-18
+
+Farol updates itself.
+
 ### Changed
 
 - Farol installs its own updates. The Update button in the title bar, or Check for Updates in the Farol menu, downloads the new version, checks its signature and relaunches Farol on it, and your sessions and agents come back. This release still has to be installed the old way once.
+
+### Fixed
+
+- Agents: a Claude Code turn that ends on an API error, like a usage limit, shows as done instead of staying "Working". Settings → Agents asks to update Claude Code once, to add the hook for it.
+- Remote: the phone shows the conversation of an interactive Codex session, found in Codex's logs, including one resumed when Farol opens.
+- Remote: a message you send while Claude Code works shows in its conversation on the phone.
 
 ## [0.42.0] - 2026-10-18
 
