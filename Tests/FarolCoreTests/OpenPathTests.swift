@@ -28,3 +28,23 @@ private func folder() throws -> String {
 @Test func fallbackIsHome() {
     #expect(OpenPath.fallback == NSHomeDirectory())
 }
+
+@Test func aLinkOpensItsFileAtTheLineAgentsPrint() throws {
+    let root = try folder()
+    defer { try? FileManager.default.removeItem(atPath: root) }
+    let file = root + "/file.txt"
+    #expect(OpenPath.file(link: "file.txt", in: root)?.path == file)
+    #expect(OpenPath.file(link: "file.txt:42", in: root)?.line == 42)
+    #expect(OpenPath.file(link: "./file.txt:42:7", in: root).map { "\($0.path):\($0.line ?? 0)" } == "\(file):42")
+    #expect(OpenPath.file(link: file + ":3", in: nil)?.line == 3)
+    #expect(OpenPath.file(link: "file://" + file, in: nil)?.path == file)
+}
+
+@Test func linksTheMacShouldOpenAreLeftAlone() throws {
+    let root = try folder()
+    defer { try? FileManager.default.removeItem(atPath: root) }
+    #expect(OpenPath.file(link: "https://farol.sh/docs", in: root) == nil)
+    #expect(OpenPath.file(link: "mailto:hi@farol.sh", in: root) == nil)
+    #expect(OpenPath.file(link: "missing.txt:4", in: root) == nil)
+    #expect(OpenPath.file(link: ".", in: root) == nil)
+}
