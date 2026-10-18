@@ -26,12 +26,16 @@ public struct AgentFolder: Equatable, Hashable {
         self.directory = directory
     }
 
-    /// The folder a conversation's log is in. Claude Code keeps its logs under `projects` in its config folder, and Codex under `sessions`.
+    /// The folder a conversation's log is in: `<folder>/projects/<project>/<id>.jsonl` for Claude Code, `<folder>/sessions/<y>/<m>/<d>/<file>.jsonl` for Codex.
+    /// Read by position, so a config folder that is itself inside a `projects` or `sessions` folder isn't mistaken for the other agent.
     public init?(log: String) {
-        if let range = log.range(of: "/projects/") {
-            self.init(kind: .claude, directory: URL(fileURLWithPath: String(log[..<range.lowerBound])))
-        } else if let range = log.range(of: "/sessions/") {
-            self.init(kind: .codex, directory: URL(fileURLWithPath: String(log[..<range.lowerBound])))
+        let file = URL(fileURLWithPath: log)
+        // Rebuilt from the path, which drops the trailing slash that would make it unequal to the same folder found elsewhere.
+        func up(_ levels: Int) -> URL { URL(fileURLWithPath: (0..<levels).reduce(file) { url, _ in url.deletingLastPathComponent() }.path) }
+        if up(2).lastPathComponent == "projects" {
+            self.init(kind: .claude, directory: up(3))
+        } else if up(4).lastPathComponent == "sessions" {
+            self.init(kind: .codex, directory: up(5))
         } else {
             return nil
         }

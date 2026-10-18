@@ -60,6 +60,9 @@ private func home(_ folders: [String: [String]]) throws -> URL {
     #expect(claude == AgentFolder(kind: .claude, directory: URL(fileURLWithPath: "/h/.claude-work")))
     #expect(codex == AgentFolder(kind: .codex, directory: URL(fileURLWithPath: "/h/.codex")))
     #expect(AgentFolder(log: "/tmp/notes.jsonl") == nil)
+    // A config folder inside a folder named like the other agent's logs.
+    #expect(AgentFolder(log: "/h/projects/codex/sessions/2026/10/18/rollout-1.jsonl")
+        == AgentFolder(kind: .codex, directory: URL(fileURLWithPath: "/h/projects/codex")))
 }
 
 @Test func resumePicksUpTheConversationOnItsAccount() {
