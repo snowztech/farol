@@ -428,17 +428,28 @@ struct SettingsPage: View {
         let shared = agentFolders.filter { $0.kind == folder.kind }.count > 1
         // ponytail: looks only where installers put the command. One installed elsewhere, as with nvm, reads as not found and still connects.
         let path = folder.kind.executable.map { ($0 as NSString).abbreviatingWithTildeInPath }
-        return Row(title: agent.name, subtitle: shared ? (folder.directory.path as NSString).abbreviatingWithTildeInPath : nil,
-                   detail: path ?? "Not found", mono: path != nil, icon: ForgeIcon(agent: folder.kind, size: 13), palette: p) {
-            HStack(spacing: 12) {
-                SetupState(state: state, palette: p)
+        return HoverRow { hovering in
+            Row(title: agent.name, subtitle: shared ? (folder.directory.path as NSString).abbreviatingWithTildeInPath : nil,
+                detail: path ?? "Not found", mono: path != nil, icon: ForgeIcon(agent: folder.kind, size: 13), palette: p) {
                 switch state {
-                case .outdated:
-                    ShipButton(title: "Update", busy: false, palette: p) { change(agent, connect: true) }
                 case .connected:
-                    ShipButton(title: "Disconnect", busy: false, palette: p) { agentChange = AgentChange(agent: agent, connect: false) }
+                    // Like an account in Integrations, a connected agent shows only its state. Disconnect takes its place under the mouse.
+                    ZStack(alignment: .trailing) {
+                        SetupState(state: state, palette: p).opacity(hovering ? 0 : 1)
+                        ShipButton(title: "Disconnect", busy: false, palette: p) { agentChange = AgentChange(agent: agent, connect: false) }
+                            .opacity(hovering ? 1 : 0)
+                            .allowsHitTesting(hovering)
+                    }
+                case .outdated:
+                    HStack(spacing: 12) {
+                        SetupState(state: state, palette: p)
+                        ShipButton(title: "Update", busy: false, palette: p) { change(agent, connect: true) }
+                    }
                 case .disconnected:
-                    ShipButton(title: "Connect", busy: false, palette: p) { agentChange = AgentChange(agent: agent, connect: true) }
+                    HStack(spacing: 12) {
+                        SetupState(state: state, palette: p)
+                        ShipButton(title: "Connect", busy: false, palette: p) { agentChange = AgentChange(agent: agent, connect: true) }
+                    }
                 }
             }
         }
@@ -874,6 +885,18 @@ private struct Row<Control: View>: View {
         }
         .padding(.vertical, 10)
         .overlay(alignment: .bottom) { Rectangle().fill(palette.line).frame(height: 1) }
+    }
+}
+
+/// A row that knows when the mouse is over any part of it, for a control that only shows then.
+private struct HoverRow<Content: View>: View {
+    @ViewBuilder let content: (Bool) -> Content
+    @State private var hovering = false
+
+    var body: some View {
+        content(hovering)
+            .contentShape(Rectangle())
+            .onHover { inside in withAnimation(.easeOut(duration: 0.12)) { hovering = inside } }
     }
 }
 
