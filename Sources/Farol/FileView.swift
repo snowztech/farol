@@ -52,6 +52,8 @@ final class FileView: NSView {
     private let scroll = NSScrollView()
     private let text: CodeTextView
     private let gutter: LineNumbers
+    /// The line a search or a link opened the file at, lit until the cursor leaves it.
+    private var litLine: NSRange?
     /// Shown instead of the text for binary files, files too big to open, or errors.
     private let message = NSTextField(labelWithString: "")
 
@@ -107,6 +109,11 @@ final class FileView: NSView {
             isDirty = text.string != onDisk
             gutter.textChanged()
             highlightSoon()
+        }
+
+        NotificationCenter.default.addObserver(forName: NSTextView.didChangeSelectionNotification, object: text, queue: .main) { [weak self] _ in
+            guard let self, let line = litLine, !NSLocationInRange(text.selectedRange().location, line) else { return }
+            unlight()
         }
 
         scroll.documentView = text
@@ -210,6 +217,7 @@ final class FileView: NSView {
             location = NSMaxRange(string.lineRange(for: NSRange(location: location, length: 0)))
         }
         text.setSelectedRange(NSRange(location: min(location, string.length), length: 0))
+        light(string.lineRange(for: NSRange(location: min(location, string.length), length: 0)))
         // A pane that was just added has no size yet, so this waits for its first layout.
         DispatchQueue.main.async { [weak self] in
             guard let self, let layout = text.layoutManager, let container = text.textContainer else { return }
@@ -220,6 +228,21 @@ final class FileView: NSView {
             scroll.reflectScrolledClipView(scroll.contentView)
             gutter.needsDisplay = true
         }
+    }
+
+    /// A soft band behind the line, in the theme's colors, so the eye lands on it.
+    private func light(_ line: NSRange) {
+        unlight()
+        guard let layout = text.layoutManager, line.length > 0, let colors = themeColors else { return }
+        layout.addTemporaryAttribute(.backgroundColor, value: colors.background.mixed(with: colors.foreground, 0.16), forCharacterRange: line)
+        litLine = line
+    }
+
+    private func unlight() {
+        guard let line = litLine else { return }
+        litLine = nil
+        let length = (text.string as NSString).length
+        text.layoutManager?.removeTemporaryAttribute(.backgroundColor, forCharacterRange: NSIntersectionRange(line, NSRange(location: 0, length: length)))
     }
 
     /// Reads the file again. Keeping the position means an agent's edit doesn't throw you back to the top.
