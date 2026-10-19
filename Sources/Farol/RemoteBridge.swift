@@ -377,6 +377,12 @@ final class RemoteBridge: ObservableObject {
             tell(.history(session: session, text: pane.historyText()), id)
         case .send(let session, let text):
             act(command, by: device, on: session, from: id) { pane in
+                // While Farol holds a question, the agent shows nothing to type into, so a typed reply is the answer, as Other is on the Mac.
+                let answer = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                if let target = store.sessions.first(where: { $0.id == session }), let ask = target.ask, ask.pane == pane.id,
+                   ask.questions.count == 1, let question = ask.questions.first, !answer.isEmpty {
+                    return store.answer(target, with: [question.text: answer])
+                }
                 pane.pasteText(text)
                 pasted[ObjectIdentifier(pane)] = (.now, text)
             }
