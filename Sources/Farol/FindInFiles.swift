@@ -260,7 +260,10 @@ struct FindInFiles: View {
                             note("Only the first \(FileSearch.perFile) lines of this file.", p).padding(.leading, CGFloat(max(digits, 3)) * 6.5 + 12)
                         }
                     }
-                    if model.invalid {
+                    // The filter narrows a search and finds nothing on its own, so an empty field says what it waits for.
+                    if !model.hasQuery && !model.globs.trimmingCharacters(in: .whitespaces).isEmpty {
+                        note("Type what to find in the files matching \(model.globs.trimmingCharacters(in: .whitespaces)).", p)
+                    } else if model.invalid {
                         note("This regular expression isn't valid.", p)
                     } else if files.isEmpty && !model.searching && model.hasQuery {
                         note("Nothing matches.", p)
