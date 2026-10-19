@@ -88,6 +88,25 @@ public enum FileSearch {
     /// The folder isn't in a git checkout, so its files come from the walk rather than git.
     public static func walks(_ folder: String) -> Bool { Git.repoRoot(of: folder) == nil }
 
+    /// Whether files changing at `paths` can change what a search in `folder` finds.
+    /// Not git's own files, nor what git ignores like build output, nor outside git the hidden folders and dependencies the walk skips.
+    /// Runs git, so call it off the main thread.
+    public static func matters(_ paths: [String], in folder: String) -> Bool {
+        let changed = paths.filter { !$0.contains("/.git/") && !$0.hasSuffix("/.git") }
+        guard !changed.isEmpty else { return false }
+        guard !walks(folder) else {
+            return changed.contains { path in
+                let inside = path.hasPrefix(folder + "/") ? String(path.dropFirst(folder.count + 1)) : path
+                return !inside.split(separator: "/").contains { $0.hasPrefix(".") || Files.dependencies.contains(String($0)) }
+            }
+        }
+        // ponytail: a burst of hundreds of paths counts as a change rather than asking git about each.
+        guard changed.count <= 200 else { return true }
+        // check-ignore prints the ignored ones, and fails when none is, so every path matters then.
+        guard let ignored = try? Git.run(["check-ignore", "--"] + changed, in: folder) else { return true }
+        return ignored.split(separator: "\n").count < changed.count
+    }
+
     /// Where `query` is in `line`, the way the search found it, so a row can mark exactly that.
     public static func ranges(of query: String, in line: String, options: Options) -> [Range<String.Index>] {
         matcher(query, options)?(line) ?? []

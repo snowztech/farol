@@ -105,3 +105,19 @@ private func folder(_ files: [String: String]) throws -> String {
         #expect(FileSearch.search("\\bname\\b", in: root, options: .init(regex: true)).map(\.line) == [2])
     }
 }
+
+@Test func onlyChangesASearchCouldSeeSearchAgain() throws {
+    let root = try folder([".gitignore": "build/\n", "src/app.swift": "x\n", "build/out.o": "x\n"])
+    try Git.run(["init", "--quiet"], in: root)
+    #expect(!FileSearch.matters([root + "/build/out.o"], in: root))
+    #expect(!FileSearch.matters([root + "/.git/index"], in: root))
+    #expect(FileSearch.matters([root + "/build/out.o", root + "/src/app.swift"], in: root))
+    #expect(FileSearch.matters([root + "/src/new.swift"], in: root))
+}
+
+@Test func outsideGitTheWalkSkipsWhatItNeverReads() throws {
+    let root = try folder(["notes.txt": "x\n", ".cache/a": "x\n", "node_modules/b/c.js": "x\n"])
+    #expect(FileSearch.walks(root))
+    #expect(!FileSearch.matters([root + "/.cache/a", root + "/node_modules/b/c.js"], in: root))
+    #expect(FileSearch.matters([root + "/notes.txt"], in: root))
+}

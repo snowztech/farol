@@ -97,13 +97,19 @@ final class FindInFilesModel: ObservableObject {
     private func watch() {
         watcher = nil
         guard live, !searched.isEmpty else { return }
-        watcher = FolderWatcher(searched, latency: 0.5) { [weak self] paths in
-            // Git touches .git at every prompt, which changes no file's lines.
-            guard let self, paths.contains(where: { !$0.contains("/.git/") }) else { return }
-            refresh?.cancel()
-            let work = DispatchWorkItem { [weak self] in self?.search() }
-            refresh = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
+        let folder = searched
+        watcher = FolderWatcher(folder, latency: 0.5) { [weak self] paths in
+            // Git touching .git at every prompt, or a build writing what git ignores, changes no line the search can find.
+            DispatchQueue.global(qos: .utility).async {
+                guard FileSearch.matters(paths, in: folder) else { return }
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    self.refresh?.cancel()
+                    let work = DispatchWorkItem { [weak self] in self?.search() }
+                    self.refresh = work
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
+                }
+            }
         }
     }
 
