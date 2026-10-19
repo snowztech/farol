@@ -78,9 +78,15 @@ public enum FileSearch {
     /// A checkout is searched with git, which skips what it ignores. Anywhere else, the same short walk as the file list.
     public static func search(_ query: String, in folder: String, options: Options = Options(), limit: Int = 300, job: Job = Job()) -> [Match] {
         guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return [] }
-        return Git.repoRoot(of: folder) != nil
-            ? grep(query, in: folder, options: options, limit: limit, job: job) : scan(query, in: folder, options: options, limit: limit, job: job)
+        return walks(folder)
+            ? scan(query, in: folder, options: options, limit: limit, job: job) : grep(query, in: folder, options: options, limit: limit, job: job)
     }
+
+    /// How many folders down the walk outside git goes, so a search there can miss deeper files and has to say so.
+    public static let walkDepth = 3
+
+    /// The folder isn't in a git checkout, so its files come from the walk rather than git.
+    public static func walks(_ folder: String) -> Bool { Git.repoRoot(of: folder) == nil }
 
     /// Where `query` is in `line`, the way the search found it, so a row can mark exactly that.
     public static func ranges(of query: String, in line: String, options: Options) -> [Range<String.Index>] {
@@ -164,7 +170,7 @@ public enum FileSearch {
     static func scan(_ query: String, in folder: String, options: Options, limit: Int, job: Job) -> [Match] {
         guard let matcher = matcher(query, options) else { return [] }
         var matches: [Match] = []
-        for path in Files.walk(folder) where !path.hasSuffix("/") && options.keeps(path) {
+        for path in Files.walk(folder, depth: walkDepth) where !path.hasSuffix("/") && options.keeps(path) {
             if job.isCancelled { return [] }
             guard case .text(let text)? = try? Files.read(folder + "/" + path) else { continue }
             var found = 0

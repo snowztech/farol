@@ -26,6 +26,8 @@ final class FindInFilesModel: ObservableObject {
     @Published var showsFiles = false
     @Published private(set) var matches: [FileSearch.Match] = []
     @Published private(set) var searching = false
+    /// The last search read a folder outside git, which only goes a few folders down.
+    @Published private(set) var walked = false
     /// The row the arrows or the mouse are on. Without one, Return opens the first match.
     @Published var active: FileSearch.Match?
     /// The folder the matches are in, so a pane that moved since still opens the right file.
@@ -77,12 +79,13 @@ final class FindInFilesModel: ObservableObject {
         let work = DispatchWorkItem {
             DispatchQueue.global(qos: .userInitiated).async {
                 let found = FileSearch.search(query, in: folder, options: options, limit: Self.limit, job: job)
+                let walked = FileSearch.walks(folder)
                 DispatchQueue.main.async { [weak self] in
                     guard let self, self.job === job, !job.isCancelled else { return }
                     // A search run again after an edit keeps your place when the line is still there.
                     let kept = active.flatMap { old in found.first { $0.path == old.path && $0.line == old.line } }
                     let moved = searched != folder
-                    (matches, searched, active, searching) = (found, folder, kept, false)
+                    (matches, searched, active, searching, self.walked) = (found, folder, kept, false, walked)
                     if moved { watch() }
                 }
             }
@@ -258,6 +261,9 @@ struct FindInFiles: View {
                     }
                     if model.matches.count == FindInFilesModel.limit {
                         note("Type more to narrow it down.", p)
+                    }
+                    if model.walked && model.hasQuery && !model.invalid && !model.searching {
+                        note("Not a git repo, so only \(FileSearch.walkDepth) folders down are searched.", p)
                     }
                 }
                 .padding(.horizontal, 6)
