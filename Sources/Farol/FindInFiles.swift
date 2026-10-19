@@ -263,6 +263,9 @@ struct FindInFiles: View {
                     // The filter narrows a search and finds nothing on its own, so an empty field says what it waits for.
                     if !model.hasQuery && !model.globs.trimmingCharacters(in: .whitespaces).isEmpty {
                         note("Type what to find in the files matching \(model.globs.trimmingCharacters(in: .whitespaces)).", p)
+                    } else if !model.hasQuery {
+                        // Before anything is typed, the one place to tell this apart from ⌘P, which finds files by their name.
+                        note("Finds text in the files under \(((model.folder() ?? "") as NSString).lastPathComponent). ⌘P finds files by name.", p)
                     } else if model.invalid {
                         note("This regular expression isn't valid.", p)
                     } else if files.isEmpty && !model.searching && model.hasQuery {
