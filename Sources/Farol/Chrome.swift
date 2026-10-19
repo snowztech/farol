@@ -14,6 +14,8 @@ final class WindowState: ObservableObject {
     @Published var showingMerge = false
     /// The session list under the title is open, from a click or ⌘P.
     @Published var switchingSession = false
+    /// Find in Files is open under the title, from ⇧⌘F.
+    @Published var findingInFiles = false
     /// Mirrors the sidebar and the files panel, so the top bar can match the columns below it.
     @Published var sidebarVisible = true
     @Published var filesVisible = false
@@ -44,6 +46,7 @@ struct Commands {
     let toggleSettings: () -> Void
     let toggleMerge: () -> Void
     let openFile: (String) -> Void
+    let openFileAt: (String, Int) -> Void
     let newSessionIn: (String) -> Void
     let titleBarDoubleClick: () -> Void
 }
@@ -64,6 +67,12 @@ struct TopBar: View {
                     Text("Settings")
                 } else if let session = store.selected {
                     SessionMenu(session: session, store: store, state: state, commands: commands)
+                        .popover(isPresented: $state.findingInFiles, arrowEdge: .bottom) {
+                            FindInFiles(folder: session.directory, palette: p) { path, line in
+                                state.findingInFiles = false
+                                commands.openFileAt(path, line)
+                            }
+                        }
                 }
             }
             .font(.system(size: 12, weight: .medium))

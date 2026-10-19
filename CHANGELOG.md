@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Find in Files, in the Edit menu or with ⇧⌘F: every line with the text you type, in the files under the folder of the pane you are in. A checkout skips what git ignores. Return or a click opens the file at that line.
+
 ## [0.43.1] - 2026-10-19
 
 A session shows only the ports you would open, and the Farol menu lines up on macOS 26.

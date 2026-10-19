@@ -97,6 +97,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             toggleSettings: { [weak self] in self?.toggleSettings() },
             toggleMerge: { [weak self] in self?.toggleMerge() },
             openFile: { [weak self] in self?.open($0) },
+            openFileAt: { [weak self] in self?.open($0, line: $1) },
             newSessionIn: { [weak self] in self?.newSession(in: $0) },
             titleBarDoubleClick: { [weak self] in self?.titleBarDoubleClicked() })
 
@@ -549,6 +550,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         state.showingSettings = false
         state.showingMerge.toggle()
         show(store.selected)
+    }
+
+    /// Under the title like the session list, so settings close first.
+    func findInFiles() {
+        guard store.selected != nil else { return }
+        if state.showingSettings { toggleSettings() }
+        state.switchingSession = false
+        state.findingInFiles.toggle()
     }
 
     /// Settings hide the session's title, which the list opens under.

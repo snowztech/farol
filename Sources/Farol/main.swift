@@ -78,6 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func previousSession(_ sender: Any?) { store.selectNext(offset: -1) }
     @objc func selectSession(_ sender: NSMenuItem) { store.select(index: sender.tag) }
     @objc func switchSession(_ sender: Any?) { windowController.switchSession() }
+    @objc func findInFiles(_ sender: Any?) { windowController.findInFiles() }
 
     @objc func toggleSettings(_ sender: Any?) { windowController.toggleSettings() }
     @objc func showAbout(_ sender: Any?) { windowController.showAbout() }
@@ -152,6 +153,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             edit.addItem(withTitle: "Find Next", action: #selector(findNext), keyEquivalent: "g"),
             edit.addItem(withTitle: "Find Previous", action: #selector(findPrevious), keyEquivalent: "G"),
             edit.addItem(withTitle: "Use Selection for Find", action: #selector(findSelection), keyEquivalent: "e"),
+            edit.addItem(withTitle: "Find in Files…", action: #selector(findInFiles), keyEquivalent: "F"),
         ]
         // Find acts on the session, not on whatever text field has focus.
         findItems.forEach { $0.target = self }
