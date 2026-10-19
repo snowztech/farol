@@ -58,6 +58,14 @@ final class PaneContainer: NSView {
     private var searchBar: SearchBar?
     /// Only panes you named have one.
     private var labels: [UUID: PaneLabel] = [:]
+    /// The project's commands for a pane's folder, read off the main thread. Set by the store, which knows where the checkout is.
+    var projectCommands: ((TerminalView, @escaping ([ProjectCommand]) -> Void) -> Void)?
+    /// The command each pane's ▶ started, kept while it runs, so ■ stops that command and never an agent.
+    private var started: [UUID: ProjectCommand] = [:]
+    /// ▶ or ■ in the corner of the pane under the mouse. One for all panes, since only one is under the mouse.
+    private var runButton: QuietButton?
+    private var hovered: TerminalView?
+    private var hoverArea: NSTrackingArea?
     var onFocusChange: ((TerminalView) -> Void)?
     /// Panes were added, removed or resized, so the saved layout is out of date.
     var onLayoutChange: (() -> Void)?
@@ -313,6 +321,7 @@ final class PaneContainer: NSView {
         applyFocus()
         placeLabels()
         placeSearchBar()
+        placeRunButton()
         window?.invalidateCursorRects(for: self)
         needsDisplay = true
     }
@@ -414,6 +423,113 @@ final class PaneContainer: NSView {
             let width = min(label.fittingWidth, terminal.frame.width - 20)
             label.frame = NSRect(x: terminal.frame.maxX - width - 10, y: terminal.frame.minY + 8, width: width, height: 20)
             if label.superview == nil { addSubview(label, positioned: .above, relativeTo: terminal) }
+        }
+    }
+
+    // MARK: Run
+
+    /// Follows the mouse over the panes, so the button shows only on the one you point at.
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let hoverArea { removeTrackingArea(hoverArea) }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self)
+        addTrackingArea(area)
+        hoverArea = area
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        let point = convert(event.locationInWindow, from: nil)
+        let terminal = terminals.first { !$0.isHidden && $0.frame.contains(point) }
+        if terminal !== hovered { hover(terminal) }
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        // Not while the mouse is on the button itself, which sits above the pane.
+        guard let button = runButton, !button.frame.contains(convert(event.locationInWindow, from: nil)) else { return hover(nil) }
+    }
+
+    /// At the prompt, ▶ when the folder's project defines commands. While a command it started runs, ■.
+    /// Anything else in front, like an agent or vim, gets nothing, so the button can never interrupt it.
+    private func hover(_ terminal: TerminalView?) {
+        hovered = terminal
+        runButton?.isHidden = true
+        guard let terminal, let projectCommands else { return }
+        let busy = terminal.runsProgram
+        if busy, started[terminal.id] != nil { return showRunButton(stop: true, on: terminal) }
+        started[terminal.id] = nil
+        guard !busy else { return }
+        projectCommands(terminal) { [weak self, weak terminal] commands in
+            guard let self, let terminal, self.hovered === terminal, !commands.isEmpty, !terminal.runsProgram else { return }
+            self.showRunButton(stop: false, on: terminal)
+        }
+    }
+
+    private func showRunButton(stop: Bool, on terminal: TerminalView) {
+        let button = runButton ?? {
+            let button = QuietButton(symbol: "play.fill", help: "") { [weak self] in self?.runButtonClicked() }
+            button.apply(background: theme.background, foreground: theme.foreground)
+            runButton = button
+            return button
+        }()
+        let command = started[terminal.id]?.command ?? ""
+        button.show(symbol: stop ? "stop.fill" : "play.fill", help: stop ? "Stop \(command)" : "Run a project command")
+        button.isHidden = false
+        placeRunButton()
+    }
+
+    /// Top right of the pane under the mouse, left of its name. Out of the way of the search bar, which takes that corner.
+    private func placeRunButton() {
+        guard let button = runButton, let terminal = hovered, !button.isHidden else { return }
+        guard searchBar?.terminal !== terminal else { return button.isHidden = true }
+        let label = labels[terminal.id].map { $0.frame.width + 6 } ?? 0
+        button.frame = NSRect(x: terminal.frame.maxX - 10 - label - 22, y: terminal.frame.minY + 8, width: 22, height: 20)
+        if button.superview == nil { addSubview(button, positioned: .above, relativeTo: nil) }
+    }
+
+    private func runButtonClicked() {
+        guard let terminal = hovered, let button = runButton else { return }
+        if started[terminal.id] != nil, terminal.runsProgram {
+            terminal.pressControl("c")
+            started[terminal.id] = nil
+            return refreshRunButton(on: terminal)
+        }
+        projectCommands?(terminal) { [weak self, weak terminal] commands in
+            guard let self, let terminal, !commands.isEmpty else { return }
+            let menu = NSMenu()
+            for command in commands {
+                let item = ActionMenuItem(title: command.name) { [weak self, weak terminal] in
+                    guard let self, let terminal else { return }
+                    self.run(command, in: terminal)
+                }
+                // The name, then what it types in the muted color, like the rows in ⌘P.
+                let title = NSMutableAttributedString(string: command.name + "  ", attributes: [.font: NSFont.menuFont(ofSize: 13)])
+                title.append(NSAttributedString(string: command.command, attributes: [
+                    .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .regular), .foregroundColor: NSColor.secondaryLabelColor,
+                ]))
+                item.attributedTitle = title
+                menu.addItem(item)
+            }
+            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.maxY + 4), in: button)
+        }
+    }
+
+    private func run(_ command: ProjectCommand, in terminal: TerminalView) {
+        // Read again: the menu stayed open while anything could have started in the pane.
+        guard !terminal.runsProgram else { return }
+        focus(terminal)
+        terminal.pasteText(command.line(from: terminal.workingDirectory))
+        terminal.press(.enter)
+        started[terminal.id] = command
+        refreshRunButton(on: terminal)
+    }
+
+    /// The shell takes a moment to start or stop the command, so the button looks again a little later.
+    private func refreshRunButton(on terminal: TerminalView) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self, weak terminal] in
+            guard let self, let terminal, self.hovered === terminal else { return }
+            self.hover(terminal)
         }
     }
 

@@ -456,6 +456,14 @@ final class SessionStore: ObservableObject {
             self?.save()
         }
         panes.onLayoutChange = { [weak self] in self?.save() }
+        // Over ssh the shell is on the server, where the Mac's folders mean nothing.
+        panes.projectCommands = { [weak session] terminal, done in
+            guard let session, !session.isRemote, let folder = terminal.workingDirectory else { return done([]) }
+            DispatchQueue.global(qos: .userInitiated).async {
+                let found = ProjectCommands.find(in: folder, top: Git.topLevel(of: folder))
+                DispatchQueue.main.async { done(found) }
+            }
+        }
         session.onRepoChange = { [weak self] in self?.objectWillChange.send() }
         session.onGitStateChange = { [weak self, weak session] before in
             guard let self, let session else { return }
