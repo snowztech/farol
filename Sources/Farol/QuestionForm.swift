@@ -22,8 +22,12 @@ struct QuestionColors {
 struct QuestionForm: View {
     let questions: [AgentQuestion]
     let colors: QuestionColors
-    /// Who asks, when the form isn't already inside that session.
+    /// The session that asks, when the form isn't already inside it.
     var asker: String?
+    /// Other sessions waiting on a question of their own.
+    var waiting = 0
+    /// The theme's waiting color, for the dot by the session's name.
+    var waitingColor: Color?
     var maxHeight: CGFloat = 420
     /// The answer to each question, keyed by its text.
     let answer: ([String: String]) -> Void
@@ -44,7 +48,13 @@ struct QuestionForm: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     if let asker {
-                        Text("\(asker) asks").font(.system(size: 11, weight: .semibold)).foregroundStyle(colors.muted)
+                        // The session's name with its waiting dot, as in the sidebar. A name like "Respond to greeting" reads badly as "… asks".
+                        HStack(spacing: 7) {
+                            Circle().fill(waitingColor ?? colors.text).frame(width: 7, height: 7)
+                            Text(asker).foregroundStyle(colors.text).lineLimit(1)
+                            if waiting > 0 { Text("· \(waiting) more waiting").foregroundStyle(colors.muted).fixedSize() }
+                        }
+                        .font(.system(size: 11, weight: .semibold))
                     }
                     ForEach(Array(questions.enumerated()), id: \.offset) { index, question in
                         questionView(index, question)
