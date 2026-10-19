@@ -377,6 +377,12 @@ final class RemoteBridge: ObservableObject {
             tell(.history(session: session, text: pane.historyText()), id)
         case .send(let session, let text):
             act(command, by: device, on: session, from: id) { pane in
+                // While Farol holds a question, the agent shows nothing to type into, so a typed reply is the answer, as Other is on the Mac.
+                let answer = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                if let target = store.sessions.first(where: { $0.id == session }), let ask = target.ask, ask.pane == pane.id,
+                   ask.questions.count == 1, let question = ask.questions.first, !answer.isEmpty {
+                    return store.answer(target, with: [question.text: answer])
+                }
                 pane.pasteText(text)
                 pasted[ObjectIdentifier(pane)] = (.now, text)
             }
@@ -418,7 +424,13 @@ final class RemoteBridge: ObservableObject {
         }
         // Gone at once, so a second tap is refused rather than typed into whatever the agent asks next.
         session.request = nil
-        terminal.type(String(choice))
+        // While Farol holds a question through its hook, the agent shows nothing to type into, so the answer goes back through the hook.
+        if let ask = session.ask, ask.pane == pane, let question = ask.questions.first, ask.questions.count == 1,
+           question.options.indices.contains(choice - 1) {
+            store.answer(session, with: [question.text: question.options[choice - 1].label])
+        } else {
+            terminal.type(String(choice))
+        }
         tell(.done(command: command.id), phone)
         tick()
     }

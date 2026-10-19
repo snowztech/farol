@@ -1,7 +1,8 @@
 import AppKit
+import FarolCore
 import SwiftUI
 
-/// A small black panel with agent status, shown while an agent is active. Hovering it shows the sessions.
+/// A small black panel with agent status, shown while an agent is active. Hovering it shows the sessions, or a question an agent waits on.
 /// At the notch it grows the notch like the Dynamic Island.
 /// On the screen edge it's a slim tab on the right, which no other app competes for and which works on any Mac.
 final class NotchStatus {
@@ -10,6 +11,10 @@ final class NotchStatus {
     }
 
     var onSelect: ((Session) -> Void)?
+    /// What was picked on a question shown here.
+    var onAnswer: ((Session, [String: String]) -> Void)?
+    var onChat: ((Session) -> Void)?
+    var onTerminal: ((Session) -> Void)?
     var place = Place.notch {
         didSet {
             model.place = place
@@ -19,12 +24,14 @@ final class NotchStatus {
 
     private let store: SessionStore
     private let model = NotchModel()
-    private var panel: NSPanel?
+    private var panel: QuestionPanel?
     private var visible = false
     private var screenObserver: Any?
     /// Where the panel is heading, which can differ from its frame while it animates.
     private var target = NSRect.zero
     private var hoverTimer: Timer?
+    /// Watching for a click away from the question while it shows, in other apps and in Farol's own windows.
+    private var clickMonitors: [Any] = []
     /// Where the mouse grabbed the tab, relative to the panel's origin, while it's being dragged.
     private var grab: NSPoint?
     private static let edgeLeftKey = "agents.edgeLeft"
@@ -33,6 +40,8 @@ final class NotchStatus {
     /// How far the notch grows on each side.
     fileprivate static let wing: CGFloat = 36
     private static let rowHeight: CGFloat = 26
+    /// A question needs room for its options, and the edge tab sits beside it.
+    fileprivate static let questionWidth: CGFloat = 440
 
     /// A Mac with a notch, so Settings only offers the option there.
     static var isAvailable: Bool { notchScreen != nil }
@@ -52,6 +61,10 @@ final class NotchStatus {
             NSApp.activate(ignoringOtherApps: true)
             self.onSelect?(session)
         }
+        model.onCardHeight = { [weak self] in self?.layout(animated: true) }
+        model.onAnswer = { [weak self] id, answers in self?.session(id).map { self?.onAnswer?($0, answers) } }
+        model.onChat = { [weak self] id in self?.session(id).map { self?.onChat?($0) } }
+        model.onTerminal = { [weak self] id in self?.session(id).map { self?.onTerminal?($0) } }
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
         ) { [weak self] _ in self?.layout(animated: false) }
@@ -71,16 +84,54 @@ final class NotchStatus {
         model.palette = palette
     }
 
-    /// Called whenever a session's activity changes.
+    private func session(_ id: UUID) -> Session? { store.sessions.first { $0.id == id } }
+
+    /// Called whenever a session's activity changes, or a question comes or goes.
+    /// A question never opens by itself: the waiting dot and the notification say it's there, and hovering the panel shows it.
     func refresh() {
         model.rows = store.ordered.map { NotchModel.Row(id: $0.id, name: $0.displayName, activity: $0.activity) }
+        // Not for the session you are looking at while Farol is in front, which asks in its own terminal.
+        let asking = store.ordered.filter { $0.ask != nil && !(NSApp.isActive && $0.id == store.selectedID) }
+        let question = asking.first.flatMap { session in
+            session.ask.map {
+                NotchModel.Question(id: $0.id, session: session.id, name: session.displayName, questions: $0.questions, more: asking.count - 1)
+            }
+        }
+        if model.question != question {
+            model.question = question
+            model.cardHeight = 0
+        }
+        watchClicks(model.showsQuestion)
         layout(animated: true)
+    }
+
+    /// A click anywhere but on the panel closes the question. It stays pending, for the next hover, its notification or its session.
+    private func watchClicks(_ on: Bool) {
+        guard on != !clickMonitors.isEmpty else { return }
+        guard on else {
+            clickMonitors.forEach(NSEvent.removeMonitor)
+            clickMonitors = []
+            return
+        }
+        let buttons: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown]
+        let close = { [weak self] in
+            guard let self, self.model.showsQuestion else { return }
+            self.model.expanded = false
+            self.refresh()
+        }
+        // Other apps get their clicks first, and this only hears about them.
+        if let other = NSEvent.addGlobalMonitorForEvents(matching: buttons, handler: { _ in close() }) { clickMonitors.append(other) }
+        // Farol's own windows, where the click still goes through to what was clicked.
+        if let own = NSEvent.addLocalMonitorForEvents(matching: buttons, handler: { [weak self] event in
+            if event.window !== self?.panel { close() }
+            return event
+        }) { clickMonitors.append(own) }
     }
 
     // MARK: Window
 
     private func layout(animated: Bool) {
-        guard visible, model.isActive || model.expanded, let frame = place == .notch ? notchFrame() : edgeFrame() else {
+        guard visible, model.isActive || model.expanded || model.question != nil, let frame = place == .notch ? notchFrame() : edgeFrame() else {
             panel?.orderOut(nil)
             watchHover(false)
             return
@@ -88,6 +139,10 @@ final class NotchStatus {
         target = frame
 
         let panel = self.panel ?? makePanel()
+        // The keyboard is only taken for a question, and only once you click into it, so typing elsewhere never lands here.
+        panel.takesKey = model.showsQuestion
+        // Still key after the question is gone, it would keep what you type. Ordering it out hands the keyboard back.
+        if !panel.takesKey, panel.isKeyWindow { panel.orderOut(nil) }
         if panel.isVisible, animated {
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.18
@@ -120,8 +175,10 @@ final class NotchStatus {
     private func checkHover() {
         guard grab == nil else { return }
         let inside = target.insetBy(dx: -1, dy: -1).contains(NSEvent.mouseLocation)
-        guard inside != model.expanded else { return }
-        model.expanded = inside
+        // Once you click into a question it stays open as the mouse leaves, so a half typed answer isn't lost. A click away closes it.
+        let open = inside || (model.showsQuestion && panel?.isKeyWindow == true)
+        guard open != model.expanded else { return }
+        model.expanded = open
         // Names change as programs retitle their sessions, so the list is read again each time it opens.
         refresh()
     }
@@ -135,8 +192,10 @@ final class NotchStatus {
         let notchHeight = screen.safeAreaInsets.top
         model.notch = NSSize(width: notchWidth, height: notchHeight)
         let collapsedWidth = notchWidth + 2 * Self.wing
-        let width = model.expanded ? max(collapsedWidth, 320) : collapsedWidth
-        let height = notchHeight + (model.expanded ? CGFloat(model.rows.count) * Self.rowHeight + 12 : 0)
+        let width = model.showsQuestion ? max(collapsedWidth, Self.questionWidth)
+            : model.expanded ? max(collapsedWidth, 320) : collapsedWidth
+        let body = model.showsQuestion ? model.questionHeight : model.expanded ? CGFloat(model.rows.count) * Self.rowHeight + 12 : 0
+        let height = notchHeight + body
         return NSRect(x: screen.frame.midX - width / 2, y: screen.frame.maxY - height, width: width, height: height)
     }
 
@@ -145,8 +204,8 @@ final class NotchStatus {
         guard let screen = NSScreen.main ?? NSScreen.screens.first else { return nil }
         let tab = EdgeTab.size(dots: model.active.count)
         let list = CGFloat(model.rows.count) * Self.rowHeight + 20
-        let width = model.expanded ? 300 : tab.width
-        let height = model.expanded ? max(tab.height, list) : tab.height
+        let width = model.showsQuestion ? Self.questionWidth + tab.width : model.expanded ? 300 : tab.width
+        let height = model.showsQuestion ? max(tab.height, model.questionHeight) : model.expanded ? max(tab.height, list) : tab.height
         let visible = screen.visibleFrame
         let saved = UserDefaults.standard.object(forKey: Self.edgeFromTopKey) as? Double ?? 48
         // Kept on screen, however the saved height compares with this screen and this many rows.
@@ -175,8 +234,8 @@ final class NotchStatus {
         layout(animated: true)
     }
 
-    private func makePanel() -> NSPanel {
-        let panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+    private func makePanel() -> QuestionPanel {
+        let panel = QuestionPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
@@ -191,6 +250,18 @@ final class NotchStatus {
     }
 }
 
+/// The status panel, which can take the keyboard while a question is open.
+private final class QuestionPanel: NSPanel {
+    var takesKey = false
+    override var canBecomeKey: Bool { takesKey }
+
+    override func sendEvent(_ event: NSEvent) {
+        // The first click on a window that isn't key only makes it key, and the button under it would miss it.
+        if event.type == .leftMouseDown, takesKey, !isKeyWindow { makeKey() }
+        super.sendEvent(event)
+    }
+}
+
 private final class NotchModel: ObservableObject {
     struct Row: Identifiable, Equatable {
         let id: UUID
@@ -198,7 +269,25 @@ private final class NotchModel: ObservableObject {
         let activity: Session.Activity
     }
 
+    /// What an agent asks, with the session that asks it.
+    struct Question: Equatable {
+        let id: UUID
+        let session: UUID
+        let name: String
+        let questions: [AgentQuestion]
+        /// Other sessions waiting on a question of their own.
+        let more: Int
+    }
+
     @Published var rows: [Row] = []
+    @Published var question: Question?
+    /// How tall the question is once drawn, which the panel is sized to. Zero until it has been.
+    var cardHeight: CGFloat = 0
+    var questionHeight: CGFloat { cardHeight == 0 ? 220 : cardHeight }
+    var onCardHeight: (() -> Void)?
+    var onAnswer: ((UUID, [String: String]) -> Void)?
+    var onChat: ((UUID) -> Void)?
+    var onTerminal: ((UUID) -> Void)?
     @Published var expanded = false
     @Published var palette: Palette?
     @Published var notch = NSSize(width: 180, height: 32)
@@ -208,6 +297,9 @@ private final class NotchModel: ObservableObject {
     var onSelect: ((UUID) -> Void)?
     /// Called as the edge tab is dragged, with true when the drag ends.
     var onDrag: ((Bool) -> Void)?
+
+    /// Open on a question an agent waits on, which takes the place of the session list.
+    var showsQuestion: Bool { expanded && question != nil }
 
     var active: [Row] { rows.filter { $0.activity != .idle } }
     var isActive: Bool { !active.isEmpty }
@@ -236,7 +328,9 @@ private struct NotchView: View {
     private var notch: some View {
         VStack(spacing: 0) {
             header
-            if model.expanded {
+            if model.expanded, let question = model.question {
+                QuestionCard(model: model, question: question)
+            } else if model.expanded {
                 VStack(spacing: 0) {
                     ForEach(model.rows) { row in
                         NotchRow(row: row, color: color(row.activity)) { model.onSelect?(row.id) }
@@ -278,6 +372,36 @@ private struct NotchView: View {
     }
 }
 
+/// The question an agent asks, with its options as buttons, on the black panel.
+private struct QuestionCard: View {
+    @ObservedObject var model: NotchModel
+    let question: NotchModel.Question
+
+    var body: some View {
+        QuestionForm(
+            questions: question.questions, colors: .notch,
+            asker: question.name, waiting: question.more, waitingColor: model.palette?.color(.waiting).map(Color.init),
+            maxHeight: 360,
+            answer: { model.onAnswer?(question.session, $0) },
+            chat: { model.onChat?(question.session) },
+            useTerminal: { model.onTerminal?(question.session) })
+            .id(question.id)
+            .fixedSize(horizontal: false, vertical: true)
+            .background(GeometryReader { Color.clear.preference(key: CardHeightKey.self, value: $0.size.height) })
+            .onPreferenceChange(CardHeightKey.self) { height in
+                guard height > 0, height != model.cardHeight else { return }
+                model.cardHeight = height
+                model.onCardHeight?()
+            }
+    }
+}
+
+/// Apart from the form's own height key, which its inner scroll view reports, so the two don't mix.
+private struct CardHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
 /// The screen edge style: a slim tab with Farol's icon and one dot per active session.
 /// Open, the session list sits to the left of the tab, so the tab itself never moves.
 private struct EdgeView: View {
@@ -287,7 +411,9 @@ private struct EdgeView: View {
         let left = model.edgeLeft
         HStack(alignment: .top, spacing: 0) {
             if left { tab }
-            if model.expanded {
+            if model.expanded, let question = model.question {
+                QuestionCard(model: model, question: question)
+            } else if model.expanded {
                 VStack(spacing: 0) {
                     ForEach(model.rows) { row in
                         NotchRow(row: row, color: color(row.activity)) { model.onSelect?(row.id) }

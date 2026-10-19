@@ -13,6 +13,21 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - A file opened at a line, from Find in Files, a path in the terminal or the review panel, lights that line until you move the cursor away.
 
+## [0.44.0] - 2026-10-19
+
+Answer Claude Code's questions from anywhere: the notification, the status panel or your phone.
+
+### Added
+
+- Claude Code's questions can be answered from the notification, with buttons for a question with a few options. In the session you are looking at, Claude asks in its terminal as usual. Choose Chat About This to turn a question down and talk it over with Claude, or Answer in Terminal to answer there as before. If you connected Claude Code before, Settings → Agents shows Needs update: click Update to add the hook for it.
+- With the status panel on, hover it while an agent waits to see its question with the options as buttons, at the notch or on the screen edge, so you can answer from any app. It never opens by itself, and it takes the keyboard only once you click into it. Clicking away closes it, and the question waits for the next hover, in its notification and in its session.
+- The notification for a waiting agent shows its question and the answers it offers, or the tool it asks to run and what for.
+- Remote: a reply typed on the phone answers a question Farol holds for Claude Code, like tapping one of its answers.
+
+### Changed
+
+- Settings → Remote no longer has its own Connect buttons for agents. The phone shows the agents connected in Settings → Agents.
+
 ## [0.43.1] - 2026-10-19
 
 A session shows only the ports you would open, and the Farol menu lines up on macOS 26.

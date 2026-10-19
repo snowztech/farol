@@ -97,6 +97,15 @@ final class Listening {
     #expect(request.choices == [AgentRequest.Choice(label: "SQLite", detail: "One file"), AgentRequest.Choice(label: "Postgres", detail: nil)])
 }
 
+@Test func aSummaryPutsTheAnswersAfterTheQuestion() throws {
+    let question = Data(#"{"hook_event_name":"PreToolUse","tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"Which database?","options":[{"label":"SQLite"},{"label":"Postgres"}]}]}}"#.utf8)
+    #expect(try #require(AgentRequest(hookInput: question)).summary() == "Which database? SQLite · Postgres")
+    let tool = Data(#"{"hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{"command":"rm -rf build","description":"Clean the build"}}"#.utf8)
+    #expect(try #require(AgentRequest(hookInput: tool)).summary() == "Bash · Clean the build")
+    let long = try #require(AgentRequest(hookInput: tool)).summary(limit: 10)
+    #expect(long.count == 10 && long.hasSuffix("…"))
+}
+
 @Test func onlyARequestOrASingleQuestionIsARequest() {
     let two = Data(#"{"hook_event_name":"PreToolUse","tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"A?"},{"question":"B?"}]}}"#.utf8)
     #expect(AgentRequest(hookInput: two) == nil)
