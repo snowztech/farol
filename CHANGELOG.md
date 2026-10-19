@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.45.0] - 2026-10-19
+
+Find text in the files under the pane you are in, with ⇧⌘F.
+
 ### Added
 
 - Find in Files, in the Edit menu, with ⇧⌘F or with the magnifier at the top of the files panel: the files panel lists every line with the text you type, in the files under the folder of the pane you are in. A checkout skips what git ignores. Buttons in the field match case, whole words or a regular expression, and a second field keeps or leaves out files, like `*.swift, !*Tests*`. Below a repo's top, it can search the whole repo instead. Return or a click opens the file at that line with every match marked, and F4 and ⇧F4 go to the next and previous result from the file. The search stays when you go back to the tree, starts from the text you selected, and runs again when files change under it.
