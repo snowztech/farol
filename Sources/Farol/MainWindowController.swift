@@ -113,8 +113,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             open: { [weak self] in self?.open($0, line: $1) },
             openMatch: { [weak self] in self?.openMatch($0, line: $1) },
             resize: { [weak self] in self?.setFilesWidth($0) },
-            startSearch: { [weak self] in self?.findInFiles() },
-            close: { [weak self] in self?.setFiles(visible: false) }))
+            startSearch: { [weak self] in self?.findInFiles() }))
         filesPanel.clipsToBounds = true
         let graphPanel = hosting(GraphPanel(
             graph: graph, state: state, review: review,

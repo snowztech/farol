@@ -102,7 +102,6 @@ struct FilesPanel: View {
     let resize: (CGFloat) -> Void
     /// The magnifier: Find in Files in place of the tree.
     let startSearch: () -> Void
-    let close: () -> Void
 
     @State private var dragStart: CGFloat?
 
@@ -140,19 +139,19 @@ struct FilesPanel: View {
 
     private func header(_ p: Palette) -> some View {
         HStack(spacing: 4) {
-            IconButton(symbol: "chevron.left", help: "Hide files (⇧⌘E)", palette: p, action: close)
             Text(tree.root.map { ($0 as NSString).lastPathComponent } ?? (state.remote ? "Not available over ssh" : ""))
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(p.muted)
                 .lineLimit(1)
             Spacer(minLength: 0)
             // Like tabs: the lit one is what the panel shows, and the other switches to it.
-            IconButton(symbol: "folder", help: "Files (esc)", active: !state.filesSearching, palette: p) {
+            IconButton(symbol: "doc", help: "Files (esc)", active: !state.filesSearching, palette: p) {
                 state.filesSearching = false
             }
             IconButton(symbol: "magnifyingglass", help: "Find in Files (⇧⌘F)", active: state.filesSearching, palette: p, action: startSearch)
         }
-        .padding(.horizontal, 6)
+        .padding(.leading, 14)
+        .padding(.trailing, 6)
         .padding(.top, 6)
         .padding(.bottom, 2)
     }
