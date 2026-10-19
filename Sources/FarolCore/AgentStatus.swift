@@ -71,6 +71,15 @@ public struct AgentRequest: Codable, Equatable, Sendable {
     }
 }
 
+extension AgentRequest {
+    /// One line for a notification: the question and its answers, or the tool and what it would do, cut to fit.
+    public func summary(limit: Int = 180) -> String {
+        let line = tool.map { "\($0) · \(title)" }
+            ?? (choices.isEmpty ? title : title + " " + choices.map(\.label).joined(separator: " · "))
+        return line.count <= limit ? line : String(line.prefix(limit - 1)) + "…"
+    }
+}
+
 /// The conversation an agent keeps, as Claude Code's hooks name it on their input.
 public struct AgentConversation: Codable, Equatable, Sendable {
     /// What `claude --resume` takes.

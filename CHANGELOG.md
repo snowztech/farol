@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- The notification for a waiting agent shows its question and the answers it offers, or the tool it asks to run and what for.
+
 ## [0.43.1] - 2026-10-19
 
 A session shows only the ports you would open, and the Farol menu lines up on macOS 26.
