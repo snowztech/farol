@@ -615,6 +615,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         store.selected?.panes.file?.mark { FileSearch.ranges(of: query, in: $0, options: options) }
     }
 
+    /// Only with results and a file in front, so F4 stays a key for programs in the terminal, like htop's filter, the rest of the time.
+    var canStepResult: Bool { !fileSearch.matches.isEmpty && focusedFile != nil }
+
     /// F4 and ⇧F4: the next or previous result, from the file, without going back to the panel.
     func stepResult(_ by: Int) {
         guard let match = fileSearch.step(by) else { return }

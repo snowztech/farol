@@ -114,6 +114,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         switch item.action {
         case #selector(saveFile): windowController.canSaveFile
         case #selector(checkForUpdates): windowController.canCheckForUpdates
+        case #selector(nextResult), #selector(previousResult): windowController.canStepResult
         default: true
         }
     }
