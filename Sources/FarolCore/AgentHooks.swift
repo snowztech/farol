@@ -9,6 +9,8 @@ public struct AgentHooks {
         public let name: String
         public let status: String
         public let matcher: String?
+        /// Seconds before the agent gives up on the hook. Set for one that waits on you.
+        public var timeout: Int?
     }
 
     public let name: String
@@ -35,6 +37,8 @@ public struct AgentHooks {
         // These say what is asked, which a phone shows instead of reading the screen. They decide nothing, so the prompt shows as usual.
         Event(name: "PermissionRequest", status: "waiting", matcher: nil),
         Event(name: "PreToolUse", status: "waiting", matcher: "^AskUserQuestion$"),
+        // Waits for you to pick an answer in Farol. Without one, Claude asks in the terminal as usual.
+        Event(name: "PermissionRequest", status: "ask", matcher: "^AskUserQuestion$", timeout: 86_400),
         Event(name: "Stop", status: "done", matcher: nil),
         // Runs instead of Stop when an API error, like a usage limit, ends the turn.
         Event(name: "StopFailure", status: "done", matcher: nil),
@@ -73,7 +77,7 @@ public struct AgentHooks {
 
     /// Does nothing outside Farol, where $FAROL_CLI is unset.
     public static func command(_ status: String) -> String {
-        "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" status \(status)"
+        "[ -z \"$FAROL_CLI\" ] || \"$FAROL_CLI\" " + (status == "ask" ? "ask" : "status \(status)")
     }
 
     /// True when every Farol hook is there in its current form. Older ones count as missing, so Connect updates them.
@@ -96,7 +100,9 @@ public struct AgentHooks {
         var settings = remove(from: settings)
         var hooks = settings["hooks"] as? [String: Any] ?? [:]
         for event in events {
-            var group: [String: Any] = ["hooks": [["type": "command", "command": Self.command(event.status)]]]
+            var hook: [String: Any] = ["type": "command", "command": Self.command(event.status)]
+            if let timeout = event.timeout { hook["timeout"] = timeout }
+            var group: [String: Any] = ["hooks": [hook]]
             if let matcher = event.matcher { group["matcher"] = matcher }
             hooks[event.name] = (hooks[event.name] as? [[String: Any]] ?? []) + [group]
         }

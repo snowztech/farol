@@ -6,6 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
+- Claude Code's questions can be answered in Farol: a window with the options when you open the session, and buttons in the notification for a question with a few options. Choose Chat About This to turn a question down and talk it over with Claude, or Answer in Terminal to answer there as before. Click **Connect** again in Settings → Agents to add the hook for it.
 - The notification for a waiting agent shows its question and the answers it offers, or the tool it asks to run and what for.
 
 ## [0.43.1] - 2026-10-19
