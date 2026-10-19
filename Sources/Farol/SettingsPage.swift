@@ -18,6 +18,7 @@ struct SettingsPage: View {
 
     @AppStorage(AppIcon.key) private var appIcon = AppIcon.default.rawValue
     @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = false
+    @AppStorage(PaneContainer.runButtonKey) private var runButton = true
     /// The relay field, shown only once you ask to use your own.
     @State private var relayDraft: String?
     @State private var versionCopied = false
@@ -155,6 +156,11 @@ struct SettingsPage: View {
             }
             .labelsHidden()
             .fixedSize()
+        }
+        Row(title: "Run button on panes",
+            detail: "▶ in a pane's corner, under the mouse, runs one of the project's commands, and ■ stops it with the port it listens on. ⌘P and the right-click menu run them too.",
+            palette: p) {
+            toggle($runButton)
         }
         .padding(.bottom, 32)
 

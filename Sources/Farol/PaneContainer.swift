@@ -58,14 +58,20 @@ final class PaneContainer: NSView {
     private var searchBar: SearchBar?
     /// Only panes you named have one.
     private var labels: [UUID: PaneLabel] = [:]
-    /// The project's commands for a pane's folder, read off the main thread. Set by the store, which knows where the checkout is.
-    var projectCommands: ((TerminalView, @escaping ([ProjectCommand]) -> Void) -> Void)?
-    /// The command each pane's ▶ started, kept while it runs, so ■ stops that command and never an agent.
+    /// The folder whose project's commands a pane offers, or nil where it has none to offer, like over ssh. Set by the store.
+    var commandFolder: ((TerminalView) -> String?)?
+    /// Runs a command in a new pane below, for a pane where a program like an agent is in front. Returns that pane.
+    var runInNewPane: ((String) -> TerminalView?)?
+    /// What each pane's folder offers, from the last look, so the right-click menu doesn't wait on the files.
+    private var commands: [UUID: (folder: String, list: [ProjectCommand])] = [:]
+    /// The command started in each pane, kept while it runs, so ■ stops that command and never an agent.
     private var started: [UUID: ProjectCommand] = [:]
-    /// ▶ or ■ in the corner of the pane under the mouse. One for all panes, since only one is under the mouse.
-    private var runButton: QuietButton?
+    private var listening: [UUID: [Int]] = [:]
+    private var chips: [UUID: RunChip] = [:]
     private var hovered: TerminalView?
     private var hoverArea: NSTrackingArea?
+    /// Settings → Appearance. On unless turned off.
+    static let runButtonKey = "panes.runButton"
     var onFocusChange: ((TerminalView) -> Void)?
     /// Panes were added, removed or resized, so the saved layout is out of date.
     var onLayoutChange: (() -> Void)?
@@ -321,7 +327,7 @@ final class PaneContainer: NSView {
         applyFocus()
         placeLabels()
         placeSearchBar()
-        placeRunButton()
+        placeChips()
         window?.invalidateCursorRects(for: self)
         needsDisplay = true
     }
@@ -428,7 +434,7 @@ final class PaneContainer: NSView {
 
     // MARK: Run
 
-    /// Follows the mouse over the panes, so the button shows only on the one you point at.
+    /// Follows the mouse over the panes, so ▶ shows only on the one you point at.
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let hoverArea { removeTrackingArea(hoverArea) }
@@ -446,91 +452,163 @@ final class PaneContainer: NSView {
 
     override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
-        // Not while the mouse is on the button itself, which sits above the pane.
-        guard let button = runButton, !button.frame.contains(convert(event.locationInWindow, from: nil)) else { return hover(nil) }
+        hover(nil)
     }
 
-    /// At the prompt, ▶ when the folder's project defines commands. While a command it started runs, ■.
-    /// Anything else in front, like an agent or vim, gets nothing, so the button can never interrupt it.
     private func hover(_ terminal: TerminalView?) {
         hovered = terminal
-        runButton?.isHidden = true
-        guard let terminal, let projectCommands else { return }
-        let busy = terminal.runsProgram
-        if busy, started[terminal.id] != nil { return showRunButton(stop: true, on: terminal) }
-        started[terminal.id] = nil
-        guard !busy else { return }
-        projectCommands(terminal) { [weak self, weak terminal] commands in
-            guard let self, let terminal, self.hovered === terminal, !commands.isEmpty, !terminal.runsProgram else { return }
-            self.showRunButton(stop: false, on: terminal)
-        }
-    }
-
-    private func showRunButton(stop: Bool, on terminal: TerminalView) {
-        let button = runButton ?? {
-            let button = QuietButton(symbol: "play.fill", help: "") { [weak self] in self?.runButtonClicked() }
-            button.apply(background: theme.background, foreground: theme.foreground)
-            runButton = button
-            return button
-        }()
-        let command = started[terminal.id]?.command ?? ""
-        button.show(symbol: stop ? "stop.fill" : "play.fill", help: stop ? "Stop \(command)" : "Run a project command")
-        button.isHidden = false
-        placeRunButton()
-    }
-
-    /// Top right of the pane under the mouse, left of its name. Out of the way of the search bar, which takes that corner.
-    private func placeRunButton() {
-        guard let button = runButton, let terminal = hovered, !button.isHidden else { return }
-        guard searchBar?.terminal !== terminal else { return button.isHidden = true }
-        let label = labels[terminal.id].map { $0.frame.width + 6 } ?? 0
-        button.frame = NSRect(x: terminal.frame.maxX - 10 - label - 22, y: terminal.frame.minY + 8, width: 22, height: 20)
-        if button.superview == nil { addSubview(button, positioned: .above, relativeTo: nil) }
-    }
-
-    private func runButtonClicked() {
-        guard let terminal = hovered, let button = runButton else { return }
-        if started[terminal.id] != nil, terminal.runsProgram {
-            terminal.pressControl("c")
-            started[terminal.id] = nil
-            return refreshRunButton(on: terminal)
-        }
-        projectCommands?(terminal) { [weak self, weak terminal] commands in
-            guard let self, let terminal, !commands.isEmpty else { return }
-            let menu = NSMenu()
-            for command in commands {
-                let item = ActionMenuItem(title: command.name) { [weak self, weak terminal] in
-                    guard let self, let terminal else { return }
-                    self.run(command, in: terminal)
-                }
-                // The name, then what it types in the muted color, like the rows in ⌘P.
-                let title = NSMutableAttributedString(string: command.name + "  ", attributes: [.font: NSFont.menuFont(ofSize: 13)])
-                title.append(NSAttributedString(string: command.command, attributes: [
-                    .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .regular), .foregroundColor: NSColor.secondaryLabelColor,
-                ]))
-                item.attributedTitle = title
-                menu.addItem(item)
+        updateChips()
+        guard let terminal, !terminal.runsProgram, let folder = commandFolder?(terminal) else { return }
+        DispatchQueue.global(qos: .userInitiated).async { [weak self, weak terminal] in
+            let list = Self.lookUp(folder)
+            DispatchQueue.main.async {
+                guard let self, let terminal else { return }
+                self.commands[terminal.id] = (folder, list)
+                self.updateChips()
             }
-            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.maxY + 4), in: button)
         }
     }
 
-    private func run(_ command: ProjectCommand, in terminal: TerminalView) {
-        // Read again: the menu stayed open while anything could have started in the pane.
-        guard !terminal.runsProgram else { return }
+    /// Reads the project's files and asks git where the checkout's top is, so not on the main thread unless there is no other way.
+    private static func lookUp(_ folder: String) -> [ProjectCommand] {
+        ProjectCommands.find(in: folder, top: Git.topLevel(of: folder))
+    }
+
+    /// What a pane's folder offers: from the last look when the folder is the same, else read now.
+    private func commandList(for terminal: TerminalView) -> [ProjectCommand] {
+        guard let folder = commandFolder?(terminal) else { return [] }
+        if let cached = commands[terminal.id], cached.folder == folder { return cached.list }
+        let list = Self.lookUp(folder)
+        commands[terminal.id] = (folder, list)
+        return list
+    }
+
+    /// Typed at the pane's prompt. With a program like an agent in front, in a new pane below, so it never types into the agent.
+    func run(_ command: ProjectCommand, in terminal: TerminalView) {
+        let line = command.line(from: terminal.workingDirectory)
+        guard !terminal.runsProgram else {
+            if let pane = runInNewPane?(line) { track(command, in: pane) }
+            return
+        }
         focus(terminal)
-        terminal.pasteText(command.line(from: terminal.workingDirectory))
+        terminal.pasteText(line)
         terminal.press(.enter)
-        started[terminal.id] = command
-        refreshRunButton(on: terminal)
+        track(command, in: terminal)
     }
 
-    /// The shell takes a moment to start or stop the command, so the button looks again a little later.
-    private func refreshRunButton(on terminal: TerminalView) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self, weak terminal] in
-            guard let self, let terminal, self.hovered === terminal else { return }
-            self.hover(terminal)
+    /// ■ and the ports show for what a pane runs from here. A dev server takes a moment to listen, so its ports are read a few times early on.
+    private func track(_ command: ProjectCommand, in terminal: TerminalView) {
+        started[terminal.id] = command
+        listening[terminal.id] = []
+        for delay in [0.5, 2.0, 5.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self, weak terminal] in
+                guard let self, let terminal else { return }
+                self.commandMayHaveChanged(in: terminal)
+            }
         }
+        updateChips()
+    }
+
+    /// The store calls this at each new title or prompt, which is when a command starts or ends.
+    func commandMayHaveChanged(in terminal: TerminalView) {
+        guard started[terminal.id] != nil else { return }
+        guard terminal.runsProgram, let root = terminal.rootProcess else {
+            (started[terminal.id], listening[terminal.id]) = (nil, nil)
+            return updateChips()
+        }
+        DispatchQueue.global(qos: .utility).async { [weak self, weak terminal] in
+            let ports = Ports.listening(under: [root])
+            DispatchQueue.main.async {
+                guard let self, let terminal, self.started[terminal.id] != nil, self.listening[terminal.id] != ports else { return }
+                self.listening[terminal.id] = ports
+                self.updateChips()
+            }
+        }
+        updateChips()
+    }
+
+    private func stop(_ terminal: TerminalView) {
+        terminal.pressControl("c")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self, weak terminal] in
+            if let self, let terminal { self.commandMayHaveChanged(in: terminal) }
+        }
+    }
+
+    /// A pane that runs a command from here shows ■ and its ports. The pane under the mouse, at a prompt with something to run, shows ▶.
+    /// Anything else, like an agent or vim in front, shows nothing, so the corner never interrupts it.
+    private func updateChips() {
+        let on = UserDefaults.standard.object(forKey: Self.runButtonKey) as? Bool ?? true
+        for terminal in terminals {
+            let look: RunChip.Look?
+            if !on || terminal.isHidden || searchBar?.terminal === terminal {
+                look = nil
+            } else if started[terminal.id] != nil, terminal.runsProgram {
+                look = .running(ports: listening[terminal.id] ?? [])
+            } else if terminal === hovered, !terminal.runsProgram, let cached = commands[terminal.id], cached.folder == terminal.workingDirectory, !cached.list.isEmpty {
+                look = .play
+            } else {
+                look = nil
+            }
+            guard let look else {
+                chips[terminal.id]?.isHidden = true
+                continue
+            }
+            let chip = chips[terminal.id] ?? makeChip(for: terminal)
+            chip.look = look
+            chip.isHidden = false
+        }
+        placeChips()
+    }
+
+    private func makeChip(for terminal: TerminalView) -> RunChip {
+        let chip = RunChip()
+        chip.apply(background: theme.background, foreground: theme.foreground)
+        chip.onPress = { [weak self, weak terminal, weak chip] in
+            guard let self, let terminal, let chip else { return }
+            if case .running = chip.look { return self.stop(terminal) }
+            let menu = NSMenu()
+            self.runItems(for: terminal).forEach(menu.addItem)
+            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: chip.bounds.maxY + 4), in: chip)
+        }
+        chips[terminal.id] = chip
+        addSubview(chip, positioned: .above, relativeTo: nil)
+        return chip
+    }
+
+    /// Top right of each pane, left of its name.
+    private func placeChips() {
+        for terminal in terminals {
+            guard let chip = chips[terminal.id], !chip.isHidden else { continue }
+            let label = labels[terminal.id].map { $0.isHidden ? 0 : $0.frame.width + 6 } ?? 0
+            let width = chip.fittingWidth
+            chip.frame = NSRect(x: terminal.frame.maxX - 10 - label - width, y: terminal.frame.minY + 8, width: width, height: 20)
+        }
+    }
+
+    /// The commands as menu items, the same for ▶ and the right-click menu: the name, then what it types in the muted color, like ⌘P.
+    private func runItems(for terminal: TerminalView) -> [NSMenuItem] {
+        commandList(for: terminal).map { command in
+            let item = ActionMenuItem(title: command.name) { [weak self, weak terminal] in
+                if let self, let terminal { self.run(command, in: terminal) }
+            }
+            let title = NSMutableAttributedString(string: command.name + "  ", attributes: [.font: NSFont.menuFont(ofSize: 13)])
+            title.append(NSAttributedString(string: command.command, attributes: [
+                .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .regular), .foregroundColor: NSColor.secondaryLabelColor,
+            ]))
+            item.attributedTitle = title
+            item.toolTip = "\(command.source) in \((command.folder as NSString).abbreviatingWithTildeInPath)"
+            return item
+        }
+    }
+
+    /// Run in the right-click menu, only where the folder's project defines something.
+    private func addRunMenu(to menu: NSMenu, for terminal: TerminalView) {
+        let items = runItems(for: terminal)
+        guard !items.isEmpty else { return }
+        let submenu = NSMenu()
+        items.forEach(submenu.addItem)
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Run", action: nil, keyEquivalent: "").submenu = submenu
     }
 
     // MARK: Dividers
@@ -604,8 +682,9 @@ final class PaneContainer: NSView {
         terminal.onSearchStart = { [weak self, weak terminal] needle in
             if let self, let terminal { self.showSearch(in: terminal, needle: needle) }
         }
-        terminal.onContextMenu = { [weak self] menu in
-            guard let self else { return }
+        terminal.onContextMenu = { [weak self, weak terminal] menu in
+            guard let self, let terminal else { return }
+            self.addRunMenu(to: menu, for: terminal)
             menu.addItem(.separator())
             menu.addItem(withTitle: "Name Pane…", action: #selector(self.nameFromMenu), keyEquivalent: "").target = self
             // Same path as ⌘W, so a running program still asks before it closes.

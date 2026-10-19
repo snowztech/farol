@@ -343,7 +343,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         case .toggleFullscreen: window?.toggleFullScreen(nil)
         case .reloadConfig: runtime.reloadConfig()
         case .openSettings: if !state.showingSettings { toggleSettings() }
-        case .newSplit(let direction): store.selected.map { store.split($0, direction) }
+        case .newSplit(let direction): if let session = store.selected { store.split(session, direction) }
         case .gotoSplit(let target): store.selected?.panes.goto(target)
         case .resizeSplit(let direction, let amount): store.selected?.panes.resize(direction, by: amount)
         case .equalizeSplits: store.selected?.panes.equalize()
@@ -552,12 +552,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// With a program like an agent in front there, it runs in a new pane below, so it never types into the agent.
     func run(_ command: ProjectCommand) {
         guard let session = store.selected else { return }
-        let pane = session.panes.focused
-        let line = command.line(from: pane.workingDirectory)
-        guard !pane.runsProgram else { return store.split(session, .down, run: line) }
-        window?.makeFirstResponder(pane)
-        pane.pasteText(line)
-        pane.press(.enter)
+        session.panes.run(command, in: session.panes.focused)
     }
 
     func showAbout() {
