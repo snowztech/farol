@@ -90,7 +90,7 @@ final class NotchStatus {
     /// A question never opens by itself: the waiting dot and the notification say it's there, and hovering the panel shows it.
     func refresh() {
         model.rows = store.ordered.map { NotchModel.Row(id: $0.id, name: $0.displayName, activity: $0.activity) }
-        // Not while the window is already asking it, in a sheet over the session you are in.
+        // Not for the session you are looking at while Farol is in front, which asks in its own terminal.
         let asking = store.ordered.filter { $0.ask != nil && !(NSApp.isActive && $0.id == store.selectedID) }
         let question = asking.first.flatMap { session in
             session.ask.map {
