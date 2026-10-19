@@ -547,7 +547,7 @@ struct SettingsPage: View {
     @ViewBuilder private func remoteSection(_ p: Palette) -> some View {
         Heading(title: "Remote", detail: "Answer your agents from your phone when you are away from the Mac.", palette: p, beta: true)
         Row(title: "Let a paired phone in",
-            detail: "It sees your sessions and types into them. The Mac has to stay on, since the agents run on it.",
+            detail: "It sees your sessions and types into them, and shows the agents connected in Settings → Agents. The Mac has to stay on, since the agents run on it.",
             palette: p) {
             toggle($agents.remote)
         }
@@ -559,19 +559,6 @@ struct SettingsPage: View {
                 detail: "While an agent works or waits for you, the Mac does not go to sleep by itself. Closing the lid still puts it to sleep.",
                 palette: p) {
                 toggle($agents.remoteKeepAwake)
-            }
-            // The phone reads an agent's conversation and what it asks through Farol's hooks, so an agent without the current ones shows less there.
-            ForEach(agentSetups.filter { setups[$0.id] != .connected }, id: \.id) { agent in
-                let outdated = setups[agent.id] == .outdated
-                Row(title: "\(outdated ? "Update" : "Connect") \(agent.name) for your phone",
-                    detail: outdated
-                        ? "Its hooks are from an older Farol. Updated, your phone shows what it asks, with the answers as buttons."
-                        : "Connected, your phone shows its conversation and what it asks, and tells you when it waits or is done.",
-                    palette: p) {
-                    ShipButton(title: outdated ? "Update" : "Connect", busy: false, palette: p) {
-                        outdated ? change(agent, connect: true) : (agentChange = AgentChange(agent: agent, connect: true))
-                    }
-                }
             }
             GroupTitle(title: "Phones", palette: p)
             ForEach(remote.devices, id: \.key) { device in
