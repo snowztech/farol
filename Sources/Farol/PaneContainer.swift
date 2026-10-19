@@ -488,9 +488,10 @@ final class PaneContainer: NSView {
         terminal.onSearchStart = { [weak self, weak terminal] needle in
             if let self, let terminal { self.showSearch(in: terminal, needle: needle) }
         }
-        terminal.onContextMenu = { [weak self] menu in
-            guard let self else { return }
+        terminal.onContextMenu = { [weak self, weak terminal] menu in
+            guard let self, let terminal else { return }
             menu.addItem(.separator())
+            self.addCommandsMenu(to: menu, for: terminal)
             menu.addItem(withTitle: "Name Pane…", action: #selector(self.nameFromMenu), keyEquivalent: "").target = self
             // Same path as ⌘W, so a running program still asks before it closes.
             menu.addItem(withTitle: self.terminals.count > 1 ? "Close Pane" : "Close Session",

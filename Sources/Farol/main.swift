@@ -98,6 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
     @objc func newTask(_ sender: Any?) { windowController.newTask() }
     @objc func namePane(_ sender: Any?) { windowController.namePane() }
+    @objc func showCommands(_ sender: Any?) { windowController.showCommands() }
     @objc func find(_ sender: Any?) { windowController.find() }
     @objc func findNext(_ sender: Any?) { windowController.findNext() }
     @objc func findPrevious(_ sender: Any?) { windowController.findPrevious() }
@@ -176,6 +177,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         sessions.addItem(withTitle: "Close Session", action: #selector(closeSession), keyEquivalent: "w")
         sessions.addItem(withTitle: "Save File", action: #selector(saveFile), keyEquivalent: "s")
         sessions.addItem(withTitle: "Name Pane…", action: #selector(namePane), keyEquivalent: "R")
+        sessions.addItem(withTitle: "Run Command…", action: #selector(showCommands), keyEquivalent: "k")
+            .keyEquivalentModifierMask = [.command, .option]
         sessions.addItem(.separator())
         sessions.addItem(withTitle: "Next Session", action: #selector(nextSession), keyEquivalent: "]")
             .keyEquivalentModifierMask = [.command, .shift]

@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Right-click a pane for Commands: name a command once and run it from any pane in that folder or under it. Edit or delete it from the same menu, or press ⌥⌘K and a digit to run one from the keyboard.
+
 ## [0.45.0] - 2026-10-19
 
 Find text in the files under the pane you are in, with ⇧⌘F.

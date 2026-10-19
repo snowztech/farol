@@ -730,6 +730,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     // MARK: Find
 
     func namePane() { store.selected?.panes.nameFocusedPane() }
+    func showCommands() { store.selected?.panes.showCommands(palette: state.palette) }
     /// The open file when it has focus, else the terminal search.
     private var focusedFile: FileView? {
         guard let panes = store.selected?.panes, panes.fileFocused else { return nil }
