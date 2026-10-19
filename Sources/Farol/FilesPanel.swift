@@ -138,10 +138,11 @@ struct FilesPanel: View {
     }
 
     private func header(_ p: Palette) -> some View {
+        // Sized like the review panel's header, so the panels read as one set and the magnifier sits in proportion.
         HStack(spacing: 4) {
             Text(tree.root.map { ($0 as NSString).lastPathComponent } ?? (state.remote ? "Not available over ssh" : ""))
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(p.muted)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(tree.root == nil ? p.muted : p.text)
                 .lineLimit(1)
             Spacer(minLength: 0)
             // Lit only while searching, like the gear while Settings shows. Clicked again, it goes back to the tree, as Esc does.
@@ -151,9 +152,8 @@ struct FilesPanel: View {
             }
         }
         .padding(.leading, 14)
-        .padding(.trailing, 6)
-        .padding(.top, 6)
-        .padding(.bottom, 2)
+        .padding(.trailing, 8)
+        .frame(height: 38)
     }
 
     private func tree(_ p: Palette) -> some View {
