@@ -196,7 +196,7 @@ struct FindInFiles: View {
                 }
                 .padding(.horizontal, 6)
             }
-            results(p)
+            if model.hasQuery { results(p) } else { waiting(p) }
         }
         .onAppear { focused = true }
         // ⇧⌘F again, with the panel already searching, puts the cursor back in the field.
@@ -260,13 +260,7 @@ struct FindInFiles: View {
                             note("Only the first \(FileSearch.perFile) lines of this file.", p).padding(.leading, CGFloat(max(digits, 3)) * 6.5 + 12)
                         }
                     }
-                    // The filter narrows a search and finds nothing on its own, so an empty field says what it waits for.
-                    if !model.hasQuery && !model.globs.trimmingCharacters(in: .whitespaces).isEmpty {
-                        note("Type what to find in the files matching \(model.globs.trimmingCharacters(in: .whitespaces)).", p)
-                    } else if !model.hasQuery {
-                        // Before anything is typed, the one place to tell this apart from ⌘P, which finds files by their name.
-                        note("Finds text in the files under \(((model.folder() ?? "") as NSString).lastPathComponent). ⌘P finds files by name.", p)
-                    } else if model.invalid {
+                    if model.invalid {
                         note("This regular expression isn't valid.", p)
                     } else if files.isEmpty && !model.searching && model.hasQuery {
                         note("Nothing matches.", p)
@@ -283,6 +277,20 @@ struct FindInFiles: View {
             }
             .onChange(of: model.active) { _, row in if let row { scroll.scrollTo(row) } }
         }
+    }
+
+    /// Before anything is typed, one quiet line in the middle, as the other panels say they have nothing to show.
+    /// It tells the search apart from ⌘P, or, with a files filter, says the filter waits for something to find.
+    private func waiting(_ p: Palette) -> some View {
+        let globs = model.globs.trimmingCharacters(in: .whitespaces)
+        let folder = ((model.folder() ?? "") as NSString).lastPathComponent
+        let text = globs.isEmpty ? "Finds text in the files under \(folder).\n⌘P finds files by name." : "Type what to find in the files matching \(globs)."
+        return Text(text)
+            .font(.system(size: 12))
+            .foregroundStyle(p.muted)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 24)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func note(_ text: String, _ p: Palette) -> some View {
