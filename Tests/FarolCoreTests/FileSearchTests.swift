@@ -96,3 +96,12 @@ private func folder(_ files: [String: String]) throws -> String {
         #expect(FileSearch.search("needle", in: root, options: .init(files: ["!*.md"])).map(\.path).sorted() == ["src/AppTests.swift", "src/app.swift"])
     }
 }
+
+@Test func perlShorthandsMeanTheSameToGitAndTheMarks() throws {
+    let root = try folder(["a.swift": "let x = 1\nlet name = \"x\"\nlet count = 42\n"])
+    for checkout in [false, true] {
+        if checkout { try Git.run(["init", "--quiet"], in: root) }
+        #expect(FileSearch.search("= \\d+$", in: root, options: .init(regex: true)).map(\.line) == [1, 3])
+        #expect(FileSearch.search("\\bname\\b", in: root, options: .init(regex: true)).map(\.line) == [2])
+    }
+}

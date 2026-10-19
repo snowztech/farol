@@ -133,11 +133,24 @@ public enum FileSearch {
     public static let perFile = 20
 
     static func grep(_ query: String, in folder: String, options: Options, limit: Int, job: Job) -> [Match] {
-        let flags = [options.regex ? "-E" : "-F"] + (options.caseSensitive ? [] : ["-i"]) + (options.wholeWord ? ["-w"] : [])
-        // -z, so a name with a colon or an accent comes through as it is. Git fails with no match, which is no match here too.
-        guard let output = try? Git.run(
-            ["grep", "-n", "-z", "-I", "--untracked", "--exclude-standard", "--max-count=\(perFile)"] + flags + ["-e", query, "--"] + options.pathspecs,
-            in: folder, trimming: false, started: job.adopt) else { return [] }
+        func run(_ syntax: String) throws -> String {
+            let flags = [syntax] + (options.caseSensitive ? [] : ["-i"]) + (options.wholeWord ? ["-w"] : [])
+            // -z, so a name with a colon or an accent comes through as it is.
+            return try Git.run(
+                ["grep", "-n", "-z", "-I", "--untracked", "--exclude-standard", "--max-count=\(perFile)"] + flags + ["-e", query, "--"] + options.pathspecs,
+                in: folder, trimming: false, started: job.adopt)
+        }
+        // Perl's syntax, like the NSRegularExpression that checks and marks the query, so \d or \b mean the same to both.
+        // POSIX -E reads them otherwise, and is only for a git built without Perl's. Git fails with no match, which is no match here too.
+        let output: String
+        do {
+            output = try run(options.regex ? "-P" : "-F")
+        } catch let error where options.regex && "\(error)".localizedCaseInsensitiveContains("perl") {
+            guard let posix = try? run("-E") else { return [] }
+            output = posix
+        } catch {
+            return []
+        }
         var matches: [Match] = []
         for record in output.split(separator: "\n") {
             let fields = record.split(separator: "\0", maxSplits: 2, omittingEmptySubsequences: false)
