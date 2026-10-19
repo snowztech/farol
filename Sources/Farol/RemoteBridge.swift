@@ -418,7 +418,13 @@ final class RemoteBridge: ObservableObject {
         }
         // Gone at once, so a second tap is refused rather than typed into whatever the agent asks next.
         session.request = nil
-        terminal.type(String(choice))
+        // While Farol holds a question through its hook, the agent shows nothing to type into, so the answer goes back through the hook.
+        if let ask = session.ask, ask.pane == pane, let question = ask.questions.first, ask.questions.count == 1,
+           question.options.indices.contains(choice - 1) {
+            store.answer(session, with: [question.text: question.options[choice - 1].label])
+        } else {
+            terminal.type(String(choice))
+        }
         tell(.done(command: command.id), phone)
         tick()
     }

@@ -20,6 +20,8 @@ final class Session: ObservableObject, Identifiable {
     var conversations: [UUID: AgentConversation] = [:]
     /// What a waiting agent asks, and the pane it waits in, so an answer from a phone goes there and nowhere else.
     @Published var request: (pane: UUID, asked: AgentRequest)?
+    /// A question the agent is blocked on, which Farol can answer through the agent's hook.
+    var ask: PendingAsk?
     /// An agent started here and has not ended. Before its first message it may have no log, and a phone shows it as an empty conversation.
     var agentStarted = false
     /// The program rang the bell or sent a notification while you were elsewhere. Covers agents that report nothing themselves.
@@ -275,6 +277,10 @@ final class SessionStore: ObservableObject {
 
     /// A session's activity changed, from the old value to the new one. Used for notifications.
     var onActivityChange: ((Session, Session.Activity, Session.Activity) -> Void)?
+    /// An agent asked a question that Farol can answer.
+    var onAsk: ((Session) -> Void)?
+    /// The question is over: answered, handed back to the terminal, or the agent went on without it.
+    var onAskEnd: ((Session) -> Void)?
 
     private let statusServer: StatusServer
     private let cliPath: String
@@ -286,6 +292,7 @@ final class SessionStore: ObservableObject {
         cliPath = Bundle.main.resourceURL?.appendingPathComponent("bin/farol").path ?? "farol"
         statusServer = StatusServer(path: socketPath)
         statusServer.onMessage = { [weak self] in self?.receive($0) }
+        statusServer.onAsk = { [weak self] in self?.receiveAsk($0, $1) }
         do {
             try statusServer.start()
         } catch {
@@ -360,6 +367,42 @@ final class SessionStore: ObservableObject {
             for terminal in session.panes.terminals where !terminal.runsProgram { session.conversations[terminal.id] = nil }
         }
         save()
+    }
+
+    private func receiveAsk(_ message: AskMessage, _ connection: AskConnection) {
+        guard let pane = UUID(uuidString: message.pane),
+              let session = sessions.first(where: { $0.panes.terminals.contains { $0.id == pane } }) else { return connection.reply(AskReply()) }
+        // A new question replaces one the agent has already moved past.
+        session.ask?.connection.reply(AskReply())
+        let ask = PendingAsk(pane: pane, questions: message.questions, connection: connection)
+        session.ask = ask
+        connection.watch { [weak self, weak session, weak ask] in
+            // The hook left, for instance because the question was answered in the terminal.
+            guard let self, let session, let ask, session.ask === ask else { return }
+            session.ask = nil
+            onAskEnd?(session)
+        }
+        // The PreToolUse hook usually said so already, with the question for the sidebar and a phone.
+        receive(StatusMessage(pane: message.pane, event: .waiting))
+        onAsk?(session)
+    }
+
+    /// Sends the answers to the agent, or nil to let it ask in its terminal.
+    func answer(_ session: Session, with answers: [String: String]?) {
+        guard let ask = session.ask else { return }
+        session.ask = nil
+        ask.connection.reply(AskReply(answers: answers))
+        // The agent goes on at once, and its next hook would say so a moment later.
+        if answers != nil { receive(StatusMessage(pane: ask.pane.uuidString, event: .working)) }
+        onAskEnd?(session)
+    }
+
+    /// Turns the question down so you can talk it over with the agent. It stops, and its terminal is where you go on.
+    func chat(_ session: Session) {
+        guard let ask = session.ask else { return }
+        session.ask = nil
+        ask.connection.reply(AskReply(chat: true))
+        onAskEnd?(session)
     }
 
     private func report(_ session: Session, from before: Session.Activity) {
