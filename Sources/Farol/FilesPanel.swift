@@ -144,11 +144,11 @@ struct FilesPanel: View {
                 .foregroundStyle(p.muted)
                 .lineLimit(1)
             Spacer(minLength: 0)
-            // Like tabs: the lit one is what the panel shows, and the other switches to it.
-            IconButton(symbol: "doc", help: "Files (esc)", active: !state.filesSearching, palette: p) {
-                state.filesSearching = false
+            // Lit only while searching, like the gear while Settings shows. Clicked again, it goes back to the tree, as Esc does.
+            IconButton(symbol: "magnifyingglass", help: state.filesSearching ? "Back to the files (esc)" : "Find in Files (⇧⌘F)",
+                       active: state.filesSearching, palette: p) {
+                if state.filesSearching { state.filesSearching = false } else { startSearch() }
             }
-            IconButton(symbol: "magnifyingglass", help: "Find in Files (⇧⌘F)", active: state.filesSearching, palette: p, action: startSearch)
         }
         .padding(.leading, 14)
         .padding(.trailing, 6)
