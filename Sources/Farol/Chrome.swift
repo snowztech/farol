@@ -51,6 +51,7 @@ struct Commands {
     let toggleMerge: () -> Void
     let openFile: (String) -> Void
     let newSessionIn: (String) -> Void
+    let runCommand: (ProjectCommand) -> Void
     let titleBarDoubleClick: () -> Void
 }
 
@@ -258,10 +259,11 @@ private struct GitButton: View {
 }
 
 /// The title opens a searchable list of every session, grouped like the sidebar, so you can switch with the sidebar closed.
-/// Typing also finds the files and folders of the checkout or the folder you are in.
+/// Typing also finds the files and folders of the checkout or the folder you are in, and the commands its project defines.
 private struct SessionMenu: View {
     private enum Choice: Hashable {
         case session(UUID)
+        case command(ProjectCommand)
         case file(String)
     }
 
@@ -277,6 +279,8 @@ private struct SessionMenu: View {
     /// The files and folders around you, listed each time the list opens, and the ones that match what is typed.
     @State private var files: (root: String, paths: [String]) = ("", [])
     @State private var hits: [String] = []
+    /// What the project defines to run, in its Makefile, package.json or justfile, read each time the list opens.
+    @State private var projectCommands: [ProjectCommand] = []
     @State private var listHeight: CGFloat = 0
     @FocusState private var searching: Bool
 
@@ -304,19 +308,32 @@ private struct SessionMenu: View {
         .hoverTip("Switch session (⌘P)")
         .popover(isPresented: $state.switchingSession, arrowEdge: .bottom) { list(p) }
         .onChange(of: state.switchingSession) { _, open in
-            if open { listFiles() } else { (query, active, files, hits) = ("", nil, ("", []), []) }
+            if open { listFiles() } else { (query, active, files, hits, projectCommands) = ("", nil, ("", []), [], []) }
         }
         .onChange(of: query) { _, query in (active, hits) = (nil, Files.search(files.paths, query)) }
     }
 
     private func listFiles() {
         let root = session.topLevel ?? session.directory
+        // Over ssh the shell is on the server, where the Mac's folders mean nothing.
+        let (folder, top, local) = (session.directory, session.topLevel, !session.isRemote)
         DispatchQueue.global(qos: .userInitiated).async {
             let paths = Files.searchable(in: root)
+            let found = local ? ProjectCommands.find(in: folder, top: top) : []
             DispatchQueue.main.async {
                 guard open else { return }
-                (files, hits) = ((root, paths), Files.search(paths, query))
+                (files, hits, projectCommands) = ((root, paths), Files.search(paths, query), found)
             }
+        }
+    }
+
+    /// Only once you type, like the files, so the list you open stays the sessions.
+    private var commandHits: [ProjectCommand] {
+        let words = query.lowercased().split(separator: " ")
+        guard !words.isEmpty else { return [] }
+        return projectCommands.filter { command in
+            let text = "\(command.name) \(command.command) \(command.source)".lowercased()
+            return words.allSatisfy(text.contains)
         }
     }
 
@@ -326,7 +343,7 @@ private struct SessionMenu: View {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(p.muted)
                 // Return takes the first match, so a session is a few letters away.
-                TextField("Search sessions, files and folders", text: $query)
+                TextField("Search sessions, files and commands", text: $query)
                     .textFieldStyle(.plain)
                     .focused($searching)
                     .onSubmit { highlighted.map(choose) }
@@ -359,8 +376,24 @@ private struct SessionMenu: View {
                                 .id(Choice.session(item.id))
                             }
                         }
+                        let commandRows = commandHits
+                        if !commandRows.isEmpty && !groups.isEmpty {
+                            Rectangle().fill(p.line).frame(height: 1).padding(.horizontal, 9).padding(.vertical, 5)
+                        }
+                        ForEach(commandRows, id: \.self) { command in
+                            CommandChoice(
+                                command: command,
+                                lit: highlighted == .command(command),
+                                elsewhere: session.panes.focused.runsProgram,
+                                palette: p,
+                                hover: { inside in
+                                    if inside { active = .command(command) } else if active == .command(command) { active = nil }
+                                },
+                                choose: { choose(.command(command)) })
+                            .id(Choice.command(command))
+                        }
                         // The file icons say what these rows are, so a line is enough to part them from the sessions.
-                        if !hits.isEmpty && !groups.isEmpty {
+                        if !hits.isEmpty && !(groups.isEmpty && commandRows.isEmpty) {
                             Rectangle().fill(p.line).frame(height: 1).padding(.horizontal, 9).padding(.vertical, 5)
                         }
                         ForEach(hits, id: \.self) { path in
@@ -374,7 +407,7 @@ private struct SessionMenu: View {
                                 choose: { choose(.file(path)) })
                             .id(Choice.file(path))
                         }
-                        if groups.isEmpty && hits.isEmpty {
+                        if groups.isEmpty && commandRows.isEmpty && hits.isEmpty {
                             Text("Nothing matches.").foregroundStyle(p.muted).padding(.vertical, 12)
                         }
                     }
@@ -409,7 +442,7 @@ private struct SessionMenu: View {
         }
     }
 
-    private var shown: [Choice] { matches.flatMap(\.items).map { .session($0.id) } + hits.map(Choice.file) }
+    private var shown: [Choice] { matches.flatMap(\.items).map { .session($0.id) } + commandHits.map(Choice.command) + hits.map(Choice.file) }
 
     /// The row Return opens: the one the arrows or the mouse are on, else where you are.
     /// A search is for going somewhere else, so it starts on the first match that is not where you are.
@@ -440,10 +473,50 @@ private struct SessionMenu: View {
         switch choice {
         case .session(let id):
             if id != store.selectedID, let item = store.sessions.first(where: { $0.id == id }) { store.select(item) }
+        case .command(let command):
+            commands.runCommand(command)
         case .file(let path):
             // A folder has nothing to show in a pane, so it opens as a session of its own.
             if path.hasSuffix("/") { commands.newSessionIn(root + "/" + path.dropLast()) } else { commands.openFile(root + "/" + path) }
         }
+    }
+}
+
+/// A command the project defines, in the title's list: its name, then what it types.
+private struct CommandChoice: View {
+    let command: ProjectCommand
+    /// Under the arrows or the mouse.
+    let lit: Bool
+    /// A program like an agent is in front in the pane, so the command goes to a new pane.
+    let elsewhere: Bool
+    let palette: Palette
+    let hover: (Bool) -> Void
+    let choose: () -> Void
+
+    var body: some View {
+        Button(action: choose) {
+            HStack(spacing: 9) {
+                // The room of a session's check and lamp, so every name starts at the same place.
+                Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).hidden()
+                Image(systemName: "play").font(.system(size: 9)).foregroundStyle(palette.muted).frame(width: 7)
+                Text(command.name).lineLimit(1).layoutPriority(1)
+                Text(command.command)
+                    .font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.tail)
+                Spacer(minLength: 8)
+                // Running something is not what a search list leads you to expect, so the row says where Return runs it.
+                if lit {
+                    Text("\(elsewhere ? "Run in a new pane" : "Run") \(Text(Image(systemName: "return")).font(.system(size: 9)))")
+                        .font(.system(size: 11)).foregroundStyle(palette.muted).fixedSize()
+                }
+            }
+            .padding(.horizontal, 9)
+            .frame(height: 28)
+            .background(RoundedRectangle(cornerRadius: 6).fill(lit ? palette.selection : .clear))
+            .contentShape(Rectangle())
+            .hoverTip("\(command.source) in \((command.folder as NSString).abbreviatingWithTildeInPath)")
+        }
+        .buttonStyle(QuietPress())
+        .onClickableHover(hover)
     }
 }
 
