@@ -7,15 +7,16 @@ public struct GitError: Error, CustomStringConvertible {
 /// Runs the git command line tool. Shelling out keeps Farol's behavior identical to the user's own git.
 public enum Git {
     @discardableResult
-    static func run(_ arguments: [String], in directory: String, trimming: Bool = true) throws -> String {
-        try run("/usr/bin/git", arguments, in: directory, trimming: trimming)
+    static func run(_ arguments: [String], in directory: String, trimming: Bool = true, started: ((Process) -> Void)? = nil) throws -> String {
+        try run("/usr/bin/git", arguments, in: directory, trimming: trimming, started: started)
     }
 
     /// Runs any command line tool the same way, as for the forges' own tools.
     /// Some tools report on stderr even when all is well, and `mergingErrors` returns that with the output.
+    /// `started` gets the running process, for a caller that may stop it before it ends.
     @discardableResult
     static func run(_ executable: String, _ arguments: [String], in directory: String, trimming: Bool = true,
-                    mergingErrors: Bool = false, named name: String? = nil) throws -> String {
+                    mergingErrors: Bool = false, named name: String? = nil, started: ((Process) -> Void)? = nil) throws -> String {
         let timer = Perf.shared.begin(executable, arguments, named: name)
         defer { Perf.shared.end(timer) }
         let process = Process()
@@ -30,6 +31,7 @@ public enum Git {
         process.standardError = errors
 
         try process.run()
+        started?(process)
         // Read apart, so a command that fills one pipe can't wait forever on the other being read.
         // A thread of its own, since the shared pool can run out while many of these wait.
         var err = Data()

@@ -78,6 +78,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func previousSession(_ sender: Any?) { store.selectNext(offset: -1) }
     @objc func selectSession(_ sender: NSMenuItem) { store.select(index: sender.tag) }
     @objc func switchSession(_ sender: Any?) { windowController.switchSession() }
+    @objc func findInFiles(_ sender: Any?) { windowController.findInFiles() }
+    @objc func nextResult(_ sender: Any?) { windowController.stepResult(1) }
+    @objc func previousResult(_ sender: Any?) { windowController.stepResult(-1) }
 
     @objc func toggleSettings(_ sender: Any?) { windowController.toggleSettings() }
     @objc func showAbout(_ sender: Any?) { windowController.showAbout() }
@@ -111,6 +114,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         switch item.action {
         case #selector(saveFile): windowController.canSaveFile
         case #selector(checkForUpdates): windowController.canCheckForUpdates
+        case #selector(nextResult), #selector(previousResult): windowController.canStepResult
         default: true
         }
     }
@@ -120,6 +124,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private func symbol(_ item: NSMenuItem, _ name: String) {
         if #available(macOS 26, *) { item.image = NSImage(systemSymbolName: name, accessibilityDescription: nil) }
     }
+
+    private static let f4 = String(Character(UnicodeScalar(NSF4FunctionKey)!))
 
     private func makeMenu() -> NSMenu {
         let main = NSMenu()
@@ -152,7 +158,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             edit.addItem(withTitle: "Find Next", action: #selector(findNext), keyEquivalent: "g"),
             edit.addItem(withTitle: "Find Previous", action: #selector(findPrevious), keyEquivalent: "G"),
             edit.addItem(withTitle: "Use Selection for Find", action: #selector(findSelection), keyEquivalent: "e"),
+            edit.addItem(withTitle: "Find in Files…", action: #selector(findInFiles), keyEquivalent: "F"),
+            edit.addItem(withTitle: "Next Search Result", action: #selector(nextResult), keyEquivalent: Self.f4),
+            edit.addItem(withTitle: "Previous Search Result", action: #selector(previousResult), keyEquivalent: Self.f4),
         ]
+        // Function keys take no modifier by default, and Shift is what goes back.
+        findItems[findItems.count - 2].keyEquivalentModifierMask = []
+        findItems[findItems.count - 1].keyEquivalentModifierMask = [.shift]
         // Find acts on the session, not on whatever text field has focus.
         findItems.forEach { $0.target = self }
         main.addItem(submenu: edit, title: "Edit")

@@ -88,23 +88,76 @@ final class FileTree: ObservableObject {
     }
 }
 
+/// The tree of the session's folder, or Find in Files in its place.
 struct FilesPanel: View {
-    static let width: CGFloat = 240
+    static let defaultWidth: CGFloat = 240
 
     @ObservedObject var tree: FileTree
     @ObservedObject var state: WindowState
-    let open: (String) -> Void
+    @ObservedObject var search: FindInFilesModel
+    /// A line of nil opens the file at its top.
+    let open: (String, Int?) -> Void
+    /// A search result, which also marks every match in the file.
+    let openMatch: (String, Int) -> Void
+    let resize: (CGFloat) -> Void
+    /// The magnifier: Find in Files in place of the tree.
+    let startSearch: () -> Void
+
+    @State private var dragStart: CGFloat?
 
     var body: some View {
         let p = state.palette
         VStack(alignment: .leading, spacing: 0) {
+            header(p)
+            if state.filesSearching {
+                FindInFiles(model: search, state: state, open: openMatch)
+            } else {
+                tree(p)
+            }
+        }
+        // Fixed width, so closing the panel clips it instead of reflowing every row.
+        .frame(width: state.filesWidth, alignment: .leading)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(p.surface)
+        .overlay(alignment: .trailing) { edge(p) }
+    }
+
+    /// The line between the panel and the terminal, wide enough to grab and drag.
+    private func edge(_ p: Palette) -> some View {
+        Rectangle().fill(p.boxed ? .clear : p.line).frame(width: 1)
+            .frame(width: 7, alignment: .trailing)
+            .contentShape(Rectangle())
+            .onHover { inside in (inside ? NSCursor.resizeLeftRight : NSCursor.arrow).set() }
+            .gesture(DragGesture(coordinateSpace: .global)
+                .onChanged { drag in
+                    let start = dragStart ?? state.filesWidth
+                    dragStart = start
+                    resize(start + drag.translation.width)
+                }
+                .onEnded { _ in dragStart = nil })
+    }
+
+    private func header(_ p: Palette) -> some View {
+        // Sized like the review panel's header, so the panels read as one set and the magnifier sits in proportion.
+        HStack(spacing: 4) {
             Text(tree.root.map { ($0 as NSString).lastPathComponent } ?? (state.remote ? "Not available over ssh" : ""))
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(p.muted)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(tree.root == nil ? p.muted : p.text)
                 .lineLimit(1)
-                .padding(.horizontal, 14)
-                .padding(.top, 10)
-                .padding(.bottom, 6)
+            Spacer(minLength: 0)
+            // Lit only while searching, like the gear while Settings shows. Clicked again, it goes back to the tree, as Esc does.
+            IconButton(symbol: "magnifyingglass", help: state.filesSearching ? "Back to the files (esc)" : "Find in Files (⇧⌘F)",
+                       active: state.filesSearching, palette: p) {
+                if state.filesSearching { state.filesSearching = false } else { startSearch() }
+            }
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 8)
+        .frame(height: 38)
+    }
+
+    private func tree(_ p: Palette) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(tree.rows) { row in
@@ -113,7 +166,7 @@ struct FilesPanel: View {
                                 tree.toggle(row.entry.path)
                             } else {
                                 tree.selected = row.entry.path
-                                open(row.entry.path)
+                                open(row.entry.path, nil)
                             }
                         }
                     }
@@ -122,11 +175,6 @@ struct FilesPanel: View {
                 .padding(.bottom, 8)
             }
         }
-        // Fixed width, so closing the panel clips it instead of reflowing every row.
-        .frame(width: Self.width, alignment: .leading)
-        .frame(maxHeight: .infinity, alignment: .top)
-        .background(p.surface)
-        .overlay(alignment: .trailing) { Rectangle().fill(p.boxed ? .clear : p.line).frame(width: 1) }
     }
 }
 

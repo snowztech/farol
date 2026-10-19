@@ -758,6 +758,8 @@ struct SettingsPage: View {
             ("Find", ["⌘F"]),
             ("Next and previous match", ["⌘G", "⇧⌘G"]),
             ("Find the selected text", ["⌘E"]),
+            ("Find in the files under the pane's folder", ["⇧⌘F"]),
+            ("Next and previous search result", ["F4", "⇧F4"]),
             ("Close find", ["esc"]),
         ]),
         ShortcutGroup(title: "Terminal", items: [

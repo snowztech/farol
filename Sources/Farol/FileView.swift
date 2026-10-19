@@ -52,6 +52,10 @@ final class FileView: NSView {
     private let scroll = NSScrollView()
     private let text: CodeTextView
     private let gutter: LineNumbers
+    /// The line a search or a link opened the file at, lit until the cursor leaves it.
+    private var litLine: NSRange?
+    /// Every match of the search that opened the file, marked until you edit it or open it otherwise.
+    private var marks: [NSRange] = []
     /// Shown instead of the text for binary files, files too big to open, or errors.
     private let message = NSTextField(labelWithString: "")
 
@@ -105,8 +109,14 @@ final class FileView: NSView {
             guard let self else { return }
             // Typing a line and deleting it again leaves nothing to save.
             isDirty = text.string != onDisk
+            unmark()
             gutter.textChanged()
             highlightSoon()
+        }
+
+        NotificationCenter.default.addObserver(forName: NSTextView.didChangeSelectionNotification, object: text, queue: .main) { [weak self] _ in
+            guard let self, let line = litLine, !NSLocationInRange(text.selectedRange().location, line) else { return }
+            unlight()
         }
 
         scroll.documentView = text
@@ -138,6 +148,12 @@ final class FileView: NSView {
 
     /// The text that takes the keyboard: the preview while it shows, else the source.
     var textView: NSTextView { showsPreview ? preview.text : text }
+
+    /// The text selected in what the pane shows, or nil without a selection.
+    var selectedText: String? {
+        let range = textView.selectedRange()
+        return range.length > 0 ? (textView.string as NSString).substring(with: range) : nil
+    }
 
     /// A click on the header or the line numbers picks this pane too, so ⌘W closes the file and not a terminal.
     override func mouseDown(with event: NSEvent) {
@@ -204,12 +220,14 @@ final class FileView: NSView {
             previewing = false
             updateMode()
         }
+        unmark()
         let string = text.string as NSString
         var location = 0
         for _ in 1..<max(line, 1) where location < string.length {
             location = NSMaxRange(string.lineRange(for: NSRange(location: location, length: 0)))
         }
         text.setSelectedRange(NSRange(location: min(location, string.length), length: 0))
+        light(string.lineRange(for: NSRange(location: min(location, string.length), length: 0)))
         // A pane that was just added has no size yet, so this waits for its first layout.
         DispatchQueue.main.async { [weak self] in
             guard let self, let layout = text.layoutManager, let container = text.textContainer else { return }
@@ -220,6 +238,50 @@ final class FileView: NSView {
             scroll.reflectScrolledClipView(scroll.contentView)
             gutter.needsDisplay = true
         }
+    }
+
+    /// Marks what `find` finds in each line, as the search panel does. Line by line, so a regular expression's ^ and $ mean what they did there.
+    func mark(_ find: (String) -> [Range<String.Index>]) {
+        unmark()
+        guard let layout = text.layoutManager, let colors = themeColors else { return }
+        let color = colors.background.mixed(with: colors.foreground, 0.32)
+        let string = text.string as NSString
+        var found: [NSRange] = []
+        // The lines are walked here and nowhere else, so `find` is only borrowed.
+        withoutActuallyEscaping(find) { find in
+            string.enumerateSubstrings(in: NSRange(location: 0, length: string.length), options: [.byLines]) { line, range, _, _ in
+                guard let line else { return }
+                found += find(line).map { NSRange(location: range.location + NSRange($0, in: line).location, length: NSRange($0, in: line).length) }
+            }
+        }
+        for mark in found { layout.addTemporaryAttribute(.backgroundColor, value: color, forCharacterRange: mark) }
+        marks = found
+    }
+
+    private func unmark() {
+        guard !marks.isEmpty else { return }
+        let length = (text.string as NSString).length
+        for mark in marks {
+            text.layoutManager?.removeTemporaryAttribute(.backgroundColor, forCharacterRange: NSIntersectionRange(mark, NSRange(location: 0, length: length)))
+        }
+        marks = []
+        // The lit line shares the attribute, so it is laid back on.
+        if let line = litLine { litLine = nil; light(line) }
+    }
+
+    /// A soft band behind the line, in the theme's colors, so the eye lands on it.
+    private func light(_ line: NSRange) {
+        unlight()
+        guard let layout = text.layoutManager, line.length > 0, let colors = themeColors else { return }
+        layout.addTemporaryAttribute(.backgroundColor, value: colors.background.mixed(with: colors.foreground, 0.16), forCharacterRange: line)
+        litLine = line
+    }
+
+    private func unlight() {
+        guard let line = litLine else { return }
+        litLine = nil
+        let length = (text.string as NSString).length
+        text.layoutManager?.removeTemporaryAttribute(.backgroundColor, forCharacterRange: NSIntersectionRange(line, NSRange(location: 0, length: length)))
     }
 
     /// Reads the file again. Keeping the position means an agent's edit doesn't throw you back to the top.

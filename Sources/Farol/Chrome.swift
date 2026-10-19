@@ -14,9 +14,15 @@ final class WindowState: ObservableObject {
     @Published var showingMerge = false
     /// The session list under the title is open, from a click or ⌘P.
     @Published var switchingSession = false
+    /// The files panel shows Find in Files instead of the tree, from ⇧⌘F or its magnifier.
+    @Published var filesSearching = false
+    /// Counts each ⇧⌘F, so one with the panel already searching puts the cursor back in its field.
+    @Published var filesSearchFocus = 0
     /// Mirrors the sidebar and the files panel, so the top bar can match the columns below it.
     @Published var sidebarVisible = true
     @Published var filesVisible = false
+    /// The files panel's width while open, which you can drag.
+    @Published var filesWidth = FilesPanel.defaultWidth
     @Published var graphVisible = false
     /// Zero while the graph panel is closed.
     @Published var graphWidth: CGFloat = 0
@@ -108,7 +114,7 @@ struct TopBar: View {
 
     /// Width of the side panels open on the left, which the title stays clear of.
     private var leftPanels: CGFloat {
-        (state.sidebarVisible ? SidebarView.width : 0) + (filesVisible ? FilesPanel.width : 0)
+        (state.sidebarVisible ? SidebarView.width : 0) + (filesVisible ? state.filesWidth : 0)
     }
 
     // The merge view covers every panel but the sidebar, so the bar is laid out as if they were closed.
@@ -130,7 +136,7 @@ struct TopBar: View {
         HStack(spacing: 0) {
             Rectangle().fill(p.surface).frame(width: state.sidebarVisible ? SidebarView.width - 1 : 0)
             Rectangle().fill(p.line).frame(width: state.sidebarVisible ? 1 : 0)
-            Rectangle().fill(p.surface).frame(width: filesVisible ? FilesPanel.width - 1 : 0)
+            Rectangle().fill(p.surface).frame(width: filesVisible ? state.filesWidth - 1 : 0)
             Rectangle().fill(p.line).frame(width: filesVisible ? 1 : 0)
             Rectangle().fill(p.background)
             Rectangle().fill(p.line).frame(width: reviewWidth > 0 ? 1 : 0)

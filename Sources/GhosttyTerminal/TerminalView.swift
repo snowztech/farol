@@ -238,6 +238,15 @@ public final class TerminalView: NSView {
 
     public func startSearch() { perform("start_search") }
     public func searchSelection() { perform("search_selection") }
+
+    /// The text selected in the pane, or nil without a selection.
+    public var selectedText: String? {
+        guard let surface, ghostty_surface_has_selection(surface) else { return nil }
+        var text = ghostty_text_s()
+        guard ghostty_surface_read_selection(surface, &text) else { return nil }
+        defer { ghostty_surface_free_text(surface, &text) }
+        return text.text.map { String(cString: $0) }
+    }
     public func search(_ needle: String) { perform("search:\(needle)") }
     public func searchNext() { perform("navigate_search:next") }
     public func searchPrevious() { perform("navigate_search:previous") }

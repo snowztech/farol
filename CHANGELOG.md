@@ -4,6 +4,15 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Find in Files, in the Edit menu, with ⇧⌘F or with the magnifier at the top of the files panel: the files panel lists every line with the text you type, in the files under the folder of the pane you are in. A checkout skips what git ignores. Buttons in the field match case, whole words or a regular expression, and a second field keeps or leaves out files, like `*.swift, !*Tests*`. Below a repo's top, it can search the whole repo instead. Return or a click opens the file at that line with every match marked, and F4 and ⇧F4 go to the next and previous result from the file. The search stays when you go back to the tree, starts from the text you selected, and runs again when files change under it.
+- Drag the files panel's edge to make it wider. Farol keeps the width.
+
+### Changed
+
+- A file opened at a line, from Find in Files, a path in the terminal or the review panel, lights that line until you move the cursor away.
+
 ## [0.44.0] - 2026-10-19
 
 Answer Claude Code's questions from anywhere: the notification, the status panel or your phone.
