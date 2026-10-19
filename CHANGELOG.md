@@ -6,7 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
-- Claude Code's questions can be answered in Farol: a window with the options when you open the session, and buttons in the notification for a question with a few options. Choose Chat About This to turn a question down and talk it over with Claude, or Answer in Terminal to answer there as before. Click **Connect** again in Settings → Agents to add the hook for it.
+- Claude Code's questions can be answered from the notification, with buttons for a question with a few options. In the session you are looking at, Claude asks in its terminal as usual. Choose Chat About This to turn a question down and talk it over with Claude, or Answer in Terminal to answer there as before. Click **Connect** again in Settings → Agents to add the hook for it.
 - With the status panel on, a question opens it with its options as buttons, at the notch or on the screen edge, so you can answer from any app. Clicking away closes it, and the question waits in its notification and its session.
 - The notification for a waiting agent shows its question and the answers it offers, or the tool it asks to run and what for.
 

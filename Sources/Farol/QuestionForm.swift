@@ -2,7 +2,7 @@ import AppKit
 import FarolCore
 import SwiftUI
 
-/// The colors a question is drawn in, so the same form serves the themed sheet and the black notch panel.
+/// The colors a question is drawn in on the status panel.
 struct QuestionColors {
     let text: Color
     let muted: Color
@@ -11,26 +11,6 @@ struct QuestionColors {
     let surface: Color
     let primaryFill: Color
     let primaryText: Color
-
-    init(palette: Palette) {
-        text = palette.text
-        muted = palette.muted
-        raised = palette.raised
-        line = palette.line
-        surface = palette.surface
-        primaryFill = palette.text
-        primaryText = palette.background
-    }
-
-    private init(text: Color, muted: Color, raised: Color, line: Color, surface: Color, primaryFill: Color, primaryText: Color) {
-        self.text = text
-        self.muted = muted
-        self.raised = raised
-        self.line = line
-        self.surface = surface
-        self.primaryFill = primaryFill
-        self.primaryText = primaryText
-    }
 
     /// On the notch panel, which is black whatever the theme.
     static let notch = QuestionColors(
