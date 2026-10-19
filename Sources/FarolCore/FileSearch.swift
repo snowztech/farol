@@ -10,20 +10,134 @@ public enum FileSearch {
         public let text: String
     }
 
-    /// Lines that have `query` in them, ignoring case, in the files under `folder`. At most `limit`, and a few per file.
-    /// A checkout is searched with git, which skips what it ignores. Anywhere else, the same short walk as the file list.
-    public static func search(_ query: String, in folder: String, limit: Int = 300) -> [Match] {
-        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return [] }
-        return Git.repoRoot(of: folder) != nil ? grep(query, in: folder, limit: limit) : scan(query, in: folder, limit: limit)
+    public struct Options: Equatable, Sendable {
+        /// Off, "Token" finds "token" too.
+        public var caseSensitive: Bool
+        /// The query as a whole word only, so "id" skips "width".
+        public var wholeWord: Bool
+        /// The query is a regular expression. Git reads it as an extended one, and the Mac's own engine marks it in the row.
+        /// The two agree on the common parts: classes, groups, alternatives, repeats and anchors.
+        public var regex: Bool
+        /// Which files, as globs on the path: `*.swift` keeps only those, `!*Tests*` leaves those out. Empty is every file.
+        public var files: [String]
+
+        public init(caseSensitive: Bool = false, wholeWord: Bool = false, regex: Bool = false, files: [String] = []) {
+            self.caseSensitive = caseSensitive
+            self.wholeWord = wholeWord
+            self.regex = regex
+            self.files = files
+        }
+
+        /// What is typed in the files field, like `*.swift, !*Tests*`, split on commas and spaces.
+        public static func files(from text: String) -> [String] {
+            text.split { $0 == "," || $0 == " " }.map(String.init)
+        }
+
+        /// The same globs as git reads them: a star crosses folders, so `*.swift` is any Swift file at any depth.
+        func keeps(_ path: String) -> Bool {
+            let included = files.filter { !$0.hasPrefix("!") }
+            let excluded = files.filter { $0.hasPrefix("!") }.map { String($0.dropFirst()) }
+            return (included.isEmpty || included.contains { fnmatch($0, path, 0) == 0 })
+                && !excluded.contains { fnmatch($0, path, 0) == 0 }
+        }
+
+        var pathspecs: [String] {
+            let included = files.filter { !$0.hasPrefix("!") && !$0.isEmpty }
+            let excluded = files.filter { $0.hasPrefix("!") && $0.count > 1 }.map { ":(exclude)" + $0.dropFirst() }
+            return (included.isEmpty ? ["."] : included) + excluded
+        }
     }
 
-    static let perFile = 20
+    /// One search, which a newer one can stop: typing on in a big checkout would otherwise leave a git grep running per key.
+    public final class Job: @unchecked Sendable {
+        private let lock = NSLock()
+        private var process: Process?
+        private var stopped = false
 
-    static func grep(_ query: String, in folder: String, limit: Int) -> [Match] {
+        public init() {}
+
+        public var isCancelled: Bool { lock.withLock { stopped } }
+
+        public func cancel() {
+            lock.withLock {
+                stopped = true
+                if process?.isRunning == true { process?.terminate() }
+            }
+        }
+
+        /// A process started after the cancel is stopped at once.
+        func adopt(_ process: Process) {
+            lock.withLock {
+                self.process = process
+                if stopped { process.terminate() }
+            }
+        }
+    }
+
+    /// Lines that have `query` in them in the files under `folder`. At most `limit`, and `perFile` per file.
+    /// A checkout is searched with git, which skips what it ignores. Anywhere else, the same short walk as the file list.
+    public static func search(_ query: String, in folder: String, options: Options = Options(), limit: Int = 300, job: Job = Job()) -> [Match] {
+        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return [] }
+        return Git.repoRoot(of: folder) != nil
+            ? grep(query, in: folder, options: options, limit: limit, job: job) : scan(query, in: folder, options: options, limit: limit, job: job)
+    }
+
+    /// Where `query` is in `line`, the way the search found it, so a row can mark exactly that.
+    public static func ranges(of query: String, in line: String, options: Options) -> [Range<String.Index>] {
+        matcher(query, options)?(line) ?? []
+    }
+
+    /// False for a regular expression that does not compile, which finds nothing and says so rather than looking empty.
+    public static func isValid(_ query: String, options: Options) -> Bool {
+        !options.regex || matcher(query, options) != nil
+    }
+
+    /// Built once per search, since compiling the expression for every line of every file would be most of the work.
+    static func matcher(_ query: String, _ options: Options) -> ((String) -> [Range<String.Index>])? {
+        guard !query.isEmpty else { return { _ in [] } }
+        let find: (String) -> [Range<String.Index>]
+        if options.regex {
+            guard let expression = try? NSRegularExpression(pattern: query, options: options.caseSensitive ? [] : .caseInsensitive) else { return nil }
+            find = { line in
+                expression.matches(in: line, range: NSRange(line.startIndex..., in: line))
+                    .compactMap { Range($0.range, in: line) }.filter { !$0.isEmpty }
+            }
+        } else {
+            find = { line in
+                var found: [Range<String.Index>] = []
+                var rest = line.startIndex..<line.endIndex
+                while let range = line.range(of: query, options: options.caseSensitive ? [] : .caseInsensitive, range: rest) {
+                    found.append(range)
+                    rest = range.upperBound..<line.endIndex
+                }
+                return found
+            }
+        }
+        guard options.wholeWord else { return find }
+        // Git's -w: a word character neither just before nor just after.
+        return { line in
+            find(line).filter { range in
+                let before = range.lowerBound == line.startIndex ? nil : line[line.index(before: range.lowerBound)]
+                let after = range.upperBound == line.endIndex ? nil : line[range.upperBound]
+                return !isWord(before) && !isWord(after)
+            }
+        }
+    }
+
+    private static func isWord(_ character: Character?) -> Bool {
+        guard let character else { return false }
+        return character == "_" || character.isLetter || character.isNumber
+    }
+
+    /// A file with more matching lines shows only these, so one log full of a word doesn't push out every other file.
+    public static let perFile = 20
+
+    static func grep(_ query: String, in folder: String, options: Options, limit: Int, job: Job) -> [Match] {
+        let flags = [options.regex ? "-E" : "-F"] + (options.caseSensitive ? [] : ["-i"]) + (options.wholeWord ? ["-w"] : [])
         // -z, so a name with a colon or an accent comes through as it is. Git fails with no match, which is no match here too.
         guard let output = try? Git.run(
-            ["grep", "-n", "-z", "-I", "-i", "-F", "--untracked", "--exclude-standard", "--max-count=\(perFile)", "-e", query, "--", "."],
-            in: folder, trimming: false) else { return [] }
+            ["grep", "-n", "-z", "-I", "--untracked", "--exclude-standard", "--max-count=\(perFile)"] + flags + ["-e", query, "--"] + options.pathspecs,
+            in: folder, trimming: false, started: job.adopt) else { return [] }
         var matches: [Match] = []
         for record in output.split(separator: "\n") {
             let fields = record.split(separator: "\0", maxSplits: 2, omittingEmptySubsequences: false)
@@ -34,13 +148,15 @@ public enum FileSearch {
         return matches
     }
 
-    static func scan(_ query: String, in folder: String, limit: Int) -> [Match] {
+    static func scan(_ query: String, in folder: String, options: Options, limit: Int, job: Job) -> [Match] {
+        guard let matcher = matcher(query, options) else { return [] }
         var matches: [Match] = []
-        for path in Files.walk(folder) where !path.hasSuffix("/") {
+        for path in Files.walk(folder) where !path.hasSuffix("/") && options.keeps(path) {
+            if job.isCancelled { return [] }
             guard case .text(let text)? = try? Files.read(folder + "/" + path) else { continue }
             var found = 0
             for (index, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated()
-            where line.range(of: query, options: .caseInsensitive) != nil {
+            where !matcher(String(line)).isEmpty {
                 matches.append(Match(path: path, line: index + 1, text: shown(line)))
                 found += 1
                 if matches.count == limit { return matches }

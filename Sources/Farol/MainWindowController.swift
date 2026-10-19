@@ -21,9 +21,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var sidebarWidth: NSLayoutConstraint!
     private var filesWidth: NSLayoutConstraint!
     private let files = FileTree()
+    private let fileSearch = FindInFilesModel()
     /// Follows the selected session's folder while the files panel is open.
     private var filesRoot: AnyCancellable?
+    private var fileSearchLive: AnyCancellable?
     private static let filesVisibleKey = "files.visible"
+    private static let filesWidthKey = "files.width"
     private var graphWidth: NSLayoutConstraint!
     private let graph = GraphModel()
     /// Follows the selected session's checkout and branch while the graph panel is open.
@@ -97,7 +100,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             toggleSettings: { [weak self] in self?.toggleSettings() },
             toggleMerge: { [weak self] in self?.toggleMerge() },
             openFile: { [weak self] in self?.open($0) },
-            openFileAt: { [weak self] in self?.open($0, line: $1) },
             newSessionIn: { [weak self] in self?.newSession(in: $0) },
             titleBarDoubleClick: { [weak self] in self?.titleBarDoubleClicked() })
 
@@ -105,9 +107,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let topBar = hosting(TopBar(state: state, store: store, updates: updates, review: review, merge: merge, commands: commands))
         let sidebar = hosting(SidebarView(store: store, state: state, commands: commands))
         sidebar.clipsToBounds = true
-        let filesPanel = hosting(FilesPanel(tree: files, state: state) { [weak self] path in
-            self?.open(path)
-        })
+        let filesPanel = hosting(FilesPanel(
+            tree: files, state: state,
+            search: fileSearch,
+            open: { [weak self] in self?.open($0, line: $1) },
+            openMatch: { [weak self] in self?.openMatch($0, line: $1) },
+            resize: { [weak self] in self?.setFilesWidth($0) },
+            startSearch: { [weak self] in self?.findInFiles() },
+            close: { [weak self] in self?.setFiles(visible: false) }))
         filesPanel.clipsToBounds = true
         let graphPanel = hosting(GraphPanel(
             graph: graph, state: state, review: review,
@@ -151,7 +158,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
 
         sidebarWidth = sidebar.widthAnchor.constraint(equalToConstant: SidebarView.width)
-        filesWidth = filesPanel.widthAnchor.constraint(equalToConstant: state.filesVisible ? FilesPanel.width : 0)
+        fileSearch.paneFolder = { [weak self] in self?.store.selected?.directory }
+        fileSearch.repoFolder = { [weak self] in self?.store.selected?.topLevel }
+        fileSearchLive = state.$filesVisible.combineLatest(state.$filesSearching)
+            .sink { [weak self] visible, searching in self?.fileSearch.live = visible && searching }
+        let savedFilesWidth = UserDefaults.standard.double(forKey: Self.filesWidthKey)
+        if savedFilesWidth > 0 { state.filesWidth = savedFilesWidth }
+        filesWidth = filesPanel.widthAnchor.constraint(equalToConstant: state.filesVisible ? state.filesWidth : 0)
         state.graphWidth = state.graphVisible ? savedGraphWidth : 0
         graphWidth = graphPanel.widthAnchor.constraint(equalToConstant: state.graphWidth)
         reviewWidth = reviewPanel.widthAnchor.constraint(equalToConstant: 0)
@@ -349,13 +362,17 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// Opens or closes the files panel. It remembers the choice, and only watches the disk while open.
     func toggleFiles() {
-        let open = !state.filesVisible
+        setFiles(visible: !state.filesVisible)
+    }
+
+    private func setFiles(visible open: Bool) {
+        if !open { state.filesSearching = false }
         UserDefaults.standard.set(open, forKey: Self.filesVisibleKey)
         withAnimation(.easeOut(duration: 0.18)) { state.filesVisible = open }
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.18
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            filesWidth.animator().constant = open ? FilesPanel.width : 0
+            filesWidth.animator().constant = open ? state.filesWidth : 0
             layoutGaps(animated: true)
         }
         followFiles(store.selected)
@@ -426,6 +443,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             reviewWidth.animator().constant = width
             layoutGaps(animated: true)
         }
+    }
+
+    /// Room for the terminal stays, however wide the panel is dragged.
+    private func setFilesWidth(_ width: CGFloat) {
+        let available = (window?.frame.width ?? 1200) - sidebarWidth.constant - reviewWidth.constant - graphWidth.constant - 360
+        let width = min(max(width, FilesPanel.defaultWidth), max(available, FilesPanel.defaultWidth))
+        filesWidth.constant = width
+        state.filesWidth = width
+        UserDefaults.standard.set(width, forKey: Self.filesWidthKey)
     }
 
     private func setReviewWidth(_ width: CGFloat) {
@@ -552,13 +578,36 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         show(store.selected)
     }
 
-    /// Under the title like the session list, so settings close first.
-    func findInFiles() {
-        guard store.selected != nil else { return }
-        if state.showingSettings { toggleSettings() }
-        state.switchingSession = false
-        state.findingInFiles.toggle()
+    /// A search result at its line, with every match in the file marked the way the search found it.
+    private func openMatch(_ path: String, line: Int) {
+        open(path, line: line)
+        let (query, options) = (fileSearch.query, fileSearch.options)
+        store.selected?.panes.file?.mark { FileSearch.ranges(of: query, in: $0, options: options) }
     }
+
+    /// F4 and ⇧F4: the next or previous result, from the file, without going back to the panel.
+    func stepResult(_ by: Int) {
+        guard let match = fileSearch.step(by) else { return }
+        openMatch(fileSearch.searched + "/" + match.path, line: match.line)
+    }
+
+    /// ⇧⌘F: the files panel in search mode, opened if it was closed, with the cursor in its field.
+    /// Text selected on one line, in the terminal or the file, is what it looks for. Otherwise the last search runs again, since files change.
+    func findInFiles() {
+        guard let session = store.selected else { return }
+        if state.showingSettings { toggleSettings() }
+        let selected = (focusedFile.map { $0.selectedText } ?? session.panes.focused.selectedText)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let selected, !selected.isEmpty, !selected.contains("\n"), selected.count <= 200, selected != fileSearch.query {
+            fileSearch.query = selected
+        } else {
+            fileSearch.search()
+        }
+        state.filesSearching = true
+        state.filesSearchFocus += 1
+        if !state.filesVisible { setFiles(visible: true) }
+    }
+
 
     /// Settings hide the session's title, which the list opens under.
     func switchSession() {
