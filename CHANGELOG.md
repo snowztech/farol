@@ -7,6 +7,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Added
 
 - ⌘P finds the commands your project defines, in its Makefile, package.json or justfile, as you type, like `make test` or `npm run dev`. Return runs one in the pane you are in, or in a new pane below when an agent is working there. Nothing to set up or save: it reads the project's own files, so it works in every worktree and stays current.
+- ⇧⌘K opens the focused pane's Run menu for those project commands.
+
+### Fixed
+
+- A pane keeps its Stop button while a command starts, finds Play when the shell reports its folder after you hover, and keeps checking for a running command's ports.
 
 ## [0.45.0] - 2026-10-19
 

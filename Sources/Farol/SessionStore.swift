@@ -510,7 +510,10 @@ final class SessionStore: ObservableObject {
         terminal.onWorkingDirectoryChange = { [weak self, weak session, weak terminal] in
             // A prompt in any pane, since a server started in one is the whole session's.
             session?.refreshPorts()
-            if let session, let terminal { session.panes.commandMayHaveChanged(in: terminal) }
+            if let session, let terminal {
+                session.panes.commandMayHaveChanged(in: terminal)
+                session.panes.commandFolderDidChange(in: terminal)
+            }
             guard let session, terminal === session.panes.focused else { return }
             session.directory = $0
             session.refreshGit()

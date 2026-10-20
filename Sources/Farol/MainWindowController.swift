@@ -555,6 +555,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         session.panes.run(command, in: session.panes.focused)
     }
 
+    func showRunMenu() { store.selected?.panes.showRunMenu() }
+
     func showAbout() {
         state.settingsSection = .about
         if !state.showingSettings { toggleSettings() }
