@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.46.0] - 2026-10-20
+
+Run a project's own commands from a pane, or save your own commands in the checkout.
+
 ### Added
 
 - ⌘P finds the commands your project defines, in its Makefile, package.json or justfile, as you type, like `make test` or `npm run dev`. Return runs one in the pane you are in, or in a new pane below when an agent is working there. Nothing to set up or save: it reads the project's own files, so it works in every worktree and stays current.
