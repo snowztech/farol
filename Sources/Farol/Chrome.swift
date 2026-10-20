@@ -577,19 +577,19 @@ private struct SessionChoice: View {
                     .opacity(current ? 1 : 0)
                 Lamp(activity: session.activity, selected: true, palette: palette)
                 Text(session.displayName).lineLimit(1).truncationMode(.tail).layoutPriority(1)
-                if session.isWorktreeCheckout {
-                    Text("worktree")
-                        .font(.system(size: 10))
-                        .foregroundStyle(palette.muted)
-                        .fixedSize()
-                        .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
-                }
                 if let branch = session.remoteLocation ?? session.branch {
                     // A long name leaves the branch room for a lone "…", so it shows whole or not at all.
                     ViewThatFits(in: .horizontal) {
                         Text(branch).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).fixedSize()
                         EmptyView()
                     }
+                }
+                if session.isWorktreeCheckout {
+                    Text("worktree")
+                        .font(.system(size: 10))
+                        .foregroundStyle(palette.muted)
+                        .fixedSize()
+                        .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
                 }
                 Spacer(minLength: 8)
                 if let shortcut {

@@ -118,19 +118,9 @@ private struct SessionRow: View {
                     .onExitCommand { editing = false }
                     .onChange(of: fieldFocused) { _, focused in if !focused { commit() } }
             } else {
-                HStack(spacing: 5) {
-                    Text(session.displayName)
-                        .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
-                        .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
-                        .lineLimit(1)
-                    if session.isWorktreeCheckout {
-                        Text("worktree")
-                            .font(.system(size: 10))
-                            .foregroundStyle(palette.muted)
-                            .fixedSize()
-                            .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
-                    }
-                }
+                Text(session.displayName)
+                    .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
+                    .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
             }
             if let waiting = session.waitingFor {
                 // In place of the branch while the agent waits, so the row says what for without being opened.
@@ -146,6 +136,11 @@ private struct SessionRow: View {
                             .truncationMode(.middle)
                     } else if let location = session.remoteLocation ?? session.location {
                         Text(location).truncationMode(.head)
+                    }
+                    if session.isWorktreeCheckout {
+                        Text("worktree")
+                            .fixedSize()
+                            .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
                     }
                     // The branch gives way first, so a port is always whole.
                     ForEach(session.ports.prefix(2), id: \.self) { PortLink(port: $0, palette: palette) }
