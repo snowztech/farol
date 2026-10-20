@@ -6,6 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
+- New Task can add Git repositories from anywhere on the Mac, alongside nearby repositories, without changing the current session.
 - Save a Run command for all projects in `~/.farol/commands/`. Global commands run in the active pane's folder. Project commands take priority when names match.
 
 ## [0.46.0] - 2026-10-20

@@ -1,6 +1,7 @@
 import AppKit
 import FarolCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The New Task sheet: what to do, on which branch, with which agent.
 struct NewTaskSheet: View {
@@ -13,6 +14,8 @@ struct NewTaskSheet: View {
     let repos: [String]
     /// From inside a repo: its main checkout, and the repos beside it that "Add repos" offers.
     let root: String?
+    /// The checkout this task starts from, which can differ from the main checkout in `root`.
+    let checkout: String?
     let siblings: [String]
     /// What each listed repo has checked out, read once when the sheet opens.
     let branches: [String: String]
@@ -41,6 +44,11 @@ struct NewTaskSheet: View {
     @State private var picked: Ticket?
     @State private var chosen: Set<String> = []
     @State private var addingRepos = false
+    @State private var outsideRepos: [String] = []
+    @State private var outsideBranches: [String: String] = [:]
+    @State private var choosingRepos = false
+    @State private var checkingRepos = false
+    @State private var repoError: String?
     @State private var repoQuery = ""
     @State private var pickingTicket = false
     @State private var pickingAgent = false
@@ -51,6 +59,7 @@ struct NewTaskSheet: View {
         // Git is asked off the main thread, so a slow repo can't freeze the window before the sheet shows.
         DispatchQueue.global(qos: .userInitiated).async {
             let root = Git.repoRoot(of: directory)
+            let checkout = root == nil ? nil : Git.topLevel(of: directory)
             let repos = root == nil ? TaskFolders.repos(in: directory) : []
             let siblings = root.map { TaskFolders.repos(in: ($0 as NSString).deletingLastPathComponent) } ?? []
             var branches = (repos + siblings).reduce(into: [String: String]()) { $0[$1] = TaskFolders.branch(of: $1) }
@@ -65,7 +74,8 @@ struct NewTaskSheet: View {
                 guard let window, window.attachedSheet == nil else { return }
                 let sheet = NSWindow(contentRect: .zero, styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: true)
                 let view = NewTaskSheet(
-                    directory: directory, repo: repo, base: base, repos: repos, root: root, siblings: siblings, branches: branches, expectsTickets: expectsTickets,
+                    directory: directory, repo: repo, base: base, repos: repos, root: root, checkout: checkout,
+                    siblings: siblings, branches: branches, expectsTickets: expectsTickets,
                     palette: palette, start: start,
                     close: { [weak window, weak sheet] in sheet.map { window?.endSheet($0) } })
                 let host = NSHostingController(rootView: view)
@@ -85,11 +95,22 @@ struct NewTaskSheet: View {
     private var name: String? { Worktrees.branchName(from: branch) }
     private var choice: AgentFolder { AgentFolder.choice(agent, in: folders) ?? folders[0] }
     /// The checklist: the folder's repos, or the current repo's neighbours once you ask to add some.
-    private var listed: [String] { !repos.isEmpty ? repos : addingRepos ? siblings : [] }
+    private var listed: [String] {
+        let nearby: [String]
+        if !repos.isEmpty {
+            nearby = repos
+        } else if addingRepos, let root {
+            nearby = [root] + siblings.filter { $0 != root }
+        } else {
+            nearby = []
+        }
+        return nearby + outsideRepos.filter { !nearby.contains($0) }
+    }
     /// Where the worktrees come from, in the folder's order. The current repo keeps its own checkout, so its branch is the base.
     private var sources: [String] {
         listed.isEmpty ? [directory] : listed.filter(chosen.contains).map { $0 == root ? directory : $0 }
     }
+    private var duplicateRepoName: String? { TaskFolders.duplicateName(in: listed.filter(chosen.contains)) }
     private var subtitle: String {
         if repos.isEmpty, sources.count < 2 { return "The agent starts in its own worktree, on a new branch from \(base)." }
         return "Each repo you pick gets its own worktree on the same branch, side by side in one folder. The agent starts there and sees them all."
@@ -127,8 +148,8 @@ struct NewTaskSheet: View {
                     }
                 if !listed.isEmpty {
                     repoChecklist(p)
-                } else if siblings.count > 1, let root {
-                    addReposLink(beside: root, p)
+                } else if let root {
+                    addReposLink(root, p)
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
@@ -164,7 +185,7 @@ struct NewTaskSheet: View {
                 }
                 .buttonStyle(SheetButton(palette: p, primary: true))
                 .keyboardShortcut(.defaultAction)
-                .disabled(prompt.isEmpty || name == nil || sources.isEmpty)
+                .disabled(prompt.isEmpty || name == nil || sources.isEmpty || duplicateRepoName != nil || checkingRepos)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
@@ -175,6 +196,15 @@ struct NewTaskSheet: View {
         .background(p.background)
         .ignoresSafeArea()
         .onAppear { focus = .task }
+        .fileImporter(isPresented: $choosingRepos, allowedContentTypes: [.folder], allowsMultipleSelection: true) { result in
+            switch result {
+            case .success(let urls): addRepositories(urls)
+            case .failure(let error): repoError = error.localizedDescription
+            }
+        }
+        .fileDialogMessage("Choose Git repositories or folders inside them")
+        .fileDialogConfirmationLabel("Add")
+        .fileDialogDefaultDirectory(URL(fileURLWithPath: directory))
         .task {
             let directory = directory
             // Both at once, since each waits on its own server.
@@ -273,16 +303,10 @@ struct NewTaskSheet: View {
         let shown = shownRepos
         let list = VStack(spacing: 1) {
             ForEach(shown, id: \.self) { repo in
-                SheetChoice(palette: p) { toggle(repo) } label: {
-                    Image(systemName: chosen.contains(repo) ? "checkmark.square.fill" : "square")
-                        .foregroundStyle(chosen.contains(repo) ? p.text : p.muted)
-                    Text(URL(fileURLWithPath: repo).lastPathComponent).lineLimit(1).truncationMode(.middle)
-                    Spacer(minLength: 8)
-                    // A new branch starts from what the repo has checked out, which is worth seeing when it isn't main.
-                    if let branch = branches[repo], !["main", "master"].contains(branch) {
-                        Text("from \(branch)").font(.system(size: 11)).foregroundStyle(p.muted)
-                            .lineLimit(1).truncationMode(.middle)
-                    }
+                TaskRepoChoice(name: URL(fileURLWithPath: repo).lastPathComponent,
+                               path: repo == root ? checkout ?? repo : repo,
+                               branch: outsideBranches[repo] ?? branches[repo], selected: chosen.contains(repo), palette: p) {
+                    toggle(repo)
                 }
             }
             if shown.isEmpty {
@@ -331,6 +355,28 @@ struct NewTaskSheet: View {
             }
             .background(RoundedRectangle(cornerRadius: 8).fill(p.surface))
             .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(focus == .repos ? p.muted : p.line))
+            Button {
+                repoError = nil
+                choosingRepos = true
+            } label: {
+                Label("Choose repository…", systemImage: "plus")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(p.muted)
+            .disabled(checkingRepos)
+            if checkingRepos {
+                Label("Checking repositories…", systemImage: "hourglass")
+                    .font(.system(size: 12))
+                    .foregroundStyle(p.muted)
+            }
+            if let duplicateRepoName {
+                Text("Two selected repositories are named \(duplicateRepoName). Choose one of them.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(p.removed)
+            }
+            if let repoError {
+                Text(repoError).font(.system(size: 12)).foregroundStyle(p.removed)
+            }
         }
     }
 
@@ -350,16 +396,39 @@ struct NewTaskSheet: View {
     }
 
     /// One quiet line, since most tasks stay in one repo. It opens the checklist with this repo already ticked.
-    private func addReposLink(beside root: String, _ p: Palette) -> some View {
-        let folder = ((root as NSString).deletingLastPathComponent as NSString).lastPathComponent
+    private func addReposLink(_ root: String, _ p: Palette) -> some View {
         return Button {
             chosen = [root]
             addingRepos = true
+            if siblings.allSatisfy({ $0 == root }) { choosingRepos = true }
         } label: {
-            Label("Add repos from \(folder)", systemImage: "plus").font(.system(size: 12))
+            Label("Add repositories", systemImage: "plus").font(.system(size: 12))
         }
         .buttonStyle(.plain)
         .foregroundStyle(p.muted)
+    }
+
+    private func addRepositories(_ urls: [URL]) {
+        checkingRepos = true
+        DispatchQueue.global(qos: .userInitiated).async {
+            var found: [(path: String, branch: String?)] = []
+            var invalid = 0
+            for url in urls {
+                guard let root = Git.repoRoot(of: url.path) else { invalid += 1; continue }
+                if !found.contains(where: { $0.path == root }) {
+                    found.append((root, TaskFolders.branch(of: root)))
+                }
+            }
+            DispatchQueue.main.async {
+                checkingRepos = false
+                for repo in found {
+                    if !listed.contains(repo.path) { outsideRepos.append(repo.path) }
+                    if repo.path != root, let branch = repo.branch { outsideBranches[repo.path] = branch }
+                    chosen.insert(repo.path)
+                }
+                repoError = invalid == 0 ? nil : "Choose a folder inside a Git repository."
+            }
+        }
     }
 
     /// The mark of where it comes from, its key, then as much of its title as fits on the line.
@@ -409,5 +478,50 @@ struct NewTaskSheet: View {
         branch = NewTask.branchName(for: task)
         pickingTicket = false
         focus = .task
+    }
+}
+
+private struct TaskRepoChoice: View {
+    let name: String
+    let path: String
+    let branch: String?
+    let selected: Bool
+    let palette: Palette
+    let choose: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: choose) {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: selected ? "checkmark.square.fill" : "square")
+                    .foregroundStyle(selected ? palette.text : palette.muted)
+                    .padding(.top, 2)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(name)
+                        .font(.system(size: 13, weight: .medium))
+                        .lineLimit(1)
+                    Text("from \(branch ?? "current commit")")
+                        .font(.system(size: 11))
+                        .foregroundStyle(palette.muted)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Text((path as NSString).abbreviatingWithTildeInPath)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(palette.muted)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised : .clear))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onClickableHover { hovering = $0 }
+        .help(path)
     }
 }

@@ -35,6 +35,16 @@ public struct TaskFolders {
         return head.dropFirst("ref: refs/heads/".count).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Worktrees share one task folder, so two repos with the same folder name would target the same path.
+    public static func duplicateName(in repos: [String]) -> String? {
+        var names = Set<String>()
+        for repo in repos {
+            let name = URL(fileURLWithPath: repo).lastPathComponent
+            if !names.insert(name.lowercased()).inserted { return name }
+        }
+        return nil
+    }
+
     /// The task folder a path is in, even from inside one of its repos, or nil outside Farol's tasks.
     public func root(of path: String) -> String? {
         let resolved = { (url: URL) in url.resolvingSymlinksInPath().path }
@@ -44,13 +54,17 @@ public struct TaskFolders {
 
     /// Creates the task folder with a worktree of each repo on `branch`. Either all of them are made or none.
     public func create(branch: String, repos: [String], copyEnvironmentFiles: Bool = false) throws -> String {
+        let roots = repos.map { Git.repoRoot(of: $0) ?? $0 }
+        if let name = Self.duplicateName(in: roots) {
+            throw GitError(description: "Two selected repositories are named \(name). Choose one of them.")
+        }
         let folder = base.appendingPathComponent(Worktrees.folderName(for: branch))
         guard !FileManager.default.fileExists(atPath: folder.path) else {
             throw GitError(description: "A task folder already exists at \(folder.path).")
         }
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 
-        let paths = repos.map { folder.appendingPathComponent(URL(fileURLWithPath: $0).lastPathComponent).path }
+        let paths = roots.map { folder.appendingPathComponent(URL(fileURLWithPath: $0).lastPathComponent).path }
         var errors = [Error?](repeating: nil, count: repos.count)
         let lock = NSLock()
         // Each repo checks out on its own, so big ones don't wait in line.
