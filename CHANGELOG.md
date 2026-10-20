@@ -6,6 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
+- Sessions in worktrees are labeled in the sidebar and session picker. Drag the sidebar edge to change its width.
 - New Task can add Git repositories from anywhere on the Mac, alongside nearby repositories, without changing the current session.
 - Save a Run command for all projects in `~/.farol/commands/`. Global commands run in the active pane's folder. Project commands take priority when names match.
 

@@ -20,6 +20,7 @@ final class WindowState: ObservableObject {
     @Published var filesSearchFocus = 0
     /// Mirrors the sidebar and the files panel, so the top bar can match the columns below it.
     @Published var sidebarVisible = true
+    @Published var sidebarWidth = SidebarView.defaultWidth
     @Published var filesVisible = false
     /// The files panel's width while open, which you can drag.
     @Published var filesWidth = FilesPanel.defaultWidth
@@ -115,7 +116,7 @@ struct TopBar: View {
 
     /// Width of the side panels open on the left, which the title stays clear of.
     private var leftPanels: CGFloat {
-        (state.sidebarVisible ? SidebarView.width : 0) + (filesVisible ? state.filesWidth : 0)
+        (state.sidebarVisible ? state.sidebarWidth : 0) + (filesVisible ? state.filesWidth : 0)
     }
 
     // The merge view covers every panel but the sidebar, so the bar is laid out as if they were closed.
@@ -135,7 +136,7 @@ struct TopBar: View {
 
     private func touchingColumns(_ p: Palette) -> some View {
         HStack(spacing: 0) {
-            Rectangle().fill(p.surface).frame(width: state.sidebarVisible ? SidebarView.width - 1 : 0)
+            Rectangle().fill(p.surface).frame(width: state.sidebarVisible ? state.sidebarWidth - 1 : 0)
             Rectangle().fill(p.line).frame(width: state.sidebarVisible ? 1 : 0)
             Rectangle().fill(p.surface).frame(width: filesVisible ? state.filesWidth - 1 : 0)
             Rectangle().fill(p.line).frame(width: filesVisible ? 1 : 0)
@@ -584,6 +585,13 @@ private struct SessionChoice: View {
                     }
                 }
                 Spacer(minLength: 8)
+                if session.isWorktreeCheckout {
+                    Text("worktree")
+                        .font(.system(size: 10))
+                        .foregroundStyle(palette.muted.opacity(0.65))
+                        .fixedSize()
+                        .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
+                }
                 if let shortcut {
                     Text(shortcut).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).fixedSize()
                 }

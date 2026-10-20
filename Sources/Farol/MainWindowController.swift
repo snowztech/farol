@@ -19,6 +19,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private let content = NSView()
     private let terminalContainer = NSView()
     private var sidebarWidth: NSLayoutConstraint!
+    private static let sidebarWidthKey = "sidebar.width"
     private var filesWidth: NSLayoutConstraint!
     private let files = FileTree()
     private let fileSearch = FindInFilesModel()
@@ -106,7 +107,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
         let root = NSView()
         let topBar = hosting(TopBar(state: state, store: store, updates: updates, review: review, merge: merge, commands: commands))
-        let sidebar = hosting(SidebarView(store: store, state: state, commands: commands))
+        let sidebar = hosting(SidebarView(store: store, state: state, commands: commands,
+                                          resize: { [weak self] in self?.setSidebarWidth($0) }))
         sidebar.clipsToBounds = true
         let filesPanel = hosting(FilesPanel(
             tree: files, state: state,
@@ -157,7 +159,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             v.translatesAutoresizingMaskIntoConstraints = false
         }
 
-        sidebarWidth = sidebar.widthAnchor.constraint(equalToConstant: SidebarView.width)
+        let savedSidebarWidth = UserDefaults.standard.double(forKey: Self.sidebarWidthKey)
+        if savedSidebarWidth > 0 { state.sidebarWidth = min(max(savedSidebarWidth, 180), 400) }
+        sidebarWidth = sidebar.widthAnchor.constraint(equalToConstant: state.sidebarWidth)
         fileSearch.paneFolder = { [weak self] in self?.store.selected?.directory }
         fileSearch.repoFolder = { [weak self] in self?.store.selected?.topLevel }
         fileSearchLive = state.$filesVisible.combineLatest(state.$filesSearching)
@@ -386,7 +390,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.18
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            sidebarWidth.animator().constant = open ? SidebarView.width : 0
+            sidebarWidth.animator().constant = open ? state.sidebarWidth : 0
             layoutGaps(animated: true)
         }
     }
@@ -474,6 +478,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             reviewWidth.animator().constant = width
             layoutGaps(animated: true)
         }
+    }
+
+    /// Room for the terminal stays, however wide the sidebar is dragged.
+    private func setSidebarWidth(_ width: CGFloat) {
+        let available = (window?.frame.width ?? 1200) - filesWidth.constant - reviewWidth.constant - graphWidth.constant - 360
+        let width = min(max(width, 180), max(available, 180), 400)
+        sidebarWidth.constant = width
+        state.sidebarWidth = width
+        UserDefaults.standard.set(width, forKey: Self.sidebarWidthKey)
     }
 
     /// Room for the terminal stays, however wide the panel is dragged.

@@ -1,13 +1,15 @@
 import SwiftUI
 
 struct SidebarView: View {
-    static let width: CGFloat = 224
+    static let defaultWidth: CGFloat = 224
 
     @ObservedObject var store: SessionStore
     @ObservedObject var state: WindowState
     let commands: Commands
+    let resize: (CGFloat) -> Void
 
     @State private var dragging: Session?
+    @State private var dragStart: CGFloat?
     /// Only read so the sidebar redraws when the setting changes. The store applies it.
     @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = false
 
@@ -46,11 +48,22 @@ struct SidebarView: View {
                 .padding(8)
         }
         // Fixed width, so collapsing the sidebar clips it instead of reflowing every row.
-        .frame(width: Self.width)
+        .frame(width: state.sidebarWidth)
         .frame(maxHeight: .infinity)
         .background(p.surface)
-        // A boxed panel has a border all around, drawn by the window.
-        .overlay(alignment: .trailing) { Rectangle().fill(p.boxed ? .clear : p.line).frame(width: 1) }
+        .overlay(alignment: .trailing) {
+            Rectangle().fill(p.boxed ? .clear : p.line).frame(width: 1)
+                .frame(width: 7, alignment: .trailing)
+                .contentShape(Rectangle())
+                .onHover { inside in (inside ? NSCursor.resizeLeftRight : NSCursor.arrow).set() }
+                .gesture(DragGesture(coordinateSpace: .global)
+                    .onChanged { drag in
+                        let start = dragStart ?? state.sidebarWidth
+                        dragStart = start
+                        resize(start + drag.translation.width)
+                    }
+                    .onEnded { _ in dragStart = nil })
+        }
     }
 }
 
@@ -119,15 +132,24 @@ private struct SessionRow: View {
             } else {
                 HStack(spacing: 6) {
                     if let branch = gitLine {
-                        Label(branch, systemImage: "arrow.triangle.branch")
-                            .labelStyle(BranchLabelStyle())
-                            .truncationMode(.middle)
+                        HStack(spacing: 4) {
+                            BranchMark(color: palette.muted)
+                            Text(branch).truncationMode(.middle)
+                        }
                     } else if let location = session.remoteLocation ?? session.location {
                         Text(location).truncationMode(.head)
                     }
                     // The branch gives way first, so a port is always whole.
+                    Spacer(minLength: 4)
                     ForEach(session.ports.prefix(2), id: \.self) { PortLink(port: $0, palette: palette) }
                     if session.ports.count > 2 { Text(verbatim: "+\(session.ports.count - 2)").fixedSize() }
+                    if session.isWorktreeCheckout {
+                        Text("worktree")
+                            .foregroundStyle(palette.muted.opacity(0.65))
+                            .fixedSize()
+                            .padding(.leading, 4)
+                            .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
+                    }
                 }
                 .font(.system(size: 10.5, design: .monospaced))
                 .foregroundStyle(palette.muted)
@@ -332,12 +354,29 @@ private struct PortLink: View {
     }
 }
 
-/// A small glyph tight against the branch name.
-private struct BranchLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 3) {
-            configuration.icon.font(.system(size: 9, weight: .medium))
-            configuration.title
+/// The system branch symbol's arrow draws too much attention beside a small branch name.
+private struct BranchMark: View {
+    let color: Color
+
+    var body: some View {
+        Canvas { context, size in
+            let unit = size.width / 12
+            var line = Path()
+            line.move(to: CGPoint(x: 3 * unit, y: 2 * unit))
+            line.addLine(to: CGPoint(x: 3 * unit, y: 10 * unit))
+            line.move(to: CGPoint(x: 9 * unit, y: 2 * unit))
+            line.addLine(to: CGPoint(x: 9 * unit, y: 4 * unit))
+            line.addQuadCurve(to: CGPoint(x: 3 * unit, y: 8 * unit),
+                              control: CGPoint(x: 9 * unit, y: 8 * unit))
+            context.stroke(line, with: .color(color), style: StrokeStyle(lineWidth: unit, lineCap: .round))
+            for point in [CGPoint(x: 3 * unit, y: 2 * unit), CGPoint(x: 9 * unit, y: 2 * unit),
+                          CGPoint(x: 3 * unit, y: 10 * unit)] {
+                let dot = Path(ellipseIn: CGRect(x: point.x - 1.4 * unit, y: point.y - 1.4 * unit,
+                                                 width: 2.8 * unit, height: 2.8 * unit))
+                context.fill(dot, with: .color(color))
+            }
         }
+        .frame(width: 11, height: 11)
+        .accessibilityHidden(true)
     }
 }
