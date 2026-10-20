@@ -578,10 +578,10 @@ private struct SessionChoice: View {
                 Lamp(activity: session.activity, selected: true, palette: palette)
                 Text(session.displayName).lineLimit(1).truncationMode(.tail).layoutPriority(1)
                 if session.isWorktreeCheckout {
-                    Image(systemName: "square.on.square")
-                        .font(.system(size: 9))
+                    Text("worktree")
+                        .font(.system(size: 10))
                         .foregroundStyle(palette.muted)
-                        .accessibilityLabel("Worktree")
+                        .fixedSize()
                         .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
                 }
                 if let branch = session.remoteLocation ?? session.branch {

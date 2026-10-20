@@ -124,11 +124,10 @@ private struct SessionRow: View {
                         .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
                         .lineLimit(1)
                     if session.isWorktreeCheckout {
-                        Image(systemName: "square.on.square")
-                            .font(.system(size: 9))
+                        Text("worktree")
+                            .font(.system(size: 10))
                             .foregroundStyle(palette.muted)
                             .fixedSize()
-                            .accessibilityLabel("Worktree")
                             .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
                     }
                 }
@@ -143,8 +142,7 @@ private struct SessionRow: View {
             } else {
                 HStack(spacing: 6) {
                     if let branch = gitLine {
-                        Label(branch, systemImage: "arrow.triangle.branch")
-                            .labelStyle(BranchLabelStyle())
+                        Text(branch)
                             .truncationMode(.middle)
                     } else if let location = session.remoteLocation ?? session.location {
                         Text(location).truncationMode(.head)
@@ -353,15 +351,5 @@ private struct PortLink: View {
         .fixedSize()
         .onClickableHover { hovering = $0 }
         .hoverTip("Open localhost:\(port)")
-    }
-}
-
-/// A small glyph tight against the branch name.
-private struct BranchLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 3) {
-            configuration.icon.font(.system(size: 9, weight: .medium))
-            configuration.title
-        }
     }
 }
