@@ -177,7 +177,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         sessions.addItem(withTitle: "Close Session", action: #selector(closeSession), keyEquivalent: "w")
         sessions.addItem(withTitle: "Save File", action: #selector(saveFile), keyEquivalent: "s")
         sessions.addItem(withTitle: "Name Pane…", action: #selector(namePane), keyEquivalent: "R")
-        sessions.addItem(withTitle: "Run Project Command…", action: #selector(showRunMenu), keyEquivalent: "K")
+        sessions.addItem(withTitle: "Run Project Command…", action: #selector(showRunMenu), keyEquivalent: "k")
+            .keyEquivalentModifierMask = [.command, .option]
         sessions.addItem(.separator())
         sessions.addItem(withTitle: "Next Session", action: #selector(nextSession), keyEquivalent: "]")
             .keyEquivalentModifierMask = [.command, .shift]

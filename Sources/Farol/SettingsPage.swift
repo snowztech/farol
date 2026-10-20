@@ -759,7 +759,7 @@ struct SettingsPage: View {
             ("Make panes equal", ["⌃⌘="]),
             ("Zoom the focused pane", ["⇧⌘↩"]),
             ("Name the focused pane", ["⇧⌘R"]),
-            ("Run a project command", ["⇧⌘K"]),
+            ("Run a project command", ["⌥⌘K"]),
         ]),
         ShortcutGroup(title: "Find", items: [
             ("Find", ["⌘F"]),
