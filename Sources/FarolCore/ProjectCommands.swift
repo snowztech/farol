@@ -19,6 +19,35 @@ public struct ProjectCommand: Equatable, Hashable, Sendable {
 }
 
 public enum ProjectCommands {
+    public enum SaveError: LocalizedError {
+        case invalidName, emptyScript, alreadyExists
+
+        public var errorDescription: String? {
+            switch self {
+            case .invalidName: "Use a name with letters, numbers, spaces, hyphens or underscores."
+            case .emptyScript: "Enter a command to run."
+            case .alreadyExists: "A command with that name already exists."
+            }
+        }
+    }
+
+    public static func commandsDirectory(in folder: String) -> URL {
+        URL(fileURLWithPath: folder, isDirectory: true).appendingPathComponent(".farol/commands", isDirectory: true)
+    }
+
+    /// One editable shell script per command, in the folder shared with the project.
+    public static func save(name: String, script: String, in folder: String) throws {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let first = name.first, first.isLetter || first.isNumber,
+              name.allSatisfy({ $0.isLetter || $0.isNumber || " _-".contains($0) }) else { throw SaveError.invalidName }
+        guard !script.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw SaveError.emptyScript }
+        let directory = commandsDirectory(in: folder)
+        let file = directory.appendingPathComponent(name + ".sh")
+        guard !FileManager.default.fileExists(atPath: file.path) else { throw SaveError.alreadyExists }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try (script.trimmingCharacters(in: .newlines) + "\n").write(to: file, atomically: true, encoding: .utf8)
+    }
+
     /// The commands defined in `folder` and the folders above it up to `top`, the checkout's, closest first.
     /// A name defined in a closer folder hides the same name further up. Reads a few small files, so call it off the main thread.
     public static func find(in folder: String, top: String?) -> [ProjectCommand] {
@@ -53,7 +82,7 @@ public enum ProjectCommands {
         func first(_ candidates: [String]) -> (name: String, text: String)? {
             candidates.lazy.filter(names.contains).compactMap { name in read(folder, name).map { (name, $0) } }.first
         }
-        var found: [ProjectCommand] = []
+        var found = savedCommands(in: folder)
         if names.contains("package.json"), let text = read(folder, "package.json") {
             let runner = packageManager(in: folder)
             found += scripts(inPackage: text).map {
@@ -68,6 +97,23 @@ public enum ProjectCommands {
             found += recipes(inJustfile: text).map { ProjectCommand(name: $0, command: "just \($0)", folder: folder, source: name) }
         }
         return found
+    }
+
+    private static func savedCommands(in folder: String) -> [ProjectCommand] {
+        let directory = commandsDirectory(in: folder)
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        return names.filter { name in
+            guard name.hasSuffix(".sh"), !name.hasPrefix("."),
+                  let type = (try? FileManager.default.attributesOfItem(atPath: directory.appendingPathComponent(name).path))?[.type]
+                    as? FileAttributeType else { return false }
+            return type == .typeRegular
+        }
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+            .map { filename in
+                let source = ".farol/commands/" + filename
+                return ProjectCommand(name: String(filename.dropLast(3)), command: "sh \(NewTask.shellQuoted(source))",
+                                      folder: folder, source: source)
+            }
     }
 
     /// The scripts of a package.json, in the order they are written.

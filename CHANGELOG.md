@@ -8,6 +8,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - ⌘P finds the commands your project defines, in its Makefile, package.json or justfile, as you type, like `make test` or `npm run dev`. Return runs one in the pane you are in, or in a new pane below when an agent is working there. Nothing to set up or save: it reads the project's own files, so it works in every worktree and stays current.
 - ⇧⌘K opens the focused pane's Run menu for those project commands.
+- The pane's Run menu can save a named shell command as an editable script in the checkout's `.farol/commands/` folder. Saved commands also appear in ⌘P.
 
 ### Fixed
 
