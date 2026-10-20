@@ -584,14 +584,14 @@ private struct SessionChoice: View {
                         EmptyView()
                     }
                 }
+                Spacer(minLength: 8)
                 if session.isWorktreeCheckout {
                     Text("worktree")
                         .font(.system(size: 10))
-                        .foregroundStyle(palette.muted)
+                        .foregroundStyle(palette.muted.opacity(0.65))
                         .fixedSize()
                         .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
                 }
-                Spacer(minLength: 8)
                 if let shortcut {
                     Text(shortcut).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).fixedSize()
                 }

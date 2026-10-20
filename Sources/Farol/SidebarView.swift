@@ -132,19 +132,24 @@ private struct SessionRow: View {
             } else {
                 HStack(spacing: 6) {
                     if let branch = gitLine {
-                        Text(branch)
-                            .truncationMode(.middle)
+                        HStack(spacing: 4) {
+                            BranchMark(color: palette.muted)
+                            Text(branch).truncationMode(.middle)
+                        }
                     } else if let location = session.remoteLocation ?? session.location {
                         Text(location).truncationMode(.head)
                     }
-                    if session.isWorktreeCheckout {
-                        Text("worktree")
-                            .fixedSize()
-                            .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
-                    }
                     // The branch gives way first, so a port is always whole.
+                    Spacer(minLength: 4)
                     ForEach(session.ports.prefix(2), id: \.self) { PortLink(port: $0, palette: palette) }
                     if session.ports.count > 2 { Text(verbatim: "+\(session.ports.count - 2)").fixedSize() }
+                    if session.isWorktreeCheckout {
+                        Text("worktree")
+                            .foregroundStyle(palette.muted.opacity(0.65))
+                            .fixedSize()
+                            .padding(.leading, 4)
+                            .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
+                    }
                 }
                 .font(.system(size: 10.5, design: .monospaced))
                 .foregroundStyle(palette.muted)
@@ -346,5 +351,32 @@ private struct PortLink: View {
         .fixedSize()
         .onClickableHover { hovering = $0 }
         .hoverTip("Open localhost:\(port)")
+    }
+}
+
+/// The system branch symbol's arrow draws too much attention beside a small branch name.
+private struct BranchMark: View {
+    let color: Color
+
+    var body: some View {
+        Canvas { context, size in
+            let unit = size.width / 12
+            var line = Path()
+            line.move(to: CGPoint(x: 3 * unit, y: 2 * unit))
+            line.addLine(to: CGPoint(x: 3 * unit, y: 10 * unit))
+            line.move(to: CGPoint(x: 9 * unit, y: 2 * unit))
+            line.addLine(to: CGPoint(x: 9 * unit, y: 4 * unit))
+            line.addQuadCurve(to: CGPoint(x: 3 * unit, y: 8 * unit),
+                              control: CGPoint(x: 9 * unit, y: 8 * unit))
+            context.stroke(line, with: .color(color), style: StrokeStyle(lineWidth: unit, lineCap: .round))
+            for point in [CGPoint(x: 3 * unit, y: 2 * unit), CGPoint(x: 9 * unit, y: 2 * unit),
+                          CGPoint(x: 3 * unit, y: 10 * unit)] {
+                let dot = Path(ellipseIn: CGRect(x: point.x - 1.4 * unit, y: point.y - 1.4 * unit,
+                                                 width: 2.8 * unit, height: 2.8 * unit))
+                context.fill(dot, with: .color(color))
+            }
+        }
+        .frame(width: 11, height: 11)
+        .accessibilityHidden(true)
     }
 }
