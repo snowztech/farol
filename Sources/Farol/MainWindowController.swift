@@ -101,6 +101,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             toggleMerge: { [weak self] in self?.toggleMerge() },
             openFile: { [weak self] in self?.open($0) },
             newSessionIn: { [weak self] in self?.newSession(in: $0) },
+            runCommand: { [weak self] in self?.run($0) },
             titleBarDoubleClick: { [weak self] in self?.titleBarDoubleClicked() })
 
         let root = NSView()
@@ -545,6 +546,18 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     func toggleSettings() {
         state.showingSettings.toggle()
         show(store.selected)
+    }
+
+    /// A project's command from ⌘P, typed at the prompt of the pane you are in.
+    /// With a program like an agent in front there, it runs in a new pane below, so it never types into the agent.
+    func run(_ command: ProjectCommand) {
+        guard let session = store.selected else { return }
+        let pane = session.panes.focused
+        let line = command.line(from: pane.workingDirectory)
+        guard !pane.runsProgram else { return store.split(session, .down, run: line) }
+        window?.makeFirstResponder(pane)
+        pane.pasteText(line)
+        pane.press(.enter)
     }
 
     func showAbout() {
