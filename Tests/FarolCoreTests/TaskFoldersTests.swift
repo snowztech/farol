@@ -52,6 +52,40 @@ struct Workspace {
     #expect((try? Git.run(["rev-parse", "--verify", "refs/heads/taken"], in: space.parent + "/api")) != nil)
 }
 
+@Test func sameNamedReposCannotShareATaskFolder() throws {
+    let space = try Workspace()
+    let other = (space.parent as NSString).deletingLastPathComponent + "/elsewhere/api"
+    try FileManager.default.createDirectory(atPath: other, withIntermediateDirectories: true)
+    try Git.run(["init", "--quiet", "--initial-branch=main"], in: other)
+    try Git.run(["-c", "user.name=Farol", "-c", "user.email=farol@example.com", "commit", "--quiet", "--allow-empty", "-m", "init"], in: other)
+    #expect(TaskFolders.duplicateName(in: [space.parent + "/api", other]) == "api")
+    #expect { try space.tasks.create(branch: "same-name", repos: [space.parent + "/api", other]) }
+        throws: { "\($0)".contains("Two selected repositories are named api") }
+    #expect(!FileManager.default.fileExists(atPath: space.tasks.base.appendingPathComponent("same-name").path))
+}
+
+@Test func aTaskCanUseReposFromDifferentFolders() throws {
+    let space = try Workspace()
+    let other = (space.parent as NSString).deletingLastPathComponent + "/elsewhere/docs"
+    try FileManager.default.createDirectory(atPath: other, withIntermediateDirectories: true)
+    try Git.run(["init", "--quiet", "--initial-branch=main"], in: other)
+    try Git.run(["-c", "user.name=Farol", "-c", "user.email=farol@example.com", "commit", "--quiet", "--allow-empty", "-m", "init"], in: other)
+
+    let folder = try space.tasks.create(branch: "across-folders", repos: [space.parent + "/api", other])
+    #expect(Git.branch(of: folder + "/api") == "across-folders")
+    #expect(Git.branch(of: folder + "/docs") == "across-folders")
+}
+
+@Test func aRepoChosenFromASubfolderKeepsItsRepoName() throws {
+    let space = try Workspace()
+    let subfolder = space.parent + "/api/src"
+    try FileManager.default.createDirectory(atPath: subfolder, withIntermediateDirectories: true)
+    let folder = try space.tasks.create(branch: "from-subfolder", repos: [subfolder, space.parent + "/web"])
+    #expect(FileManager.default.fileExists(atPath: folder + "/api"))
+    #expect(FileManager.default.fileExists(atPath: folder + "/web"))
+    #expect(!FileManager.default.fileExists(atPath: folder + "/src"))
+}
+
 @Test func removingTheTaskKeepsTheBranches() throws {
     let space = try Workspace()
     let folder = try space.tasks.create(branch: "done", repos: space.repos)
