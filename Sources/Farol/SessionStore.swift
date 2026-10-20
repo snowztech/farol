@@ -54,6 +54,10 @@ final class Session: ObservableObject, Identifiable {
     private let taskFolderRepos: [String]
     /// The task's repos while the session is in its folder. Empty once it `cd`s out, where it is a plain session again.
     @Published private(set) var taskRepos: [String] = []
+    /// Follows the current checkout, so leaving a worktree clears its cue even if the session began there.
+    var isWorktreeCheckout: Bool {
+        !isRemote && (!taskRepos.isEmpty || (repoRoot != nil && topLevel != nil && topLevel != repoRoot))
+    }
     /// The task repo the git panels show. Until you pick one or `cd` into one, the first with changes, or else the first.
     private var pickedRepo: String?
     private var refreshingGit = false

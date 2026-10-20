@@ -1,13 +1,15 @@
 import SwiftUI
 
 struct SidebarView: View {
-    static let width: CGFloat = 224
+    static let defaultWidth: CGFloat = 224
 
     @ObservedObject var store: SessionStore
     @ObservedObject var state: WindowState
     let commands: Commands
+    let resize: (CGFloat) -> Void
 
     @State private var dragging: Session?
+    @State private var dragStart: CGFloat?
     /// Only read so the sidebar redraws when the setting changes. The store applies it.
     @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = false
 
@@ -46,11 +48,22 @@ struct SidebarView: View {
                 .padding(8)
         }
         // Fixed width, so collapsing the sidebar clips it instead of reflowing every row.
-        .frame(width: Self.width)
+        .frame(width: state.sidebarWidth)
         .frame(maxHeight: .infinity)
         .background(p.surface)
-        // A boxed panel has a border all around, drawn by the window.
-        .overlay(alignment: .trailing) { Rectangle().fill(p.boxed ? .clear : p.line).frame(width: 1) }
+        .overlay(alignment: .trailing) {
+            Rectangle().fill(p.boxed ? .clear : p.line).frame(width: 1)
+                .frame(width: 7, alignment: .trailing)
+                .contentShape(Rectangle())
+                .onHover { inside in (inside ? NSCursor.resizeLeftRight : NSCursor.arrow).set() }
+                .gesture(DragGesture(coordinateSpace: .global)
+                    .onChanged { drag in
+                        let start = dragStart ?? state.sidebarWidth
+                        dragStart = start
+                        resize(start + drag.translation.width)
+                    }
+                    .onEnded { _ in dragStart = nil })
+        }
     }
 }
 
@@ -105,9 +118,20 @@ private struct SessionRow: View {
                     .onExitCommand { editing = false }
                     .onChange(of: fieldFocused) { _, focused in if !focused { commit() } }
             } else {
-                Text(session.displayName)
-                    .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
-                    .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
+                HStack(spacing: 5) {
+                    Text(session.displayName)
+                        .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
+                        .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
+                        .lineLimit(1)
+                    if session.isWorktreeCheckout {
+                        Image(systemName: "square.on.square")
+                            .font(.system(size: 9))
+                            .foregroundStyle(palette.muted)
+                            .fixedSize()
+                            .accessibilityLabel("Worktree")
+                            .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
+                    }
+                }
             }
             if let waiting = session.waitingFor {
                 // In place of the branch while the agent waits, so the row says what for without being opened.
