@@ -1,6 +1,7 @@
 import AppKit
 import FarolCore
 import GhosttyTerminal
+import SwiftUI
 
 /// A session's terminals and at most one open file, split into panes. Each split holds two children and the share the first one gets.
 /// Layout is plain arithmetic on that tree, which maps directly onto Ghostty's resize and equalize requests.
@@ -53,6 +54,7 @@ final class PaneContainer: NSView {
             applyFocus()
         }
     }
+    var palette: Palette?
     /// Code colors for the file pane, from the same theme.
     var syntax: SyntaxColors? { didSet { if let syntax { file?.highlight(with: syntax) } } }
     private var dividerColor: NSColor { theme.background.mixed(with: theme.foreground, 0.11) }
@@ -501,7 +503,7 @@ final class PaneContainer: NSView {
 
     /// Reads the project's files and asks git where the checkout's top is, so not on the main thread unless there is no other way.
     private static func lookUp(_ folder: String) -> [ProjectCommand] {
-        ProjectCommands.find(in: folder, top: Git.topLevel(of: folder))
+        ProjectCommands.find(in: folder, top: Git.topLevel(of: folder), globalDirectory: ProjectCommands.globalDirectory)
     }
 
     /// What a pane's folder offers: from the last look when the folder is the same, else read now.
@@ -634,11 +636,11 @@ final class PaneContainer: NSView {
                 if let self, let terminal { self.run(command, in: terminal) }
             }
             let title = NSMutableAttributedString(string: command.name + "  ", attributes: [.font: NSFont.menuFont(ofSize: 13)])
-            title.append(NSAttributedString(string: command.command, attributes: [
+            title.append(NSAttributedString(string: command.displayCommand, attributes: [
                 .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .regular), .foregroundColor: NSColor.secondaryLabelColor,
             ]))
             item.attributedTitle = title
-            item.toolTip = "\(command.source) in \((command.folder as NSString).abbreviatingWithTildeInPath)"
+            item.toolTip = command.global ? "Available in all projects" : "\(command.source) in \((command.folder as NSString).abbreviatingWithTildeInPath)"
             return item
         }
     }
@@ -671,30 +673,17 @@ final class PaneContainer: NSView {
         DispatchQueue.global(qos: .userInitiated).async { [weak self, weak terminal] in
             let root = Git.topLevel(of: folder) ?? folder
             DispatchQueue.main.async {
-                guard let self, let terminal, let window = self.window else { return }
-                let name = NSTextField(frame: NSRect(x: 0, y: 32, width: 300, height: 24))
-                name.placeholderString = "Name, e.g. Preview site"
-                let script = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
-                script.placeholderString = "Command, e.g. npm run dev"
-                let fields = NSView(frame: NSRect(x: 0, y: 0, width: 300, height: 56))
-                fields.addSubview(name)
-                fields.addSubview(script)
-                let alert = NSAlert()
-                alert.messageText = "Add Project Command"
-                alert.informativeText = "Save a shell command in .farol/commands/ at \((root as NSString).abbreviatingWithTildeInPath). Edit its file later for multiple lines."
-                alert.accessoryView = fields
-                alert.addButton(withTitle: "Add")
-                alert.addButton(withTitle: "Cancel")
-                alert.beginSheetModal(for: window) { [weak self, weak terminal] response in
-                    guard response == .alertFirstButtonReturn, let self, let terminal else { return }
-                    do {
-                        try ProjectCommands.save(name: name.stringValue, script: script.stringValue, in: root)
-                        self.commands[terminal.id] = nil
-                        self.commandLookups[terminal.id] = nil
-                        if self.hovered === terminal { self.hover(terminal) }
-                    } catch {
-                        NSAlert(error: error).beginSheetModal(for: window)
+                guard let self, let terminal, let window = self.window, let palette = self.palette else { return }
+                AddCommandSheet.present(in: window, root: root, palette: palette) { [weak self, weak terminal] name, script, global in
+                    if global {
+                        try ProjectCommands.saveGlobal(name: name, script: script)
+                    } else {
+                        try ProjectCommands.save(name: name, script: script, in: root)
                     }
+                    guard let self, let terminal else { return }
+                    self.commands.removeAll()
+                    self.commandLookups.removeAll()
+                    if self.hovered === terminal { self.hover(terminal) }
                 }
             }
         }
