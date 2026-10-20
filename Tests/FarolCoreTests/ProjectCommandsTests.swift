@@ -95,3 +95,23 @@ private func project(_ files: [String: String]) throws -> String {
         try ProjectCommands.save(name: "build", script: "echo again", in: root)
     }
 }
+
+@Test func globalCommandsRunInTheActiveFolderAndProjectNamesWin() throws {
+    let root = try project([
+        "Makefile": "test:\n",
+        ".farol/commands/Preview.sh": "echo project\n",
+    ])
+    let global = URL(fileURLWithPath: try project([
+        "global commands/Preview.sh": "echo global\n",
+        "global commands/Refresh.sh": "echo refresh\n",
+    ])).appendingPathComponent("global commands", isDirectory: true)
+    let found = ProjectCommands.find(in: root, top: root, globalDirectory: global)
+    #expect(found.map(\.name) == ["Preview", "test", "Refresh"])
+    #expect(found[0].source == ".farol/commands/Preview.sh")
+    #expect(found[2].source == "~/.farol/commands/Refresh.sh")
+    #expect(found[2].line(from: root) == "sh \(NewTask.shellQuoted(global.appendingPathComponent("Refresh.sh").path))")
+    #expect(found[2].line(from: root + "/src") == found[2].line(from: root))
+
+    let other = try project(["package.json": #"{ "scripts": { "dev": "vite" } }"#])
+    #expect(ProjectCommands.find(in: other, top: other, globalDirectory: global).map(\.name) == ["dev", "Preview", "Refresh"])
+}

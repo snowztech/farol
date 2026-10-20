@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Save a Run command for all projects in `~/.farol/commands/`. Global commands run in the active pane's folder. Project commands take priority when names match.
+
 ## [0.46.0] - 2026-10-20
 
 Run a project's own commands from a pane, or save your own commands in the checkout.

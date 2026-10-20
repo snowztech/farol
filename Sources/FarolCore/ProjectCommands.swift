@@ -1,19 +1,31 @@
 import Foundation
 
-/// A command the project already defines, like a Makefile target or a script in package.json, offered to run without saving anything.
+/// A command found in a project or saved by the user, offered in Run and search.
 public struct ProjectCommand: Equatable, Hashable, Sendable {
     /// What it is called where it is defined, like `test`.
     public let name: String
     /// What is typed to run it, like `make test` or `pnpm run test`.
     public let command: String
-    /// The folder it runs in, the one with the file that defines it.
+    /// The folder with the file that defines it.
     public let folder: String
     /// The file that defines it, like `Makefile`.
     public let source: String
+    public let global: Bool
 
-    /// Typed in a shell that is in `directory`. From elsewhere it runs in a subshell in its own folder, so the shell stays where it was.
+    public var displayCommand: String { global ? "sh \(source)" : command }
+
+    public init(name: String, command: String, folder: String, source: String, global: Bool = false) {
+        self.name = name
+        self.command = command
+        self.folder = folder
+        self.source = source
+        self.global = global
+    }
+
+    /// Project commands use their own folder. Global scripts use the pane's current folder.
     public func line(from directory: String?) -> String {
-        directory.map { URL(fileURLWithPath: $0).standardizedFileURL.path } == URL(fileURLWithPath: folder).standardizedFileURL.path
+        if global { return command }
+        return directory.map { URL(fileURLWithPath: $0).standardizedFileURL.path } == URL(fileURLWithPath: folder).standardizedFileURL.path
             ? command : "(cd \(NewTask.shellQuoted(folder)) && \(command))"
     }
 }
@@ -35,28 +47,44 @@ public enum ProjectCommands {
         URL(fileURLWithPath: folder, isDirectory: true).appendingPathComponent(".farol/commands", isDirectory: true)
     }
 
+    public static var globalDirectory: URL {
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".farol/commands", isDirectory: true)
+    }
+
     /// One editable shell script per command, in the folder shared with the project.
     public static func save(name: String, script: String, in folder: String) throws {
+        try save(name: name, script: script, to: commandsDirectory(in: folder))
+    }
+
+    public static func saveGlobal(name: String, script: String) throws {
+        try save(name: name, script: script, to: globalDirectory)
+    }
+
+    private static func save(name: String, script: String, to directory: URL) throws {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let first = name.first, first.isLetter || first.isNumber,
               name.allSatisfy({ $0.isLetter || $0.isNumber || " _-".contains($0) }) else { throw SaveError.invalidName }
         guard !script.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw SaveError.emptyScript }
-        let directory = commandsDirectory(in: folder)
         let file = directory.appendingPathComponent(name + ".sh")
         guard !FileManager.default.fileExists(atPath: file.path) else { throw SaveError.alreadyExists }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try (script.trimmingCharacters(in: .newlines) + "\n").write(to: file, atomically: true, encoding: .utf8)
     }
 
-    /// The commands defined in `folder` and the folders above it up to `top`, the checkout's, closest first.
-    /// A name defined in a closer folder hides the same name further up. Reads a few small files, so call it off the main thread.
-    public static func find(in folder: String, top: String?) -> [ProjectCommand] {
+    /// The commands defined from `folder` up to `top`, then global scripts, closest first.
+    /// Project names hide matching global names. Reads files, so call it off the main thread.
+    public static func find(in folder: String, top: String?, globalDirectory: URL? = nil) -> [ProjectCommand] {
         var found: [ProjectCommand] = []
         var seen = Set<String>()
         for directory in folders(from: folder, to: top) {
             for command in commands(in: directory) where seen.insert(command.command).inserted {
                 found.append(command)
             }
+        }
+        if let globalDirectory {
+            let names = Set(found.map(\.name))
+            found += savedCommands(in: globalDirectory, folder: globalDirectory.path, global: true)
+                .filter { !names.contains($0.name) }
         }
         return found
     }
@@ -82,7 +110,7 @@ public enum ProjectCommands {
         func first(_ candidates: [String]) -> (name: String, text: String)? {
             candidates.lazy.filter(names.contains).compactMap { name in read(folder, name).map { (name, $0) } }.first
         }
-        var found = savedCommands(in: folder)
+        var found = savedCommands(in: commandsDirectory(in: folder), folder: folder)
         if names.contains("package.json"), let text = read(folder, "package.json") {
             let runner = packageManager(in: folder)
             found += scripts(inPackage: text).map {
@@ -99,8 +127,7 @@ public enum ProjectCommands {
         return found
     }
 
-    private static func savedCommands(in folder: String) -> [ProjectCommand] {
-        let directory = commandsDirectory(in: folder)
+    private static func savedCommands(in directory: URL, folder: String, global: Bool = false) -> [ProjectCommand] {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
         return names.filter { name in
             guard name.hasSuffix(".sh"), !name.hasPrefix("."),
@@ -110,9 +137,10 @@ public enum ProjectCommands {
         }
             .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
             .map { filename in
-                let source = ".farol/commands/" + filename
+                let source = global ? directory.appendingPathComponent(filename).path : ".farol/commands/" + filename
                 return ProjectCommand(name: String(filename.dropLast(3)), command: "sh \(NewTask.shellQuoted(source))",
-                                      folder: folder, source: source)
+                                      folder: folder,
+                                      source: global ? "~/.farol/commands/" + filename : source, global: global)
             }
     }
 

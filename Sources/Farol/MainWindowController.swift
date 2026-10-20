@@ -697,6 +697,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         content.layer?.backgroundColor = bg.cgColor
         store.sessions.forEach {
             $0.panes.theme = theme
+            $0.panes.palette = state.palette
             $0.panes.syntax = state.palette.code
         }
     }
@@ -779,6 +780,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         session.panes.frame = terminalContainer.bounds
         session.panes.autoresizingMask = [.width, .height]
         session.panes.theme = theme
+        session.panes.palette = state.palette
         session.panes.syntax = state.palette.code
         terminalContainer.addSubview(session.panes)
     }

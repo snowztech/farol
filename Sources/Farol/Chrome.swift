@@ -319,7 +319,7 @@ private struct SessionMenu: View {
         let (folder, top, local) = (session.directory, session.topLevel, !session.isRemote)
         DispatchQueue.global(qos: .userInitiated).async {
             let paths = Files.searchable(in: root)
-            let found = local ? ProjectCommands.find(in: folder, top: top) : []
+            let found = local ? ProjectCommands.find(in: folder, top: top, globalDirectory: ProjectCommands.globalDirectory) : []
             DispatchQueue.main.async {
                 guard open else { return }
                 (files, hits, projectCommands) = ((root, paths), Files.search(paths, query), found)
@@ -500,7 +500,7 @@ private struct CommandChoice: View {
                 Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).hidden()
                 Image(systemName: "play").font(.system(size: 9)).foregroundStyle(palette.muted).frame(width: 7)
                 Text(command.name).lineLimit(1).layoutPriority(1)
-                Text(command.command)
+                Text(command.displayCommand)
                     .font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: 8)
                 // Running something is not what a search list leads you to expect, so the row says where Return runs it.
@@ -513,7 +513,7 @@ private struct CommandChoice: View {
             .frame(height: 28)
             .background(RoundedRectangle(cornerRadius: 6).fill(lit ? palette.selection : .clear))
             .contentShape(Rectangle())
-            .hoverTip("\(command.source) in \((command.folder as NSString).abbreviatingWithTildeInPath)")
+            .hoverTip(command.global ? "Available in all projects" : "\(command.source) in \((command.folder as NSString).abbreviatingWithTildeInPath)")
         }
         .buttonStyle(QuietPress())
         .onClickableHover(hover)
