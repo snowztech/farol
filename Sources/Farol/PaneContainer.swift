@@ -65,6 +65,7 @@ final class PaneContainer: NSView {
     var runInNewPane: ((String) -> TerminalView?)?
     /// What each pane's folder offers, from the last look, so the right-click menu doesn't wait on the files.
     private var commands: [UUID: (folder: String, list: [ProjectCommand])] = [:]
+    private var commandLookups: [UUID: UUID] = [:]
     /// The command started in each pane, kept while it runs, so ■ stops that command and never an agent.
     private var started: [UUID: ProjectCommand] = [:]
     private var runStates: [UUID: RunCommandState] = [:]
@@ -208,6 +209,7 @@ final class PaneContainer: NSView {
         runTokens[terminal.id] = nil
         listening[terminal.id] = nil
         commands[terminal.id] = nil
+        commandLookups[terminal.id] = nil
         if hovered === terminal { hovered = nil }
         terminal.removeFromSuperview()
         terminal.close()
@@ -479,10 +481,13 @@ final class PaneContainer: NSView {
         hovered = terminal
         updateChips()
         guard let terminal, !terminal.runsProgram, let folder = commandFolder?(terminal) else { return }
+        let token = UUID()
+        commandLookups[terminal.id] = token
         DispatchQueue.global(qos: .userInitiated).async { [weak self, weak terminal] in
             let list = Self.lookUp(folder)
             DispatchQueue.main.async {
-                guard let self, let terminal else { return }
+                guard let self, let terminal, self.commandLookups[terminal.id] == token,
+                      self.commandFolder?(terminal) == folder else { return }
                 self.commands[terminal.id] = (folder, list)
                 self.updateChips()
             }
@@ -582,7 +587,7 @@ final class PaneContainer: NSView {
             } else if started[terminal.id] != nil {
                 look = .running(ports: listening[terminal.id] ?? [])
             } else if searchBar?.terminal !== terminal, terminal === hovered, !terminal.runsProgram,
-                      let cached = commands[terminal.id], cached.folder == terminal.workingDirectory, !cached.list.isEmpty {
+                      commandFolder?(terminal) != nil {
                 look = .play
             } else {
                 look = nil
@@ -645,19 +650,59 @@ final class PaneContainer: NSView {
     }
 
     private func showRunMenu(for terminal: TerminalView, at point: NSPoint, in view: NSView) {
-        let items = runItems(for: terminal)
-        guard !items.isEmpty else { return NSSound.beep() }
-        let menu = NSMenu()
-        items.forEach(menu.addItem)
+        guard let menu = runMenu(for: terminal) else { return NSSound.beep() }
         menu.popUp(positioning: nil, at: point, in: view)
     }
 
-    /// Run in the right-click menu, only where the folder's project defines something.
-    private func addRunMenu(to menu: NSMenu, for terminal: TerminalView) {
+    private func runMenu(for terminal: TerminalView) -> NSMenu? {
+        guard commandFolder?(terminal) != nil else { return nil }
+        let menu = NSMenu()
         let items = runItems(for: terminal)
-        guard !items.isEmpty else { return }
-        let submenu = NSMenu()
-        items.forEach(submenu.addItem)
+        items.forEach(menu.addItem)
+        if !items.isEmpty { menu.addItem(.separator()) }
+        menu.addItem(ActionMenuItem(title: "Add Command…") { [weak self, weak terminal] in
+            if let terminal { self?.addCommand(for: terminal) }
+        })
+        return menu
+    }
+
+    private func addCommand(for terminal: TerminalView) {
+        guard let folder = commandFolder?(terminal) else { return }
+        DispatchQueue.global(qos: .userInitiated).async { [weak self, weak terminal] in
+            let root = Git.topLevel(of: folder) ?? folder
+            DispatchQueue.main.async {
+                guard let self, let terminal, let window = self.window else { return }
+                let name = NSTextField(frame: NSRect(x: 0, y: 32, width: 300, height: 24))
+                name.placeholderString = "Name, e.g. Preview site"
+                let script = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+                script.placeholderString = "Command, e.g. npm run dev"
+                let fields = NSView(frame: NSRect(x: 0, y: 0, width: 300, height: 56))
+                fields.addSubview(name)
+                fields.addSubview(script)
+                let alert = NSAlert()
+                alert.messageText = "Add Project Command"
+                alert.informativeText = "Save a shell command in .farol/commands/ at \((root as NSString).abbreviatingWithTildeInPath). Edit its file later for multiple lines."
+                alert.accessoryView = fields
+                alert.addButton(withTitle: "Add")
+                alert.addButton(withTitle: "Cancel")
+                alert.beginSheetModal(for: window) { [weak self, weak terminal] response in
+                    guard response == .alertFirstButtonReturn, let self, let terminal else { return }
+                    do {
+                        try ProjectCommands.save(name: name.stringValue, script: script.stringValue, in: root)
+                        self.commands[terminal.id] = nil
+                        self.commandLookups[terminal.id] = nil
+                        if self.hovered === terminal { self.hover(terminal) }
+                    } catch {
+                        NSAlert(error: error).beginSheetModal(for: window)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Run in the right-click menu for local panes, including where the project has no commands yet.
+    private func addRunMenu(to menu: NSMenu, for terminal: TerminalView) {
+        guard let submenu = runMenu(for: terminal) else { return }
         menu.addItem(.separator())
         menu.addItem(withTitle: "Run", action: nil, keyEquivalent: "").submenu = submenu
     }

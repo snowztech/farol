@@ -73,3 +73,25 @@ private func project(_ files: [String: String]) throws -> String {
     #expect(command.line(from: "/repo") == "make test")
     #expect(command.line(from: "/repo/ui") == "(cd '/repo' && make test)")
 }
+
+@Test func savedCommandRunsFromItsProjectFolder() throws {
+    let root = try project(["ui/package.json": #"{ "scripts": { "dev": "vite" } }"#])
+    try ProjectCommands.save(name: "Preview site", script: "npm run dev", in: root)
+    try FileManager.default.createDirectory(atPath: root + "/.farol/commands/not-a-command.sh", withIntermediateDirectories: true)
+    let path = root + "/.farol/commands/Preview site.sh"
+    #expect(try String(contentsOfFile: path, encoding: .utf8) == "npm run dev\n")
+    let found = ProjectCommands.find(in: root + "/ui", top: root)
+    #expect(found.map(\.name) == ["dev", "Preview site"])
+    #expect(found[1].line(from: root + "/ui") == "(cd '\(root)' && sh '.farol/commands/Preview site.sh')")
+}
+
+@Test func savedCommandNamesCannotEscapeTheirFolderOrOverwrite() throws {
+    let root = try project([:])
+    #expect(throws: ProjectCommands.SaveError.self) {
+        try ProjectCommands.save(name: "../outside", script: "echo hi", in: root)
+    }
+    try ProjectCommands.save(name: "build", script: "echo hi", in: root)
+    #expect(throws: ProjectCommands.SaveError.self) {
+        try ProjectCommands.save(name: "build", script: "echo again", in: root)
+    }
+}
