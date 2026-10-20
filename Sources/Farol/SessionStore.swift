@@ -456,6 +456,15 @@ final class SessionStore: ObservableObject {
             self?.save()
         }
         panes.onLayoutChange = { [weak self] in self?.save() }
+        // Over ssh the shell is on the server, where the Mac's folders mean nothing.
+        panes.commandFolder = { [weak session] terminal in
+            guard let session, !session.isRemote else { return nil }
+            return terminal.workingDirectory
+        }
+        panes.runInNewPane = { [weak self, weak session] line in
+            guard let self, let session else { return nil }
+            return self.split(session, .down, run: line)
+        }
         session.onRepoChange = { [weak self] in self?.objectWillChange.send() }
         session.onGitStateChange = { [weak self, weak session] before in
             guard let self, let session else { return }
@@ -469,10 +478,12 @@ final class SessionStore: ObservableObject {
     }
 
     /// Splits the focused pane. The new one opens in the same folder, and runs `run` when given.
-    func split(_ session: Session, _ direction: TerminalRequest.Direction, run: String? = nil) {
+    @discardableResult
+    func split(_ session: Session, _ direction: TerminalRequest.Direction, run: String? = nil) -> TerminalView {
         let terminal = makeTerminal(in: session.panes.focused.workingDirectory, run: run)
         wire(terminal, to: session)
         session.panes.split(direction, with: terminal)
+        return terminal
     }
 
     /// Every terminal reports to its session, but only the focused pane decides what the session shows.
@@ -487,6 +498,8 @@ final class SessionStore: ObservableObject {
             }
             previousTitle = $0
             session.noteTitle($0, pane: terminal.id)
+            // A new title or a prompt is when a command run from the pane's corner starts, starts listening, or ends. Nothing to do otherwise.
+            session.panes.commandMayHaveChanged(in: terminal)
             guard terminal === session.panes.focused else { return }
             // Agents animate a glyph in the title many times a second, and those frames are not worth a git lookup.
             // The title is cleared when a command ends, which is one way a `git checkout` gets noticed.
@@ -497,6 +510,10 @@ final class SessionStore: ObservableObject {
         terminal.onWorkingDirectoryChange = { [weak self, weak session, weak terminal] in
             // A prompt in any pane, since a server started in one is the whole session's.
             session?.refreshPorts()
+            if let session, let terminal {
+                session.panes.commandMayHaveChanged(in: terminal)
+                session.panes.commandFolderDidChange(in: terminal)
+            }
             guard let session, terminal === session.panes.focused else { return }
             session.directory = $0
             session.refreshGit()
