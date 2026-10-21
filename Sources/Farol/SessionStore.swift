@@ -395,6 +395,7 @@ final class SessionStore: ObservableObject {
     func answer(_ session: Session, with answers: [String: String]?) {
         guard let ask = session.ask else { return }
         session.ask = nil
+        if session.request?.pane == ask.pane { session.request = nil }
         ask.connection.reply(AskReply(answers: answers))
         // The agent goes on at once, and its next hook would say so a moment later.
         if answers != nil { receive(StatusMessage(pane: ask.pane.uuidString, event: .working)) }
@@ -405,6 +406,7 @@ final class SessionStore: ObservableObject {
     func chat(_ session: Session) {
         guard let ask = session.ask else { return }
         session.ask = nil
+        if session.request?.pane == ask.pane { session.request = nil }
         ask.connection.reply(AskReply(chat: true))
         onAskEnd?(session)
     }
