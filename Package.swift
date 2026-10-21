@@ -6,7 +6,7 @@ let package = Package(
     platforms: [.macOS(.v14)],
     dependencies: [
         // What a paired phone and the Mac say to each other, shared with the iOS app.
-        .package(url: "https://github.com/snowztech/farol-remote", from: "0.16.0"),
+        .package(url: "https://github.com/snowztech/farol-remote", from: "0.18.0"),
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.10.0"),
     ],
     targets: [

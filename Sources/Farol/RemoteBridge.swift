@@ -42,6 +42,8 @@ final class RemoteBridge: ObservableObject {
     }
     /// Kept per device and across its connections, since a phone resends on a new one.
     private var seen: [Data: SeenCommands] = [:]
+    /// A reconnect repeats the same decision ID. Return the same result, including a refusal.
+    private var askResponses: [Data: [UUID: RemoteEvent]] = [:]
     private var timer: Timer?
     private var offerEnd: Timer?
     private var wake: NSObjectProtocol?
@@ -98,6 +100,9 @@ final class RemoteBridge: ObservableObject {
         var toldEmpty: UUID?
         /// What it was told the watched session waits on. Nil until told, so the first tick always says, even that it waits on nothing.
         var request: RemoteRequest??
+        /// A phone opts in on `watch`, so an older phone never receives an event it cannot decode.
+        var asks = false
+        var ask: RemoteAsk??
         /// The conversation it reads, and the last message it has, so only what follows is sent.
         var conversation: (session: UUID, log: String, last: String?)?
     }
@@ -319,10 +324,12 @@ final class RemoteBridge: ObservableObject {
         case .hello(let version):
             tell(.hello(version: RemoteProtocol.version, features: RemoteFeature.allCases.map(\.rawValue), name: Self.computerName), id)
             if RemoteProtocol.accepts(version) { tick() } else { phones[id] = nil }
-        case .watch(let session):
+        case .watch(let session, let asks):
             phones[id]?.watching = session
+            phones[id]?.asks = asks == true
             phones[id]?.screen = nil
             phones[id]?.request = nil
+            phones[id]?.ask = nil
             phones[id]?.toldEmpty = nil
             phones[id]?.conversation = nil
             tick()
@@ -346,6 +353,8 @@ final class RemoteBridge: ObservableObject {
             conversation(command, of: session, before: before, from: id)
         case .answer(let session, let request, let choice):
             answer(command, by: device, session: session, request: request, choice: choice, from: id)
+        case .respondAsk(let session, let ask, let decision):
+            respondAsk(command, by: device, session: session, ask: ask, decision: decision, from: id)
         case .terminal(let session, let open):
             phones[id]?.saysTerminal = true
             if open { phones[id]?.terminal = session } else if phones[id]?.terminal == session { phones[id]?.terminal = nil }
@@ -433,6 +442,56 @@ final class RemoteBridge: ObservableObject {
         }
         tell(.done(command: command.id), phone)
         tick()
+    }
+
+    private func respondAsk(_ command: RemoteCommand, by device: PairedDevice, session id: UUID, ask: UUID,
+                            decision: RemoteAsk.Decision, from phone: UInt32) {
+        if let previous = askResponses[device.key]?[command.id] { return tell(previous, phone) }
+        guard let session = store.sessions.first(where: { $0.id == id }), let held = session.ask, held.id == ask,
+              session.agentIsWaiting, session.panes.terminals.contains(where: { $0.id == held.pane }) else {
+            return finishAsk(.refused(command: command.id, reason: "That question is no longer waiting."), command: command, device: device, phone: phone)
+        }
+        switch decision {
+        case .submit(let answers):
+            guard let values = Self.answers(answers, to: held.questions) else {
+                return finishAsk(.refused(command: command.id, reason: "Choose an answer for every question."), command: command, device: device, phone: phone)
+            }
+            store.answer(session, with: values)
+        case .discuss:
+            store.chat(session)
+        case .inTerminal:
+            store.answer(session, with: nil)
+        }
+        finishAsk(.done(command: command.id), command: command, device: device, phone: phone)
+        tick()
+    }
+
+    private func finishAsk(_ event: RemoteEvent, command: RemoteCommand, device: PairedDevice, phone: UInt32) {
+        var replies = askResponses[device.key] ?? [:]
+        if replies.count >= 100 { replies.removeValue(forKey: replies.keys.first!) }
+        replies[command.id] = event
+        askResponses[device.key] = replies
+        tell(event, phone)
+    }
+
+    private static func answers(_ submitted: [RemoteAsk.Answer], to questions: [AgentQuestion]) -> [String: String]? {
+        guard submitted.count == questions.count, Set(questions.map(\.text)).count == questions.count,
+              Set(submitted.map(\.question)).count == submitted.count else { return nil }
+        var values: [String: String] = [:]
+        for answer in submitted {
+            guard questions.indices.contains(answer.question) else { return nil }
+            let question = questions[answer.question]
+            guard Set(answer.choices).count == answer.choices.count,
+                  answer.choices.allSatisfy({ question.options.indices.contains($0) }),
+                  question.multiSelect || answer.choices.count <= 1 else { return nil }
+            let words = answer.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard question.multiSelect || words.isEmpty || answer.choices.isEmpty else { return nil }
+            let labels = answer.choices.map { question.options[$0].label }
+            let parts = labels + (words.isEmpty ? [] : [words])
+            guard !parts.isEmpty else { return nil }
+            values[question.text] = AskHook.join(parts)
+        }
+        return values
     }
 
     private func tell(_ event: RemoteEvent, _ id: UInt32) {
@@ -597,6 +656,14 @@ final class RemoteBridge: ObservableObject {
     private static func remote(_ request: AgentRequest) -> RemoteRequest {
         RemoteRequest(id: request.id, tool: request.tool, title: request.title, detail: request.detail,
                       choices: request.choices.map { RemoteRequest.Choice(label: $0.label, detail: $0.detail) })
+    }
+
+    private static func remote(_ ask: PendingAsk) -> RemoteAsk {
+        RemoteAsk(id: ask.id, questions: ask.questions.map { question in
+            RemoteAsk.Question(text: question.text, header: question.header,
+                               options: question.options.map { .init(label: $0.label, detail: $0.detail.isEmpty ? nil : $0.detail) },
+                               multiSelect: question.multiSelect)
+        })
     }
 
     private static func remote(_ message: Transcript.Message) -> RemoteMessage {
@@ -819,6 +886,13 @@ final class RemoteBridge: ObservableObject {
                 if phone.request != .some(request) {
                     phones[id]?.request = .some(request)
                     tell(.request(session: watching, request: request), id)
+                }
+                if phone.asks {
+                    let ask = store.sessions.first { $0.id == watching }?.ask.map(Self.remote)
+                    if phone.ask != .some(ask) {
+                        phones[id]?.ask = .some(ask)
+                        tell(.ask(session: watching, ask: ask), id)
+                    }
                 }
             }
             // A phone reading the conversation needs the screen only for a question the hooks did not describe.
