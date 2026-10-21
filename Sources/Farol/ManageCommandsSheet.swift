@@ -14,16 +14,21 @@ struct ManageCommandsSheet: View {
     @State private var editing: ProjectCommand?
     @State private var name = ""
     @State private var script = ""
+    @State private var originalName = ""
+    @State private var originalScript = ""
     @State private var error: String?
     @State private var confirmingDelete = false
+    @State private var confirmingDiscard = false
 
     private var projectCommands: [ProjectCommand] { commands.filter { !$0.global } }
     private var globalCommands: [ProjectCommand] { commands.filter(\.global) }
-    private var deleteTitle: String { "Delete \(name)?" }
+    private var hasChanges: Bool { name != originalName || script != originalScript }
+    private var deleteTitle: String { "Delete \(editing?.name ?? name)?" }
     private var deleteMessage: String {
         guard let editing else { return "This removes the saved command script. It cannot be undone." }
-        let location = editing.global ? "~/.farol/commands" : "\(editing.folder)/.farol/commands"
-        return "This removes the script from \(location). It cannot be undone."
+        let directory = editing.global ? "~/.farol/commands" : "\(editing.folder)/.farol/commands"
+        let unsaved = hasChanges ? " Any unsaved edits will be discarded." : ""
+        return "This permanently removes \(directory)/\(editing.name).sh. It cannot be undone.\(unsaved)"
     }
 
     init(folder: String, top: String?, commands: [ProjectCommand], palette: Palette,
@@ -71,6 +76,12 @@ struct ManageCommandsSheet: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(deleteMessage)
+        }
+        .confirmationDialog("Discard unsaved changes?", isPresented: $confirmingDiscard, titleVisibility: .visible) {
+            Button("Discard Changes", role: .destructive) { returnToList() }
+            Button("Continue Editing", role: .cancel) {}
+        } message: {
+            Text("Your changes to this command have not been saved.")
         }
     }
 
@@ -187,10 +198,14 @@ struct ManageCommandsSheet: View {
 
             Rectangle().fill(palette.line).frame(height: 1)
             HStack {
-                Button("Back") { editing = nil; error = nil }
+                Button("Back") { backToList() }
                     .buttonStyle(SheetButton(palette: palette, primary: false))
                     .keyboardShortcut(.cancelAction)
-                Button("Delete") { confirmingDelete = true }
+                Button {
+                    confirmingDelete = true
+                } label: {
+                    Label("Delete…", systemImage: "trash")
+                }
                     .buttonStyle(.plain)
                     .foregroundStyle(palette.removed)
                 Spacer()
@@ -198,7 +213,8 @@ struct ManageCommandsSheet: View {
                     .buttonStyle(SheetButton(palette: palette, primary: true))
                     .keyboardShortcut(.defaultAction)
                     .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                              || script.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                              || script.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                              || !hasChanges)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
@@ -215,6 +231,8 @@ struct ManageCommandsSheet: View {
         do {
             name = command.name
             script = try ProjectCommands.script(for: command)
+            originalName = name
+            originalScript = script
             error = nil
             editing = command
         } catch {
@@ -244,6 +262,20 @@ struct ManageCommandsSheet: View {
         } catch {
             self.error = error.localizedDescription
         }
+    }
+
+    private func backToList() {
+        if hasChanges {
+            confirmingDiscard = true
+        } else {
+            returnToList()
+        }
+    }
+
+    private func returnToList() {
+        editing = nil
+        error = nil
+        confirmingDiscard = false
     }
 
     private func refresh() {
