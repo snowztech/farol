@@ -895,9 +895,10 @@ final class RemoteBridge: ObservableObject {
                     }
                 }
             }
-            // A phone reading the conversation needs the screen only for a question the hooks did not describe.
+            // Codex can keep a question on screen while its title says working. Keep that screen live so the phone can offer the terminal.
             guard let watching = phone.watching, let session = store.sessions.first(where: { $0.id == watching }),
-                  !phone.saysTerminal || phone.terminal == watching || session.activity == .waiting,
+                  !phone.saysTerminal || phone.terminal == watching || session.activity == .waiting ||
+                  (session.activity == .working && session.panes.focused.foregroundProgram?.name == "codex"),
                   case let text = session.panes.focused.screenText, text != phone.screen else { continue }
             phones[id]?.screen = text
             tell(.screen(session: watching, text: text), id)
