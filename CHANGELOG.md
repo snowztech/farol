@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- Remote can send the complete Claude Code question form to the phone and accept its answers together, including multiple selections and custom text.
+
 ## [0.47.0] - 2026-10-20
 
 Run commands across projects, start tasks from repositories anywhere, and see worktrees in the session list.

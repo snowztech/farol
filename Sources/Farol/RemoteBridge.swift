@@ -98,6 +98,9 @@ final class RemoteBridge: ObservableObject {
         var toldEmpty: UUID?
         /// What it was told the watched session waits on. Nil until told, so the first tick always says, even that it waits on nothing.
         var request: RemoteRequest??
+        /// A phone opts in on `watch`, so an older phone never receives an event it cannot decode.
+        var asks = false
+        var ask: RemoteAsk??
         /// The conversation it reads, and the last message it has, so only what follows is sent.
         var conversation: (session: UUID, log: String, last: String?)?
     }
@@ -319,10 +322,12 @@ final class RemoteBridge: ObservableObject {
         case .hello(let version):
             tell(.hello(version: RemoteProtocol.version, features: RemoteFeature.allCases.map(\.rawValue), name: Self.computerName), id)
             if RemoteProtocol.accepts(version) { tick() } else { phones[id] = nil }
-        case .watch(let session):
+        case .watch(let session, let asks):
             phones[id]?.watching = session
+            phones[id]?.asks = asks == true
             phones[id]?.screen = nil
             phones[id]?.request = nil
+            phones[id]?.ask = nil
             phones[id]?.toldEmpty = nil
             phones[id]?.conversation = nil
             tick()
@@ -346,6 +351,8 @@ final class RemoteBridge: ObservableObject {
             conversation(command, of: session, before: before, from: id)
         case .answer(let session, let request, let choice):
             answer(command, by: device, session: session, request: request, choice: choice, from: id)
+        case .answerAsk(let session, let ask, let answers):
+            answerAsk(command, by: device, session: session, ask: ask, answers: answers, from: id)
         case .terminal(let session, let open):
             phones[id]?.saysTerminal = true
             if open { phones[id]?.terminal = session } else if phones[id]?.terminal == session { phones[id]?.terminal = nil }
@@ -431,6 +438,19 @@ final class RemoteBridge: ObservableObject {
         } else {
             terminal.type(String(choice))
         }
+        tell(.done(command: command.id), phone)
+        tick()
+    }
+
+    private func answerAsk(_ command: RemoteCommand, by device: PairedDevice, session id: UUID, ask: UUID, answers: [String: String], from phone: UInt32) {
+        guard seen[device.key, default: SeenCommands()].insert(command.id) else { return tell(.done(command: command.id), phone) }
+        guard let session = store.sessions.first(where: { $0.id == id }), let held = session.ask, held.id == ask,
+              session.agentIsWaiting, session.panes.terminals.contains(where: { $0.id == held.pane }),
+              Set(held.questions.map(\.text)).count == held.questions.count,
+              Set(answers.keys) == Set(held.questions.map(\.text)), answers.values.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
+            return tell(.refused(command: command.id, reason: "That question is no longer waiting, or its answers are incomplete."), phone)
+        }
+        store.answer(session, with: answers)
         tell(.done(command: command.id), phone)
         tick()
     }
@@ -597,6 +617,14 @@ final class RemoteBridge: ObservableObject {
     private static func remote(_ request: AgentRequest) -> RemoteRequest {
         RemoteRequest(id: request.id, tool: request.tool, title: request.title, detail: request.detail,
                       choices: request.choices.map { RemoteRequest.Choice(label: $0.label, detail: $0.detail) })
+    }
+
+    private static func remote(_ ask: PendingAsk) -> RemoteAsk {
+        RemoteAsk(id: ask.id, questions: ask.questions.map { question in
+            RemoteAsk.Question(text: question.text, header: question.header,
+                               options: question.options.map { .init(label: $0.label, detail: $0.detail.isEmpty ? nil : $0.detail) },
+                               multiSelect: question.multiSelect)
+        })
     }
 
     private static func remote(_ message: Transcript.Message) -> RemoteMessage {
@@ -819,6 +847,13 @@ final class RemoteBridge: ObservableObject {
                 if phone.request != .some(request) {
                     phones[id]?.request = .some(request)
                     tell(.request(session: watching, request: request), id)
+                }
+                if phone.asks {
+                    let ask = store.sessions.first { $0.id == watching }?.ask.map(Self.remote)
+                    if phone.ask != .some(ask) {
+                        phones[id]?.ask = .some(ask)
+                        tell(.ask(session: watching, ask: ask), id)
+                    }
                 }
             }
             // A phone reading the conversation needs the screen only for a question the hooks did not describe.
