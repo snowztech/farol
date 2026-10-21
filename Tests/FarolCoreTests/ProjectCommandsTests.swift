@@ -96,6 +96,65 @@ private func project(_ files: [String: String]) throws -> String {
     }
 }
 
+@Test func savedCommandsCanBeEditedRenamedAndRemoved() throws {
+    let root = try project([:])
+    try ProjectCommands.save(name: "Preview", script: "npm run dev", in: root)
+    let command = try #require(ProjectCommands.saved(in: root, top: root).first)
+
+    #expect(try ProjectCommands.script(for: command) == "npm run dev\n")
+    try ProjectCommands.update(command, name: "Preview site", script: "npm run dev\nnpm run watch")
+    let renamed = try #require(ProjectCommands.saved(in: root, top: root).first)
+    #expect(renamed.name == "Preview site")
+    #expect(try ProjectCommands.script(for: renamed) == "npm run dev\nnpm run watch\n")
+
+    try ProjectCommands.delete(renamed)
+    #expect(ProjectCommands.saved(in: root, top: root).isEmpty)
+    #expect(throws: ProjectCommands.SaveError.self) { try ProjectCommands.script(for: renamed) }
+}
+
+@Test func savedCommandsListsShadowedGlobalScriptsForManagement() throws {
+    let root = try project([".farol/commands/Preview.sh": "echo project\n"])
+    let global = URL(fileURLWithPath: try project([
+        "commands/Preview.sh": "echo global\n",
+        "commands/Refresh.sh": "echo refresh\n",
+    ])).appendingPathComponent("commands", isDirectory: true)
+
+    let commands = ProjectCommands.saved(in: root, top: root, globalDirectory: global)
+    #expect(commands.map(\.name) == ["Preview", "Preview", "Refresh"])
+    #expect(commands.map(\.global) == [false, true, true])
+    #expect(try ProjectCommands.script(for: commands[1], globalDirectory: global) == "echo global\n")
+}
+
+@Test func renamingSavedCommandCannotOverwriteAnotherScript() throws {
+    let root = try project([:])
+    try ProjectCommands.save(name: "Build", script: "make", in: root)
+    try ProjectCommands.save(name: "Test", script: "make test", in: root)
+    let command = try #require(ProjectCommands.saved(in: root, top: root).first)
+
+    #expect(throws: ProjectCommands.SaveError.self) {
+        try ProjectCommands.update(command, name: "Test", script: "make all")
+    }
+    #expect(try ProjectCommands.script(for: command) == "make\n")
+}
+
+@Test func renamingSavedCommandCanChangeOnlyItsLetterCase() throws {
+    let root = try project([:])
+    try ProjectCommands.save(name: "Preview", script: "npm run dev", in: root)
+    let command = try #require(ProjectCommands.saved(in: root, top: root).first)
+
+    try ProjectCommands.update(command, name: "preview", script: "npm run dev")
+    #expect(try #require(ProjectCommands.saved(in: root, top: root).first).name == "preview")
+}
+
+@Test func commandManagementRejectsNamesOutsideTheSavedCommandFormat() throws {
+    let root = try project([".farol/outside.sh": "keep me\n"])
+    let invalid = ProjectCommand(name: "../outside", command: "", folder: root, source: "")
+
+    #expect(throws: ProjectCommands.SaveError.self) { try ProjectCommands.script(for: invalid) }
+    #expect(throws: ProjectCommands.SaveError.self) { try ProjectCommands.delete(invalid) }
+    #expect(try String(contentsOfFile: root + "/.farol/outside.sh", encoding: .utf8) == "keep me\n")
+}
+
 @Test func globalCommandsRunInTheActiveFolderAndProjectNamesWin() throws {
     let root = try project([
         "Makefile": "test:\n",

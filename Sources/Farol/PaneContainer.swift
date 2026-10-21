@@ -665,6 +665,9 @@ final class PaneContainer: NSView {
         menu.addItem(ActionMenuItem(title: "Add Command…") { [weak self, weak terminal] in
             if let terminal { self?.addCommand(for: terminal) }
         })
+        menu.addItem(ActionMenuItem(title: "Manage Saved Commands…") { [weak self, weak terminal] in
+            if let terminal { self?.manageCommands(for: terminal) }
+        })
         return menu
     }
 
@@ -680,6 +683,23 @@ final class PaneContainer: NSView {
                     } else {
                         try ProjectCommands.save(name: name, script: script, in: root)
                     }
+                    guard let self, let terminal else { return }
+                    self.commands.removeAll()
+                    self.commandLookups.removeAll()
+                    if self.hovered === terminal { self.hover(terminal) }
+                }
+            }
+        }
+    }
+
+    private func manageCommands(for terminal: TerminalView) {
+        guard let folder = commandFolder?(terminal) else { return }
+        DispatchQueue.global(qos: .userInitiated).async { [weak self, weak terminal] in
+            let top = Git.topLevel(of: folder) ?? folder
+            DispatchQueue.main.async {
+                guard let self, let terminal, let window = self.window, let palette = self.palette,
+                      self.commandFolder?(terminal) == folder else { return }
+                ManageCommandsSheet.present(in: window, folder: folder, top: top, palette: palette) { [weak self, weak terminal] in
                     guard let self, let terminal else { return }
                     self.commands.removeAll()
                     self.commandLookups.removeAll()
