@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.47.1] - 2026-10-21
+
+Answer complete Claude Code question forms from the phone.
+
 ### Fixed
 
 - Remote can send the complete Claude Code question form to the phone and accept multiple selections, custom text or a request to talk it over.
@@ -960,7 +964,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.33.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.47.1...HEAD
+[0.47.1]: https://github.com/snowztech/farol/releases/tag/v0.47.1
 [0.33.0]: https://github.com/snowztech/farol/releases/tag/v0.33.0
 [0.32.1]: https://github.com/snowztech/farol/releases/tag/v0.32.1
 [0.32.0]: https://github.com/snowztech/farol/releases/tag/v0.32.0
