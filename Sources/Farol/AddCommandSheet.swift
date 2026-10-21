@@ -52,7 +52,7 @@ struct AddCommandSheet: View {
                         .focused($focus, equals: .command)
                         .sheetField(p, focused: focus == .command)
                         .onChange(of: command) { _, _ in error = nil }
-                    Text("Edit the saved script later for multiple lines.")
+                    Text("Use multiple lines when editing the saved script.")
                         .font(.system(size: 12))
                         .foregroundStyle(p.muted)
                 }
