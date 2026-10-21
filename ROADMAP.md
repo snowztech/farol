@@ -27,7 +27,7 @@ Milestones are themes, not version numbers. Releases ship whatever is ready.
 Someone who downloads Farol understands what it is for in the first minute.
 
 - [x] **New task**: one flow that picks the repo, takes a task description, creates the worktree and starts the agent with the task as its first prompt
-- [ ] Edit or delete a saved project or global command in Farol
+- [ ] Manage saved project and global commands in a quiet, native Farol flow: edit a name or script, or remove a command
 - [x] Codex notifications through its terminal notifications, since its hooks lose track of the terminal
 - [ ] A working dot for Codex, once its hooks know which terminal they belong to
 - [x] Sessions grouped by project in the sidebar, as a setting
