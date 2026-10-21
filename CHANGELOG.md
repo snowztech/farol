@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep a Codex session's terminal screen live on the phone while it works, so questions remain reachable there.
+
 ## [0.47.1] - 2026-10-21
 
 Answer complete Claude Code question forms from the phone.
