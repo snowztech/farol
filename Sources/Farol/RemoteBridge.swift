@@ -42,6 +42,8 @@ final class RemoteBridge: ObservableObject {
     }
     /// Kept per device and across its connections, since a phone resends on a new one.
     private var seen: [Data: SeenCommands] = [:]
+    /// A reconnect repeats the same decision ID. Return the same result, including a refusal.
+    private var askResponses: [Data: [UUID: RemoteEvent]] = [:]
     private var timer: Timer?
     private var offerEnd: Timer?
     private var wake: NSObjectProtocol?
@@ -351,8 +353,8 @@ final class RemoteBridge: ObservableObject {
             conversation(command, of: session, before: before, from: id)
         case .answer(let session, let request, let choice):
             answer(command, by: device, session: session, request: request, choice: choice, from: id)
-        case .answerAsk(let session, let ask, let answers):
-            answerAsk(command, by: device, session: session, ask: ask, answers: answers, from: id)
+        case .respondAsk(let session, let ask, let decision):
+            respondAsk(command, by: device, session: session, ask: ask, decision: decision, from: id)
         case .terminal(let session, let open):
             phones[id]?.saysTerminal = true
             if open { phones[id]?.terminal = session } else if phones[id]?.terminal == session { phones[id]?.terminal = nil }
@@ -442,17 +444,54 @@ final class RemoteBridge: ObservableObject {
         tick()
     }
 
-    private func answerAsk(_ command: RemoteCommand, by device: PairedDevice, session id: UUID, ask: UUID, answers: [String: String], from phone: UInt32) {
-        guard seen[device.key, default: SeenCommands()].insert(command.id) else { return tell(.done(command: command.id), phone) }
+    private func respondAsk(_ command: RemoteCommand, by device: PairedDevice, session id: UUID, ask: UUID,
+                            decision: RemoteAsk.Decision, from phone: UInt32) {
+        if let previous = askResponses[device.key]?[command.id] { return tell(previous, phone) }
         guard let session = store.sessions.first(where: { $0.id == id }), let held = session.ask, held.id == ask,
-              session.agentIsWaiting, session.panes.terminals.contains(where: { $0.id == held.pane }),
-              Set(held.questions.map(\.text)).count == held.questions.count,
-              Set(answers.keys) == Set(held.questions.map(\.text)), answers.values.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
-            return tell(.refused(command: command.id, reason: "That question is no longer waiting, or its answers are incomplete."), phone)
+              session.agentIsWaiting, session.panes.terminals.contains(where: { $0.id == held.pane }) else {
+            return finishAsk(.refused(command: command.id, reason: "That question is no longer waiting."), command: command, device: device, phone: phone)
         }
-        store.answer(session, with: answers)
-        tell(.done(command: command.id), phone)
+        switch decision {
+        case .submit(let answers):
+            guard let values = Self.answers(answers, to: held.questions) else {
+                return finishAsk(.refused(command: command.id, reason: "Choose an answer for every question."), command: command, device: device, phone: phone)
+            }
+            store.answer(session, with: values)
+        case .discuss:
+            store.chat(session)
+        case .inTerminal:
+            store.answer(session, with: nil)
+        }
+        finishAsk(.done(command: command.id), command: command, device: device, phone: phone)
         tick()
+    }
+
+    private func finishAsk(_ event: RemoteEvent, command: RemoteCommand, device: PairedDevice, phone: UInt32) {
+        var replies = askResponses[device.key] ?? [:]
+        if replies.count >= 100 { replies.removeValue(forKey: replies.keys.first!) }
+        replies[command.id] = event
+        askResponses[device.key] = replies
+        tell(event, phone)
+    }
+
+    private static func answers(_ submitted: [RemoteAsk.Answer], to questions: [AgentQuestion]) -> [String: String]? {
+        guard submitted.count == questions.count, Set(questions.map(\.text)).count == questions.count,
+              Set(submitted.map(\.question)).count == submitted.count else { return nil }
+        var values: [String: String] = [:]
+        for answer in submitted {
+            guard questions.indices.contains(answer.question) else { return nil }
+            let question = questions[answer.question]
+            guard Set(answer.choices).count == answer.choices.count,
+                  answer.choices.allSatisfy({ question.options.indices.contains($0) }),
+                  question.multiSelect || answer.choices.count <= 1 else { return nil }
+            let words = answer.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard question.multiSelect || words.isEmpty || answer.choices.isEmpty else { return nil }
+            let labels = answer.choices.map { question.options[$0].label }
+            let parts = labels + (words.isEmpty ? [] : [words])
+            guard !parts.isEmpty else { return nil }
+            values[question.text] = AskHook.join(parts)
+        }
+        return values
     }
 
     private func tell(_ event: RemoteEvent, _ id: UInt32) {

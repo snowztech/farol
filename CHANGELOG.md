@@ -6,7 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Fixed
 
-- Remote can send the complete Claude Code question form to the phone and accept its answers together, including multiple selections and custom text.
+- Remote can send the complete Claude Code question form to the phone and accept multiple selections, custom text or a request to talk it over.
 
 ## [0.47.0] - 2026-10-20
 
