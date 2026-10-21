@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.47.2] - 2026-10-22
+
+Manage saved commands, and keep Codex questions reachable from the phone.
+
 ### Added
 
 - Manage saved project and global commands from the Run menu, including editing scripts and removing commands.
