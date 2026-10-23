@@ -4,6 +4,8 @@ public enum AgentTitle {
     /// Includes the en and em dashes, written as code points.
     private static let joiners = [" | ", " · ", " \u{2013} ", " \u{2014} "]
     private static let codexSpinners = Set("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")
+    /// What Codex puts first while it waits on you, blinking between the two.
+    private static let codexWaiting = ["[ ! ] Action Required", "[ . ] Action Required"]
 
     /// Codex's interactive TUI does not run lifecycle hooks, but it does report the same states in its terminal title.
     public static func event(from previous: String, to current: String) -> AgentEvent? {
@@ -28,12 +30,12 @@ public enum AgentTitle {
         // Padded so a joiner at the very start, as in "| farol", is found too.
         var parts = [" " + text + " "]
         for joiner in joiners { parts = parts.flatMap { $0.components(separatedBy: joiner) } }
-        return parts.map { $0.trimmingCharacters(in: .whitespaces) }.first { !$0.isEmpty } ?? ""
+        return parts.map { $0.trimmingCharacters(in: .whitespaces) }.first { !$0.isEmpty && !codexWaiting.contains($0) } ?? ""
     }
 
     private static func codexStatus(_ title: String) -> AgentStatus? {
         let text = title.trimmingCharacters(in: .whitespaces)
-        if text.hasPrefix("[ ! ] Action Required") || text.hasPrefix("[ . ] Action Required") { return .waiting }
+        if codexWaiting.contains(where: text.hasPrefix) { return .waiting }
         if text.first.map(codexSpinners.contains) == true { return .working }
         return nil
     }
