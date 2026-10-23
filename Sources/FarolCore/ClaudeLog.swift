@@ -9,6 +9,9 @@ final class ClaudeLog: AgentLog {
 
     /// The records that gave messages, in the order they were written.
     private var records: [(id: String, messages: [Transcript.Message])] = []
+    var revised: Set<String> = []
+    /// Each tool call's place in the records, by the id its result names it by.
+    private var calls: [String: (record: Int, message: Int)] = [:]
     private var children: [String: [String]] = [:]
     /// The prompt written last after each record. A rewind writes a new one after the same record.
     private var prompts: [String: String] = [:]
@@ -35,6 +38,7 @@ final class ClaudeLog: AgentLog {
         }
         let messages = Self.messages(in: record, id: id)
         var changed = !messages.isEmpty
+        if ended(record) { changed = true }
         if let parent, messages.contains(where: { $0.role == .you }) {
             if let earlier = prompts[parent] {
                 abandon(earlier)
@@ -42,10 +46,36 @@ final class ClaudeLog: AgentLog {
             }
             prompts[parent] = id
         }
-        if !messages.isEmpty { records.append((id, messages)) }
+        if !messages.isEmpty {
+            let content = (record["message"] as? [String: Any])?["content"] as? [[String: Any]] ?? []
+            for (place, message) in messages.enumerated() where message.role == .tool {
+                // A message's id ends in its block's place in the record, which is where its call's id is.
+                guard let block = Int(message.id.split(separator: ".").last ?? ""), content.indices.contains(block),
+                      let call = content[block]["id"] as? String else { continue }
+                calls[call] = (records.count, place)
+            }
+            records.append((id, messages))
+        }
         if changed { shown = nil }
         return changed
     }
+
+    /// The results in your turn that say a tool call you said no to, or one that failed. True when one changed a message.
+    private func ended(_ record: [String: Any]) -> Bool {
+        guard record["type"] as? String == "user", let content = (record["message"] as? [String: Any])?["content"] as? [[String: Any]] else { return false }
+        var changed = false
+        for block in content where block["type"] as? String == "tool_result" && block["is_error"] as? Bool == true {
+            guard let call = block["tool_use_id"] as? String, let (record, message) = calls[call] else { continue }
+            let text = (block["content"] as? String) ?? (block["content"] as? [[String: Any]])?.compactMap { $0["text"] as? String }.joined() ?? ""
+            records[record].messages[message].outcome = Self.refusals.contains(where: text.hasPrefix) ? .stopped : .failed
+            revised.insert(records[record].messages[message].id)
+            changed = true
+        }
+        return changed
+    }
+
+    /// How Claude Code writes, as a tool's result, that you said no to it or stopped it.
+    private static let refusals = ["The user doesn't want to proceed", "[Request interrupted by user"]
 
     private func abandon(_ id: String) {
         var left = [id]

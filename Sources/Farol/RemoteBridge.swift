@@ -554,9 +554,13 @@ final class RemoteBridge: ObservableObject {
             guard let self else { return }
             let transcript = transcripts[log] ?? Transcript(url: URL(fileURLWithPath: log))
             transcripts[log] = transcript
-            transcript.refresh()
-            let messages = transcript.messages
-            DispatchQueue.main.async { use(messages) }
+            let changed = transcript.refresh()
+            let messages = transcript.messages, revised = transcript.revised
+            DispatchQueue.main.async {
+                // What the agent wrote since goes to the phones following the log too, since its watch now finds nothing new.
+                if changed { self.logChanged(log, messages, revised: revised) }
+                use(messages)
+            }
         }
     }
 
@@ -596,11 +600,14 @@ final class RemoteBridge: ObservableObject {
         tell(.conversation(session: session, messages: messages[start...].map(Self.remote), place: .latest, more: start > 0), id)
     }
 
-    /// Sends the phones reading a log what the agent just wrote. After a rewind, or more than a page, they get the latest page instead.
-    private func logChanged(_ log: String, _ messages: [Transcript.Message]) {
+    /// Sends the phones reading a log what the agent just wrote, and the messages they have that changed, like a tool you said no to.
+    /// After a rewind, or more than a page, they get the latest page instead, as does one whose page was empty.
+    private func logChanged(_ log: String, _ messages: [Transcript.Message], revised: Set<String>) {
         for (id, phone) in phones {
             guard let (session, current, last) = phone.conversation, current == log, phone.watching == session else { continue }
             if let last, let index = messages.lastIndex(where: { $0.id == last }), Self.pageStart(messages, end: messages.count) <= index + 1 {
+                let changed = messages[...index].filter { revised.contains($0.id) }
+                if !changed.isEmpty { tell(.conversation(session: session, messages: changed.map(Self.remote), place: .changed, more: false), id) }
                 guard index + 1 < messages.count else { continue }
                 phones[id]?.conversation?.last = messages.last?.id
                 tell(.conversation(session: session, messages: messages[(index + 1)...].map(Self.remote), place: .after(last), more: false), id)
@@ -627,8 +634,8 @@ final class RemoteBridge: ObservableObject {
             let watch = DispatchSource.makeFileSystemObjectSource(fileDescriptor: file, eventMask: [.extend, .write], queue: reading)
             watch.setEventHandler { [weak self] in
                 guard let self, let transcript = transcripts[log], transcript.refresh() else { return }
-                let messages = transcript.messages
-                DispatchQueue.main.async { self.logChanged(log, messages) }
+                let messages = transcript.messages, revised = transcript.revised
+                DispatchQueue.main.async { self.logChanged(log, messages, revised: revised) }
             }
             watch.setCancelHandler { Darwin.close(file) }
             watch.resume()
@@ -639,8 +646,8 @@ final class RemoteBridge: ObservableObject {
                 let transcript = transcripts[log] ?? Transcript(url: URL(fileURLWithPath: log))
                 transcripts[log] = transcript
                 guard transcript.refresh() else { return }
-                let messages = transcript.messages
-                DispatchQueue.main.async { self.logChanged(log, messages) }
+                let messages = transcript.messages, revised = transcript.revised
+                DispatchQueue.main.async { self.logChanged(log, messages, revised: revised) }
             }
         }
     }
@@ -676,7 +683,12 @@ final class RemoteBridge: ObservableObject {
         case .agent: .agent
         case .tool: .tool
         }
-        return RemoteMessage(id: message.id, role: role, text: message.text, tool: message.tool, detail: message.detail)
+        let outcome: RemoteMessage.Outcome? = switch message.outcome {
+        case .stopped: .stopped
+        case .failed: .failed
+        case nil: nil
+        }
+        return RemoteMessage(id: message.id, role: role, text: message.text, tool: message.tool, detail: message.detail, outcome: outcome)
     }
 
     // MARK: Commands

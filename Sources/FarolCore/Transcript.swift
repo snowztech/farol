@@ -16,10 +16,20 @@ public final class Transcript {
         public var tool: String?
         /// A command in full, or an edit as a unified diff.
         public var detail: String?
+        /// How a tool call ended, once its result is in, when not as asked.
+        public var outcome: Outcome?
+
+        public enum Outcome: String, Sendable {
+            /// You said no when it asked, or interrupted it.
+            case stopped
+            case failed
+        }
     }
 
     public let url: URL
     public var messages: [Message] { log?.messages ?? [] }
+    /// The messages the last refresh changed in place, by id, like a tool whose result came after it.
+    public private(set) var revised: Set<String> = []
     /// Which agent wrote it, known from its first line.
     private var log: AgentLog?
     private var offset: UInt64 = 0
@@ -46,10 +56,15 @@ public final class Transcript {
             log = nil
         }
         try? handle.seek(toOffset: offset)
+        revised = []
         var changed = false
         // Foundation leaves the chunks it reads and the objects JSONSerialization makes to an autorelease pool, which would otherwise hold a whole log's worth until the read ends.
         while let more = autoreleasepool(invoking: { (try? handle.read(upToCount: 1 << 20)).flatMap { $0.isEmpty ? nil : take($0) } }) {
             if more { changed = true }
+        }
+        if let log {
+            revised = log.revised
+            log.revised = []
         }
         return changed
     }
@@ -114,6 +129,8 @@ public final class Transcript {
 /// One agent's way of logging, read a line at a time.
 protocol AgentLog: AnyObject {
     var messages: [Transcript.Message] { get }
+    /// Messages read before that a later line changed, by id, since the transcript last took them.
+    var revised: Set<String> { get set }
     /// True when the line changed the messages.
     func read(_ line: Data) -> Bool
 }
