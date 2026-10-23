@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.48.0] - 2026-10-24
+
+Split panes on the phone, Codex questions answered there, and tool calls that say how they ended.
+
 ### Added
 
 - The phone lists each split pane as its own session, so an agent in a split is read and answered on its own.
