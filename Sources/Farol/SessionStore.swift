@@ -14,16 +14,14 @@ final class Session: ObservableObject, Identifiable {
     @Published var directory: String
     /// Reported per pane by agent hooks or interactive terminal titles.
     @Published private(set) var agents: [UUID: AgentActivity] = [:]
-    /// The agent's own conversation, as its hooks last named it. A phone reads it.
-    var conversation: AgentConversation?
+    /// Each pane's agent conversation, as its hooks or logs last named it. Kept after the agent ends, so a phone can still read it.
+    var logs: [UUID: AgentConversation] = [:]
     /// Each pane's conversation while its agent runs, saved so the next launch resumes it there.
     var conversations: [UUID: AgentConversation] = [:]
     /// What a waiting agent asks, and the pane it waits in, so an answer from a phone goes there and nowhere else.
     @Published var request: (pane: UUID, asked: AgentRequest)?
     /// A question the agent is blocked on, which Farol can answer through the agent's hook.
     var ask: PendingAsk?
-    /// An agent started here and has not ended. Before its first message it may have no log, and a phone shows it as an empty conversation.
-    var agentStarted = false
     /// The program rang the bell or sent a notification while you were elsewhere. Covers agents that report nothing themselves.
     @Published var bellRang = false
     /// The host each pane is on over ssh, kept apart from the title so it outlives a program retitling the pane.
@@ -137,22 +135,32 @@ final class Session: ObservableObject, Identifiable {
         case .working, .done, .clear, .start: if self.request?.pane == pane { self.request = nil }
         case .subagentStart, .subagentStop: break
         }
-        if event == .start { agentStarted = true }
-        if event == .clear { agentStarted = false }
     }
 
     /// Claude Code runs no hook when you stop it, so a stop at the end of its log ends what its pane showed. True when one did.
     func noticeStop() -> Bool {
-        guard let log = conversation?.log else { return false }
         var stopped = false
         for (pane, agent) in agents where agent.status == .working || agent.status == .waiting {
-            guard let since = agent.since, Transcript.stopped(log: log, since: since) else { continue }
+            guard let since = agent.since, let log = logs[pane]?.log, Transcript.stopped(log: log, since: since) else { continue }
             agents[pane]?.stop()
             if request?.pane == pane { request = nil }
             stopped = true
         }
         return stopped
     }
+
+    /// One pane's state, for a phone that lists split panes apart. The bell counts only for panes whose program says nothing itself, as `flag` rings it.
+    func activity(of pane: UUID) -> Activity {
+        let agent = agents[pane]
+        if stopped != nil { return .stopped }
+        if agent?.status == .waiting || (bellRang && agent?.reports != true) { return .waiting }
+        if agent?.status == .working { return .working }
+        if agent?.status == .done { return .done }
+        return .idle
+    }
+
+    /// An agent runs in the pane, from its first report until it ends. Before its first message it may have no log yet.
+    func agentRuns(in pane: UUID) -> Bool { agents[pane]?.reports == true }
 
     /// An agent in one of the panes waits for your approval or answer, as opposed to a bell or terminal notification.
     var agentIsWaiting: Bool { agents.values.contains { $0.status == .waiting } }
@@ -220,11 +228,22 @@ final class Session: ObservableObject, Identifiable {
     /// Programs that set a real title (Claude Code, vim, htop) keep it.
     /// A worktree folder is named after its branch, so the repo name says more there.
     var displayName: String {
-        if let customName { return customName }
-        if let remote, !hasProgramTitle { return remote.host }
-        if hasProgramTitle { return programTitle }
+        customName ?? name(title: title, remote: remote, directory: directory)
+    }
+
+    /// A pane's own name, from its title and folder, for a phone that lists split panes apart. A renamed session keeps its name in front.
+    func name(of terminal: TerminalView) -> String {
+        let own = name(title: terminal.title, remote: remotes[terminal.id], directory: terminal.workingDirectory ?? directory)
+        return customName.map { "\($0) · \(own)" } ?? own
+    }
+
+    private func name(title: String, remote: RemoteTitle?, directory: String) -> String {
+        let program = Self.isProgramTitle(title)
+        if let remote, !program { return remote.host }
+        // Agents put their status in the title, like Claude Code's ✳. The sidebar dot already shows it.
+        if program { return AgentTitle.withoutStatus(title) }
         if worktree != nil, let repoName { return repoName }
-        return folderName
+        return directory == NSHomeDirectory() ? "~" : (directory as NSString).lastPathComponent
     }
 
     /// The second line when there is no branch, so every row has the same height.
@@ -235,7 +254,7 @@ final class Session: ObservableObject, Identifiable {
 
     /// The second line over ssh, where the local branch says nothing about the machine you are on.
     /// A program's title takes the name, so the host moves down here.
-    var remoteLocation: String? { remote.map { hasProgramTitle ? $0.host : $0.path } }
+    var remoteLocation: String? { remote.map { Self.isProgramTitle(title) ? $0.host : $0.path } }
 
     private var remote: RemoteTitle? { remotes[panes.focused.id] }
 
@@ -249,19 +268,12 @@ final class Session: ObservableObject, Identifiable {
         if isRemote != (remote != nil) { isRemote = remote != nil }
     }
 
-    /// Agents put their status in the title, like Claude Code's ✳. The sidebar dot already shows it.
-    private var programTitle: String { AgentTitle.withoutStatus(title) }
-
     /// Shells title the window with the folder, sometimes shortened to "…/dev/project" or "dev/project".
     /// A path has a slash and no spaces, while a program title like "vim src/main.swift" has spaces.
     /// Until a program sets a title, Ghostty uses the full folder path, which can have spaces.
-    private var hasProgramTitle: Bool {
+    private static func isProgramTitle(_ title: String) -> Bool {
         let looksLikePath = title.hasPrefix("/") || title.contains("/") && !title.contains(" ")
         return !(title.isEmpty || title.contains("@") || title.hasPrefix("~") || looksLikePath)
-    }
-
-    private var folderName: String {
-        directory == NSHomeDirectory() ? "~" : (directory as NSString).lastPathComponent
     }
 }
 
@@ -329,7 +341,7 @@ final class SessionStore: ObservableObject {
         let before = session.activity
         let resumable = session.conversations[pane]
         if let conversation = message.conversation {
-            session.conversation = conversation
+            session.logs[pane] = conversation
             session.conversations[pane] = conversation
         }
         // The agent ended, so there is nothing to resume. Codex also sends this when you interrupt a turn, and its next prompt brings it back.
@@ -356,7 +368,7 @@ final class SessionStore: ObservableObject {
             DispatchQueue.main.async {
                 guard let self, let session, let terminal, let found else { return }
                 // Also for a session restored with this conversation already saved, which a phone could not read until now.
-                session.conversation = found
+                session.logs[terminal.id] = found
                 guard session.conversations[terminal.id] != found else { return }
                 session.conversations[terminal.id] = found
                 self.save()

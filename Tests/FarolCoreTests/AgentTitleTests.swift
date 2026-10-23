@@ -14,6 +14,12 @@ import Testing
     #expect(AgentTitle.withoutStatus("Fix login · api") == "Fix login")
 }
 
+/// Codex waits with "[ ! ] Action Required" first, which would otherwise name the session on the phone and in the sidebar.
+@Test func dropsCodexWaitingMarker() {
+    #expect(AgentTitle.withoutStatus("[ ! ] Action Required | Run tests | farol") == "Run tests")
+    #expect(AgentTitle.withoutStatus("[ . ] Action Required | Approve touch probe file | play") == "Approve touch probe file")
+}
+
 @Test func leavesOrdinaryTitlesAlone() {
     #expect(AgentTitle.withoutStatus("vim src/main.swift") == "vim src/main.swift")
     #expect(AgentTitle.withoutStatus("npm run dev") == "npm run dev")

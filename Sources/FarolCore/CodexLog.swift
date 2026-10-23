@@ -3,8 +3,11 @@ import Foundation
 /// Codex's log: a message or a tool call under each line's `payload`, one after the other. The top of the log names the folder.
 final class CodexLog: AgentLog {
     private(set) var messages: [Transcript.Message] = []
+    var revised: Set<String> = []
     /// Where the session works, to show paths from there.
     private var folder: String?
+    /// Each tool call's place in the messages, by the id its output names it by.
+    private var calls: [String: Int] = [:]
 
     func read(_ line: Data) -> Bool {
         // Most lines are Codex's own bookkeeping, like token counts, and are not parsed.
@@ -36,12 +39,33 @@ final class CodexLog: AgentLog {
             message = Self.tool(payload["input"] as? String ?? "", in: folder, id: id)
         case "function_call":
             message = Self.tool(payload["arguments"] as? String ?? "", name: payload["name"] as? String, in: folder, id: id)
+        case "function_call_output", "custom_tool_call_output":
+            return ended(payload)
         default:
             message = nil
         }
         guard let message else { return false }
+        if message.role == .tool, let call = payload["call_id"] as? String { calls[call] = messages.count }
         messages.append(message)
         return true
+    }
+
+    /// A tool call's output, which says whether you stopped it or a command it ran failed.
+    private func ended(_ payload: [String: Any]) -> Bool {
+        guard let call = payload["call_id"] as? String, let place = calls[call] else { return false }
+        let output = payload["output"] as? String ?? ""
+        guard let outcome = Self.outcome(of: output) else { return false }
+        messages[place].outcome = outcome
+        revised.insert(messages[place].id)
+        return true
+    }
+
+    /// Codex writes "aborted by user" for a call you said no to or interrupted, and each command's exit code in what it ran.
+    static func outcome(of output: String) -> Transcript.Message.Outcome? {
+        if output.hasPrefix("aborted by user") { return .stopped }
+        // Escaped once at most: a command's own output that quotes an exit code is escaped deeper.
+        let codes = output.matches(of: #/exit_code\\?"\s*:\s*(-?\d+)/#).compactMap { Int($0.1) }
+        return codes.contains { $0 != 0 } ? .failed : nil
     }
 
     /// What a Codex tool call did: an edit, from the patch it applied, or the commands it ran.

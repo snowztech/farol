@@ -382,13 +382,13 @@ final class RemoteBridge: ObservableObject {
             tell(.refused(command: command.id, reason: "This version of Farol cannot start tasks from the phone."), id)
         case .history(let session):
             // Read once, when the phone asks. Reading it on every change would cost the Mac for something rarely looked at.
-            guard let pane = store.sessions.first(where: { $0.id == session })?.panes.focused else { return }
-            tell(.history(session: session, text: pane.historyText()), id)
+            guard let terminal = pane(session)?.terminal else { return }
+            tell(.history(session: session, text: terminal.historyText()), id)
         case .send(let session, let text):
             act(command, by: device, on: session, from: id) { pane in
                 // While Farol holds a question, the agent shows nothing to type into, so a typed reply is the answer, as Other is on the Mac.
                 let answer = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                if let target = store.sessions.first(where: { $0.id == session }), let ask = target.ask, ask.pane == pane.id,
+                if let target = self.pane(session)?.session, let ask = target.ask, ask.pane == pane.id,
                    ask.questions.count == 1, let question = ask.questions.first, !answer.isEmpty {
                     return store.answer(target, with: [question.text: answer])
                 }
@@ -414,10 +414,10 @@ final class RemoteBridge: ObservableObject {
     /// Types into a session once, however many times the command arrives.
     private func act(_ command: RemoteCommand, by device: PairedDevice, on session: UUID, from id: UInt32, _ type: (TerminalView) -> Void) {
         if seen[device.key, default: SeenCommands()].insert(command.id) {
-            guard let pane = store.sessions.first(where: { $0.id == session })?.panes.focused else {
+            guard let terminal = pane(session)?.terminal else {
                 return tell(.refused(command: command.id, reason: "That session is closed."), id)
             }
-            type(pane)
+            type(terminal)
         }
         tell(.done(command: command.id), id)
         tick()
@@ -427,14 +427,14 @@ final class RemoteBridge: ObservableObject {
     /// A tap that arrives after the question was answered on the Mac, or replaced by another, is refused rather than typed into it.
     private func answer(_ command: RemoteCommand, by device: PairedDevice, session id: UUID, request: String, choice: Int, from phone: UInt32) {
         guard seen[device.key, default: SeenCommands()].insert(command.id) else { return tell(.done(command: command.id), phone) }
-        guard let session = store.sessions.first(where: { $0.id == id }), let (pane, asked) = session.request, asked.id == request,
-              session.agentIsWaiting, let terminal = session.panes.terminals.first(where: { $0.id == pane }) else {
+        guard let (session, terminal) = pane(id), let (asking, asked) = session.request, asking == terminal.id, asked.id == request,
+              session.agents[asking]?.status == .waiting else {
             return tell(.refused(command: command.id, reason: "That was already answered."), phone)
         }
         // Gone at once, so a second tap is refused rather than typed into whatever the agent asks next.
         session.request = nil
         // While Farol holds a question through its hook, the agent shows nothing to type into, so the answer goes back through the hook.
-        if let ask = session.ask, ask.pane == pane, let question = ask.questions.first, ask.questions.count == 1,
+        if let ask = session.ask, ask.pane == asking, let question = ask.questions.first, ask.questions.count == 1,
            question.options.indices.contains(choice - 1) {
             store.answer(session, with: [question.text: question.options[choice - 1].label])
         } else {
@@ -447,8 +447,8 @@ final class RemoteBridge: ObservableObject {
     private func respondAsk(_ command: RemoteCommand, by device: PairedDevice, session id: UUID, ask: UUID,
                             decision: RemoteAsk.Decision, from phone: UInt32) {
         if let previous = askResponses[device.key]?[command.id] { return tell(previous, phone) }
-        guard let session = store.sessions.first(where: { $0.id == id }), let held = session.ask, held.id == ask,
-              session.agentIsWaiting, session.panes.terminals.contains(where: { $0.id == held.pane }) else {
+        guard let (session, terminal) = pane(id), let held = session.ask, held.id == ask, held.pane == terminal.id,
+              session.agentIsWaiting else {
             return finishAsk(.refused(command: command.id, reason: "That question is no longer waiting."), command: command, device: device, phone: phone)
         }
         switch decision {
@@ -523,17 +523,21 @@ final class RemoteBridge: ObservableObject {
         guard projects.contains(project), agent == nil || folder != nil else {
             return tell(.refused(command: command.id, reason: "The Mac could not open that session. Pick the project again and retry."), id)
         }
-        let session = store.create(directory: project, run: folder?.command())
-        opened[command.id] = session.id
-        tell(.opened(command: command.id, session: session.id), id)
+        let pane = store.create(directory: project, run: folder?.command()).panes.focused.id
+        opened[command.id] = pane
+        tell(.opened(command: command.id, session: pane), id)
         tick()
     }
 
-    /// Closes a session as its tab's close button would, but never the last one: closing that quits Farol, and the phone with it.
+    /// Closes a split pane, or a session as its tab's close button would, but never the last one: closing that quits Farol, and the phone with it.
     /// A worktree session keeps its worktree. Removing that asks questions only the Mac's own close button answers.
     private func close(_ command: RemoteCommand, by device: PairedDevice, session id: UUID, from phone: UInt32) {
         guard seen[device.key, default: SeenCommands()].insert(command.id) else { return tell(.done(command: command.id), phone) }
-        guard let session = store.sessions.first(where: { $0.id == id }) else { return tell(.done(command: command.id), phone) }
+        guard let (session, terminal) = pane(id) else { return tell(.done(command: command.id), phone) }
+        if session.panes.remove(terminal) {
+            tell(.done(command: command.id), phone)
+            return tick()
+        }
         guard store.sessions.count > 1 else {
             return tell(.refused(command: command.id, reason: "Farol keeps its last session open. Open another one first."), phone)
         }
@@ -550,18 +554,22 @@ final class RemoteBridge: ObservableObject {
             guard let self else { return }
             let transcript = transcripts[log] ?? Transcript(url: URL(fileURLWithPath: log))
             transcripts[log] = transcript
-            transcript.refresh()
-            let messages = transcript.messages
-            DispatchQueue.main.async { use(messages) }
+            let changed = transcript.refresh()
+            let messages = transcript.messages, revised = transcript.revised
+            DispatchQueue.main.async {
+                // What the agent wrote since goes to the phones following the log too, since its watch now finds nothing new.
+                if changed { self.logChanged(log, messages, revised: revised) }
+                use(messages)
+            }
         }
     }
 
     /// The latest page of a session's conversation, then what follows while it is watched, or a page further back.
     private func conversation(_ command: RemoteCommand, of session: UUID, before: String?, from id: UInt32) {
-        let asked = store.sessions.first { $0.id == session }
-        guard let log = asked?.conversation?.log else {
+        let asked = pane(session)
+        guard let log = asked.flatMap({ $0.session.logs[$0.terminal.id] })?.log else {
             // An agent that has not said anything yet has no log, and its conversation is empty rather than missing.
-            if asked?.agentStarted == true, before == nil {
+            if let asked, asked.session.agentRuns(in: asked.terminal.id), before == nil {
                 phones[id]?.toldEmpty = session
                 return tell(.conversation(session: session, messages: [], place: .latest, more: false), id)
             }
@@ -592,11 +600,14 @@ final class RemoteBridge: ObservableObject {
         tell(.conversation(session: session, messages: messages[start...].map(Self.remote), place: .latest, more: start > 0), id)
     }
 
-    /// Sends the phones reading a log what the agent just wrote. After a rewind, or more than a page, they get the latest page instead.
-    private func logChanged(_ log: String, _ messages: [Transcript.Message]) {
+    /// Sends the phones reading a log what the agent just wrote, and the messages they have that changed, like a tool you said no to.
+    /// After a rewind, or more than a page, they get the latest page instead, as does one whose page was empty.
+    private func logChanged(_ log: String, _ messages: [Transcript.Message], revised: Set<String>) {
         for (id, phone) in phones {
             guard let (session, current, last) = phone.conversation, current == log, phone.watching == session else { continue }
             if let last, let index = messages.lastIndex(where: { $0.id == last }), Self.pageStart(messages, end: messages.count) <= index + 1 {
+                let changed = messages[...index].filter { revised.contains($0.id) }
+                if !changed.isEmpty { tell(.conversation(session: session, messages: changed.map(Self.remote), place: .changed, more: false), id) }
                 guard index + 1 < messages.count else { continue }
                 phones[id]?.conversation?.last = messages.last?.id
                 tell(.conversation(session: session, messages: messages[(index + 1)...].map(Self.remote), place: .after(last), more: false), id)
@@ -623,8 +634,8 @@ final class RemoteBridge: ObservableObject {
             let watch = DispatchSource.makeFileSystemObjectSource(fileDescriptor: file, eventMask: [.extend, .write], queue: reading)
             watch.setEventHandler { [weak self] in
                 guard let self, let transcript = transcripts[log], transcript.refresh() else { return }
-                let messages = transcript.messages
-                DispatchQueue.main.async { self.logChanged(log, messages) }
+                let messages = transcript.messages, revised = transcript.revised
+                DispatchQueue.main.async { self.logChanged(log, messages, revised: revised) }
             }
             watch.setCancelHandler { Darwin.close(file) }
             watch.resume()
@@ -635,8 +646,8 @@ final class RemoteBridge: ObservableObject {
                 let transcript = transcripts[log] ?? Transcript(url: URL(fileURLWithPath: log))
                 transcripts[log] = transcript
                 guard transcript.refresh() else { return }
-                let messages = transcript.messages
-                DispatchQueue.main.async { self.logChanged(log, messages) }
+                let messages = transcript.messages, revised = transcript.revised
+                DispatchQueue.main.async { self.logChanged(log, messages, revised: revised) }
             }
         }
     }
@@ -672,17 +683,22 @@ final class RemoteBridge: ObservableObject {
         case .agent: .agent
         case .tool: .tool
         }
-        return RemoteMessage(id: message.id, role: role, text: message.text, tool: message.tool, detail: message.detail)
+        let outcome: RemoteMessage.Outcome? = switch message.outcome {
+        case .stopped: .stopped
+        case .failed: .failed
+        case nil: nil
+        }
+        return RemoteMessage(id: message.id, role: role, text: message.text, tool: message.tool, detail: message.detail, outcome: outcome)
     }
 
     // MARK: Commands
 
     /// What the agent in a session takes after a slash, read off the main thread since it reads a few dozen small files.
     private func commands(_ command: RemoteCommand, of id: UUID, from phone: UInt32) {
-        guard let session = store.sessions.first(where: { $0.id == id }) else {
+        guard let (session, terminal) = pane(id) else {
             return tell(.refused(command: command.id, reason: "That session is closed."), phone)
         }
-        let log = session.conversation?.log, project = session.repoRoot ?? session.directory
+        let log = session.logs[terminal.id]?.log, project = session.repoRoot ?? session.directory
         DispatchQueue.global(qos: .userInitiated).async {
             let commands = AgentCommands.list(log: log, project: project).map { RemoteAgentCommand(name: $0.name, detail: $0.detail, menu: $0.menu, mention: $0.mention) }
             DispatchQueue.main.async { [weak self] in self?.tell(.commands(session: id, commands: commands), phone) }
@@ -701,7 +717,7 @@ final class RemoteBridge: ObservableObject {
 
     /// One part of a picture. Each is answered, so the phone sends the next, and the last with where the picture is.
     private func attach(_ command: RemoteCommand, session: UUID, attachment: UUID, part: Int, of parts: Int, data: Data, from id: UInt32) {
-        guard store.sessions.contains(where: { $0.id == session }) else {
+        guard pane(session) != nil else {
             return tell(.refused(command: command.id, reason: "That session is closed."), id)
         }
         do {
@@ -723,7 +739,7 @@ final class RemoteBridge: ObservableObject {
 
     /// The repository a session works in, and what the review panel compares it with. Nil outside git.
     private func repository(of session: UUID) -> (directory: String, scope: Diff.Scope)? {
-        guard let session = store.sessions.first(where: { $0.id == session }) else { return nil }
+        guard let session = pane(session)?.session else { return nil }
         let directory = session.repoRoot ?? session.directory
         return (directory, Diff.defaultScope(in: directory))
     }
@@ -807,9 +823,13 @@ final class RemoteBridge: ObservableObject {
         default: nil
         }
         guard let notice else { return }
+        // The pane that asks or is done, which is the session a phone opens.
+        let panes = session.panes.terminals
+        let pane = panes.count == 1 ? panes[0] : panes.first { session.activity(of: $0.id) == after } ?? session.panes.focused
+        let name = panes.count == 1 ? session.displayName : session.name(of: pane)
         for target in pushTargets where target.notices?.contains(notice) ?? true {
             let sealed = target.key.flatMap {
-                NoticeBox.seal(RemoteNoticeContent(session: session.id, name: session.displayName, notice: notice), key: $0)
+                NoticeBox.seal(RemoteNoticeContent(session: pane.id, name: name, notice: notice), key: $0)
             }
             connection.send(RelayFrame.push(token: target.token, sandbox: target.sandbox, notice: notice, sealed: sealed))
         }
@@ -842,10 +862,25 @@ final class RemoteBridge: ObservableObject {
 
     // MARK: Sessions
 
+    /// Each pane is a session to a phone, so an agent in a split pane is listed, read and answered on its own.
+    /// A tab of one pane is listed as the sidebar shows it, and its pane's id is the one a phone knows it by.
     private var remoteSessions: [RemoteSession] {
-        store.ordered.map {
-            RemoteSession(id: $0.id, name: $0.displayName, branch: $0.branch, status: RemoteStatus(rawValue: "\($0.activity)") ?? .idle)
+        store.ordered.flatMap { session in
+            let panes = session.panes.terminals
+            return panes.map { pane in
+                let activity = panes.count == 1 ? session.activity : session.activity(of: pane.id)
+                return RemoteSession(id: pane.id, name: panes.count == 1 ? session.displayName : session.name(of: pane),
+                                     branch: session.branch, status: RemoteStatus(rawValue: "\(activity)") ?? .idle)
+            }
         }
+    }
+
+    /// The pane a phone means by a session's id, and the session it is in.
+    private func pane(_ id: UUID) -> (session: Session, terminal: TerminalView)? {
+        for session in store.sessions {
+            if let terminal = session.panes.terminals.first(where: { $0.id == id }) { return (session, terminal) }
+        }
+        return nil
     }
 
     /// Runs only while a phone is connected.
@@ -863,15 +898,15 @@ final class RemoteBridge: ObservableObject {
         for (id, phone) in phones where phone.device != nil {
             // Claude Code starts a new log after /clear, and its next hook says so.
             if let (session, log, _) = phone.conversation, phone.watching == session,
-               let now = store.sessions.first(where: { $0.id == session })?.conversation?.log, now != log {
+               let now = pane(session).flatMap({ $0.session.logs[$0.terminal.id] })?.log, now != log {
                 openConversation(of: session, log: now, for: id)
             }
             // The log is known only once a hook names it: Codex names it after its first turn, and Claude Code after its first prompt.
             // The phone shows the terminal until then, so it is sent the conversation as soon as there is one rather than waiting to ask.
-            if phone.conversation == nil, let watching = phone.watching, let session = store.sessions.first(where: { $0.id == watching }) {
-                if let log = session.conversation?.log {
+            if phone.conversation == nil, let watching = phone.watching, let (session, _) = pane(watching) {
+                if let log = session.logs[watching]?.log {
                     openConversation(of: watching, log: log, for: id)
-                } else if session.agentStarted, phone.toldEmpty != watching {
+                } else if session.agentRuns(in: watching), phone.toldEmpty != watching {
                     // An agent just started, with nothing said: the phone leaves the terminal for its empty conversation.
                     phones[id]?.toldEmpty = watching
                     tell(.conversation(session: watching, messages: [], place: .latest, more: false), id)
@@ -881,14 +916,14 @@ final class RemoteBridge: ObservableObject {
                 phones[id]?.sessions = sessions
                 tell(.sessions(sessions), id)
             }
-            if let watching = phone.watching {
-                let request = store.sessions.first { $0.id == watching }?.request.map { Self.remote($0.asked) }
+            if let watching = phone.watching, let (session, _) = pane(watching) {
+                let request = session.request.flatMap { $0.pane == watching ? Self.remote($0.asked) : nil }
                 if phone.request != .some(request) {
                     phones[id]?.request = .some(request)
                     tell(.request(session: watching, request: request), id)
                 }
                 if phone.asks {
-                    let ask = store.sessions.first { $0.id == watching }?.ask.map(Self.remote)
+                    let ask = session.ask.flatMap { $0.pane == watching ? Self.remote($0) : nil }
                     if phone.ask != .some(ask) {
                         phones[id]?.ask = .some(ask)
                         tell(.ask(session: watching, ask: ask), id)
@@ -896,10 +931,11 @@ final class RemoteBridge: ObservableObject {
                 }
             }
             // Codex can keep a question on screen while its title says working. Keep that screen live so the phone can offer the terminal.
-            guard let watching = phone.watching, let session = store.sessions.first(where: { $0.id == watching }),
-                  !phone.saysTerminal || phone.terminal == watching || session.activity == .waiting ||
-                  (session.activity == .working && session.panes.focused.foregroundProgram?.name == "codex"),
-                  case let text = session.panes.focused.screenText, text != phone.screen else { continue }
+            guard let watching = phone.watching, let (session, terminal) = pane(watching),
+                  case let activity = session.activity(of: watching),
+                  !phone.saysTerminal || phone.terminal == watching || activity == .waiting ||
+                  (activity == .working && terminal.foregroundProgram?.name == "codex"),
+                  case let text = terminal.screenText, text != phone.screen else { continue }
             phones[id]?.screen = text
             tell(.screen(session: watching, text: text), id)
         }

@@ -4,6 +4,17 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- The phone lists each split pane as its own session, so an agent in a split is read and answered on its own.
+- The phone shows when you stopped a tool call or it failed, rather than saying it ran.
+- The phone can open the questions Codex asks while it works.
+
+### Fixed
+
+- Codex's "Action Required" no longer names its session in the sidebar and on the phone.
+- A reply the agent wrote while the phone loaded an earlier page of its conversation is no longer missed.
+
 ## [0.47.2] - 2026-10-22
 
 Manage saved commands, and keep Codex questions reachable from the phone.

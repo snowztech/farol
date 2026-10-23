@@ -178,3 +178,35 @@ private let codexLog = [
     #expect(!Transcript.stopped(log: file.path + ".gone", since: before))
     #expect(ClaudeLog.messages(in: ["type": "user", "message": ["content": [["type": "text", "text": "[Request interrupted by user for tool use]"]]]], id: "u2").isEmpty)
 }
+
+@Test func marksAClaudeCodeToolYouSaidNoToOrThatFailed() throws {
+    let url = try file([
+        #"{"parentUuid":null,"type":"user","uuid":"u1","message":{"role":"user","content":"touch a and b"}}"#,
+        #"{"parentUuid":"u1","type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"On it."},{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"command":"touch a"}},{"type":"tool_use","id":"toolu_2","name":"Bash","input":{"command":"touch b"}}]}}"#,
+    ])
+    let transcript = Transcript(url: url)
+    transcript.refresh()
+    #expect(transcript.messages.compactMap(\.outcome).isEmpty, "running until their results are in")
+    let results = #"{"parentUuid":"a1","type":"user","uuid":"u2","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","is_error":true,"content":"The user doesn't want to proceed with this tool use. The tool use was rejected."},{"type":"tool_result","tool_use_id":"toolu_2","is_error":true,"content":[{"type":"text","text":"Exit code 1"}]}]}}"#
+    let handle = try FileHandle(forWritingTo: url)
+    try handle.seekToEnd()
+    try handle.write(contentsOf: Data((results + "\n").utf8))
+    try handle.close()
+    #expect(transcript.refresh())
+    #expect(transcript.messages.map(\.outcome) == [nil, nil, .stopped, .failed])
+    #expect(transcript.revised == ["a1.1", "a1.2"])
+}
+
+@Test func marksACodexCallYouStoppedOrWhoseCommandFailed() throws {
+    let transcript = Transcript(url: try file([
+        codexLog[0],
+        #"{"type":"response_item","payload":{"type":"custom_tool_call","id":"ctc_1","call_id":"call_1","name":"exec","input":"tools.exec_command({cmd:\"touch a\"})"}}"#,
+        #"{"type":"response_item","payload":{"type":"custom_tool_call","id":"ctc_2","call_id":"call_2","name":"exec","input":"tools.exec_command({cmd:\"git push\"})"}}"#,
+        #"{"type":"response_item","payload":{"type":"custom_tool_call","id":"ctc_3","call_id":"call_3","name":"exec","input":"tools.exec_command({cmd:\"grep x log\"})"}}"#,
+        #"{"type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"call_1","output":"aborted by user after 8.5s"}}"#,
+        #"{"type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"call_2","output":"{\\\"chunk_id\\\":\\\"a\\\",\\\"exit_code\\\":1,\\\"output\\\":\\\"rejected\\\"}"}}"#,
+        #"{"type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"call_3","output":"{\\\"exit_code\\\":0,\\\"output\\\":\\\"{\\\\\\\"exit_code\\\\\\\":1}\\\"}"}}"#,
+    ]))
+    transcript.refresh()
+    #expect(transcript.messages.filter { $0.role == .tool }.map(\.outcome) == [.stopped, .failed, nil], "an exit code in a command's own output is not its own")
+}
