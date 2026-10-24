@@ -130,12 +130,12 @@ public final class Transcript {
         return Message(id: id, role: .tool, text: first, tool: "Question", detail: detail == first ? nil : detail)
     }
 
-    /// Long enough for any edit worth reading on a phone, short enough to travel in one message.
     /// True when the last turn in an agent's log is you stopping it, after `since`. Only Claude Code's say so.
     public static func stopped(log: String, since: Date) -> Bool {
         ClaudeLog.stopped(log: log, since: since)
     }
 
+    /// Long enough for any edit worth reading on a phone, short enough to travel in one message.
     static func limit(_ text: String, to bytes: Int = 20_000) -> String {
         guard text.utf8.count > bytes else { return text }
         return String(decoding: text.utf8.prefix(bytes), as: UTF8.self) + "\n… cut short, open it on the Mac for the rest"

@@ -867,9 +867,10 @@ final class RemoteBridge: ObservableObject {
         let panes = session.panes.terminals
         let pane = panes.count == 1 ? panes[0] : panes.first { session.activity(of: $0.id) == after } ?? session.panes.focused
         let name = session.label(of: pane)
+        let asking = notice == .waiting ? session.asking(in: pane) : nil
         for target in pushTargets where target.notices?.contains(notice) ?? true {
             let sealed = target.key.flatMap {
-                NoticeBox.seal(RemoteNoticeContent(session: pane.id, name: name, notice: notice), key: $0)
+                NoticeBox.seal(RemoteNoticeContent(session: pane.id, name: name, notice: notice, asking: asking), key: $0)
             }
             connection.send(RelayFrame.push(token: target.token, sandbox: target.sandbox, notice: notice, sealed: sealed))
         }
