@@ -23,9 +23,15 @@ public enum Markdown {
     }
 
     public static func blocks(in text: String) -> [Block] {
-        let lines = text.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
+        var lines = text.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
+        var blocks: [Block] = []
+        // Front matter, like a skill's name and description, shows as the YAML it is rather than a heading over a rule.
+        if lines.first == "---", let end = lines.dropFirst().firstIndex(where: { $0 == "---" || $0 == "..." }) {
+            blocks.append(.code(language: "yaml", text: lines[1..<end].joined(separator: "\n")))
+            lines.removeSubrange(...end)
+        }
         // Tabs count as four columns, which is how far they indent a list item's content.
-        return parse(lines.map { $0.replacingOccurrences(of: "\t", with: "    ") })
+        return blocks + parse(lines.map { $0.replacingOccurrences(of: "\t", with: "    ") })
     }
 
     /// Whether the preview offers itself for this file.

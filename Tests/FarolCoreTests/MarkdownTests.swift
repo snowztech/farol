@@ -13,6 +13,13 @@ import Testing
     #expect(Markdown.blocks(in: "#hashtag") == [.paragraph("#hashtag")])
 }
 
+@Test func readsFrontMatterAsYAML() {
+    let blocks = Markdown.blocks(in: "---\nname: farol\ndescription: Farol\n---\n\n# Farol")
+    #expect(blocks == [.code(language: "yaml", text: "name: farol\ndescription: Farol"), .heading(level: 1, text: "Farol")])
+    // A rule that opens the file without closing is still a rule.
+    #expect(Markdown.blocks(in: "---\nafter") == [.rule, .paragraph("after")])
+}
+
 @Test func readsFencedCodeAsItIs() {
     let blocks = Markdown.blocks(in: "```swift\nlet x = 1\n\n  # not a heading\n```\nafter")
     #expect(blocks == [.code(language: "swift", text: "let x = 1\n\n  # not a heading"), .paragraph("after")])

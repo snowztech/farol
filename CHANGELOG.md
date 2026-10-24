@@ -13,6 +13,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Fixed
 
 - TypeScript `.ts` and `.mts` files and Elixir `.exs` scripts open in the file pane instead of the app macOS gives their extension.
+- The Markdown preview shows a file's front matter, like a skill's name and description, as YAML instead of one big heading.
 
 ## [0.50.0] - 2026-10-24
 
