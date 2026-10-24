@@ -62,20 +62,10 @@ final class AgentControl {
     }
 
     private func info(_ session: Session, _ terminal: TerminalView, caller: UUID?) -> SessionInfo {
-        let asking = session.request.flatMap { $0.pane == terminal.id ? $0.asked.summary() : nil }
-            ?? session.ask.flatMap { $0.pane == terminal.id ? $0.questions.first?.text : nil }
         let status = SessionInfo.Status(rawValue: "\(session.status(of: terminal))") ?? .idle
         return SessionInfo(id: terminal.id.uuidString, name: session.label(of: terminal), folder: terminal.workingDirectory ?? session.directory,
-                           branch: session.branch, agent: Self.agent(in: terminal, of: session), status: status, asking: asking,
+                           branch: session.branch, agent: session.agent(in: terminal), status: status, asking: session.asking(in: terminal),
                            isCaller: terminal.id == caller)
-    }
-
-    /// The agent in front: none at a shell prompt, then the program's own name, or the agent whose log the pane writes.
-    /// Claude Code's process is named after its version, so its log says it is Claude Code.
-    private static func agent(in terminal: TerminalView, of session: Session) -> String? {
-        guard let name = terminal.foregroundProgram?.name, !["zsh", "bash", "fish", "sh", "login"].contains(name) else { return nil }
-        if AgentFolder.Kind(rawValue: name) != nil { return name }
-        return session.logs[terminal.id].flatMap { AgentFolder(log: $0.log) }?.kind.rawValue ?? name
     }
 
     /// The pane a command names, with its session, or a reply that says why there is none.
@@ -96,9 +86,7 @@ final class AgentControl {
         guard let directory = repo ?? calling.map({ $0.repoRoot ?? $0.directory }) else {
             return connection.reply(ControlReply.failed("Say which repository with --repo, since this command runs outside a Farol session."))
         }
-        let callerAgent = calling.flatMap { session in
-            session.panes.terminals.first { $0.id == caller }.flatMap { Self.agent(in: $0, of: session) }
-        }
+        let callerAgent = calling.flatMap { session in session.panes.terminals.first { $0.id == caller }.flatMap(session.agent) }
         let folders = AgentFolder.find()
         let wanted = (agent ?? callerAgent)?.lowercased()
         guard let folder = folders.first(where: { [$0.kind.rawValue, $0.id.lowercased(), $0.label.lowercased()].contains(wanted) }) ?? (agent == nil ? folders.first : nil) else {

@@ -1,5 +1,6 @@
 import AppKit
 import FarolCore
+import FarolRemote
 import GhosttyTerminal
 
 final class Session: ObservableObject, Identifiable {
@@ -167,6 +168,29 @@ final class Session: ObservableObject, Identifiable {
     func label(of terminal: TerminalView) -> String {
         panes.terminals.count == 1 ? displayName : name(of: terminal)
     }
+
+    /// The agent in front of a pane: none at a shell prompt, then the program's own name, or the agent whose log the pane writes.
+    /// Claude Code's process is named after its version, so its log says it is Claude Code.
+    func agent(in terminal: TerminalView) -> String? {
+        guard let name = terminal.foregroundProgram?.name, !["zsh", "bash", "fish", "sh", "login"].contains(name) else { return nil }
+        if AgentFolder.Kind(rawValue: name) != nil { return name }
+        return logs[terminal.id].flatMap { AgentFolder(log: $0.log) }?.kind.rawValue ?? name
+    }
+
+    /// What a waiting pane asks, in one line: what its hook or Farol's held question says, or else the menu on its screen.
+    /// An agent without hooks, like Codex, says it only there, so its screen is read, at most every two seconds.
+    func asking(in terminal: TerminalView) -> String? {
+        guard status(of: terminal) == .waiting else { return nil }
+        if let (pane, asked) = request, pane == terminal.id { return asked.summary() }
+        if let ask, ask.pane == terminal.id { return ask.questions.first?.text }
+        if let kept = screenAsking[terminal.id], kept.at > .now - 2 { return kept.text }
+        let text = Prompt.asking(in: terminal.screenText)
+        screenAsking[terminal.id] = (.now, text)
+        return text
+    }
+
+    /// What each pane's screen asked when last read, so a list sent often does not read every screen each time.
+    private var screenAsking: [UUID: (at: Date, text: String?)] = [:]
 
     /// An agent runs in the pane, from its first report until it ends. Before its first message it may have no log yet.
     func agentRuns(in pane: UUID) -> Bool { agents[pane]?.reports == true }

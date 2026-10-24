@@ -869,7 +869,8 @@ final class RemoteBridge: ObservableObject {
             let panes = session.panes.terminals
             return panes.map { pane in
                 RemoteSession(id: pane.id, name: session.label(of: pane), branch: session.branch,
-                              status: RemoteStatus(rawValue: "\(session.status(of: pane))") ?? .idle)
+                              status: RemoteStatus(rawValue: "\(session.status(of: pane))") ?? .idle,
+                              agent: session.agent(in: pane), asking: session.asking(in: pane))
             }
         }
     }
