@@ -31,12 +31,60 @@ public enum Markdown {
             lines.removeSubrange(...end)
         }
         // Tabs count as four columns, which is how far they indent a list item's content.
-        return blocks + parse(lines.map { $0.replacingOccurrences(of: "\t", with: "    ") })
+        lines = lines.map { $0.replacingOccurrences(of: "\t", with: "    ") }
+        let links = definitions(taking: &lines)
+        return (blocks + parse(lines)).map { linked($0, links) }
     }
 
     /// Whether the preview offers itself for this file.
     public static func handles(_ path: String) -> Bool {
         ["md", "markdown", "mdx"].contains((path as NSString).pathExtension.lowercased())
+    }
+
+    // MARK: Link definitions
+
+    /// Takes out the lines that define a link, like `[0.2.1]: https://…` under a changelog, and returns the links by label.
+    static func definitions(taking lines: inout [String]) -> [String: String] {
+        var links: [String: String] = [:]
+        var kept: [String] = []
+        var fence: String?
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if let open = fence {
+                if trimmed.hasPrefix(open) { fence = nil }
+            } else if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
+                fence = String(trimmed.prefix(3))
+            } else if indentation(line) < 4,
+                      let link = trimmed.wholeMatch(of: #/\[([^\[\]]+)\]:\s*<?([^\s<>]+)>?(?:\s+(?:"[^"]*"|'[^']*'|\([^)]*\)))?/#) {
+                // The first definition of a label wins, as on GitHub.
+                links[String(link.1).lowercased()] = links[String(link.1).lowercased()] ?? String(link.2)
+                continue
+            }
+            kept.append(line)
+        }
+        lines = kept
+        return links
+    }
+
+    /// Writes `[text][label]`, `[label][]` and `[label]` as inline links, which is all the inline parser reads.
+    static func linked(_ block: Block, _ links: [String: String]) -> Block {
+        guard !links.isEmpty else { return block }
+        func text(_ text: String) -> String {
+            text.replacing(#/\[([^\[\]]+)\](?:\[([^\[\]]*)\])?(?![(\[:])/#) { match in
+                let label = match.2.flatMap { $0.isEmpty ? nil : $0 } ?? match.1
+                guard let url = links[label.lowercased()] else { return String(match.0) }
+                return "[\(match.1)](\(url))"
+            }
+        }
+        return switch block {
+        case .heading(let level, let heading): .heading(level: level, text: text(heading))
+        case .paragraph(let paragraph): .paragraph(text(paragraph))
+        case .quote(let blocks): .quote(blocks.map { linked($0, links) })
+        case .list(let ordered, let start, let items):
+            .list(ordered: ordered, start: start, items: items.map { Item(checked: $0.checked, blocks: $0.blocks.map { linked($0, links) }) })
+        case .table(let header, let rows): .table(header: header.map(text), rows: rows.map { $0.map(text) })
+        case .code, .rule: block
+        }
     }
 
     // MARK: Blocks
