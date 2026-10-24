@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.51.0] - 2026-10-24
+
+OpenCode and Pi join Claude Code and Codex, any agent can report its status, and notifications say what a waiting agent asks.
+
 ### Added
 
 - OpenCode and Pi connect in Settings → Agents, like Claude Code and Codex. OpenCode says when it works, finishes or asks for a permission or an answer, and Pi says when it works and finishes. The phone reads Pi's conversation.
