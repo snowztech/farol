@@ -4,7 +4,8 @@ import FarolCore
 /// A Markdown file as it reads: headings, lists, code and links drawn natively, in the theme's colors.
 /// Read only, but selectable and searchable with ⌘F like the source.
 final class MarkdownView: NSScrollView {
-    let text = MarkdownTextView()
+    // TextKit 1 from the start: drawing code blocks reads the layout manager, which would otherwise switch the view over mid-draw and drop the text.
+    let text = MarkdownTextView(usingTextLayoutManager: false)
     /// Opens a file a relative link points to, in the file pane.
     var onOpenFile: ((String) -> Void)?
 
@@ -104,10 +105,12 @@ struct MarkdownColors: Equatable {
     /// Behind code blocks and inline code.
     let codeBackground: NSColor
     let line: NSColor
+    let syntax: SyntaxColors?
 
     init(background: NSColor, foreground: NSColor, syntax: SyntaxColors?) {
         self.background = background
         self.foreground = foreground
+        self.syntax = syntax
         muted = background.mixed(with: foreground, 0.6)
         link = syntax?.keyword ?? foreground
         code = syntax?.string ?? foreground
@@ -117,7 +120,7 @@ struct MarkdownColors: Equatable {
 }
 
 private extension NSAttributedString.Key {
-    /// Marks a code block's lines, so their background spans the width.
+    /// Marks a code block's lines, so their background spans the width. Each block has its own number, so two in a row stay two boxes.
     static let markdownCode = NSAttributedString.Key("farol.markdownCode")
     /// A rule's line, drawn across the width.
     static let markdownRule = NSAttributedString.Key("farol.markdownRule")
@@ -134,6 +137,7 @@ private struct MarkdownRenderer {
     private(set) var hasImages = false
     private let output = NSMutableAttributedString()
     private var quote = 0
+    private var codeBlocks = 0
 
     private static let size: CGFloat = 13.5
     private static let step: CGFloat = 22
@@ -173,21 +177,27 @@ private struct MarkdownRenderer {
                 style.lineSpacing = 2
                 append(markerText(&marker, font: font), inline(text, font: font, color: quote > 0 ? colors.muted : colors.foreground),
                        style: style)
-            case .code(_, let code):
+            case .code(let language, let code):
                 if let pending = markerText(&marker, font: .systemFont(ofSize: Self.size)) {
                     append(pending, NSAttributedString(), style: paragraph(left: left, marker: ""))
                 }
-                let font = NSFont.monospacedSystemFont(ofSize: 12.5, weight: .regular)
+                // Colored as a whole before it is cut into lines, so a comment or string over several lines stays colored.
+                let colored = NSTextStorage(string: code, attributes: [.font: CodeText.font])
+                CodeText.highlight(colored, language.flatMap(Syntax.language(named:)), colors.syntax, plain: colors.foreground)
                 let lines = code.components(separatedBy: "\n")
+                var start = 0
                 for (index, line) in lines.enumerated() {
                     let style = paragraph(left: left + 12, marker: nil)
                     style.tailIndent = -12
                     // The background reaches past the text, so the block needs room around it.
                     if index == 0 { style.paragraphSpacingBefore = 8 }
                     if index == lines.count - 1 { style.paragraphSpacing = Self.gap + 8 }
-                    let text = NSAttributedString(string: line, attributes: [.font: font, .foregroundColor: colors.foreground])
-                    append(nil, text, style: style, extra: [.markdownCode: true])
+                    let length = (line as NSString).length
+                    append(nil, colored.attributedSubstring(from: NSRange(location: start, length: length)), style: style,
+                           extra: [.markdownCode: codeBlocks])
+                    start += length + 1
                 }
+                codeBlocks += 1
             case .quote(let blocks):
                 quote += 1
                 render(blocks, indent: indent, marker: marker, tight: tight)

@@ -47,6 +47,18 @@ public enum Syntax {
         }
     }
 
+    /// The language a Markdown code fence names, by its extension or its full name, like `ts` or `typescript`.
+    public static func language(named name: String) -> Language? {
+        let names = [
+            "javascript": "a.js", "typescript": "a.ts", "python": "a.py", "ruby": "a.rb", "rust": "a.rs", "golang": "a.go",
+            "shell": "a.sh", "console": "a.sh", "shellsession": "a.sh", "kotlin": "a.kt", "objc": "a.m", "objective-c": "a.m",
+            "csharp": "a.cs", "c#": "a.cs", "c++": "a.cpp", "dockerfile": "Dockerfile", "docker": "Dockerfile",
+            "make": "Makefile", "makefile": "Makefile", "markdown": "a.md",
+        ]
+        let name = name.lowercased()
+        return language(for: names[name] ?? "a.\(name)")
+    }
+
     public static func tokens(in text: String, _ language: Language) -> [Token] {
         if language.isMarkdown { return markdownTokens(in: text) }
         let chars = Array(text.utf16)

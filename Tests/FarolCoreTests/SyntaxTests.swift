@@ -33,6 +33,14 @@ private func tokens(_ text: String, _ path: String) -> [String] {
     #expect(Syntax.language(for: "Makefile") != nil)
 }
 
+@Test func codeFencesNameTheirLanguage() {
+    for name in ["swift", "ts", "TypeScript", "bash", "json", "yaml", "dockerfile", "c++"] {
+        #expect(Syntax.language(named: name) != nil, "\(name)")
+    }
+    #expect(Syntax.language(named: "text") == nil)
+    #expect(Syntax.language(named: "") == nil)
+}
+
 @Test func htmlColorsTagsAttributesAndComments() {
     let code = "<!-- hi --><p class=\"a\">Farol's</p>"
     #expect(tokens(code, "index.html") == ["<!-- hi -->:comment", "p:keyword", "\"a\":string", "p:keyword"])
