@@ -561,7 +561,10 @@ final class SessionStore: ObservableObject {
             guard let self, let session else { return nil }
             return self.split(session, .down, run: line)
         }
-        session.onRepoChange = { [weak self] in self?.objectWillChange.send() }
+        session.onRepoChange = { [weak self, weak session] in
+            self?.objectWillChange.send()
+            if let session { self?.remember(session) }
+        }
         session.onGitStateChange = { [weak self, weak session] before in
             guard let self, let session else { return }
             self.report(session, from: before)
@@ -703,6 +706,17 @@ final class SessionStore: ObservableObject {
     }
 
     /// Closing the last session ends the app: there is never a window without a terminal.
+    /// Repositories sessions were open in, latest first, so a phone can start one in a project closed since. At most ten.
+    /// A worktree's repository is its main checkout, so a task remembers the project it came from.
+    private(set) var recentRepos = UserDefaults.standard.stringArray(forKey: SessionStore.recentReposKey) ?? []
+    private static let recentReposKey = "sessions.recentRepos"
+
+    private func remember(_ session: Session) {
+        guard let repo = session.repoRoot else { return }
+        recentRepos = Array(([repo] + recentRepos.filter { $0 != repo }).prefix(10))
+        UserDefaults.standard.set(recentRepos, forKey: Self.recentReposKey)
+    }
+
     func close(_ session: Session) {
         guard let index = sessions.firstIndex(where: { $0.id == session.id }) else { return }
         session.panes.terminals.forEach { $0.close() }

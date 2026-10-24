@@ -507,11 +507,14 @@ final class RemoteBridge: ObservableObject {
 
     // MARK: New sessions
 
-    /// The folders a session is open in, its repository's when it has one, then the home folder, where a new tab opens anyway.
+    /// The folders a session is open in, its repository's when it has one, then repositories sessions were open in before, then the home folder.
     /// Home is there so a phone can open the first session when none is. A phone opens a session in one of these, never any folder on the Mac.
     private var projects: [String] {
         var seen = Set<String>()
-        return (store.ordered.map { $0.repoRoot ?? $0.directory } + [NSHomeDirectory()]).filter { seen.insert($0).inserted }
+        let open = store.ordered.map { $0.repoRoot ?? $0.directory }
+        // A repository moved or deleted since is left out.
+        let recent = store.recentRepos.filter { FileManager.default.fileExists(atPath: $0) }.prefix(8)
+        return (open + recent + [NSHomeDirectory()]).filter { seen.insert($0).inserted }
     }
 
     /// The session each `open` made, so one a phone sends again after a dropped connection is answered and not opened twice.
