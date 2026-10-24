@@ -4,6 +4,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- The phone shows which agent runs in each session and what a waiting one asks, read off its screen for Codex, so you see which session needs what without opening each.
+- Start a task from the phone: write what the agent should do in New session, and it starts on a branch of its own, in a new worktree.
+
 ## [0.49.0] - 2026-10-24
 
 Agents that see Farol's sessions, hand work to each other and wait for the answer.
