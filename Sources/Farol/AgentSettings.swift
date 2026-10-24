@@ -18,6 +18,8 @@ final class AgentSettings: ObservableObject {
     /// Typed into the shell of each new session, for example "claude". Empty starts a plain shell.
     @Published var startCommand: String { didSet { Self.defaults.set(startCommand, forKey: "agents.startCommand") } }
     @Published var resume: Bool { didSet { Self.defaults.set(resume, forKey: Self.resumeKey) } }
+    /// Lets an agent start tasks and type to other agents with `farol task` and `farol send`. Off until turned on, since one agent then acts on others.
+    @Published var agentControl: Bool { didSet { Self.defaults.set(agentControl, forKey: "agents.control") } }
 
     /// Also read by the session store at launch.
     static let resumeKey = "agents.resume"
@@ -36,5 +38,6 @@ final class AgentSettings: ObservableObject {
         resume = Self.defaults.bool(forKey: Self.resumeKey)
         remote = Self.defaults.bool(forKey: RemoteBridge.enabledKey)
         remoteKeepAwake = Self.defaults.bool(forKey: "remote.keepAwake")
+        agentControl = Self.defaults.bool(forKey: "agents.control")
     }
 }

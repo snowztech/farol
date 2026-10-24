@@ -12,9 +12,12 @@ ask is the hook for an agent's question tool. It shows the question in Farol and
 If Farol can't answer, it prints nothing, and the agent asks in the terminal as usual.
 
 Outside Farol both do nothing, so hooks that call them are safe in any terminal.
+
+\(Control.usage)
 """
 
 let arguments = Array(CommandLine.arguments.dropFirst())
+if let name = arguments.first, ControlCommand.names.contains(name) { Control.run(arguments) }
 let isAsk = arguments == ["ask"]
 guard isAsk || (arguments.count == 2 && arguments[0] == "status") else {
     print(usage)

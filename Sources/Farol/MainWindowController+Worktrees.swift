@@ -101,20 +101,9 @@ extension MainWindowController {
 
     /// One repo gets a plain worktree. Several get a task folder with a worktree of each.
     private func startWorktreeSession(branch: String, from repos: [String], run command: String?, environment: [String: String] = [:]) {
-        let copyEnvironmentFiles = worktreeSettings.copyEnvironmentFiles
-        // Checking out a big repo can take a moment, so keep it off the main thread.
-        DispatchQueue.global(qos: .userInitiated).async {
-            let result = Result {
-                repos.count == 1
-                    ? try Worktrees.default.create(branch: branch, from: repos[0], copyEnvironmentFiles: copyEnvironmentFiles)
-                    : try TaskFolders.default.create(branch: branch, repos: repos, copyEnvironmentFiles: copyEnvironmentFiles)
-            }
-            DispatchQueue.main.async { [weak self] in
-                switch result {
-                case .success(let path): self?.store.create(directory: path, run: command, environment: environment)
-                case .failure(let error): self?.showError("Couldn't create the worktree", "\(error)")
-                }
-            }
+        store.createWorktreeSession(branch: branch, from: repos, run: command, environment: environment,
+                                    copyEnvironmentFiles: worktreeSettings.copyEnvironmentFiles) { [weak self] result in
+            if case .failure(let error) = result { self?.showError("Couldn't create the worktree", "\(error)") }
         }
     }
 

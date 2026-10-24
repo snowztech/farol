@@ -264,6 +264,13 @@ struct SettingsPage: View {
         GroupTitle(title: "Status", palette: p)
         ForEach(Array(agentSetups.enumerated()), id: \.element.id) { agentRow($0.element, in: agentFolders[$0.offset], p) }
 
+        GroupTitle(title: "Agents working together", palette: p)
+        Row(title: "Let agents start tasks and message sessions",
+            detail: "Any agent in Farol can list the sessions with farol sessions, wait for one and read what it said. With this on, it can also start a task in a new worktree with farol task, and type to another agent with farol send.",
+            palette: p) {
+            toggle($agents.agentControl)
+        }
+
         GroupTitle(title: "When Farol opens", palette: p)
         Row(title: "Resume agent conversations",
             detail: "Agents that were running when Farol quit pick up where they left off, in the same panes. Needs the agent connected above.",

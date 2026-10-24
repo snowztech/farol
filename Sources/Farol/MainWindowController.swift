@@ -64,6 +64,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var notchPlace: AnyCancellable?
     private var sessionsChange: AnyCancellable?
     private(set) lazy var remote = RemoteBridge(store: store)
+    private lazy var control = AgentControl(store: store, agents: agents, worktrees: worktreeSettings)
     private var remoteSwitch: AnyCancellable?
     private var awakeSwitch: AnyCancellable?
 
@@ -249,6 +250,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         store.onTerminalCreated = { [weak self] in self?.configure($0) }
         store.onPaneExit = { [weak self] in self?.paneExited($1, in: $0) }
         runtime.onRequest = { [weak self] in self?.handle($0) }
+        store.onControl = { [weak self] in self?.control.handle($0, $1) }
         store.onActivityChange = { [weak self] session, before, after in
             guard let self else { return }
             notifier.activityChanged(session, from: before, to: after)

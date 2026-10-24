@@ -7,9 +7,9 @@ final class PendingAsk {
     let id = UUID()
     let pane: UUID
     let questions: [AgentQuestion]
-    let connection: AskConnection
+    let connection: HeldConnection
 
-    init(pane: UUID, questions: [AgentQuestion], connection: AskConnection) {
+    init(pane: UUID, questions: [AgentQuestion], connection: HeldConnection) {
         self.pane = pane
         self.questions = questions
         self.connection = connection

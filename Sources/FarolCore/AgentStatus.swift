@@ -106,7 +106,9 @@ public final class StatusServer {
     public let path: String
     public var onMessage: ((StatusMessage) -> Void)?
     /// A question the agent is blocked on. The connection stays open until it is answered.
-    public var onAsk: ((AskMessage, AskConnection) -> Void)?
+    public var onAsk: ((AskMessage, HeldConnection) -> Void)?
+    /// A `farol` command run by an agent or a person, answered once on the same connection.
+    public var onControl: ((ControlRequest, HeldConnection) -> Void)?
 
     private let delivery: DispatchQueue
     private let queue = DispatchQueue(label: "dev.farol.status")
@@ -170,9 +172,16 @@ public final class StatusServer {
         let lines = data.split(separator: UInt8(ascii: "\n"))
 
         if let line = lines.first, let ask = try? JSONDecoder().decode(AskMessage.self, from: Data(line)) {
-            let connection = AskConnection(descriptor: client, deliverOn: delivery)
+            let connection = HeldConnection(descriptor: client, deliverOn: delivery)
             delivery.async { [weak self] in
                 if let handler = self?.onAsk { handler(ask, connection) } else { connection.reply(AskReply()) }
+            }
+            return
+        }
+        if let line = lines.first, let request = try? JSONDecoder().decode(ControlRequest.self, from: Data(line)) {
+            let connection = HeldConnection(descriptor: client, deliverOn: delivery)
+            delivery.async { [weak self] in
+                if let handler = self?.onControl { handler(request, connection) } else { connection.reply(ControlReply.failed("Farol is not ready yet.")) }
             }
             return
         }
@@ -184,8 +193,9 @@ public final class StatusServer {
     }
 }
 
-/// The open end of a question, answered once. Closing it without answers sends the agent back to its own prompt.
-public final class AskConnection: @unchecked Sendable {
+/// The open end of a request, like a question or a `farol` command, answered once.
+/// Closing a question without answers sends the agent back to its own prompt.
+public final class HeldConnection: @unchecked Sendable {
     private let descriptor: Int32
     private let delivery: DispatchQueue
     private let lock = NSLock()
@@ -219,7 +229,7 @@ public final class AskConnection: @unchecked Sendable {
         source.resume()
     }
 
-    public func reply(_ reply: AskReply) {
+    public func reply<Reply: Encodable>(_ reply: Reply) {
         lock.lock()
         defer { lock.unlock() }
         guard !finished else { return }
@@ -266,6 +276,16 @@ public enum StatusClient {
 extension StatusClient {
     /// Sends a question and waits as long as it takes for the answer. Nil when Farol closes without one.
     public static func ask(_ message: AskMessage, to path: String) throws -> AskReply? {
+        try request(message, as: AskReply.self, to: path)
+    }
+
+    /// Sends a `farol` command and waits for Farol's answer, which can be a long list or a long message.
+    public static func control(_ request: ControlRequest, to path: String) throws -> ControlReply? {
+        try self.request(request, as: ControlReply.self, to: path, limit: 8 << 20)
+    }
+
+    /// One line out, then the first line back, decoded. Nil when Farol closes without answering.
+    static func request<Message: Encodable, Reply: Decodable>(_ message: Message, as: Reply.Type, to path: String, limit: Int = 64 * 1024) throws -> Reply? {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { throw posixError("socket") }
         defer { close(fd) }
@@ -280,13 +300,13 @@ extension StatusClient {
 
         var data = Data()
         var buffer = [UInt8](repeating: 0, count: 4096)
-        while data.count < 64 * 1024 {
+        while data.count < limit {
             let count = read(fd, &buffer, buffer.count)
             guard count > 0 else { break }
             data.append(contentsOf: buffer[0..<count])
             if buffer[0..<count].contains(UInt8(ascii: "\n")) { break }
         }
-        return data.split(separator: UInt8(ascii: "\n")).first.flatMap { try? JSONDecoder().decode(AskReply.self, from: Data($0)) }
+        return data.split(separator: UInt8(ascii: "\n")).first.flatMap { try? JSONDecoder().decode(Reply.self, from: Data($0)) }
     }
 }
 

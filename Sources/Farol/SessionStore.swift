@@ -159,6 +159,15 @@ final class Session: ObservableObject, Identifiable {
         return .idle
     }
 
+    /// A pane as it shows on its own, to a phone or an agent. A tab of one pane is the tab, as the sidebar shows it.
+    func status(of terminal: TerminalView) -> Activity {
+        panes.terminals.count == 1 ? activity : activity(of: terminal.id)
+    }
+
+    func label(of terminal: TerminalView) -> String {
+        panes.terminals.count == 1 ? displayName : name(of: terminal)
+    }
+
     /// An agent runs in the pane, from its first report until it ends. Before its first message it may have no log yet.
     func agentRuns(in pane: UUID) -> Bool { agents[pane]?.reports == true }
 
@@ -295,6 +304,8 @@ final class SessionStore: ObservableObject {
     var onActivityChange: ((Session, Session.Activity, Session.Activity) -> Void)?
     /// An agent asked a question that Farol can answer.
     var onAsk: ((Session) -> Void)?
+    /// A `farol` command from an agent or a terminal, answered on its connection.
+    var onControl: ((ControlRequest, HeldConnection) -> Void)?
     /// The question is over: answered, handed back to the terminal, or the agent went on without it.
     var onAskEnd: ((Session) -> Void)?
 
@@ -309,6 +320,10 @@ final class SessionStore: ObservableObject {
         statusServer = StatusServer(path: socketPath)
         statusServer.onMessage = { [weak self] in self?.receive($0) }
         statusServer.onAsk = { [weak self] in self?.receiveAsk($0, $1) }
+        statusServer.onControl = { [weak self] request, connection in
+            guard let handler = self?.onControl else { return connection.reply(ControlReply.failed("Farol is not ready yet.")) }
+            handler(request, connection)
+        }
         do {
             try statusServer.start()
         } catch {
@@ -332,6 +347,8 @@ final class SessionStore: ObservableObject {
             "FAROL_PANE": id.uuidString,
             "FAROL_SOCKET": statusServer.path,
             "FAROL_CLI": cliPath,
+            // So `farol sessions` and the rest work as typed, by people and agents alike.
+            "PATH": ((cliPath as NSString).deletingLastPathComponent) + ":" + (ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"),
         ].merging(environment) { $1 }, input: command.isEmpty ? nil : command + "\n")
     }
 
@@ -385,7 +402,7 @@ final class SessionStore: ObservableObject {
         save()
     }
 
-    private func receiveAsk(_ message: AskMessage, _ connection: AskConnection) {
+    private func receiveAsk(_ message: AskMessage, _ connection: HeldConnection) {
         guard let pane = UUID(uuidString: message.pane),
               let session = sessions.first(where: { $0.panes.terminals.contains { $0.id == pane } }) else { return connection.reply(AskReply()) }
         // A new question replaces one the agent has already moved past.
@@ -446,9 +463,27 @@ final class SessionStore: ObservableObject {
 
     /// `run` is typed into the new shell, for example "claude" to start an agent right away.
     /// `environment` holds what is too long to type, which `run` can name as a variable.
+    /// `select` false opens it in the sidebar without leaving the session on screen, as a task an agent starts does.
     @discardableResult
-    func create(directory: String = NSHomeDirectory(), run: String? = nil, environment: [String: String] = [:]) -> Session {
-        create(PaneContainer(makeTerminal(in: directory, run: run, environment: environment)), directory: directory)
+    func create(directory: String = NSHomeDirectory(), run: String? = nil, environment: [String: String] = [:], select: Bool = true) -> Session {
+        create(PaneContainer(makeTerminal(in: directory, run: run, environment: environment)), directory: directory, select: select)
+    }
+
+    /// A session in a new worktree on `branch`: a plain worktree for one repo, a task folder with a worktree of each for several.
+    /// Checking out a big repo takes a moment, so git runs off the main thread, and `done` is called on it.
+    func createWorktreeSession(branch: String, from repos: [String], run command: String?, environment: [String: String] = [:],
+                               copyEnvironmentFiles: Bool, select: Bool = true, done: @escaping (Result<Session, Error>) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = Result {
+                repos.count == 1
+                    ? try Worktrees.default.create(branch: branch, from: repos[0], copyEnvironmentFiles: copyEnvironmentFiles)
+                    : try TaskFolders.default.create(branch: branch, repos: repos, copyEnvironmentFiles: copyEnvironmentFiles)
+            }
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                done(result.map { self.create(directory: $0, run: command, environment: environment, select: select) })
+            }
+        }
     }
 
     /// An empty name goes back to the automatic one.
@@ -466,7 +501,7 @@ final class SessionStore: ObservableObject {
         save()
     }
 
-    private func create(_ panes: PaneContainer, directory: String) -> Session {
+    private func create(_ panes: PaneContainer, directory: String, select: Bool = true) -> Session {
         let session = Session(panes: panes, directory: directory)
         panes.terminals.forEach { wire($0, to: session) }
         panes.onFocusChange = { [weak self, weak session] in
@@ -491,7 +526,7 @@ final class SessionStore: ObservableObject {
 
         sessions.append(session)
         onSessionCreated?(session)
-        select(session)
+        if select { self.select(session) }
         return session
     }
 
