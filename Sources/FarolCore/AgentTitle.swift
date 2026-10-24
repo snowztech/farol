@@ -6,6 +6,8 @@ public enum AgentTitle {
     private static let codexSpinners = Set("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")
     /// What Codex puts first while it waits on you, blinking between the two.
     private static let codexWaiting = ["[ ! ] Action Required", "[ . ] Action Required"]
+    /// What OpenCode puts before its session's title, as in "OC | Fix the login bug".
+    private static let prefixes = codexWaiting + ["OC"]
 
     /// Codex's interactive TUI does not run lifecycle hooks, but it does report the same states in its terminal title.
     public static func event(from previous: String, to current: String) -> AgentEvent? {
@@ -30,7 +32,7 @@ public enum AgentTitle {
         // Padded so a joiner at the very start, as in "| farol", is found too.
         var parts = [" " + text + " "]
         for joiner in joiners { parts = parts.flatMap { $0.components(separatedBy: joiner) } }
-        return parts.map { $0.trimmingCharacters(in: .whitespaces) }.first { !$0.isEmpty && !codexWaiting.contains($0) } ?? ""
+        return parts.map { $0.trimmingCharacters(in: .whitespaces) }.first { !$0.isEmpty && !prefixes.contains($0) } ?? ""
     }
 
     private static func codexStatus(_ title: String) -> AgentStatus? {
