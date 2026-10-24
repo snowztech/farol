@@ -28,7 +28,7 @@ public struct AgentSkill {
     static let text = """
     ---
     name: farol
-    description: Farol terminal settings. Use when the user asks to change a terminal setting such as the theme, the font or a shortcut, to add a theme, where a Farol setting lives, or how Farol works, like tasks, worktrees, agent status, review or answering agents from the phone.
+    description: Farol terminal settings and sessions. Use when the user asks to change a terminal setting such as the theme, the font or a shortcut, to add a theme, where a Farol setting lives, or how Farol works, like tasks, worktrees, agent status, review or answering agents from the phone. Also use to see Farol's other sessions, to hand part of the work to another agent in its own worktree, to message another agent, or to wait for one.
     ---
 
     # Farol
@@ -67,6 +67,22 @@ public struct AgentSkill {
     ## Agent status
 
     Claude Code and Codex report working, waiting and done through the hooks that Settings → Agents adds. Any other agent or script in a Farol session can report with `"$FAROL_CLI" status working`, `waiting`, `done` or `clear`. `$FAROL_CLI` is unset outside Farol. A session that stays idle usually needs its agent connected in Settings → Agents, then restarted.
+
+    ## Other sessions and agents
+
+    The `farol` command, in every Farol pane, drives Farol. Where `farol` is not found, `"$FAROL_CLI"` is the same command.
+
+    - `farol sessions` lists the sessions: id, status, name, agent and branch, and what one that waits asks. `(you)` marks your own. `--json` gives every field.
+    - `farol task <what to do> [--agent claude|codex] [--repo <folder>]` starts an agent on the task in a new worktree of this repository, on a new branch, and prints its session. It opens beside the user's, without taking their window.
+    - `farol wait <session>` returns once that session's agent is done or needs someone, after 9 minutes at most. Exit code 2 means it still works: run it again.
+    - `farol read <session>` prints its agent's last message.
+    - `farol send <session> <message>` types a message to its agent. Farol refuses one that waits for someone, since that answer is the user's.
+
+    A session is its id, the start of it, or its name. `task` and `send` work once the user turns on Settings → Agents → Let agents start tasks and message sessions. Until then they say so: tell the user.
+
+    Codex runs commands in a sandbox that cannot reach Farol. Run `farol` with escalated permissions, so Codex asks the user, who can allow every command that starts with `farol` at once.
+
+    Split work this way only when the user asks for work to be split up, run in parallel or handed off. Start the tasks, wait for each, read what it did, then point the user to its branch to review.
 
     ## Shortcuts
 

@@ -141,6 +141,22 @@ These hooks complement the terminal-title status used by interactive Codex sessi
 
 </details>
 
+## Agents working together
+
+An agent in Farol can see the other sessions and, when you let it, hand work to another agent. The `farol` command is in every Farol pane:
+
+```sh
+farol sessions                       # each session: id, status, name, agent, branch, and what one that waits asks
+farol task add a search box --agent codex   # a new agent on the task, in its own worktree and branch
+farol wait 8f3b99d0                  # returns once that agent is done or needs someone
+farol read 8f3b99d0                  # its last message
+farol send 8f3b99d0 run the tests    # types a message to it, as you would
+```
+
+A session is its id, the start of it, or its name. `--json` gives a program every field. Reading is always allowed. Starting tasks and sending messages need **Settings → Agents → Let agents start tasks and message sessions**, since one agent then acts on others. Farol never types into a session that waits for someone, since that answer is yours, and a task opens beside the session you are in without taking the window.
+
+The skill Farol adds when you connect an agent teaches it these commands, so you can say "split this into two tasks and review what each did". Codex runs its commands in a sandbox that cannot reach Farol, so it asks you before running `farol`. Allow commands that start with `farol` once and it stops asking.
+
 ## From your phone
 
 Farol for iPhone, in beta on [TestFlight](https://farol.sh/iphone), lets you answer your agents when you are away from the Mac. In Farol, open Settings → Remote, turn it on, press **Show code** and scan it from the app.

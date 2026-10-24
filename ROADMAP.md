@@ -75,9 +75,11 @@ An agent running in Farol can change Farol when you ask, so you stay in the conv
 - [x] A skill for Claude Code and Codex, installed with Connect, that tells the agent where the config is and what it can change
 - [x] Config errors shown in Farol, when the file is saved and in Settings
 - [ ] A `settings` file for Farol's own preferences and shortcuts, next to `config`, which stays libghostty's. One table in `FarolCore` defines every setting, and the settings page, the menu, the errors and the skill all read from it. Worth doing once the preferences outgrow a handful, or someone asks to rebind Farol's shortcuts
-- [ ] `farol sessions`: the sessions with their branch, folder and status, so an agent can tell which one is waiting
-- [ ] `farol task`: a task started in a new worktree session from the command line, so one agent can hand work to another
-- [ ] The `farol` command working from Codex, which runs its commands without Farol's environment
+- [x] `farol sessions`: the sessions with their branch, folder and status, so an agent can tell which one is waiting
+- [x] `farol task`: a task started in a new worktree session from the command line, so one agent can hand work to another
+- [x] `farol wait`, `read` and `send`: wait for another agent, read its answer, and message it, behind a setting since one agent then acts on others
+- [x] The `farol` command working from Codex, which passes Farol's environment and asks before leaving its sandbox to reach Farol
+- [ ] An agent's own sub-agents as sessions, so a task it splits shows in the sidebar and on the phone
 - [ ] Claude Code and Codex conversations resumed when Farol restores a session. The hooks already receive the session id, so Farol keeps it and restarts the agent on that conversation (`claude --resume`, `codex resume`)
 
 ## Speed and upkeep

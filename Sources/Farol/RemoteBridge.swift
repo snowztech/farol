@@ -826,7 +826,7 @@ final class RemoteBridge: ObservableObject {
         // The pane that asks or is done, which is the session a phone opens.
         let panes = session.panes.terminals
         let pane = panes.count == 1 ? panes[0] : panes.first { session.activity(of: $0.id) == after } ?? session.panes.focused
-        let name = panes.count == 1 ? session.displayName : session.name(of: pane)
+        let name = session.label(of: pane)
         for target in pushTargets where target.notices?.contains(notice) ?? true {
             let sealed = target.key.flatMap {
                 NoticeBox.seal(RemoteNoticeContent(session: pane.id, name: name, notice: notice), key: $0)
@@ -868,9 +868,8 @@ final class RemoteBridge: ObservableObject {
         store.ordered.flatMap { session in
             let panes = session.panes.terminals
             return panes.map { pane in
-                let activity = panes.count == 1 ? session.activity : session.activity(of: pane.id)
-                return RemoteSession(id: pane.id, name: panes.count == 1 ? session.displayName : session.name(of: pane),
-                                     branch: session.branch, status: RemoteStatus(rawValue: "\(activity)") ?? .idle)
+                RemoteSession(id: pane.id, name: session.label(of: pane), branch: session.branch,
+                              status: RemoteStatus(rawValue: "\(session.status(of: pane))") ?? .idle)
             }
         }
     }
