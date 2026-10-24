@@ -93,30 +93,18 @@ final class AgentControl {
             return connection.reply(ControlReply.failed(agent.map { "No agent is called \($0). Use claude or codex, connected in Settings → Agents." }
                 ?? "Connect Claude Code or Codex in Settings → Agents first."))
         }
-        // Git is asked off the main thread, as the New Task sheet does.
-        reading.async { [weak self] in
-            guard let root = Git.repoRoot(of: directory) else {
-                return connection.reply(ControlReply.failed("\(directory) is not in a git repository."))
-            }
-            let branch = NewTask.freeBranch(for: text) { Git.hasBranch($0, in: root) }
-            DispatchQueue.main.async {
-                guard let self else { return }
-                // Opened beside the one on screen, so an agent's task never takes the window from you.
-                self.store.createWorktreeSession(branch: branch, from: [root], run: folder.command() + " \"$\(NewTask.variable)\"",
-                                                 environment: [NewTask.variable: text], copyEnvironmentFiles: self.worktrees.copyEnvironmentFiles,
-                                            select: false) { result in
-                    switch result {
-                    case .success(let session):
-                        let pane = session.panes.focused
-                        self.told[pane.id] = .now
-                        // Its branch is known here, before the session has asked git.
-                        var started = self.info(session, pane, caller: caller)
-                        started.branch = started.branch ?? branch
-                        connection.reply(ControlReply(session: started))
-                    case .failure(let error):
-                        connection.reply(ControlReply.failed("Farol could not create the worktree: \(error)"))
-                    }
-                }
+        // Opened beside the one on screen, so an agent's task never takes the window from you.
+        store.startTask(text, in: directory, with: folder, copyEnvironmentFiles: worktrees.copyEnvironmentFiles, select: false) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success(let (session, branch)):
+                let pane = session.panes.focused
+                told[pane.id] = .now
+                var started = info(session, pane, caller: caller)
+                started.branch = started.branch ?? branch
+                connection.reply(ControlReply(session: started))
+            case .failure(let error):
+                connection.reply(ControlReply.failed("Farol could not start the task: \(error)"))
             }
         }
     }

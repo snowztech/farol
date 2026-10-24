@@ -493,6 +493,25 @@ final class SessionStore: ObservableObject {
         create(PaneContainer(makeTerminal(in: directory, run: run, environment: environment)), directory: directory, select: select)
     }
 
+    /// An agent on `task` in a new worktree of the repository `directory` is in, on a branch no other has, with the task as its first prompt.
+    /// What an agent's `farol task` and the phone start. The New Task sheet asks for its branch and repos itself.
+    /// `done` gets the session and its branch, which the session itself learns only once git answers.
+    func startTask(_ task: String, in directory: String, with agent: AgentFolder, copyEnvironmentFiles: Bool, select: Bool,
+                   done: @escaping (Result<(session: Session, branch: String), Error>) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard let root = Git.repoRoot(of: directory) else {
+                return DispatchQueue.main.async { done(.failure(GitError(description: "\(directory) is not in a git repository."))) }
+            }
+            let branch = NewTask.freeBranch(for: task) { Git.hasBranch($0, in: root) }
+            DispatchQueue.main.async { [weak self] in
+                self?.createWorktreeSession(branch: branch, from: [root], run: agent.command() + " \"$\(NewTask.variable)\"",
+                                            environment: [NewTask.variable: task], copyEnvironmentFiles: copyEnvironmentFiles, select: select) {
+                    done($0.map { ($0, branch) })
+                }
+            }
+        }
+    }
+
     /// A session in a new worktree on `branch`: a plain worktree for one repo, a task folder with a worktree of each for several.
     /// Checking out a big repo takes a moment, so git runs off the main thread, and `done` is called on it.
     func createWorktreeSession(branch: String, from repos: [String], run command: String?, environment: [String: String] = [:],

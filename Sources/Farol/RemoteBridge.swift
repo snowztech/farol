@@ -32,6 +32,7 @@ final class RemoteBridge: ObservableObject {
     @Published private(set) var ownRelay = UserDefaults.standard.string(forKey: RemoteBridge.relayKey)
 
     private let store: SessionStore
+    private let worktrees: WorktreeSettings
     private var key: DeviceKey?
     private var connection: RelayConnection?
     private var phones: [UInt32: Phone] = [:] {
@@ -113,8 +114,9 @@ final class RemoteBridge: ObservableObject {
     /// The logs phones read, watched so a change is read when the agent writes and nothing is done while it does not.
     private var logWatches: [String: DispatchSourceFileSystemObject] = [:]
 
-    init(store: SessionStore) {
+    init(store: SessionStore, worktrees: WorktreeSettings) {
         self.store = store
+        self.worktrees = worktrees
         if let saved = UserDefaults.standard.data(forKey: Self.devicesKey) {
             devices = (try? JSONDecoder().decode([PairedDevice].self, from: saved)) ?? []
         }
@@ -377,9 +379,8 @@ final class RemoteBridge: ObservableObject {
             changes(command, in: session, from: id)
         case .diff(let session, let path):
             diff(command, of: path, in: session, from: id)
-        case .task:
-            // Starting a task in a new worktree from the phone, which this version does not do. The phone is told so, and says to update.
-            tell(.refused(command: command.id, reason: "This version of Farol cannot start tasks from the phone."), id)
+        case .task(let project, let agent, let text):
+            task(command, in: project, with: agent, text: text, from: id)
         case .history(let session):
             // Read once, when the phone asks. Reading it on every change would cost the Mac for something rarely looked at.
             guard let terminal = pane(session)?.terminal else { return }
@@ -527,6 +528,34 @@ final class RemoteBridge: ObservableObject {
         opened[command.id] = pane
         tell(.opened(command: command.id, session: pane), id)
         tick()
+    }
+
+    /// Tasks the phone sent whose worktree is still being made, so one sent again meanwhile is not started twice.
+    private var startingTasks: Set<UUID> = []
+
+    /// A task from the phone: an agent on the words in a worktree of the project, on a branch of its own, answered like `open`.
+    /// It opens beside the session on screen, since whoever sends it is away from the Mac.
+    private func task(_ command: RemoteCommand, in project: String, with agent: String, text: String, from id: UInt32) {
+        if let session = opened[command.id] { return tell(.opened(command: command.id, session: session), id) }
+        guard !startingTasks.contains(command.id) else { return }
+        let words = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard projects.contains(project), let folder = AgentFolder.find().first(where: { $0.id == agent }), !words.isEmpty else {
+            return tell(.refused(command: command.id, reason: "The Mac could not start that task. Pick the project again and retry."), id)
+        }
+        startingTasks.insert(command.id)
+        store.startTask(words, in: project, with: folder, copyEnvironmentFiles: worktrees.copyEnvironmentFiles, select: false) { [weak self] result in
+            guard let self else { return }
+            startingTasks.remove(command.id)
+            switch result {
+            case .success(let (session, _)):
+                let pane = session.panes.focused.id
+                opened[command.id] = pane
+                tell(.opened(command: command.id, session: pane), id)
+                tick()
+            case .failure(let error):
+                tell(.refused(command: command.id, reason: "The Mac could not start the task: \(error)"), id)
+            }
+        }
     }
 
     /// Closes a split pane, or a session as its tab's close button would, but never the last one: closing that quits Farol, and the phone with it.
