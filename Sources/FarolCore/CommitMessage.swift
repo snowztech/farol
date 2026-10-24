@@ -10,13 +10,14 @@ public enum CommitMessage {
     /// `started` gets the process, to stop it when the sheet closes.
     public static func generate(with agent: AgentFolder, paths: [String]?, in directory: String,
                                 started: (Process) -> Void = { _ in }) throws -> String {
+        guard let arguments = arguments(for: agent.kind) else { throw GitError(description: "\(agent.kind.title) can't write commit messages yet.") }
         guard let executable = agent.kind.executable else {
             throw GitError(description: "\(agent.kind.title) isn't installed.")
         }
         let diff = try self.diff(of: paths, in: directory)
         guard !diff.isEmpty else { throw GitError(description: "There is nothing to describe.") }
         let recent = (try? Git.run(["log", "-n", "20", "--format=%s"], in: directory))?.split(separator: "\n").map(String.init) ?? []
-        let reply = try run(executable, arguments(for: agent.kind), input: prompt(diff: diff, recent: recent),
+        let reply = try run(executable, arguments, input: prompt(diff: diff, recent: recent),
                             environment: environment(for: agent), in: directory, started: started)
         let message = cleaned(reply)
         guard !message.isEmpty else { throw GitError(description: "\(agent.label) didn't answer.") }
@@ -70,7 +71,8 @@ public enum CommitMessage {
         return message
     }
 
-    static func arguments(for kind: AgentFolder.Kind) -> [String] {
+    /// Nil for an agent whose one-shot mode Farol hasn't tried without tools yet.
+    public static func arguments(for kind: AgentFolder.Kind) -> [String]? {
         switch kind {
         // The prompt comes on stdin. No tools and no saved session: one answer, nothing left behind.
         // Hooks and MCP servers are off too, yours and the repo's, while CLAUDE.md is still read.
@@ -78,6 +80,7 @@ public enum CommitMessage {
                        "--no-session-persistence", "--output-format", "text"]
         // ponytail: not tried against a real Codex yet. "-" reads the prompt from stdin, read-only keeps it from editing.
         case .codex: ["exec", "--sandbox", "read-only", "--skip-git-repo-check", "-"]
+        case .opencode, .pi: nil
         }
     }
 

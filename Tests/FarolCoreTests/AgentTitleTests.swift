@@ -9,6 +9,7 @@ import Testing
 /// Codex titles are "<conversation> | <project>", and the first part is empty until the conversation has a name.
 @Test func keepsOnlyTheFirstPart() {
     #expect(AgentTitle.withoutStatus("Design codebase | farol") == "Design codebase")
+    #expect(AgentTitle.withoutStatus("OC | Echo a test command") == "Echo a test command")
     #expect(AgentTitle.withoutStatus(" | farol") == "farol")
     #expect(AgentTitle.withoutStatus("⠋ | farol") == "farol")
     #expect(AgentTitle.withoutStatus("Fix login · api") == "Fix login")

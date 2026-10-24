@@ -6,6 +6,8 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
+- OpenCode and Pi connect in Settings → Agents, like Claude Code and Codex. OpenCode says when it works, finishes or asks for a permission or an answer, and Pi says when it works and finishes. The phone reads Pi's conversation.
+- Any agent can say what it waits on and which conversation it is in: `farol status waiting --asking "npm test" --tool Bash`, or `--session` and `--log`. The README shows how.
 - A notification for an agent that waits on you says what it asks, and so does the Live Activity on the lock screen.
 
 ## [0.50.0] - 2026-10-24

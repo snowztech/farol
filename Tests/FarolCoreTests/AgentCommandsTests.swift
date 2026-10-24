@@ -73,3 +73,16 @@ private func home(_ files: [String: String]) throws -> URL {
     #expect(names.contains("farol"))
     #expect(names.contains("clear"))
 }
+
+@Test func piAndOpenCodeListWhatYouWrote() throws {
+    let home = try home([
+        ".pi/agent/prompts/review.md": "---\ndescription: Review the diff\n---\n",
+        ".pi/agent/skills/farol/SKILL.md": "---\nname: farol\ndescription: Farol terminal settings\n---\n",
+        ".config/opencode/command/ship.md": "Push and open a pull request.",
+        "shelf/.opencode/commands/release.md": "Cut a release.",
+    ])
+    let pi = AgentCommands.list(log: nil, agent: .pi, project: nil, home: home)
+    #expect(pi.map(\.name) == ["review", "skill:farol"])
+    let opencode = AgentCommands.list(log: nil, agent: .opencode, project: home.appendingPathComponent("shelf").path, home: home)
+    #expect(opencode.map(\.name) == ["release", "ship"])
+}

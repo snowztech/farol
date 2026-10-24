@@ -119,3 +119,22 @@ final class Listening {
     #expect(StatusMessage.prompt(hookInput: prompt) == "fix the flaky test")
     #expect(StatusMessage.prompt(hookInput: Data(#"{"hook_event_name":"Stop","prompt":"x"}"#.utf8)) == nil)
 }
+
+@Test func anyAgentSaysWhatItAsksWithFlags() throws {
+    let waiting = try #require(StatusMessage(pane: "p", arguments: ["waiting", "--asking", " Run npm test? ", "--tool", "Bash"], hookInput: nil))
+    #expect(waiting.event == .waiting && waiting.request?.title == "Run npm test?" && waiting.request?.tool == "Bash")
+    #expect(waiting.request?.summary() == "Bash · Run npm test?")
+    let started = try #require(StatusMessage(pane: "p", arguments: ["start", "--session", "019d", "--log", "/h/.pi/agent/sessions/a/b.jsonl"], hookInput: nil))
+    #expect(started.conversation == AgentConversation(id: "019d", log: "/h/.pi/agent/sessions/a/b.jsonl"))
+    #expect(StatusMessage(pane: "p", arguments: ["working", "--prompt", "fix it"], hookInput: nil)?.prompt == "fix it")
+    // What it asks only counts while it waits, and a conversation needs both its id and its log.
+    #expect(StatusMessage(pane: "p", arguments: ["done", "--asking", "x"], hookInput: nil)?.request == nil)
+    #expect(StatusMessage(pane: "p", arguments: ["start", "--session", "019d"], hookInput: nil)?.conversation == nil)
+    #expect(StatusMessage(pane: "p", arguments: ["working", "--asking"], hookInput: nil) == nil)
+    #expect(StatusMessage(pane: "p", arguments: ["working", "--color", "red"], hookInput: nil) == nil)
+    #expect(StatusMessage(pane: "p", arguments: ["sleeping"], hookInput: nil) == nil)
+    // Claude Code's hooks keep working through their input.
+    let hook = Data(#"{"hook_event_name":"UserPromptSubmit","prompt":"from the hook","session_id":"s","transcript_path":"/t.jsonl"}"#.utf8)
+    let claude = StatusMessage(pane: "p", arguments: ["working"], hookInput: hook)
+    #expect(claude?.prompt == "from the hook" && claude?.conversation == AgentConversation(id: "s", log: "/t.jsonl"))
+}

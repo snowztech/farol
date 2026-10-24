@@ -224,3 +224,21 @@ private let codexLog = [
     let claude = ClaudeLog.tool("AskUserQuestion", ["questions": [["question": "Which approach?", "options": [["label": "Small"], ["label": "Rewrite"]]]]], in: nil, id: "a1.0")
     #expect(claude.text == "Which approach?" && claude.tool == "Question")
 }
+
+@Test func readsAPiConversation() throws {
+    let transcript = Transcript(url: try file([
+        #"{"type":"session","version":3,"id":"019d","timestamp":"2026-05-03T15:04:12Z","cwd":"/h/app"}"#,
+        #"{"type":"model_change","id":"a1","parentId":null,"provider":"anthropic","modelId":"m"}"#,
+        #"{"type":"message","id":"u1","parentId":"a1","message":{"role":"user","content":[{"type":"text","text":"fix the test"}]}}"#,
+        #"{"type":"message","id":"m1","parentId":"u1","message":{"role":"assistant","content":[{"type":"thinking","thinking":"hm"},{"type":"text","text":"Looking."},{"type":"toolCall","id":"t1","name":"bash","arguments":{"command":"npm test\nnpm run lint"}},{"type":"toolCall","id":"t2","name":"edit","arguments":{"path":"/h/app/src/a.ts","edits":[{"oldText":"a","newText":"b"}]}}]}}"#,
+        #"{"type":"message","id":"r1","parentId":"m1","message":{"role":"toolResult","toolCallId":"t1","toolName":"bash","content":[{"type":"text","text":"1 failed"}],"isError":true}}"#,
+        #"{"type":"message","id":"m2","parentId":"r1","message":{"role":"assistant","content":[{"type":"text","text":"Fixed."},{"type":"toolCall","id":"t3","name":"plan_mode_question","arguments":{"questions":[{"id":"q","header":"Ship","question":"Push it?","options":[{"label":"Yes","description":"Now"}]}]}}]}}"#,
+    ]))
+    transcript.refresh()
+    let messages = transcript.messages
+    #expect(messages.map(\.role) == [.you, .agent, .tool, .tool, .agent, .tool])
+    #expect(messages.map(\.text) == ["fix the test", "Looking.", "npm test", "src/a.ts", "Fixed.", "Push it?"])
+    #expect(messages[5].tool == "Question")
+    #expect(messages[2].tool == "Bash" && messages[2].outcome == .failed && messages[2].detail == "npm test\nnpm run lint")
+    #expect(messages[3].tool == "Edit" && messages[3].detail == "@@\n-a\n+b\n")
+}

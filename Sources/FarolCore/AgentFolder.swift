@@ -1,17 +1,70 @@
 import Foundation
 
-/// One config folder of Claude Code or Codex. Someone with a work and a personal account has several.
+/// One config folder of a coding agent. Someone with a work and a personal account has several.
 public struct AgentFolder: Equatable, Hashable {
+    /// Every agent Farol knows. What differs between them is answered here, so adding one starts with a case.
+    /// The compiler then names each place that has to say how the new agent does it.
     public enum Kind: String, CaseIterable {
-        case claude, codex
+        case claude, codex, opencode, pi
 
-        var title: String { self == .claude ? "Claude Code" : "Codex" }
-        var environmentVariable: String { self == .claude ? "CLAUDE_CONFIG_DIR" : "CODEX_HOME" }
+        var title: String {
+            switch self {
+            case .claude: "Claude Code"
+            case .codex: "Codex"
+            case .opencode: "OpenCode"
+            case .pi: "Pi"
+            }
+        }
+
+        var environmentVariable: String {
+            switch self {
+            case .claude: "CLAUDE_CONFIG_DIR"
+            case .codex: "CODEX_HOME"
+            case .opencode: "OPENCODE_CONFIG_DIR"
+            case .pi: "PI_CODING_AGENT_DIR"
+            }
+        }
+
+        /// Where the agent keeps its config when nothing picks another, from the home folder.
+        var defaultFolder: String {
+            switch self {
+            case .claude: ".claude"
+            case .codex: ".codex"
+            case .opencode: ".config/opencode"
+            case .pi: ".pi/agent"
+            }
+        }
+
         /// The file whose presence says a look-alike folder really is a config folder.
-        var configFile: String { self == .claude ? "settings.json" : "config.toml" }
+        var configFile: String {
+            switch self {
+            case .claude, .pi: "settings.json"
+            case .codex: "config.toml"
+            case .opencode: "opencode.json"
+            }
+        }
+
+        /// Listed before it is set up, as the two agents most people use. The others show once their folder is there.
+        var listedWhenMissing: Bool { self == .claude || self == .codex }
+
+        /// What starts it on a first prompt, as words for a shell.
+        func prompt(_ task: String) -> [String] {
+            (self == .opencode ? ["--prompt"] : []) + [NewTask.shellQuoted(task)]
+        }
+
+        /// What picks a conversation up where it stopped, as words for a shell.
+        func resume(_ id: String) -> [String] {
+            let flag = switch self {
+            case .claude: "--resume"
+            case .codex: "resume"
+            case .opencode, .pi: "--session"
+            }
+            return [flag, NewTask.shellQuoted(id)]
+        }
 
         /// An app opened from the Finder doesn't get the shell's PATH, so the agent is looked for where its installers put it.
-        static let installFolders = [NSHomeDirectory() + "/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", NSHomeDirectory() + "/.claude/local"]
+        static let installFolders = [NSHomeDirectory() + "/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", NSHomeDirectory() + "/.claude/local",
+                                     NSHomeDirectory() + "/.opencode/bin"]
 
         public var executable: String? {
             Self.installFolders.map { "\($0)/\(rawValue)" }.first(where: FileManager.default.isExecutableFile(atPath:))
@@ -27,6 +80,7 @@ public struct AgentFolder: Equatable, Hashable {
     }
 
     /// The folder a conversation's log is in: `<folder>/projects/<project>/<id>.jsonl` for Claude Code, `<folder>/sessions/<y>/<m>/<d>/<file>.jsonl` for Codex.
+    /// Pi writes `<folder>/sessions/<project>/<file>.jsonl`.
     /// Read by position, so a config folder that is itself inside a `projects` or `sessions` folder isn't mistaken for the other agent.
     public init?(log: String) {
         let file = URL(fileURLWithPath: log)
@@ -36,6 +90,8 @@ public struct AgentFolder: Equatable, Hashable {
             self.init(kind: .claude, directory: up(3))
         } else if up(4).lastPathComponent == "sessions" {
             self.init(kind: .codex, directory: up(5))
+        } else if up(2).lastPathComponent == "sessions" {
+            self.init(kind: .pi, directory: up(3))
         } else {
             return nil
         }
@@ -44,7 +100,7 @@ public struct AgentFolder: Equatable, Hashable {
     private var name: String { directory.lastPathComponent.drop { $0 == "." }.description }
 
     /// The folder the agent uses when nothing picks another.
-    public var isDefault: Bool { name == kind.rawValue }
+    public var isDefault: Bool { name == URL(fileURLWithPath: kind.defaultFolder).lastPathComponent.drop { $0 == "." }.description }
 
     /// "Claude Code" for ~/.claude, "Claude Code (work)" for ~/.claude-work.
     public var label: String {
@@ -58,30 +114,35 @@ public struct AgentFolder: Equatable, Hashable {
     /// Starts the agent on this folder, with `task` as its first prompt when there is one.
     /// The default folder starts plainly, since the agent finds it by itself.
     public func command(task: String? = nil) -> String {
-        ([launcher] + (task.map { [NewTask.shellQuoted($0)] } ?? [])).joined(separator: " ")
+        line(task.map(kind.prompt) ?? [])
     }
 
     /// Picks up the conversation `id` where it stopped. Run in the folder it started in, where Claude Code looks for it.
     public func resume(_ id: String) -> String {
-        [launcher, kind == .claude ? "--resume" : "resume", NewTask.shellQuoted(id)].joined(separator: " ")
+        line(kind.resume(id))
+    }
+
+    private func line(_ words: [String]) -> String {
+        ([launcher] + words).joined(separator: " ")
     }
 
     private var launcher: String {
         isDefault ? kind.rawValue : "\(kind.environmentVariable)=\(NewTask.shellQuoted(directory.path)) \(kind.rawValue)"
     }
 
-    /// The default folder, every `<default>-*` folder that holds the agent's config file, and the folder the environment names.
+    /// The default folder, every `<default>-*` folder beside it that holds the agent's config file, and the folder the environment names.
     /// The config file keeps out look-alikes such as backups.
     public static func find(home: URL = FileManager.default.homeDirectoryForCurrentUser,
                             environment: [String: String] = ProcessInfo.processInfo.environment) -> [AgentFolder] {
         let manager = FileManager.default
-        let names = (try? manager.contentsOfDirectory(atPath: home.path)) ?? []
         return Kind.allCases.flatMap { kind -> [AgentFolder] in
-            let prefix = "." + kind.rawValue + "-"
-            var directories = [home.appendingPathComponent("." + kind.rawValue)]
+            let base = home.appendingPathComponent(kind.defaultFolder)
+            let prefix = base.lastPathComponent + "-"
+            let names = (try? manager.contentsOfDirectory(atPath: base.deletingLastPathComponent().path)) ?? []
+            var directories = kind.listedWhenMissing || manager.fileExists(atPath: base.path) ? [base] : []
             directories += names.sorted()
                 .filter { $0.hasPrefix(prefix) && $0.count > prefix.count }
-                .map { home.appendingPathComponent($0, isDirectory: true) }
+                .map { base.deletingLastPathComponent().appendingPathComponent($0, isDirectory: true) }
                 .filter { manager.fileExists(atPath: $0.appendingPathComponent(kind.configFile).path) }
             if let value = environment[kind.environmentVariable], !value.isEmpty {
                 directories.append(URL(fileURLWithPath: value, isDirectory: true))

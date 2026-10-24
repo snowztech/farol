@@ -1,6 +1,6 @@
 import Foundation
 
-/// The conversation an agent logs, as Claude Code or Codex writes it: one JSON record per line, appended as the session goes.
+/// The conversation an agent logs, as Claude Code, Codex or Pi writes it: one JSON record per line, appended as the session goes.
 /// It is read from where it was left, a megabyte at a time, so a long session costs only what was added since and never sits whole in memory.
 /// Only the few fields a reader needs are looked at, and a line that does not read as expected is skipped, so a change in the format loses detail, not the session.
 public final class Transcript {
@@ -86,7 +86,7 @@ public final class Transcript {
                 continue
             }
             guard !line.isEmpty else { continue }
-            if log == nil { log = Self.isCodex(line) ? CodexLog() : ClaudeLog() }
+            if log == nil { log = Self.reader(for: line) }
             if log?.read(line) == true { changed = true }
         }
         partial.removeSubrange(..<start)
@@ -98,9 +98,13 @@ public final class Transcript {
         return changed
     }
 
-    /// Codex starts its log with a record of the session. Claude Code starts with anything else.
-    private static func isCodex(_ line: Data) -> Bool {
-        ((try? JSONSerialization.jsonObject(with: line)) as? [String: Any])?["type"] as? String == "session_meta"
+    /// Codex and Pi start their logs with a record of the session, each its own. Claude Code starts with anything else.
+    private static func reader(for line: Data) -> AgentLog {
+        switch ((try? JSONSerialization.jsonObject(with: line)) as? [String: Any])?["type"] as? String {
+        case "session_meta": CodexLog()
+        case "session": PiLog()
+        default: ClaudeLog()
+        }
     }
 
     /// An edit as a diff with one hunk: the old lines removed, the new ones added. Context and line numbers are not in the log.

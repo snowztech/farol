@@ -48,12 +48,13 @@ import Testing
     #expect(CommitMessage.cleaned("`foo` replaces `bar`") == "`foo` replaces `bar`")
 }
 
-@Test func theAgentRunsWithoutTools() {
-    let claude = CommitMessage.arguments(for: .claude)
+@Test func theAgentRunsWithoutTools() throws {
+    let claude = try #require(CommitMessage.arguments(for: .claude))
     #expect(claude.contains("--tools"))
     #expect(claude.contains("--strict-mcp-config"))
     #expect(claude.contains { $0.contains("disableAllHooks") })
-    #expect(CommitMessage.arguments(for: .codex).contains("read-only"))
+    #expect(CommitMessage.arguments(for: .codex)?.contains("read-only") == true)
+    #expect(CommitMessage.arguments(for: .pi) == nil)
 }
 
 @Test func anAgentThatQuitsWithoutReadingDoesNotKillTheApp() throws {

@@ -739,8 +739,9 @@ final class RemoteBridge: ObservableObject {
             return tell(.refused(command: command.id, reason: "That session is closed."), phone)
         }
         let log = session.logs[terminal.id]?.log, project = session.repoRoot ?? session.directory
+        let agent = session.agent(in: terminal).flatMap(AgentFolder.Kind.init(rawValue:))
         DispatchQueue.global(qos: .userInitiated).async {
-            let commands = AgentCommands.list(log: log, project: project).map { RemoteAgentCommand(name: $0.name, detail: $0.detail, menu: $0.menu, mention: $0.mention) }
+            let commands = AgentCommands.list(log: log, agent: agent, project: project).map { RemoteAgentCommand(name: $0.name, detail: $0.detail, menu: $0.menu, mention: $0.mention) }
             DispatchQueue.main.async { [weak self] in self?.tell(.commands(session: id, commands: commands), phone) }
         }
     }

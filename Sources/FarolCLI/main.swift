@@ -2,11 +2,18 @@ import FarolCore
 import Foundation
 
 let usage = """
-usage: farol status working|waiting|done|clear|start|subagent-start|subagent-stop
+usage: farol status working|waiting|done|clear|start|subagent-start|subagent-stop [flags]
        farol ask
 
 status reports what the agent in this pane is doing, so Farol's sidebar can show it.
 subagent-start and subagent-stop keep the pane working while a background agent runs.
+Any agent can add:
+  --asking <text>    what it waits on, shown in the list and the notification (with waiting)
+  --tool <name>      the tool that asks, like Bash (with --asking)
+  --prompt <text>    what you just asked it
+  --session <id> --log <file>
+                     its conversation, for the phone to read and the next launch to resume
+Claude Code's and Codex's hooks give these on their input instead.
 
 ask is the hook for an agent's question tool. It shows the question in Farol and prints the answer for the agent.
 If Farol can't answer, it prints nothing, and the agent asks in the terminal as usual.
@@ -19,14 +26,14 @@ Outside Farol both do nothing, so hooks that call them are safe in any terminal.
 let arguments = Array(CommandLine.arguments.dropFirst())
 if let name = arguments.first, ControlCommand.names.contains(name) { Control.run(arguments) }
 let isAsk = arguments == ["ask"]
-guard isAsk || (arguments.count == 2 && arguments[0] == "status") else {
+guard isAsk || (arguments.count >= 2 && arguments[0] == "status") else {
     print(usage)
     exit(arguments.first == "help" || arguments.first == "--help" ? 0 : 64)
 }
 
-let event = isAsk ? nil : AgentEvent(rawValue: arguments[1])
-guard isAsk || event != nil else {
-    FileHandle.standardError.write("farol: unknown status \(arguments[1])\n\n\(usage)\n".data(using: .utf8)!)
+// Checked before the pane is, so a wrong hook shows up even when tried outside Farol.
+guard isAsk || StatusMessage(pane: "", arguments: Array(arguments.dropFirst()), hookInput: nil) != nil else {
+    FileHandle.standardError.write("farol: \(AgentEvent(rawValue: arguments[1]) == nil ? "unknown status \(arguments[1])" : "a flag is unknown or has no value")\n\n\(usage)\n".data(using: .utf8)!)
     exit(64)
 }
 
@@ -62,13 +69,9 @@ if isAsk {
     exit(0)
 }
 
-guard let event else { exit(64) }
-
 do {
-    let input = hookInput()
-    let request = event == .waiting ? input.flatMap(AgentRequest.init(hookInput:)) : nil
-    try StatusClient.send(StatusMessage(pane: pane, event: event, conversation: input.flatMap(AgentConversation.init(hookInput:)), request: request,
-                                        prompt: input.flatMap(StatusMessage.prompt(hookInput:))), to: socket)
+    guard let message = StatusMessage(pane: pane, arguments: Array(arguments.dropFirst()), hookInput: hookInput()) else { exit(64) }
+    try StatusClient.send(message, to: socket)
 } catch {
     // Farol may have quit while the agent kept running. A hook must never fail the agent over that.
     exit(0)
