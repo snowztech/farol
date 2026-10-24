@@ -2,6 +2,10 @@ import Foundation
 
 public struct GitError: Error, CustomStringConvertible {
     public let description: String
+
+    public init(description: String) {
+        self.description = description
+    }
 }
 
 /// Runs the git command line tool. Shelling out keeps Farol's behavior identical to the user's own git.

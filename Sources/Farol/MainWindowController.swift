@@ -63,7 +63,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var notchSwitch: AnyCancellable?
     private var notchPlace: AnyCancellable?
     private var sessionsChange: AnyCancellable?
-    private(set) lazy var remote = RemoteBridge(store: store)
+    private(set) lazy var remote = RemoteBridge(store: store, worktrees: worktreeSettings)
     private lazy var control = AgentControl(store: store, agents: agents, worktrees: worktreeSettings)
     private var remoteSwitch: AnyCancellable?
     private var awakeSwitch: AnyCancellable?

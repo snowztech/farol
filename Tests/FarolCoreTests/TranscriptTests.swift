@@ -210,3 +210,17 @@ private let codexLog = [
     transcript.refresh()
     #expect(transcript.messages.filter { $0.role == .tool }.map(\.outcome) == [.stopped, .failed, nil], "an exit code in a command's own output is not its own")
 }
+
+@Test func showsAQuestionToolAsTheQuestionItAsks() throws {
+    let transcript = Transcript(url: try file([
+        codexLog[0],
+        #"{"type":"response_item","payload":{"type":"function_call","name":"request_user_input_async","call_id":"c1","arguments":"{\"questions\":[{\"title\":\"Which fruit?\",\"options\":[\"Apple\",\"Pear\"]}]}"}}"#,
+        #"{"type":"response_item","payload":{"type":"function_call","name":"request_user_input","call_id":"c2","arguments":"{\"questions\":[{\"header\":\"Color\",\"question\":\"Which color?\",\"options\":[{\"label\":\"Red\"},{\"label\":\"Blue\"}]}]}"}}"#,
+    ]))
+    transcript.refresh()
+    let questions = transcript.messages.filter { $0.tool == "Question" }
+    #expect(questions.map(\.text) == ["Which fruit?", "Which color?"])
+    #expect(questions.first?.detail == "Which fruit?\n· Apple\n· Pear")
+    let claude = ClaudeLog.tool("AskUserQuestion", ["questions": [["question": "Which approach?", "options": [["label": "Small"], ["label": "Rewrite"]]]]], in: nil, id: "a1.0")
+    #expect(claude.text == "Which approach?" && claude.tool == "Question")
+}

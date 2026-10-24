@@ -17,12 +17,23 @@ public struct StatusMessage: Codable, Equatable, Sendable {
     public var conversation: AgentConversation?
     /// What a waiting agent asks, when its hook says.
     public var request: AgentRequest?
+    /// What you just asked the agent, from Claude Code's `UserPromptSubmit`. Shown until its log has it.
+    public var prompt: String?
 
-    public init(pane: String, event: AgentEvent, conversation: AgentConversation? = nil, request: AgentRequest? = nil) {
+    public init(pane: String, event: AgentEvent, conversation: AgentConversation? = nil, request: AgentRequest? = nil, prompt: String? = nil) {
         self.pane = pane
         self.event = event
         self.conversation = conversation
         self.request = request
+        self.prompt = prompt
+    }
+
+    /// The words of a prompt hook's input. Nil for any other hook.
+    public static func prompt(hookInput: Data) -> String? {
+        guard let input = (try? JSONSerialization.jsonObject(with: hookInput)) as? [String: Any],
+              input["hook_event_name"] as? String == "UserPromptSubmit",
+              let prompt = (input["prompt"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !prompt.isEmpty else { return nil }
+        return prompt
     }
 }
 

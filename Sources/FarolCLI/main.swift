@@ -67,7 +67,8 @@ guard let event else { exit(64) }
 do {
     let input = hookInput()
     let request = event == .waiting ? input.flatMap(AgentRequest.init(hookInput:)) : nil
-    try StatusClient.send(StatusMessage(pane: pane, event: event, conversation: input.flatMap(AgentConversation.init(hookInput:)), request: request), to: socket)
+    try StatusClient.send(StatusMessage(pane: pane, event: event, conversation: input.flatMap(AgentConversation.init(hookInput:)), request: request,
+                                        prompt: input.flatMap(StatusMessage.prompt(hookInput:))), to: socket)
 } catch {
     // Farol may have quit while the agent kept running. A hook must never fail the agent over that.
     exit(0)

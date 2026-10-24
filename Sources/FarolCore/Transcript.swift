@@ -114,6 +114,22 @@ public final class Transcript {
         return String(path.dropFirst(folder.count + 1))
     }
 
+    /// A question tool's call, as one row: the first question as its line, and every question with its answers as its detail.
+    /// Claude Code writes `question` and options with a `label`, Codex `question` or `title` and options as labels or plain words.
+    static func question(_ questions: [[String: Any]], id: String) -> Message? {
+        func text(_ question: [String: Any]) -> String? {
+            [question["question"], question["title"], question["text"]].lazy.compactMap { ($0 as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) }.first { !$0.isEmpty }
+        }
+        func answers(_ question: [String: Any]) -> [String] {
+            (question["options"] as? [Any] ?? []).compactMap { ($0 as? String) ?? (($0 as? [String: Any])?["label"] as? String) }
+        }
+        guard let first = questions.first.flatMap(text) else { return nil }
+        let detail = questions.compactMap { question in
+            text(question).map { ([$0] + answers(question).map { "· \($0)" }).joined(separator: "\n") }
+        }.joined(separator: "\n\n")
+        return Message(id: id, role: .tool, text: first, tool: "Question", detail: detail == first ? nil : detail)
+    }
+
     /// Long enough for any edit worth reading on a phone, short enough to travel in one message.
     /// True when the last turn in an agent's log is you stopping it, after `since`. Only Claude Code's say so.
     public static func stopped(log: String, since: Date) -> Bool {

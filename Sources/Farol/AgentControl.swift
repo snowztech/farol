@@ -62,20 +62,10 @@ final class AgentControl {
     }
 
     private func info(_ session: Session, _ terminal: TerminalView, caller: UUID?) -> SessionInfo {
-        let asking = session.request.flatMap { $0.pane == terminal.id ? $0.asked.summary() : nil }
-            ?? session.ask.flatMap { $0.pane == terminal.id ? $0.questions.first?.text : nil }
         let status = SessionInfo.Status(rawValue: "\(session.status(of: terminal))") ?? .idle
         return SessionInfo(id: terminal.id.uuidString, name: session.label(of: terminal), folder: terminal.workingDirectory ?? session.directory,
-                           branch: session.branch, agent: Self.agent(in: terminal, of: session), status: status, asking: asking,
+                           branch: session.branch, agent: session.agent(in: terminal), status: status, asking: session.asking(in: terminal),
                            isCaller: terminal.id == caller)
-    }
-
-    /// The agent in front: none at a shell prompt, then the program's own name, or the agent whose log the pane writes.
-    /// Claude Code's process is named after its version, so its log says it is Claude Code.
-    private static func agent(in terminal: TerminalView, of session: Session) -> String? {
-        guard let name = terminal.foregroundProgram?.name, !["zsh", "bash", "fish", "sh", "login"].contains(name) else { return nil }
-        if AgentFolder.Kind(rawValue: name) != nil { return name }
-        return session.logs[terminal.id].flatMap { AgentFolder(log: $0.log) }?.kind.rawValue ?? name
     }
 
     /// The pane a command names, with its session, or a reply that says why there is none.
@@ -96,39 +86,25 @@ final class AgentControl {
         guard let directory = repo ?? calling.map({ $0.repoRoot ?? $0.directory }) else {
             return connection.reply(ControlReply.failed("Say which repository with --repo, since this command runs outside a Farol session."))
         }
-        let callerAgent = calling.flatMap { session in
-            session.panes.terminals.first { $0.id == caller }.flatMap { Self.agent(in: $0, of: session) }
-        }
+        let callerAgent = calling.flatMap { session in session.panes.terminals.first { $0.id == caller }.flatMap(session.agent) }
         let folders = AgentFolder.find()
         let wanted = (agent ?? callerAgent)?.lowercased()
         guard let folder = folders.first(where: { [$0.kind.rawValue, $0.id.lowercased(), $0.label.lowercased()].contains(wanted) }) ?? (agent == nil ? folders.first : nil) else {
             return connection.reply(ControlReply.failed(agent.map { "No agent is called \($0). Use claude or codex, connected in Settings → Agents." }
                 ?? "Connect Claude Code or Codex in Settings → Agents first."))
         }
-        // Git is asked off the main thread, as the New Task sheet does.
-        reading.async { [weak self] in
-            guard let root = Git.repoRoot(of: directory) else {
-                return connection.reply(ControlReply.failed("\(directory) is not in a git repository."))
-            }
-            let branch = NewTask.freeBranch(for: text) { Git.hasBranch($0, in: root) }
-            DispatchQueue.main.async {
-                guard let self else { return }
-                // Opened beside the one on screen, so an agent's task never takes the window from you.
-                self.store.createWorktreeSession(branch: branch, from: [root], run: folder.command() + " \"$\(NewTask.variable)\"",
-                                                 environment: [NewTask.variable: text], copyEnvironmentFiles: self.worktrees.copyEnvironmentFiles,
-                                            select: false) { result in
-                    switch result {
-                    case .success(let session):
-                        let pane = session.panes.focused
-                        self.told[pane.id] = .now
-                        // Its branch is known here, before the session has asked git.
-                        var started = self.info(session, pane, caller: caller)
-                        started.branch = started.branch ?? branch
-                        connection.reply(ControlReply(session: started))
-                    case .failure(let error):
-                        connection.reply(ControlReply.failed("Farol could not create the worktree: \(error)"))
-                    }
-                }
+        // Opened beside the one on screen, so an agent's task never takes the window from you.
+        store.startTask(text, in: directory, with: folder, copyEnvironmentFiles: worktrees.copyEnvironmentFiles, select: false) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success(let (session, branch)):
+                let pane = session.panes.focused
+                told[pane.id] = .now
+                var started = info(session, pane, caller: caller)
+                started.branch = started.branch ?? branch
+                connection.reply(ControlReply(session: started))
+            case .failure(let error):
+                connection.reply(ControlReply.failed("Farol could not start the task: \(error)"))
             }
         }
     }

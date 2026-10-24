@@ -32,6 +32,7 @@ final class RemoteBridge: ObservableObject {
     @Published private(set) var ownRelay = UserDefaults.standard.string(forKey: RemoteBridge.relayKey)
 
     private let store: SessionStore
+    private let worktrees: WorktreeSettings
     private var key: DeviceKey?
     private var connection: RelayConnection?
     private var phones: [UInt32: Phone] = [:] {
@@ -113,8 +114,9 @@ final class RemoteBridge: ObservableObject {
     /// The logs phones read, watched so a change is read when the agent writes and nothing is done while it does not.
     private var logWatches: [String: DispatchSourceFileSystemObject] = [:]
 
-    init(store: SessionStore) {
+    init(store: SessionStore, worktrees: WorktreeSettings) {
         self.store = store
+        self.worktrees = worktrees
         if let saved = UserDefaults.standard.data(forKey: Self.devicesKey) {
             devices = (try? JSONDecoder().decode([PairedDevice].self, from: saved)) ?? []
         }
@@ -377,9 +379,8 @@ final class RemoteBridge: ObservableObject {
             changes(command, in: session, from: id)
         case .diff(let session, let path):
             diff(command, of: path, in: session, from: id)
-        case .task:
-            // Starting a task in a new worktree from the phone, which this version does not do. The phone is told so, and says to update.
-            tell(.refused(command: command.id, reason: "This version of Farol cannot start tasks from the phone."), id)
+        case .task(let project, let agent, let text):
+            task(command, in: project, with: agent, text: text, from: id)
         case .history(let session):
             // Read once, when the phone asks. Reading it on every change would cost the Mac for something rarely looked at.
             guard let terminal = pane(session)?.terminal else { return }
@@ -506,11 +507,14 @@ final class RemoteBridge: ObservableObject {
 
     // MARK: New sessions
 
-    /// The folders a session is open in, its repository's when it has one, then the home folder, where a new tab opens anyway.
+    /// The folders a session is open in, its repository's when it has one, then repositories sessions were open in before, then the home folder.
     /// Home is there so a phone can open the first session when none is. A phone opens a session in one of these, never any folder on the Mac.
     private var projects: [String] {
         var seen = Set<String>()
-        return (store.ordered.map { $0.repoRoot ?? $0.directory } + [NSHomeDirectory()]).filter { seen.insert($0).inserted }
+        let open = store.ordered.map { $0.repoRoot ?? $0.directory }
+        // A repository moved or deleted since is left out.
+        let recent = store.recentRepos.filter { FileManager.default.fileExists(atPath: $0) }.prefix(8)
+        return (open + recent + [NSHomeDirectory()]).filter { seen.insert($0).inserted }
     }
 
     /// The session each `open` made, so one a phone sends again after a dropped connection is answered and not opened twice.
@@ -527,6 +531,34 @@ final class RemoteBridge: ObservableObject {
         opened[command.id] = pane
         tell(.opened(command: command.id, session: pane), id)
         tick()
+    }
+
+    /// Tasks the phone sent whose worktree is still being made, so one sent again meanwhile is not started twice.
+    private var startingTasks: Set<UUID> = []
+
+    /// A task from the phone: an agent on the words in a worktree of the project, on a branch of its own, answered like `open`.
+    /// It opens beside the session on screen, since whoever sends it is away from the Mac.
+    private func task(_ command: RemoteCommand, in project: String, with agent: String, text: String, from id: UInt32) {
+        if let session = opened[command.id] { return tell(.opened(command: command.id, session: session), id) }
+        guard !startingTasks.contains(command.id) else { return }
+        let words = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard projects.contains(project), let folder = AgentFolder.find().first(where: { $0.id == agent }), !words.isEmpty else {
+            return tell(.refused(command: command.id, reason: "The Mac could not start that task. Pick the project again and retry."), id)
+        }
+        startingTasks.insert(command.id)
+        store.startTask(words, in: project, with: folder, copyEnvironmentFiles: worktrees.copyEnvironmentFiles, select: false) { [weak self] result in
+            guard let self else { return }
+            startingTasks.remove(command.id)
+            switch result {
+            case .success(let (session, _)):
+                let pane = session.panes.focused.id
+                opened[command.id] = pane
+                tell(.opened(command: command.id, session: pane), id)
+                tick()
+            case .failure(let error):
+                tell(.refused(command: command.id, reason: "The Mac could not start the task: \(error)"), id)
+            }
+        }
     }
 
     /// Closes a split pane, or a session as its tab's close button would, but never the last one: closing that quits Farol, and the phone with it.
@@ -571,7 +603,7 @@ final class RemoteBridge: ObservableObject {
             // An agent that has not said anything yet has no log, and its conversation is empty rather than missing.
             if let asked, asked.session.agentRuns(in: asked.terminal.id), before == nil {
                 phones[id]?.toldEmpty = session
-                return tell(.conversation(session: session, messages: [], place: .latest, more: false), id)
+                return tell(.conversation(session: session, messages: waitingPrompt(session), place: .latest, more: false), id)
             }
             return tell(.refused(command: command.id, reason: "This session has no agent conversation to show."), id)
         }
@@ -597,7 +629,15 @@ final class RemoteBridge: ObservableObject {
     private func sendLatest(_ messages: [Transcript.Message], of session: UUID, to id: UInt32) {
         let start = Self.pageStart(messages, end: messages.count)
         phones[id]?.conversation?.last = messages.last?.id
-        tell(.conversation(session: session, messages: messages[start...].map(Self.remote), place: .latest, more: start > 0), id)
+        let page = messages.isEmpty ? waitingPrompt(session) : messages[start...].map(Self.remote)
+        tell(.conversation(session: session, messages: page, place: .latest, more: start > 0), id)
+    }
+
+    /// What you asked a pane's agent, as your message, while its log has nothing yet.
+    /// The log's first page takes its place, since `last` stays nil and the next change sends the latest page.
+    private func waitingPrompt(_ pane: UUID) -> [RemoteMessage] {
+        guard let (session, terminal) = self.pane(pane), let prompt = session.prompts[terminal.id] else { return [] }
+        return [RemoteMessage(id: "farol.prompt.\(terminal.id.uuidString)", role: .you, text: prompt)]
     }
 
     /// Sends the phones reading a log what the agent just wrote, and the messages they have that changed, like a tool you said no to.
@@ -869,7 +909,8 @@ final class RemoteBridge: ObservableObject {
             let panes = session.panes.terminals
             return panes.map { pane in
                 RemoteSession(id: pane.id, name: session.label(of: pane), branch: session.branch,
-                              status: RemoteStatus(rawValue: "\(session.status(of: pane))") ?? .idle)
+                              status: RemoteStatus(rawValue: "\(session.status(of: pane))") ?? .idle,
+                              agent: session.agent(in: pane), asking: session.asking(in: pane))
             }
         }
     }
@@ -908,7 +949,7 @@ final class RemoteBridge: ObservableObject {
                 } else if session.agentRuns(in: watching), phone.toldEmpty != watching {
                     // An agent just started, with nothing said: the phone leaves the terminal for its empty conversation.
                     phones[id]?.toldEmpty = watching
-                    tell(.conversation(session: watching, messages: [], place: .latest, more: false), id)
+                    tell(.conversation(session: watching, messages: waitingPrompt(watching), place: .latest, more: false), id)
                 }
             }
             if phone.sessions != sessions {

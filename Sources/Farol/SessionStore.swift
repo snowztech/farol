@@ -1,5 +1,6 @@
 import AppKit
 import FarolCore
+import FarolRemote
 import GhosttyTerminal
 
 final class Session: ObservableObject, Identifiable {
@@ -16,6 +17,9 @@ final class Session: ObservableObject, Identifiable {
     @Published private(set) var agents: [UUID: AgentActivity] = [:]
     /// Each pane's agent conversation, as its hooks or logs last named it. Kept after the agent ends, so a phone can still read it.
     var logs: [UUID: AgentConversation] = [:]
+    /// What you last asked each pane's agent, from its prompt hook or the task it started on.
+    /// A phone shows it while the agent's log has nothing yet, as Claude Code writes its log only once a turn is under way.
+    var prompts: [UUID: String] = [:]
     /// Each pane's conversation while its agent runs, saved so the next launch resumes it there.
     var conversations: [UUID: AgentConversation] = [:]
     /// What a waiting agent asks, and the pane it waits in, so an answer from a phone goes there and nowhere else.
@@ -167,6 +171,29 @@ final class Session: ObservableObject, Identifiable {
     func label(of terminal: TerminalView) -> String {
         panes.terminals.count == 1 ? displayName : name(of: terminal)
     }
+
+    /// The agent in front of a pane: none at a shell prompt, then the program's own name, or the agent whose log the pane writes.
+    /// Claude Code's process is named after its version, so its log says it is Claude Code.
+    func agent(in terminal: TerminalView) -> String? {
+        guard let name = terminal.foregroundProgram?.name, !["zsh", "bash", "fish", "sh", "login"].contains(name) else { return nil }
+        if AgentFolder.Kind(rawValue: name) != nil { return name }
+        return logs[terminal.id].flatMap { AgentFolder(log: $0.log) }?.kind.rawValue ?? name
+    }
+
+    /// What a waiting pane asks, in one line: what its hook or Farol's held question says, or else the menu on its screen.
+    /// An agent without hooks, like Codex, says it only there, so its screen is read, at most every two seconds.
+    func asking(in terminal: TerminalView) -> String? {
+        guard status(of: terminal) == .waiting else { return nil }
+        if let (pane, asked) = request, pane == terminal.id { return asked.summary() }
+        if let ask, ask.pane == terminal.id { return ask.questions.first?.text }
+        if let kept = screenAsking[terminal.id], kept.at > .now - 2 { return kept.text }
+        let text = Prompt.asking(in: terminal.screenText)
+        screenAsking[terminal.id] = (.now, text)
+        return text
+    }
+
+    /// What each pane's screen asked when last read, so a list sent often does not read every screen each time.
+    private var screenAsking: [UUID: (at: Date, text: String?)] = [:]
 
     /// An agent runs in the pane, from its first report until it ends. Before its first message it may have no log yet.
     func agentRuns(in pane: UUID) -> Bool { agents[pane]?.reports == true }
@@ -362,7 +389,11 @@ final class SessionStore: ObservableObject {
             session.conversations[pane] = conversation
         }
         // The agent ended, so there is nothing to resume. Codex also sends this when you interrupt a turn, and its next prompt brings it back.
-        if message.event == .clear { session.conversations[pane] = nil }
+        if message.event == .clear {
+            session.conversations[pane] = nil
+            session.prompts[pane] = nil
+        }
+        if let prompt = message.prompt { session.prompts[pane] = prompt }
         if session.conversations[pane] != resumable { save() }
         session.apply(message.event, pane: pane, request: message.request)
         // An agent can end its turn, or stop to ask you, on a rebase git stopped, so every session's checkout is looked at again.
@@ -469,6 +500,26 @@ final class SessionStore: ObservableObject {
         create(PaneContainer(makeTerminal(in: directory, run: run, environment: environment)), directory: directory, select: select)
     }
 
+    /// An agent on `task` in a new worktree of the repository `directory` is in, on a branch no other has, with the task as its first prompt.
+    /// What an agent's `farol task` and the phone start. The New Task sheet asks for its branch and repos itself.
+    /// `done` gets the session and its branch, which the session itself learns only once git answers.
+    func startTask(_ task: String, in directory: String, with agent: AgentFolder, copyEnvironmentFiles: Bool, select: Bool,
+                   done: @escaping (Result<(session: Session, branch: String), Error>) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard let root = Git.repoRoot(of: directory) else {
+                return DispatchQueue.main.async { done(.failure(GitError(description: "\(directory) is not in a git repository."))) }
+            }
+            let branch = NewTask.freeBranch(for: task) { Git.hasBranch($0, in: root) }
+            DispatchQueue.main.async { [weak self] in
+                self?.createWorktreeSession(branch: branch, from: [root], run: agent.command() + " \"$\(NewTask.variable)\"",
+                                            environment: [NewTask.variable: task], copyEnvironmentFiles: copyEnvironmentFiles, select: select) {
+                    if case .success(let session) = $0 { session.prompts[session.panes.focused.id] = task }
+                    done($0.map { ($0, branch) })
+                }
+            }
+        }
+    }
+
     /// A session in a new worktree on `branch`: a plain worktree for one repo, a task folder with a worktree of each for several.
     /// Checking out a big repo takes a moment, so git runs off the main thread, and `done` is called on it.
     func createWorktreeSession(branch: String, from repos: [String], run command: String?, environment: [String: String] = [:],
@@ -518,7 +569,10 @@ final class SessionStore: ObservableObject {
             guard let self, let session else { return nil }
             return self.split(session, .down, run: line)
         }
-        session.onRepoChange = { [weak self] in self?.objectWillChange.send() }
+        session.onRepoChange = { [weak self, weak session] in
+            self?.objectWillChange.send()
+            if let session { self?.remember(session) }
+        }
         session.onGitStateChange = { [weak self, weak session] before in
             guard let self, let session else { return }
             self.report(session, from: before)
@@ -660,6 +714,17 @@ final class SessionStore: ObservableObject {
     }
 
     /// Closing the last session ends the app: there is never a window without a terminal.
+    /// Repositories sessions were open in, latest first, so a phone can start one in a project closed since. At most ten.
+    /// A worktree's repository is its main checkout, so a task remembers the project it came from.
+    private(set) var recentRepos = UserDefaults.standard.stringArray(forKey: SessionStore.recentReposKey) ?? []
+    private static let recentReposKey = "sessions.recentRepos"
+
+    private func remember(_ session: Session) {
+        guard let repo = session.repoRoot else { return }
+        recentRepos = Array(([repo] + recentRepos.filter { $0 != repo }).prefix(10))
+        UserDefaults.standard.set(recentRepos, forKey: Self.recentReposKey)
+    }
+
     func close(_ session: Session) {
         guard let index = sessions.firstIndex(where: { $0.id == session.id }) else { return }
         session.panes.terminals.forEach { $0.close() }
