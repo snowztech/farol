@@ -45,7 +45,7 @@ When a new version is out, an Update button shows in the title bar. Click it and
 ## Features
 
 - **New task.** ⇧⌘N asks what to do, then starts Claude Code or Codex on it in a new worktree, with the task as its first prompt. Or pick one of your open Jira tickets or the repo's GitHub issues, and the branch is named after it and the agent gets the ticket in full. With more than one Claude Code or Codex account, each one is a choice. From a folder of repos, or with Add repositories from inside one, tick the repos the task touches. Choose repository… adds a Git repo from anywhere on the Mac. Each selected repo gets a worktree on the same branch, side by side in one folder, and the agent starts there. The review and graph panels get a tab per repo with its changes, and the title bar counts them all.
-- **Agent status.** Each session shows whether its agent is working, waiting for you or done, with a notification when it waits in the background. See [Agent status](#agent-status).
+- **Agent status.** Each session shows whether its agent is working, waiting for you or done, with a notification when it waits in the background. Claude Code, Codex, OpenCode and Pi connect in one click, and any other agent can report with `farol status`. See [Agent status](#agent-status).
 - **Agents from any app.** Farol's lighthouse in the menu bar lights up while agents work, wait or finish, and its menu opens any session. Or pick a small status panel at the notch or on the screen edge, which you can drag anywhere along the side.
 - **From your phone.** Farol for iPhone lists your sessions and opens each one as its agent's conversation. Approve or answer with a tap, get a notification when an agent waits, and keep count on the lock screen. End-to-end encrypted. See [From your phone](#from-your-phone).
 - **Worktree sessions.** ⇧⌘T asks for a branch and opens a session in its own git worktree, so parallel agents never touch each other's files. Closing it offers to remove the worktree and always keeps the branch.
@@ -91,7 +91,29 @@ When an agent waits or finishes while Farol is in the background, you get a noti
 
 **Codex:** interactive sessions work automatically through Codex's terminal titles. Keep Codex's terminal-title setting enabled. To cover non-interactive runs and background agents too, click **Connect**. Farol adds hooks to `~/.codex/hooks.json`, leaves other hooks alone and keeps a backup. Restart open Codex sessions, then review and trust the hooks with `/hooks`. Connecting adds the same skill in `~/.codex/skills/farol`. **Disconnect** removes only Farol's hooks and its skill. Interactive status keeps working.
 
+**OpenCode and Pi:** click **Connect** and Farol adds one plugin file, `~/.config/opencode/plugins/farol.js` or `~/.pi/agent/extensions/farol.ts`, plus the same skill. Restart open sessions to load it. OpenCode reports working, done, and what a permission or a question asks. Pi reports working and done, and the phone reads its conversation. Farol keeps the plugin up to date and **Disconnect** removes it. They show in Settings once their config folder exists.
+
 **Other agents** can report with `"$FAROL_CLI" status working|waiting|done|clear`, which Farol makes available in every session. Agents that ring the terminal bell show as waiting without any setup.
+
+<details>
+<summary>Add Farol support to your agent</summary>
+
+Call `farol status` from your agent's hooks or plugin. `FAROL_CLI` and `FAROL_PANE` are set only inside Farol, so check for them and do nothing otherwise.
+
+```sh
+"$FAROL_CLI" status start --session "$ID" --log "$LOG"   # a conversation began, or was resumed
+"$FAROL_CLI" status working --prompt "fix the login bug"    # what the user just asked
+"$FAROL_CLI" status waiting --tool Bash --asking "npm test" # it needs an approval or an answer
+"$FAROL_CLI" status done                                    # its turn ended
+"$FAROL_CLI" status clear                                   # it quit, or was interrupted
+```
+
+- `--asking` is what the sidebar, the notification and the phone show while it waits.
+- `--session` and `--log` together name the conversation, so Farol can resume it after a relaunch. The phone reads the log when Farol knows its format.
+- Report one call at a time, in order, and never wait on Farol: a hook must not hold the agent up.
+- Farol's own plugins, in `Sources/FarolCore/AgentPlugin.swift`, are short examples.
+
+</details>
 
 <details>
 <summary>The Claude Code hooks, if you prefer to add them by hand</summary>
