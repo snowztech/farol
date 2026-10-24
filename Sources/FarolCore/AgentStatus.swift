@@ -28,6 +28,27 @@ public struct StatusMessage: Codable, Equatable, Sendable {
         self.prompt = prompt
     }
 
+    /// A report from `farol status <event>`: what the flags say, then what a Claude Code or Codex hook gave on its input.
+    /// The flags are how any agent says what it asks and which conversation it is in, without writing those hooks' JSON.
+    /// Nil for an unknown event, a flag Farol doesn't know, or one without its value.
+    public init?(pane: String, arguments: [String], hookInput input: Data?) {
+        guard let name = arguments.first, let event = AgentEvent(rawValue: name) else { return nil }
+        var flags: [String: String] = [:]
+        var rest = arguments.dropFirst()[...]
+        while let flag = rest.popFirst() {
+            guard Self.flags.contains(flag), let value = rest.popFirst() else { return nil }
+            flags[flag] = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        func flag(_ name: String) -> String? { flags[name].flatMap { $0.isEmpty ? nil : $0 } }
+        let asking = flag("--asking").map { AgentRequest(id: UUID().uuidString, tool: flag("--tool"), title: $0) }
+        let conversation = flag("--session").flatMap { id in flag("--log").map { AgentConversation(id: id, log: $0) } }
+        self.init(pane: pane, event: event, conversation: conversation ?? input.flatMap(AgentConversation.init(hookInput:)),
+                  request: event == .waiting ? asking ?? input.flatMap(AgentRequest.init(hookInput:)) : nil,
+                  prompt: flag("--prompt") ?? input.flatMap(Self.prompt(hookInput:)))
+    }
+
+    public static let flags: Set = ["--asking", "--tool", "--prompt", "--session", "--log"]
+
     /// The words of a prompt hook's input. Nil for any other hook.
     public static func prompt(hookInput: Data) -> String? {
         guard let input = (try? JSONSerialization.jsonObject(with: hookInput)) as? [String: Any],
@@ -52,6 +73,14 @@ public struct AgentRequest: Codable, Equatable, Sendable {
     public struct Choice: Codable, Equatable, Sendable {
         public var label: String
         public var detail: String?
+    }
+
+    public init(id: String, tool: String? = nil, title: String, detail: String? = nil, choices: [Choice] = []) {
+        self.id = id
+        self.tool = tool
+        self.title = title
+        self.detail = detail
+        self.choices = choices
     }
 
     /// From Claude Code's or Codex's `PermissionRequest` input, or Claude Code's `PreToolUse` for `AskUserQuestion`. Nil for anything else.
