@@ -17,6 +17,9 @@ final class Session: ObservableObject, Identifiable {
     @Published private(set) var agents: [UUID: AgentActivity] = [:]
     /// Each pane's agent conversation, as its hooks or logs last named it. Kept after the agent ends, so a phone can still read it.
     var logs: [UUID: AgentConversation] = [:]
+    /// What you last asked each pane's agent, from its prompt hook or the task it started on.
+    /// A phone shows it while the agent's log has nothing yet, as Claude Code writes its log only once a turn is under way.
+    var prompts: [UUID: String] = [:]
     /// Each pane's conversation while its agent runs, saved so the next launch resumes it there.
     var conversations: [UUID: AgentConversation] = [:]
     /// What a waiting agent asks, and the pane it waits in, so an answer from a phone goes there and nowhere else.
@@ -386,7 +389,11 @@ final class SessionStore: ObservableObject {
             session.conversations[pane] = conversation
         }
         // The agent ended, so there is nothing to resume. Codex also sends this when you interrupt a turn, and its next prompt brings it back.
-        if message.event == .clear { session.conversations[pane] = nil }
+        if message.event == .clear {
+            session.conversations[pane] = nil
+            session.prompts[pane] = nil
+        }
+        if let prompt = message.prompt { session.prompts[pane] = prompt }
         if session.conversations[pane] != resumable { save() }
         session.apply(message.event, pane: pane, request: message.request)
         // An agent can end its turn, or stop to ask you, on a rebase git stopped, so every session's checkout is looked at again.
@@ -506,6 +513,7 @@ final class SessionStore: ObservableObject {
             DispatchQueue.main.async { [weak self] in
                 self?.createWorktreeSession(branch: branch, from: [root], run: agent.command() + " \"$\(NewTask.variable)\"",
                                             environment: [NewTask.variable: task], copyEnvironmentFiles: copyEnvironmentFiles, select: select) {
+                    if case .success(let session) = $0 { session.prompts[session.panes.focused.id] = task }
                     done($0.map { ($0, branch) })
                 }
             }

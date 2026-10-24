@@ -603,7 +603,7 @@ final class RemoteBridge: ObservableObject {
             // An agent that has not said anything yet has no log, and its conversation is empty rather than missing.
             if let asked, asked.session.agentRuns(in: asked.terminal.id), before == nil {
                 phones[id]?.toldEmpty = session
-                return tell(.conversation(session: session, messages: [], place: .latest, more: false), id)
+                return tell(.conversation(session: session, messages: waitingPrompt(session), place: .latest, more: false), id)
             }
             return tell(.refused(command: command.id, reason: "This session has no agent conversation to show."), id)
         }
@@ -629,7 +629,15 @@ final class RemoteBridge: ObservableObject {
     private func sendLatest(_ messages: [Transcript.Message], of session: UUID, to id: UInt32) {
         let start = Self.pageStart(messages, end: messages.count)
         phones[id]?.conversation?.last = messages.last?.id
-        tell(.conversation(session: session, messages: messages[start...].map(Self.remote), place: .latest, more: start > 0), id)
+        let page = messages.isEmpty ? waitingPrompt(session) : messages[start...].map(Self.remote)
+        tell(.conversation(session: session, messages: page, place: .latest, more: start > 0), id)
+    }
+
+    /// What you asked a pane's agent, as your message, while its log has nothing yet.
+    /// The log's first page takes its place, since `last` stays nil and the next change sends the latest page.
+    private func waitingPrompt(_ pane: UUID) -> [RemoteMessage] {
+        guard let (session, terminal) = self.pane(pane), let prompt = session.prompts[terminal.id] else { return [] }
+        return [RemoteMessage(id: "farol.prompt.\(terminal.id.uuidString)", role: .you, text: prompt)]
     }
 
     /// Sends the phones reading a log what the agent just wrote, and the messages they have that changed, like a tool you said no to.
@@ -941,7 +949,7 @@ final class RemoteBridge: ObservableObject {
                 } else if session.agentRuns(in: watching), phone.toldEmpty != watching {
                     // An agent just started, with nothing said: the phone leaves the terminal for its empty conversation.
                     phones[id]?.toldEmpty = watching
-                    tell(.conversation(session: watching, messages: [], place: .latest, more: false), id)
+                    tell(.conversation(session: watching, messages: waitingPrompt(watching), place: .latest, more: false), id)
                 }
             }
             if phone.sessions != sessions {

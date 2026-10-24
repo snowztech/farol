@@ -113,3 +113,9 @@ final class Listening {
     #expect(AgentRequest(hookInput: Data(#"{"hook_event_name":"Notification","message":"Claude needs your permission"}"#.utf8)) == nil)
     #expect(AgentRequest(hookInput: Data("not json".utf8)) == nil)
 }
+
+@Test func readsWhatYouAskedFromThePromptHook() {
+    let prompt = Data(#"{"hook_event_name":"UserPromptSubmit","prompt":"  fix the flaky test \n","session_id":"s"}"#.utf8)
+    #expect(StatusMessage.prompt(hookInput: prompt) == "fix the flaky test")
+    #expect(StatusMessage.prompt(hookInput: Data(#"{"hook_event_name":"Stop","prompt":"x"}"#.utf8)) == nil)
+}
