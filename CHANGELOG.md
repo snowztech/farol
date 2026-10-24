@@ -10,6 +10,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - Any agent can say what it waits on and which conversation it is in: `farol status waiting --asking "npm test" --tool Bash`, or `--session` and `--log`. The README shows how.
 - A notification for an agent that waits on you says what it asks, and so does the Live Activity on the lock screen.
 
+### Fixed
+
+- TypeScript `.ts` and `.mts` files and Elixir `.exs` scripts open in the file pane instead of the app macOS gives their extension.
+- The Markdown preview shows a file's front matter, like a skill's name and description, as YAML instead of one big heading.
+
 ## [0.50.0] - 2026-10-24
 
 See from the phone what each agent asks, and start tasks there on a branch of their own.
