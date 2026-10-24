@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.50.0] - 2026-10-24
+
+See from the phone what each agent asks, and start tasks there on a branch of their own.
+
 ### Added
 
 - The phone shows which agent runs in each session and what a waiting one asks, read off its screen for Codex, so you see which session needs what without opening each.
