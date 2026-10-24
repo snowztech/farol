@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Agents can see and drive Farol with `farol sessions`, `task`, `wait`, `read` and `send`: list the sessions, hand a task to another agent in its own worktree, wait for it and read its answer. Starting tasks and sending messages need Settings → Agents → Let agents start tasks and message sessions.
+
 ## [0.48.0] - 2026-10-24
 
 Split panes on the phone, Codex questions answered there, and tool calls that say how they ended.
