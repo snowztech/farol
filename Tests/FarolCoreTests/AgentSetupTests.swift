@@ -87,3 +87,20 @@ func skillFollowsTheConnection(kind: AgentFolder.Kind) throws {
     #expect(setups[1].file.path == "/h/.claude-work/settings.json")
     #expect(setups[3].file.path == "/h/.codex-work/hooks.json")
 }
+
+@Test(arguments: [AgentFolder.Kind.opencode, .pi])
+func aPluginAgentConnectsAndKeepsItsPluginCurrent(kind: AgentFolder.Kind) throws {
+    let folder = AgentFolder(kind: kind, directory: tempFile(kind.rawValue))
+    let setup = try #require(AgentSetup.all(folders: [folder]).first)
+    let plugin = kind == .opencode ? AgentPlugin.opencode(in: folder) : AgentPlugin.pi(in: folder)
+    let skill = AgentSkill(nextTo: folder.directory.appendingPathComponent(kind.configFile))
+    #expect(setup.state() == .disconnected && setup.file == plugin.file)
+    try setup.connect()
+    #expect(setup.state() == .connected && plugin.isCurrent && skill.isCurrent)
+    #expect(plugin.text.contains("FAROL_PANE") && plugin.text.contains(#"farol("waiting""#) == (kind == .opencode))
+    try "// from an older Farol".write(to: plugin.file, atomically: true, encoding: .utf8)
+    AgentSetup.refreshSkills(of: [setup])
+    #expect(plugin.isCurrent)
+    try setup.disconnect()
+    #expect(setup.state() == .disconnected && !FileManager.default.fileExists(atPath: skill.file.path))
+}

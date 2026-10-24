@@ -1,6 +1,6 @@
 import Foundation
 
-/// A skill that tells the agent how Farol is configured. Claude Code and Codex read the same format.
+/// A skill that tells the agent how Farol is configured. Claude Code, Codex, OpenCode and Pi read the same format.
 /// The agent loads only its description until someone asks about Farol, so it costs almost no context.
 public struct AgentSkill {
     public let file: URL
@@ -59,14 +59,14 @@ public struct AgentSkill {
     Everything else is kept by the app, where only the user can change it, in Settings (⌘,). For these, tell the user where to click:
 
     - Appearance: the app icon, the panel style and grouping sessions by project.
-    - Agents: connecting Claude Code and Codex, one row per account, notifications, the Dock badge, the menu bar lighthouse or the status panel at the notch or screen edge, what new sessions start with, and whether agent conversations resume when Farol opens.
+    - Agents: connecting Claude Code, Codex, OpenCode and Pi, one row per account, notifications, the Dock badge, the menu bar lighthouse or the status panel at the notch or screen edge, what new sessions start with, and whether agent conversations resume when Farol opens.
     - Worktrees: copying ignored `.env` files into each new worktree.
     - Integrations: the `gh`, `glab` and jira-cli accounts, and which Jira tickets New Task lists.
     - Remote: letting a paired phone in, pairing a phone with Show code, removing one, keeping the Mac awake for agents, and the relay.
 
     ## Agent status
 
-    Claude Code and Codex report working, waiting and done through the hooks that Settings → Agents adds. Any other agent or script in a Farol session can report with `"$FAROL_CLI" status working`, `waiting`, `done` or `clear`. `$FAROL_CLI` is unset outside Farol. A session that stays idle usually needs its agent connected in Settings → Agents, then restarted.
+    Claude Code and Codex report working, waiting and done through the hooks that Settings → Agents adds, and OpenCode and Pi through a plugin it adds. Any other agent or script in a Farol session can report with `"$FAROL_CLI" status working`, `waiting`, `done` or `clear`, and add `--asking "<what it waits on>"`, `--tool <name>`, `--prompt "<what you asked>"` or `--session <id> --log <file>` for its conversation. `$FAROL_CLI` is unset outside Farol. A session that stays idle usually needs its agent connected in Settings → Agents, then restarted.
 
     ## Other sessions and agents
 

@@ -315,7 +315,7 @@ private struct CommitSheet: View {
     @State private var files: [Diff.File]?
     @FocusState private var typing: Bool
     @AppStorage("commit.agent") private var agent = ""
-    @State private var agents = AgentFolder.find()
+    @State private var agents = AgentFolder.find().filter { CommitMessage.arguments(for: $0.kind) != nil }
     /// The agent writing the message, to stop it when the sheet closes.
     @State private var generating: Generation?
     @State private var generationError: String?

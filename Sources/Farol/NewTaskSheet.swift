@@ -27,7 +27,7 @@ struct NewTaskSheet: View {
     let close: () -> Void
 
     @AppStorage("newTask.agent") private var agent = AgentFolder.Kind.claude.rawValue
-    /// Every Claude Code and Codex config folder found, so each account is a choice.
+    /// Every agent config folder found, so each account is a choice.
     @State private var folders = AgentFolder.find()
     @State private var task = ""
     @State private var branch = ""

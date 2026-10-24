@@ -104,3 +104,21 @@ private func home(_ folders: [String: [String]]) throws -> URL {
     #expect(AgentFolder.choice("codex", in: folders)?.label == "Codex")
     #expect(AgentFolder.choice("/gone", in: folders)?.label == "Claude Code")
 }
+
+@Test func otherAgentsShowOnceTheirFolderIsThere() throws {
+    let h = try home([".config/opencode": ["opencode.json"], ".pi/agent": ["settings.json"]])
+    #expect(AgentFolder.find(home: h, environment: [:]).map(\.label) == ["Claude Code", "Codex", "OpenCode", "Pi"])
+    let pi = AgentFolder.find(home: h, environment: ["PI_CODING_AGENT_DIR": "/work/pi-acme"]).filter { $0.kind == .pi }
+    #expect(pi.map(\.label) == ["Pi", "Pi (acme)"])
+}
+
+@Test func eachAgentStartsAndResumesItsOwnWay() {
+    let home = URL(fileURLWithPath: "/h")
+    let opencode = AgentFolder(kind: .opencode, directory: home.appendingPathComponent(".config/opencode"))
+    let pi = AgentFolder(kind: .pi, directory: home.appendingPathComponent(".pi/agent"))
+    #expect(opencode.command(task: "Fix it") == "opencode --prompt 'Fix it'")
+    #expect(opencode.resume("ses_1") == "opencode --session 'ses_1'")
+    #expect(pi.command(task: "Fix it") == "pi 'Fix it'")
+    #expect(pi.resume("019d") == "pi --session '019d'")
+    #expect(AgentFolder(log: "/h/.pi/agent/sessions/--h-app--/2026-05-03_019d.jsonl") == pi)
+}

@@ -22,7 +22,7 @@ struct SettingsPage: View {
     /// The relay field, shown only once you ask to use your own.
     @State private var relayDraft: String?
     @State private var versionCopied = false
-    /// One setup per Claude Code and Codex config folder, with each one's state by id.
+    /// One setup per agent config folder, with each one's state by id.
     @State private var agentSetups: [AgentSetup] = []
     @State private var agentFolders = AgentFolder.find()
     @State private var setups: [String: AgentSetup.State] = [:]

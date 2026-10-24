@@ -21,23 +21,52 @@ public struct AgentSetup {
     public let state: () -> State
     public let connect: () throws -> Void
     public let disconnect: () throws -> Void
+    /// Brings what Farol owns up to date without asking, at launch. Hooks share a file with yours, so they wait for a click.
+    var refresh: () -> Void = {}
 
     public static func all(folders: [AgentFolder] = AgentFolder.find()) -> [AgentSetup] {
         folders.map { folder in
             switch folder.kind {
             case .claude: claude(hooks: .claude(in: folder))
             case .codex: codex(config: folder.directory.appendingPathComponent("config.toml"), hooks: .codex(in: folder))
+            case .opencode: plugin(.opencode(in: folder), for: folder)
+            case .pi: plugin(.pi(in: folder), for: folder)
             }
         }
     }
 
     /// Hooks report working, waiting and done.
-    /// Rewrites the skill of every connected agent when Farol's text has changed, so a reworded skill needs no click.
+    /// Rewrites the skill and plugin of every connected agent when Farol's text has changed, so a reworded one needs no click.
     public static func refreshSkills(of setups: [AgentSetup] = all()) {
         for setup in setups where setup.state() != .disconnected {
             let skill = AgentSkill(nextTo: setup.file)
             if !skill.isCurrent { try? skill.install() }
+            setup.refresh()
         }
+    }
+
+    /// An agent that loads a plugin file of Farol's, which reports with `farol status`.
+    static func plugin(_ plugin: AgentPlugin, for folder: AgentFolder) -> AgentSetup {
+        // Beside the config file, as for the other agents: `<folder>/skills/farol`.
+        let skill = AgentSkill(nextTo: folder.directory.appendingPathComponent(folder.kind.configFile))
+        let title = folder.kind.title
+        var setup = AgentSetup(
+            name: folder.label,
+            id: plugin.file.path,
+            file: plugin.file,
+            connectMessage: "Farol adds a plugin, \(tilde(plugin.file)), that tells it when \(title) is working, waiting or done, and a skill in \(tilde(skill.file.deletingLastPathComponent())) so \(title) can change Farol's settings when you ask. Nothing else in your config changes. \(title) sessions that are already open need a restart to load the plugin.",
+            disconnectMessage: "The sidebar stops showing when \(title) is working, waiting or done, and Farol stops notifying you. \(title) keeps working as before. Farol removes its plugin and its skill.",
+            state: { plugin.isInstalled ? .connected : .disconnected },
+            connect: {
+                try plugin.install()
+                try skill.install()
+            },
+            disconnect: {
+                try plugin.remove()
+                try skill.remove()
+            })
+        setup.refresh = { if !plugin.isCurrent { try? plugin.install() } }
+        return setup
     }
 
     static func claude(hooks: AgentHooks = .claude) -> AgentSetup {

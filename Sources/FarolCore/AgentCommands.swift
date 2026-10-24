@@ -21,9 +21,10 @@ public struct AgentCommand: Equatable, Sendable {
 /// What an agent takes after a slash: its own commands, and the skills and commands of yours, the project's and your plugins'.
 /// Read from the agent's config folder and the project, so a phone can offer them as you type.
 public enum AgentCommands {
-    /// For the agent whose conversation is `log`, working in `project`. Without a log, Claude Code in its default folder.
-    public static func list(log: String?, project: String?, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> [AgentCommand] {
-        let folder = folder(of: log, home: home)
+    /// For the agent whose conversation is `log`, working in `project`. Without a log, `agent` in its default folder, or else Claude Code.
+    public static func list(log: String?, agent: AgentFolder.Kind? = nil, project: String?,
+                            home: URL = FileManager.default.homeDirectoryForCurrentUser) -> [AgentCommand] {
+        let folder = folder(of: log, agent: agent, home: home)
         var all: [AgentCommand]
         switch folder.kind {
         case .claude:
@@ -46,13 +47,25 @@ public enum AgentCommands {
                 skill.mention = true
                 return skill
             }
+        // Only what you wrote yourself, since a built-in Farol lists wrongly would send words the agent doesn't take.
+        case .opencode:
+            let project = project.map { URL(fileURLWithPath: $0).appendingPathComponent(".opencode") }
+            all = ([folder.directory] + (project.map { [$0] } ?? [])).flatMap { base in
+                markdown(in: base.appendingPathComponent("command")) + markdown(in: base.appendingPathComponent("commands"))
+            }
+        case .pi:
+            let project = project.map { URL(fileURLWithPath: $0).appendingPathComponent(".pi") }
+            all = ([folder.directory] + (project.map { [$0] } ?? [])).flatMap { base in
+                markdown(in: base.appendingPathComponent("prompts")) + skills(in: base.appendingPathComponent("skills"), prefix: "skill:")
+            }
         }
         var seen = Set<String>()
         return all.filter { seen.insert(($0.mention ? "$" : "/") + $0.name).inserted }.sorted { $0.name < $1.name }
     }
 
-    static func folder(of log: String?, home: URL) -> AgentFolder {
-        log.flatMap(AgentFolder.init(log:)) ?? AgentFolder(kind: .claude, directory: home.appendingPathComponent(".claude"))
+    static func folder(of log: String?, agent: AgentFolder.Kind?, home: URL) -> AgentFolder {
+        let kind = agent ?? .claude
+        return log.flatMap(AgentFolder.init(log:)) ?? AgentFolder(kind: kind, directory: home.appendingPathComponent(kind.defaultFolder))
     }
 
     /// Markdown files, each one a command named by its path, with a colon for each folder.

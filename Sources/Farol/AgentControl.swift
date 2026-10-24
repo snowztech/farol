@@ -90,8 +90,8 @@ final class AgentControl {
         let folders = AgentFolder.find()
         let wanted = (agent ?? callerAgent)?.lowercased()
         guard let folder = folders.first(where: { [$0.kind.rawValue, $0.id.lowercased(), $0.label.lowercased()].contains(wanted) }) ?? (agent == nil ? folders.first : nil) else {
-            return connection.reply(ControlReply.failed(agent.map { "No agent is called \($0). Use claude or codex, connected in Settings → Agents." }
-                ?? "Connect Claude Code or Codex in Settings → Agents first."))
+            return connection.reply(ControlReply.failed(agent.map { "No agent is called \($0). Use \(AgentFolder.Kind.allCases.map(\.rawValue).joined(separator: ", ")), connected in Settings → Agents." }
+                ?? "Connect an agent in Settings → Agents first."))
         }
         // Opened beside the one on screen, so an agent's task never takes the window from you.
         store.startTask(text, in: directory, with: folder, copyEnvironmentFiles: worktrees.copyEnvironmentFiles, select: false) { [weak self] result in
