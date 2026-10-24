@@ -455,12 +455,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// Anything else is shown in Finder rather than opened, since opening an unknown binary could run it.
     private func open(_ path: String, line: Int? = nil) {
         let url = URL(fileURLWithPath: path)
-        // SVG is an image to macOS, but here it is code you might want to read.
-        if let type = UTType(filenameExtension: url.pathExtension), !type.conforms(to: .svg),
-           [UTType.image, .pdf, .audiovisualContent].contains(where: type.conforms) {
-            NSWorkspace.shared.open(url)
-        } else if case .text? = try? Files.read(path) {
+        // The contents decide before the extension does, since macOS calls a TypeScript .ts a video and an SVG an image.
+        if case .text? = try? Files.read(path) {
             store.selected?.panes.open(path, line: line)
+        } else if let type = UTType(filenameExtension: url.pathExtension),
+                  [UTType.image, .pdf, .audiovisualContent].contains(where: type.conforms) {
+            NSWorkspace.shared.open(url)
         } else {
             NSWorkspace.shared.activateFileViewerSelecting([url])
         }
