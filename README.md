@@ -98,20 +98,28 @@ When an agent waits or finishes while Farol is in the background, you get a noti
 <details>
 <summary>Add Farol support to your agent</summary>
 
-Call `farol status` from your agent's hooks or plugin. `FAROL_CLI` and `FAROL_PANE` are set only inside Farol, so check for them and do nothing otherwise.
+Nothing to install: your agent runs `farol status` when something happens in it, from its hooks, a plugin or an extension. Farol puts `FAROL_CLI` in every session's environment, and it is unset elsewhere, so check for it and do nothing outside Farol.
 
-```sh
-"$FAROL_CLI" status start --session "$ID" --log "$LOG"   # a conversation began, or was resumed
-"$FAROL_CLI" status working --prompt "fix the login bug"    # what the user just asked
-"$FAROL_CLI" status waiting --tool Bash --asking "npm test" # it needs an approval or an answer
-"$FAROL_CLI" status done                                    # its turn ended
-"$FAROL_CLI" status clear                                   # it quit, or was interrupted
-```
+| When your agent | It runs | Needed |
+| --- | --- | --- |
+| Starts working on a prompt | `"$FAROL_CLI" status working` | Yes |
+| Ends its turn | `"$FAROL_CLI" status done` | Yes |
+| Waits for an approval or an answer | `"$FAROL_CLI" status waiting --tool Bash --asking "npm test"` | For the yellow dot |
+| Quits, or is interrupted | `"$FAROL_CLI" status clear` | No |
+| Starts or resumes a conversation | `"$FAROL_CLI" status start --session "$ID" --log "$LOG"` | No |
 
-- `--asking` is what the sidebar, the notification and the phone show while it waits.
+- `--asking` is what the sidebar, the notification and the phone show while it waits. `--tool` is optional.
+- `--prompt "<text>"` on `working` shows what you asked before the agent's log has it.
 - `--session` and `--log` together name the conversation, so Farol can resume it after a relaunch. The phone reads the log when Farol knows its format.
 - Report one call at a time, in order, and never wait on Farol: a hook must not hold the agent up.
-- Farol's own plugins, in `Sources/FarolCore/AgentPlugin.swift`, are short examples.
+
+A hook that runs a shell command can be one line:
+
+```sh
+[ -z "$FAROL_CLI" ] || "$FAROL_CLI" status done
+```
+
+Farol's own OpenCode and Pi plugins, in `Sources/FarolCore/AgentPlugin.swift`, are short examples in JavaScript.
 
 </details>
 
