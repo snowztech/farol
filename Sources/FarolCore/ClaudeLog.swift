@@ -155,6 +155,8 @@ final class ClaudeLog: AgentLog {
             return Transcript.Message(id: id, role: .tool, text: string("description") ?? name, tool: name)
         case "TodoWrite":
             return Transcript.Message(id: id, role: .tool, text: "Updated the to-do list", tool: name)
+        case "AskUserQuestion":
+            return Transcript.question(input["questions"] as? [[String: Any]] ?? [], id: id) ?? Transcript.Message(id: id, role: .tool, text: name, tool: name)
         default:
             return Transcript.Message(id: id, role: .tool, text: string("skill") ?? string("description") ?? name, tool: name)
         }

@@ -71,6 +71,12 @@ final class CodexLog: AgentLog {
     /// What a Codex tool call did: an edit, from the patch it applied, or the commands it ran.
     /// Its calls are a small script, `tools.exec_command({"cmd": "…"})`, or a patch between `*** Begin Patch` and `*** End Patch`.
     static func tool(_ input: String, name: String? = nil, in folder: String?, id: String) -> Transcript.Message? {
+        // Codex asks with request_user_input, and while it works with request_user_input_async.
+        if let name, name.hasPrefix("request_user_input"),
+           let arguments = (try? JSONSerialization.jsonObject(with: Data(input.utf8))) as? [String: Any],
+           let question = Transcript.question(arguments["questions"] as? [[String: Any]] ?? [], id: id) {
+            return question
+        }
         if let patch = patch(in: input) {
             let files = patch.split(separator: "\n").compactMap { $0.firstMatch(of: #/^\*\*\* (?:Update|Add|Delete) File: (.+)$/#).map { String($0.1) } }
             let diff = patch.split(separator: "\n", omittingEmptySubsequences: false).map { line -> String in
