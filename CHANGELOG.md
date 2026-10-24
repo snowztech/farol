@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- A notification for an agent that waits on you says what it asks, and so does the Live Activity on the lock screen.
+
 ## [0.50.0] - 2026-10-24
 
 See from the phone what each agent asks, and start tasks there on a branch of their own.
