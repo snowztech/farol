@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- Links defined further down a Markdown file, like the version links under a changelog, work in the preview instead of showing as lines of text.
+
 ## [0.51.0] - 2026-10-24
 
 OpenCode and Pi join Claude Code and Codex, any agent can report its status, and notifications say what a waiting agent asks.

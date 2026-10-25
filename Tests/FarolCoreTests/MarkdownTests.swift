@@ -20,6 +20,23 @@ import Testing
     #expect(Markdown.blocks(in: "---\nafter") == [.rule, .paragraph("after")])
 }
 
+@Test func readsLinksDefinedElsewhere() {
+    let text = """
+    See [0.2.1], [the docs][docs], [Docs][] and [no such link].
+
+    ```
+    [kept]: https://code
+    ```
+
+    [0.2.1]: https://farol.sh/releases/0.2.1
+    [docs]: <https://farol.sh/docs> "Docs"
+    """
+    #expect(Markdown.blocks(in: text) == [
+        .paragraph("See [0.2.1](https://farol.sh/releases/0.2.1), [the docs](https://farol.sh/docs), [Docs](https://farol.sh/docs) and [no such link]."),
+        .code(language: nil, text: "[kept]: https://code"),
+    ])
+}
+
 @Test func readsFencedCodeAsItIs() {
     let blocks = Markdown.blocks(in: "```swift\nlet x = 1\n\n  # not a heading\n```\nafter")
     #expect(blocks == [.code(language: "swift", text: "let x = 1\n\n  # not a heading"), .paragraph("after")])
