@@ -195,6 +195,14 @@ final class Session: ObservableObject, Identifiable {
     /// What each pane's screen asked when last read, so a list sent often does not read every screen each time.
     private var screenAsking: [UUID: (at: Date, text: String?)] = [:]
 
+    /// The agent the sidebar marks the session with: the focused pane's, or else the first pane's that runs one.
+    var agentKind: AgentFolder.Kind? {
+        ([panes.focused] + panes.terminals).lazy.compactMap { self.agent(in: $0).flatMap(AgentFolder.Kind.init) }.first
+    }
+
+    /// When an agent in the session last said what it does, so the sidebar can say how long one has waited or been done.
+    var lastReport: Date? { agents.values.compactMap(\.since).max() }
+
     /// An agent runs in the pane, from its first report until it ends. Before its first message it may have no log yet.
     func agentRuns(in pane: UUID) -> Bool { agents[pane]?.reports == true }
 
