@@ -693,11 +693,20 @@ struct ReviewPanel: View {
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 0) {
+                        // A file's header stays at the top while its lines scroll, so it can always be folded or left out.
+                        LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
                             if let discussion = review.discussion, review.scope == review.shownRequest.map({ .request($0.number) }) {
                                 Conversation(description: discussion.description, comments: review.conversation, palette: p, reveal: review.reveal)
                             }
-                            ForEach(review.rows) { row(for: $0, p) }
+                            ForEach(sections) { section in
+                                Section {
+                                    ForEach(section.rows) { row(for: $0, p) }
+                                } header: {
+                                    if let head = section.header {
+                                        row(for: head, p).background(p.background).id(head.id)
+                                    }
+                                }
+                            }
                         }
                         .padding(.bottom, 12)
                     }
@@ -712,6 +721,27 @@ struct ReviewPanel: View {
         .background(p.background)
         .overlay(alignment: .leading) { edge(p) }
         .commitSheet(review, palette: p)
+    }
+
+    private struct FileSection: Identifiable {
+        let header: ReviewModel.Row?
+        var rows: [ReviewModel.Row]
+        var id: String { header?.id ?? "" }
+    }
+
+    /// The rows cut at each file header, so the header can pin over the rows under it.
+    private var sections: [FileSection] {
+        var result: [FileSection] = []
+        for row in review.rows {
+            if case .header = row {
+                result.append(FileSection(header: row, rows: []))
+            } else if result.isEmpty {
+                result.append(FileSection(header: nil, rows: [row]))
+            } else {
+                result[result.count - 1].rows.append(row)
+            }
+        }
+        return result
     }
 
     /// Looking at one commit or a request, the working tree plays no part, so there is nothing to offer a commit for.
