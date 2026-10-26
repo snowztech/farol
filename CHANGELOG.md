@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.51.1] - 2026-10-26
+
+Farol opens again on a Mac set to a language like Brazilian Portuguese, and Markdown links defined lower in a file work.
+
 ### Fixed
 
 - Farol opens on a Mac whose language writes decimals with a comma, like Brazilian Portuguese. It used to crash on launch.
