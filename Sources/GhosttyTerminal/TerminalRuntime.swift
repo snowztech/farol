@@ -32,6 +32,7 @@ public final class TerminalRuntime {
         if ghostty_init(UInt(CommandLine.argc), CommandLine.unsafeArgv) != GHOSTTY_SUCCESS {
             fatalError("ghostty_init failed")
         }
+        setlocale(LC_NUMERIC, "C")
         self.overrideFiles = overrideFiles
         config = Self.loadConfig(overrideFiles)
         configErrors = Self.errors(in: config)
