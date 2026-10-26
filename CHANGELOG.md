@@ -1037,8 +1037,32 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.47.1...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.51.1...HEAD
+[0.51.1]: https://github.com/snowztech/farol/releases/tag/v0.51.1
+[0.51.0]: https://github.com/snowztech/farol/releases/tag/v0.51.0
+[0.50.0]: https://github.com/snowztech/farol/releases/tag/v0.50.0
+[0.49.0]: https://github.com/snowztech/farol/releases/tag/v0.49.0
+[0.48.0]: https://github.com/snowztech/farol/releases/tag/v0.48.0
+[0.47.2]: https://github.com/snowztech/farol/releases/tag/v0.47.2
 [0.47.1]: https://github.com/snowztech/farol/releases/tag/v0.47.1
+[0.47.0]: https://github.com/snowztech/farol/releases/tag/v0.47.0
+[0.46.0]: https://github.com/snowztech/farol/releases/tag/v0.46.0
+[0.45.0]: https://github.com/snowztech/farol/releases/tag/v0.45.0
+[0.44.0]: https://github.com/snowztech/farol/releases/tag/v0.44.0
+[0.43.1]: https://github.com/snowztech/farol/releases/tag/v0.43.1
+[0.43.0]: https://github.com/snowztech/farol/releases/tag/v0.43.0
+[0.42.0]: https://github.com/snowztech/farol/releases/tag/v0.42.0
+[0.41.0]: https://github.com/snowztech/farol/releases/tag/v0.41.0
+[0.40.1]: https://github.com/snowztech/farol/releases/tag/v0.40.1
+[0.40.0]: https://github.com/snowztech/farol/releases/tag/v0.40.0
+[0.39.1]: https://github.com/snowztech/farol/releases/tag/v0.39.1
+[0.39.0]: https://github.com/snowztech/farol/releases/tag/v0.39.0
+[0.38.0]: https://github.com/snowztech/farol/releases/tag/v0.38.0
+[0.37.0]: https://github.com/snowztech/farol/releases/tag/v0.37.0
+[0.36.1]: https://github.com/snowztech/farol/releases/tag/v0.36.1
+[0.36.0]: https://github.com/snowztech/farol/releases/tag/v0.36.0
+[0.35.0]: https://github.com/snowztech/farol/releases/tag/v0.35.0
+[0.34.0]: https://github.com/snowztech/farol/releases/tag/v0.34.0
 [0.33.0]: https://github.com/snowztech/farol/releases/tag/v0.33.0
 [0.32.1]: https://github.com/snowztech/farol/releases/tag/v0.32.1
 [0.32.0]: https://github.com/snowztech/farol/releases/tag/v0.32.0
