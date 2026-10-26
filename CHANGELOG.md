@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- In the review panel, a file's header stays at the top while you scroll its diff, so you can fold it or leave it out of the commit from anywhere in it.
+
 ## [0.51.1] - 2026-10-26
 
 Farol opens again on a Mac set to a language like Brazilian Portuguese, and Markdown links defined lower in a file work.
