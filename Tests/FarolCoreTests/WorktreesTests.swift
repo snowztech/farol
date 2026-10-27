@@ -25,6 +25,16 @@ struct Sandbox {
     #expect(Worktrees.branchName(from: "...") == nil)
 }
 
+/// The names that get past the character filter, each judged as git judges it.
+@Test func branchNamesFollowGitsRules() throws {
+    let names = ["HEAD", "head", "-x", "x-", "a//b", ".a", "a/.b", "a..b", "a.", "a./b", "a.lock", "a.lock/b", "a/b.lock",
+                 "a.lock.lock", "a.b.lock.x", "a/-b", "-a/b", "a/b/", "x/HEAD", "é-fix", "a_b", "a/b/c"]
+    for name in names {
+        let git = (try? Git.run(["check-ref-format", "--branch", name], in: "/")) != nil
+        #expect(Worktrees.isBranchName(name) == git, "\(name)")
+    }
+}
+
 @Test func createsWorktreeOnNewBranch() throws {
     let box = try Sandbox()
     let path = try box.worktrees.create(branch: "feat/x", from: box.repo)

@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 
 /// The New Task sheet: what to do, on which branch, with which agent.
 struct NewTaskSheet: View {
-    private enum Field { case task, branch, repos }
+    private enum Field { case branch, repos }
 
     let directory: String
     let repo: String
@@ -30,6 +30,12 @@ struct NewTaskSheet: View {
     /// Every agent config folder found, so each account is a choice.
     @State private var folders = AgentFolder.find()
     @State private var task = ""
+    /// Files and pictures for the agent, pasted or dropped on the task. It gets their paths.
+    @State private var attachments: [URL] = []
+    @State private var taskHeight = TaskField.height(lines: 3)
+    @State private var taskFocused = false
+    /// Bumped to put the cursor back in the task, which is AppKit's and so outside `focus`.
+    @State private var focusTask = 1
     @State private var branch = ""
     /// The branch follows the task until you edit it yourself.
     @State private var branchEdited = false
@@ -88,9 +94,12 @@ struct NewTaskSheet: View {
     }
 
     private var text: String { task.trimmingCharacters(in: .whitespacesAndNewlines) }
-    /// The picked ticket in full, which the sheet doesn't show, then what you typed.
+    /// The picked ticket in full, which the sheet doesn't show, the attachments' paths, one a line as the phone sends them, then what you typed.
     private var prompt: String {
-        [picked?.task ?? "", text].filter { !$0.isEmpty }.joined(separator: "\n\n")
+        [picked?.task ?? "", attachments.map(\.path).joined(separator: "\n"), text].filter { !$0.isEmpty }.joined(separator: "\n\n")
+    }
+    private var canStart: Bool {
+        !prompt.isEmpty && name != nil && !sources.isEmpty && duplicateRepoName == nil && !checkingRepos
     }
     private var name: String? { Worktrees.branchName(from: branch) }
     private var choice: AgentFolder { AgentFolder.choice(agent, in: folders) ?? folders[0] }
@@ -136,16 +145,32 @@ struct NewTaskSheet: View {
                     ticketPlaceholder(p)
                 }
                 if let picked, !picked.description.isEmpty { ticketPreview(picked.description, p) }
-                // Return starts the task. Option-Return adds a line, for longer ones.
-                TextField(picked == nil ? "What should the agent do?" : "Anything to add? The agent gets the ticket as it is.",
-                          text: $task, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .lineLimit(3...8)
-                    .focused($focus, equals: .task)
-                    .sheetField(p, focused: focus == .task)
-                    .onChange(of: task) { _, task in
-                        if !branchEdited { branch = NewTask.branchName(for: task) }
+                VStack(alignment: .leading, spacing: 6) {
+                    TaskField(
+                        placeholder: picked == nil ? "What should the agent do?" : "Anything to add? The agent gets the ticket as it is.",
+                        text: $task, height: $taskHeight, focusRequest: focusTask, palette: p,
+                        focused: { taskFocused = $0 },
+                        attach: { urls in attachments += urls.filter { !attachments.contains($0) } },
+                        submit: { if canStart { startTask() } },
+                        cancel: close)
+                        .frame(height: taskHeight)
+                        .sheetField(p, focused: taskFocused)
+                        .onChange(of: task) { _, task in
+                            if !branchEdited { branch = NewTask.branchName(for: task) }
+                        }
+                    if !attachments.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(attachments, id: \.self) { url in
+                                    AttachmentChip(url: url, palette: p) { attachments.removeAll { $0 == url } }
+                                }
+                            }
+                        }
                     }
+                    Text("↩ start · ⇧↩ new line · paste or drop pictures and files")
+                        .font(.system(size: 11))
+                        .foregroundStyle(p.muted)
+                }
                 if !listed.isEmpty {
                     repoChecklist(p)
                 } else if let root {
@@ -176,16 +201,10 @@ struct NewTaskSheet: View {
                 Button("Cancel", action: close)
                     .buttonStyle(SheetButton(palette: p, primary: false))
                     .keyboardShortcut(.cancelAction)
-                Button("Start") {
-                    guard let name else { return }
-                    let command = choice.command() + " \"$\(NewTask.variable)\""
-                    close()
-                    // The worktree may fail and show why, which needs this sheet gone first.
-                    DispatchQueue.main.async { [sources] in start(name, command, prompt, sources) }
-                }
-                .buttonStyle(SheetButton(palette: p, primary: true))
-                .keyboardShortcut(.defaultAction)
-                .disabled(prompt.isEmpty || name == nil || sources.isEmpty || duplicateRepoName != nil || checkingRepos)
+                Button("Start", action: startTask)
+                    .buttonStyle(SheetButton(palette: p, primary: true))
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!canStart)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
@@ -195,7 +214,6 @@ struct NewTaskSheet: View {
         .frame(width: 460)
         .background(p.background)
         .ignoresSafeArea()
-        .onAppear { focus = .task }
         .fileImporter(isPresented: $choosingRepos, allowedContentTypes: [.folder], allowsMultipleSelection: true) { result in
             switch result {
             case .success(let urls): addRepositories(urls)
@@ -462,6 +480,14 @@ struct NewTaskSheet: View {
         }
     }
 
+    private func startTask() {
+        guard canStart, let name else { return }
+        let command = choice.command() + " \"$\(NewTask.variable)\""
+        close()
+        // The worktree may fail and show why, which needs this sheet gone first.
+        DispatchQueue.main.async { [sources, prompt] in start(name, command, prompt, sources) }
+    }
+
     private func fill(from ticket: Ticket) {
         picked = ticket
         branch = ticket.branch
@@ -469,7 +495,7 @@ struct NewTaskSheet: View {
         branchEdited = true
         pickingTicket = false
         query = ""
-        focus = .task
+        focusTask += 1
     }
 
     private func dropTicket() {
@@ -477,7 +503,48 @@ struct NewTaskSheet: View {
         branchEdited = false
         branch = NewTask.branchName(for: task)
         pickingTicket = false
-        focus = .task
+        focusTask += 1
+    }
+}
+
+/// A file or picture going to the agent, with a way to take it back.
+private struct AttachmentChip: View {
+    let url: URL
+    let palette: Palette
+    let remove: () -> Void
+
+    /// Read once, since the sheet redraws on every key typed in the task.
+    @State private var thumbnail: NSImage?
+
+    /// A pasted picture is saved under a made-up name, which says nothing.
+    private var name: String {
+        url.deletingLastPathComponent().path == TaskTextView.inbox.folder.path ? "Pasted picture" : url.lastPathComponent
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if let thumbnail {
+                Image(nsImage: thumbnail).resizable().scaledToFill().frame(width: 18, height: 18).clipShape(RoundedRectangle(cornerRadius: 3))
+            } else {
+                Image(systemName: "doc").foregroundStyle(palette.muted)
+            }
+            Text(name).lineLimit(1).truncationMode(.middle).frame(maxWidth: 180, alignment: .leading)
+            Button(action: remove) {
+                Image(systemName: "xmark").font(.system(size: 9, weight: .semibold)).foregroundStyle(palette.muted)
+            }
+            .buttonStyle(.plain)
+            .hoverTip("Remove")
+        }
+        .font(.system(size: 12))
+        .padding(.horizontal, 8)
+        .frame(height: 26)
+        .background(RoundedRectangle(cornerRadius: 6).fill(palette.surface))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(palette.line))
+        .hoverTip(url.path)
+        .task(id: url) {
+            guard UTType(filenameExtension: url.pathExtension)?.conforms(to: .image) == true else { return }
+            thumbnail = NSImage(contentsOf: url)
+        }
     }
 }
 
