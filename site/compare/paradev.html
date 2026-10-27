@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Farol vs Paradev (Superset): an open source alternative</title>
+  <meta name="description" content="Farol and Paradev (formerly Superset) both run Claude Code and Codex in parallel git worktrees. How they differ: native vs Electron, MIT vs Elastic License, a free phone app, price and platforms.">
+  <link rel="canonical" href="https://farol.sh/compare/paradev">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Farol">
+  <meta property="og:url" content="https://farol.sh/compare/paradev">
+  <meta property="og:title" content="Farol vs Paradev (formerly Superset)">
+  <meta property="og:description" content="Two apps for running coding agents in parallel worktrees, compared feature by feature.">
+  <meta property="og:image" content="https://farol.sh/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="article:published_time" content="2026-10-27">
+  <meta property="article:modified_time" content="2026-10-27">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/icon.png">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Farol vs Paradev (formerly Superset)",
+    "description": "Farol and Paradev (formerly Superset) both run Claude Code and Codex in parallel git worktrees. How they differ, feature by feature.",
+    "url": "https://farol.sh/compare/paradev",
+    "image": "https://farol.sh/og.png",
+    "datePublished": "2026-10-27",
+    "dateModified": "2026-10-27",
+    "author": { "@type": "Person", "name": "Lucas Neves Pereira", "url": "https://github.com/lucasnevespereira" },
+    "publisher": { "@type": "Organization", "name": "Farol", "url": "https://farol.sh/" },
+    "about": [
+      { "@type": "SoftwareApplication", "name": "Farol", "url": "https://farol.sh/", "applicationCategory": "DeveloperApplication", "operatingSystem": "macOS" },
+      { "@type": "SoftwareApplication", "name": "Paradev", "alternateName": "Superset", "url": "https://paradev.com/", "applicationCategory": "DeveloperApplication" }
+    ]
+  }
+  </script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.2/dist/snowztech-ui.min.css">
+  <script>
+    if (matchMedia("(prefers-color-scheme: light)").matches) document.documentElement.dataset.theme = "light";
+  </script>
+  <style>
+    body {
+      margin: 0; background: var(--sn-bg); color: var(--sn-fg);
+      font-family: var(--sn-font-mono); font-size: var(--sn-text-base);
+      line-height: var(--sn-leading-normal);
+    }
+    a { color: inherit; }
+    .wide { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+
+    .topbar { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; text-decoration: none; }
+    .brand img { width: 30px; height: 30px; }
+    .topbar nav { display: flex; gap: 18px; font-size: var(--sn-text-sm); }
+    .topbar nav a { color: var(--sn-fg-muted); text-decoration: none; }
+    .topbar nav a:hover { color: var(--sn-fg); }
+
+    html { scroll-behavior: smooth; }
+    .post { max-width: 1080px; margin: 0 auto; padding: 48px 20px 0; display: grid; gap: 0 64px; }
+    article { min-width: 0; max-width: 680px; }
+    article h2 { scroll-margin-top: 24px; }
+
+    .toc { margin-bottom: 32px; font-size: var(--sn-text-sm); }
+    .toc details { border: 1px solid var(--sn-border-subtle); border-radius: 8px; padding: 12px 16px; }
+    .toc summary { cursor: pointer; font-weight: 500; }
+    .toc ul { list-style: none; margin: 12px 0 0; padding: 0; }
+    .toc li + li { margin-top: 8px; }
+    .toc a { color: var(--sn-fg-muted); text-decoration: none; }
+    .toc a:hover { color: var(--sn-fg); }
+    /* Wide screens: the contents sit beside the page and stay in view. */
+    @media (min-width: 1000px) {
+      .post { grid-template-columns: minmax(0, 680px) 220px; grid-template-areas: "head toc" "body toc"; justify-content: center; }
+      .head { grid-area: head; }
+      article { grid-area: body; }
+      .toc { grid-area: toc; align-self: start; position: sticky; top: 24px; margin: 0; padding-top: 8px; }
+      .toc details { border: 0; padding: 0; }
+      .toc summary { list-style: none; pointer-events: none; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); text-transform: uppercase; letter-spacing: 0.12em; }
+      .toc summary::-webkit-details-marker { display: none; }
+    }
+    .meta { margin: 0 0 12px; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); }
+    h1 { margin: 0 0 24px; font-size: 28px; font-weight: 600; line-height: 1.25; letter-spacing: -0.02em; }
+    h2 { margin: 48px 0 16px; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+    h3 { margin: 28px 0 8px; font-size: inherit; font-weight: 600; }
+    p, li { color: var(--sn-fg-muted); }
+    p { margin: 0 0 16px; }
+    ul.list { margin: 0 0 16px; padding-left: 20px; }
+    ul.list li + li { margin-top: 8px; }
+    article a { color: var(--sn-fg); text-underline-offset: 3px; }
+    strong { color: var(--sn-fg); font-weight: 600; }
+    code {
+      padding: 1px 5px; border: 1px solid var(--sn-border-subtle); border-radius: 4px;
+      background: var(--sn-bg-raised); color: var(--sn-fg); font: inherit;
+    }
+    pre {
+      margin: 0 0 20px; padding: 16px 18px; overflow-x: auto;
+      border: 1px solid var(--sn-border-subtle); border-radius: 8px;
+      background: var(--sn-bg-raised); color: var(--sn-fg); font-size: var(--sn-text-sm); line-height: 1.6;
+    }
+    pre code { padding: 0; border: 0; background: none; }
+
+    /* A phone scrolls the table sideways rather than squeezing three columns of text. */
+    .table { margin: 0 0 24px; overflow-x: auto; border: 1px solid var(--sn-border-subtle); border-radius: 8px; }
+    table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: var(--sn-text-sm); }
+    th, td { padding: 10px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--sn-border-subtle); }
+    tr:last-child th, tr:last-child td { border-bottom: 0; }
+    thead th { color: var(--sn-fg); font-weight: 600; background: var(--sn-bg-raised); }
+    tbody th { width: 11em; color: var(--sn-fg); font-weight: 500; }
+    td { color: var(--sn-fg-muted); }
+
+    .wideshot { display: block; width: 100%; height: auto; margin: 8px 0 24px; border: 1px solid var(--sn-border-strong); border-radius: 10px; }
+    .note { padding: 14px 16px; border: 1px solid var(--sn-border-subtle); border-radius: 8px; font-size: var(--sn-text-sm); }
+    .try { margin-top: 48px; padding: 20px; border: 1px solid var(--sn-border-subtle); border-radius: 10px; }
+    .try p:last-child { margin: 0; }
+    .sources { font-size: var(--sn-text-sm); }
+
+    footer {
+      margin: 96px auto 0; padding: 20px 20px 40px; max-width: 1040px;
+      border-top: 1px solid var(--sn-border-subtle);
+      display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+      color: var(--sn-fg-subtle); font-size: var(--sn-text-xs);
+    }
+    footer a { color: var(--sn-fg-muted); text-decoration: none; }
+    footer a:hover { color: var(--sn-fg); }
+    @media (max-width: 600px) {
+      h1 { font-size: 23px; }
+      h2 { font-size: 18px; margin-top: 40px; }
+      pre { font-size: 12px; padding: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar wide">
+    <a class="brand" href="/"><img src="/icon.png" alt="">Farol</a>
+    <nav><a href="/remote">Remote</a><a href="/docs">Docs</a><a href="/blog/">Blog</a></nav>
+  </header>
+
+  <main class="post">
+    <header class="head">
+      <p class="meta">Last checked <time datetime="2026-10-27">October 27, 2026</time> · Lucas Neves Pereira</p>
+      <h1>Farol vs Paradev (formerly Superset)</h1>
+    </header>
+    <nav class="toc" aria-label="On this page">
+      <details>
+        <summary>On this page</summary>
+        <ul>
+          <li><a href="#the-short-version">The short version</a></li>
+          <li><a href="#side-by-side">Side by side</a></li>
+          <li><a href="#where-farol-is-ahead">Where Farol is ahead</a></li>
+          <li><a href="#where-paradev-is-ahead">Where Paradev is ahead</a></li>
+          <li><a href="#which-one-to-pick">Which one to pick</a></li>
+          <li><a href="#moving-from-paradev-to-farol">Moving from Paradev to Farol</a></li>
+          <li><a href="#questions">Questions</a></li>
+          <li><a href="#sources">Sources</a></li>
+        </ul>
+      </details>
+    </nav>
+    <article>
+      <p>Farol and Paradev do the same job. You run several coding agents at once, like Claude Code and Codex, each in its own git worktree, and you review what they did before it ships. Paradev was called Superset until its rename, and its CLI is still named <code>superset</code>.</p>
+      <p>I make Farol, so weigh what follows with that in mind. Every claim about Paradev links to its own site or docs, and the page says where Paradev is the better choice.</p>
+
+      <h2 id="the-short-version">The short version</h2>
+      <ul class="list">
+        <li><strong>Pick Farol</strong> if you want a fast native Mac terminal, an open source license, and a phone app that costs nothing.</li>
+        <li><strong>Pick Paradev</strong> if you need Linux or an Intel Mac, agents that start on a schedule, cloud workspaces, or Slack and Linear built in.</li>
+      </ul>
+
+      <h2 id="side-by-side">Side by side</h2>
+      <div class="table">
+        <table>
+          <thead>
+            <tr><th scope="col"></th><th scope="col">Farol</th><th scope="col">Paradev</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">App</th><td>Native macOS app on libghostty, the engine behind Ghostty</td><td>Electron and React</td></tr>
+            <tr><th scope="row">License</th><td>MIT, open source</td><td>Elastic License 2.0, source available</td></tr>
+            <tr><th scope="row">Price</th><td>Free</td><td>Free for local workspaces. Pro is $20 a month per user, $16 billed yearly</td></tr>
+            <tr><th scope="row">Platforms</th><td>macOS 14+, Apple silicon</td><td>macOS on Apple silicon or Intel. Linux in an experimental AppImage</td></tr>
+            <tr><th scope="row">Agents</th><td>Claude Code, Codex, OpenCode and Pi in one click. Any other through <code>farol status</code></td><td>Any CLI agent. Claude Code and Codex detected on first launch</td></tr>
+            <tr><th scope="row">Worktree per task</th><td>Yes, also one task across several repos</td><td>Yes</td></tr>
+            <tr><th scope="row">Review</th><td>One scrolling diff, commit, push, open a PR on GitHub or MR on GitLab</td><td>Diff viewer with comments and edits, then commit and push</td></tr>
+            <tr><th scope="row">Merge conflicts</th><td>Three-column resolver</td><td>Not advertised</td></tr>
+            <tr><th scope="row">Tasks from tickets</th><td>Jira and GitHub issues</td><td>Linear, on Pro</td></tr>
+            <tr><th scope="row">Phone</th><td>Free iPhone app, end-to-end encrypted. In beta on TestFlight</td><td>iPhone and iPad app on the App Store, on Pro</td></tr>
+            <tr><th scope="row">Agents on another machine</th><td><code>farol-host</code> on a server of your own, experimental</td><td>Remote access to another machine, on Pro</td></tr>
+            <tr><th scope="row">Scheduled agents</th><td>On the roadmap</td><td>Automations, on Pro</td></tr>
+            <tr><th scope="row">Cloud workspaces</th><td>No</td><td>Yes, from the Team plan</td></tr>
+            <tr><th scope="row">Built-in browser</th><td>No. Ports open in your browser</td><td>Yes</td></tr>
+            <tr><th scope="row">Scripting</th><td><code>farol</code> CLI: sessions, tasks, wait, read and send</td><td>CLI, TypeScript SDK and MCP server</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="where-farol-is-ahead">Where Farol is ahead</h2>
+      <h3>A native terminal, not a web view</h3>
+      <p>Farol is a Swift app built on libghostty, the same engine as Ghostty. It reads your Ghostty config and themes. Sessions you aren't looking at keep running but stop drawing, so twenty agents in the background cost no GPU time. Paradev is built on Electron.</p>
+      <h3>Open source, and free all the way</h3>
+      <p>Farol is MIT licensed. Paradev's code is public under the Elastic License 2.0, which its own site says is not an approved open source license. Paradev's desktop app is free, and remote access, automations and its mobile app need Pro. Farol has no paid plan.</p>
+      <h3>The phone app costs nothing</h3>
+      <p>Farol for iPhone lists your sessions, notifies you when an agent waits, and lets you answer Claude Code or Codex with a tap. Messages go through a relay that can't read them. It also works with agents on a server of your own. <a href="/blog/claude-code-from-your-phone">How the encryption works</a>.</p>
+      <img class="wideshot" src="/features/review.png" width="2540" height="1520" loading="lazy"
+           alt="Farol's review panel showing a branch's changes since main as one scrolling diff, next to Claude Code in the terminal">
+      <h3>More of git in one window</h3>
+      <p>Besides the review panel, Farol has a git graph where you check out, rebase or cherry-pick, and a three-column resolver when a merge or rebase stops on conflicts. A New task can start from a Jira ticket or a GitHub issue, and one task can span several repos, each in its own worktree on the same branch.</p>
+      <h3>Status from any app</h3>
+      <p>A lighthouse in the menu bar, or a small panel at the notch, shows which agents work, wait or are done while you're in another app.</p>
+
+      <h2 id="where-paradev-is-ahead">Where Paradev is ahead</h2>
+      <ul class="list">
+        <li><strong>More platforms.</strong> Intel Macs, and Linux in an experimental build. Farol needs Apple silicon.</li>
+        <li><strong>Automations.</strong> Agents that start on a schedule or on an event, like triaging new issues. Farol has scheduled tasks on its roadmap.</li>
+        <li><strong>Cloud workspaces</strong>, so nothing has to run on your machine. Farol keeps everything on your Mac or your own server.</li>
+        <li><strong>Setup scripts</strong> that run when a workspace is created, like <code>bun install</code>. Farol copies <code>.env</code> files into new worktrees, and its own setup scripts are on the roadmap.</li>
+        <li><strong>A browser inside the app</strong>, and integrations with Slack and Linear.</li>
+        <li><strong>An SDK and an MCP server</strong>, and a larger team and community behind it.</li>
+      </ul>
+
+      <h2 id="which-one-to-pick">Which one to pick</h2>
+      <p>If you live in the terminal on a Mac and care about speed, an open license and answering agents from your phone without a subscription, try Farol. If your team needs Linux, cloud workspaces or agents that run on their own on a schedule, Paradev covers more of that today.</p>
+      <p>You don't have to choose blind. Both are free to try, and both work with the agents you already pay for.</p>
+
+      <h2 id="moving-from-paradev-to-farol">Moving from Paradev to Farol</h2>
+      <p>Install Farol from the <a href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">download</a> or with Homebrew:</p>
+      <pre><code>brew install --cask snowztech/tap/farol</code></pre>
+      <ul class="list">
+        <li>Connect Claude Code and Codex in Settings → Agents, one click each.</li>
+        <li>Press ⇧⌘N, describe the task and pick an agent. Farol creates the worktree and starts the agent on it.</li>
+        <li>Worktrees you already have are plain git worktrees. Open their folders as sessions and carry on.</li>
+        <li>To answer from your phone, turn on Remote in Settings and scan the code with <a href="/remote">Farol for iPhone</a>.</li>
+      </ul>
+
+      <h2 id="questions">Questions</h2>
+      <h3>Is Paradev the same as Superset?</h3>
+      <p>Yes. Paradev is the new name for Superset. Its CLI is still called <code>superset</code>, and its Homebrew formula is <code>paradevai/tap/superset</code>. It isn't related to Apache Superset, the data dashboard tool.</p>
+      <h3>Is Farol open source?</h3>
+      <p>Yes, under the MIT license. The source is on <a href="https://github.com/snowztech/farol">GitHub</a>.</p>
+      <h3>Does Farol need an account?</h3>
+      <p>No. Farol runs on your Mac and talks to GitHub, GitLab and Jira through the tools you already use, like <code>gh</code>. Nothing goes through a Farol service, except Remote's relay, which can't read the messages it passes.</p>
+      <h3>Does Farol run on Linux, Windows or an Intel Mac?</h3>
+      <p>No. Farol is a native app for Apple silicon Macs on macOS 14 or later. Agents can run on a Linux server with <code>farol-host</code>, and you reach them from your phone.</p>
+      <h3>Can I use Claude Code and Codex at the same time?</h3>
+      <p>Yes, in both apps. In Farol, each task picks its agent, and the sidebar shows which one is working, waiting or done.</p>
+
+      <h2 id="sources">Sources</h2>
+      <ul class="list sources">
+        <li><a href="https://paradev.com/">paradev.com</a>: features, platforms, license and supported agents</li>
+        <li><a href="https://paradev.com/pricing">Paradev pricing</a>: what Free, Pro and Team include</li>
+        <li><a href="https://github.com/paradevai/paradev">paradevai/paradev on GitHub</a>: the stack (Electron, React), the license and the Superset name</li>
+        <li><a href="https://docs.paradev.com/install">Paradev install docs</a>: system requirements</li>
+        <li><a href="https://docs.paradev.com/setup-teardown-scripts">Paradev setup and teardown scripts</a></li>
+        <li><a href="https://github.com/snowztech/farol">Farol on GitHub</a>: features, roadmap and changelog</li>
+      </ul>
+      <p class="note">Something here out of date or wrong? <a href="https://github.com/snowztech/farol/issues/new?title=Compare%20page%3A%20Paradev">Open an issue</a> and I'll fix it.</p>
+
+      <div class="try">
+        <p><a href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Download Farol</a> · <a href="/docs">Read the docs</a> · <a href="/blog/best-terminal-for-claude-code">Other terminals for Claude Code</a></p>
+      </div>
+    </article>
+  </main>
+
+  <script>
+    if (matchMedia("(min-width: 1000px)").matches) document.querySelector(".toc details").open = true;
+  </script>
+
+  <footer>
+    <span>© 2026 Lucas Neves Pereira, <a href="https://github.com/snowztech">snowztech</a></span>
+    <span><a href="/">Home</a> · <a href="/docs">Docs</a> · <a href="/blog/">Blog</a> · <a href="https://discord.gg/XGY4jHU29d">Discord</a></span>
+  </footer>
+</body>
+</html>
