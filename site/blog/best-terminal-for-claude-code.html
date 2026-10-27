@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Best Terminal for Claude Code and Codex in 2026 · Farol</title>
+  <meta name="description" content="What a terminal needs when coding agents write the code, and how Farol, Paradev (Superset), Conductor, cmux, Warp, Ghostty and iTerm2 compare for running Claude Code and Codex in parallel.">
+  <link rel="canonical" href="https://farol.sh/blog/best-terminal-for-claude-code">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Farol">
+  <meta property="og:url" content="https://farol.sh/blog/best-terminal-for-claude-code">
+  <meta property="og:title" content="The Best Terminal for Claude Code and Codex in 2026">
+  <meta property="og:description" content="Six ways to run Claude Code and Codex, compared: what each one is good at and where it falls short.">
+  <meta property="og:image" content="https://farol.sh/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="article:published_time" content="2026-10-27">
+  <meta property="article:modified_time" content="2026-10-27">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/icon.png">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": "The Best Terminal for Claude Code and Codex in 2026",
+    "description": "What a terminal needs when coding agents write the code, and how Farol, Paradev, Conductor, cmux, Warp, Ghostty and iTerm2 compare.",
+    "url": "https://farol.sh/blog/best-terminal-for-claude-code",
+    "image": "https://farol.sh/og.png",
+    "datePublished": "2026-10-27",
+    "dateModified": "2026-10-27",
+    "author": { "@type": "Person", "name": "Lucas Neves Pereira", "url": "https://github.com/lucasnevespereira" },
+    "publisher": { "@type": "Organization", "name": "Farol", "url": "https://farol.sh/" }
+  }
+  </script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.2/dist/snowztech-ui.min.css">
+  <script>
+    if (matchMedia("(prefers-color-scheme: light)").matches) document.documentElement.dataset.theme = "light";
+  </script>
+  <style>
+    body {
+      margin: 0; background: var(--sn-bg); color: var(--sn-fg);
+      font-family: var(--sn-font-mono); font-size: var(--sn-text-base);
+      line-height: var(--sn-leading-normal);
+    }
+    a { color: inherit; }
+    .wide { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+
+    .topbar { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; text-decoration: none; }
+    .brand img { width: 30px; height: 30px; }
+    .topbar nav { display: flex; gap: 18px; font-size: var(--sn-text-sm); }
+    .topbar nav a { color: var(--sn-fg-muted); text-decoration: none; }
+    .topbar nav a:hover { color: var(--sn-fg); }
+
+    html { scroll-behavior: smooth; }
+    .post { max-width: 1080px; margin: 0 auto; padding: 48px 20px 0; display: grid; gap: 0 64px; }
+    article { min-width: 0; max-width: 680px; }
+    article h2 { scroll-margin-top: 24px; }
+
+    .toc { margin-bottom: 32px; font-size: var(--sn-text-sm); }
+    .toc details { border: 1px solid var(--sn-border-subtle); border-radius: 8px; padding: 12px 16px; }
+    .toc summary { cursor: pointer; font-weight: 500; }
+    .toc ul { list-style: none; margin: 12px 0 0; padding: 0; }
+    .toc li + li { margin-top: 8px; }
+    .toc a { color: var(--sn-fg-muted); text-decoration: none; }
+    .toc a:hover { color: var(--sn-fg); }
+    /* Wide screens: the contents sit beside the post and stay in view. */
+    @media (min-width: 1000px) {
+      .post { grid-template-columns: minmax(0, 680px) 220px; grid-template-areas: "head toc" "body toc"; justify-content: center; }
+      .head { grid-area: head; }
+      article { grid-area: body; }
+      .toc { grid-area: toc; align-self: start; position: sticky; top: 24px; margin: 0; padding-top: 8px; }
+      .toc details { border: 0; padding: 0; }
+      .toc summary { list-style: none; pointer-events: none; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); text-transform: uppercase; letter-spacing: 0.12em; }
+      .toc summary::-webkit-details-marker { display: none; }
+    }
+    .meta { margin: 0 0 12px; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); }
+    h1 { margin: 0 0 24px; font-size: 28px; font-weight: 600; line-height: 1.25; letter-spacing: -0.02em; }
+    h2 { margin: 48px 0 16px; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+    h3 { margin: 28px 0 8px; font-size: inherit; font-weight: 600; }
+    p, li { color: var(--sn-fg-muted); }
+    p { margin: 0 0 16px; }
+    ul.list { margin: 0 0 16px; padding-left: 20px; }
+    ul.list li + li { margin-top: 8px; }
+    article a { color: var(--sn-fg); text-underline-offset: 3px; }
+    strong { color: var(--sn-fg); font-weight: 600; }
+    code {
+      padding: 1px 5px; border: 1px solid var(--sn-border-subtle); border-radius: 4px;
+      background: var(--sn-bg-raised); color: var(--sn-fg); font: inherit;
+    }
+
+    /* A phone scrolls the table sideways rather than squeezing five columns of text. */
+    .table { margin: 0 0 24px; overflow-x: auto; border: 1px solid var(--sn-border-subtle); border-radius: 8px; }
+    table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: var(--sn-text-sm); }
+    th, td { padding: 10px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--sn-border-subtle); }
+    tr:last-child th, tr:last-child td { border-bottom: 0; }
+    thead th { color: var(--sn-fg); font-weight: 600; background: var(--sn-bg-raised); }
+    tbody th { width: 7em; color: var(--sn-fg); font-weight: 500; }
+    td { color: var(--sn-fg-muted); }
+
+    .wideshot { display: block; width: 100%; height: auto; margin: 8px 0 24px; border: 1px solid var(--sn-border-strong); border-radius: 10px; }
+    .verdict { margin: -4px 0 16px; padding-left: 16px; border-left: 2px solid var(--sn-border-strong); font-size: var(--sn-text-sm); }
+    .try { margin-top: 48px; padding: 20px; border: 1px solid var(--sn-border-subtle); border-radius: 10px; }
+    .try p:last-child { margin: 0; }
+    .sources { font-size: var(--sn-text-sm); }
+
+    footer {
+      margin: 96px auto 0; padding: 20px 20px 40px; max-width: 1040px;
+      border-top: 1px solid var(--sn-border-subtle);
+      display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+      color: var(--sn-fg-subtle); font-size: var(--sn-text-xs);
+    }
+    footer a { color: var(--sn-fg-muted); text-decoration: none; }
+    footer a:hover { color: var(--sn-fg); }
+    @media (max-width: 600px) {
+      h1 { font-size: 23px; }
+      h2 { font-size: 18px; margin-top: 40px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar wide">
+    <a class="brand" href="/"><img src="/icon.png" alt="">Farol</a>
+    <nav><a href="/remote">Remote</a><a href="/docs">Docs</a><a href="/blog/">Blog</a></nav>
+  </header>
+
+  <main class="post">
+    <header class="head">
+      <p class="meta"><time datetime="2026-10-27">October 27, 2026</time> · Lucas Neves Pereira</p>
+      <h1>The Best Terminal for Claude Code and Codex in 2026</h1>
+    </header>
+    <nav class="toc" aria-label="On this page">
+      <details>
+        <summary>On this page</summary>
+        <ul>
+          <li><a href="#what-an-agent-terminal-needs">What an agent terminal needs</a></li>
+          <li><a href="#at-a-glance">At a glance</a></li>
+          <li><a href="#farol">Farol</a></li>
+          <li><a href="#paradev-formerly-superset">Paradev (formerly Superset)</a></li>
+          <li><a href="#conductor">Conductor</a></li>
+          <li><a href="#cmux">cmux</a></li>
+          <li><a href="#warp">Warp</a></li>
+          <li><a href="#ghostty-or-iterm2-with-tmux">Ghostty or iTerm2, with tmux</a></li>
+          <li><a href="#how-to-choose">How to choose</a></li>
+          <li><a href="#sources">Sources</a></li>
+        </ul>
+      </details>
+    </nav>
+    <article>
+      <p>Claude Code and Codex run in a terminal, so any terminal works. One agent in one tab is fine. The trouble starts at three or four: which one is waiting for you, which one is still working, and which one just changed the file another is editing?</p>
+      <p>That's the job a terminal for coding agents has to do. I build one of the options below, <a href="/">Farol</a>, so take my pick with a grain of salt. I've tried to be fair to the others and linked their own pages for every claim.</p>
+
+      <h2 id="what-an-agent-terminal-needs">What an agent terminal needs</h2>
+      <ul class="list">
+        <li><strong>A session per agent, with its status.</strong> Working, waiting for you, or done, visible without clicking through tabs.</li>
+        <li><strong>Isolation.</strong> Two agents on the same folder overwrite each other. A git worktree per task gives each one its own copy of the repo on its own branch.</li>
+        <li><strong>A way to know it's waiting.</strong> A notification, a badge, ideally your phone. An agent that waits ten minutes for a yes is ten minutes lost.</li>
+        <li><strong>Review before shipping.</strong> You read every diff an agent writes. The closer the diff is to the terminal, the more you actually read it.</li>
+        <li><strong>Speed.</strong> Agents print a lot. A terminal that stutters with ten sessions open gets in the way of all of the above.</li>
+      </ul>
+
+      <h2 id="at-a-glance">At a glance</h2>
+      <div class="table">
+        <table>
+          <thead>
+            <tr><th scope="col"></th><th scope="col">What it is</th><th scope="col">Runs on</th><th scope="col">License</th><th scope="col">Worktree per task</th><th scope="col">Phone</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">Farol</th><td>Native terminal for agents, on libghostty</td><td>macOS, Apple silicon</td><td>MIT</td><td>Built in</td><td>Free iPhone app, beta</td></tr>
+            <tr><th scope="row">Paradev</th><td>Agent workspace app, on Electron</td><td>macOS, Linux (experimental)</td><td>Elastic License 2.0</td><td>Built in</td><td>iPhone and iPad, on Pro</td></tr>
+            <tr><th scope="row">Conductor</th><td>Mac app for parallel agents</td><td>macOS</td><td>Not stated</td><td>Isolated workspaces</td><td>Not mentioned</td></tr>
+            <tr><th scope="row">cmux</th><td>Native terminal for agents, on libghostty</td><td>macOS</td><td>GPL-3.0</td><td>Not mentioned</td><td>iOS app, beta</td></tr>
+            <tr><th scope="row">Warp</th><td>Agent platform with its own terminal and agent</td><td>macOS, Linux, Windows</td><td>Terminal open source</td><td>Not mentioned</td><td>Not mentioned</td></tr>
+            <tr><th scope="row">Ghostty, iTerm2</th><td>Fast general terminals</td><td>macOS (Ghostty on Linux too)</td><td>MIT, GPL-2.0</td><td>By hand</td><td>No</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="farol">Farol</h2>
+      <p>Farol is a native macOS terminal made for running several agents at once. It's built on libghostty, the engine behind Ghostty, and reads your Ghostty config.</p>
+      <p>Press ⇧⌘N, describe a task and pick Claude Code or Codex. Farol creates a worktree on a new branch and starts the agent there with the task as its first prompt. A task can also start from a Jira ticket or a GitHub issue. The sidebar shows every session with a dot that says working, waiting or done, and the menu bar or the notch shows the same from any app.</p>
+      <img class="wideshot" src="/features/agent-status.png" width="2540" height="1520" loading="lazy"
+           alt="Farol's sidebar with several Claude Code and Codex sessions, each with a dot showing whether it is working, waiting or done">
+      <p>When an agent is done, the review panel shows its changes as one diff. You commit, push and open a pull request from there. There's a git graph and a three-column conflict resolver too. And <a href="/remote">Farol for iPhone</a> lets you answer an agent from your phone, end-to-end encrypted.</p>
+      <p class="verdict"><strong>Good for:</strong> Mac users who want a fast terminal with everything for parallel agents built in, for free. <strong>Watch out:</strong> Apple silicon only, the iPhone app is still in beta, and there are no scheduled agents yet.</p>
+
+      <h2 id="paradev-formerly-superset">Paradev (formerly Superset)</h2>
+      <p>Paradev, called Superset until its rename, is the most complete app here. Each task gets a worktree, a branch and terminals. It has a diff viewer, a browser for previewing your app, automations that start agents on a schedule or an event, remote access to another machine, cloud workspaces, and integrations with Slack and Linear. It's built on Electron.</p>
+      <p>The desktop app is free for local workspaces. Remote access, automations, Linear, Slack and the mobile app are on Pro, at $20 a month per user, and cloud workspaces start with Team. Its code is public under the Elastic License 2.0, which isn't an open source license.</p>
+      <p class="verdict"><strong>Good for:</strong> teams that want automations, cloud workspaces or Linux. <strong>Watch out:</strong> the best parts are paid, and it's an Electron app rather than a native terminal. I wrote a <a href="/compare/paradev">detailed Farol vs Paradev comparison</a>.</p>
+
+      <h2 id="conductor">Conductor</h2>
+      <p>Conductor is a Mac app for running Claude Code, Codex and Cursor agents in parallel, each in an isolated workspace, then reviewing and merging their work. It's built around that workflow more than around a terminal.</p>
+      <p class="verdict"><strong>Good for:</strong> people who want an app that manages agents for them, rather than a terminal. <strong>Watch out:</strong> its site doesn't say much about pricing or license, so check before you settle on it.</p>
+
+      <h2 id="cmux">cmux</h2>
+      <p>cmux is the closest to Farol in spirit: a native macOS terminal on libghostty, with vertical tabs, notification rings when an agent needs you, and a browser you can split next to the terminal and script. Its README calls it "a primitive, not a solution". It's GPL-3.0 and has an iOS app in beta.</p>
+      <p class="verdict"><strong>Good for:</strong> people who want a fast terminal with agent notifications and prefer to build the rest themselves. <strong>Watch out:</strong> worktrees, review and pull requests are left to you.</p>
+
+      <h2 id="warp">Warp</h2>
+      <p>Warp now describes itself as an agentic development platform. It has its own terminal, which it says is open source, its own coding agent, and it works with Claude Code and Codex too. It runs on macOS, Linux and Windows, and its agent runs are priced by usage.</p>
+      <p class="verdict"><strong>Good for:</strong> people who want one vendor's agent and terminal together, or need Windows. <strong>Watch out:</strong> it's built around its own agent and cloud runs, which you may not need if you're set on Claude Code or Codex.</p>
+
+      <h2 id="ghostty-or-iterm2-with-tmux">Ghostty or iTerm2, with tmux</h2>
+      <p>The classic setup: a great terminal, tmux for sessions, and <code>git worktree add</code> by hand for each agent. Ghostty is fast and native, iTerm2 is mature and does everything. Neither knows what an agent is, so status, notifications and review are up to you, through hooks and scripts.</p>
+      <p class="verdict"><strong>Good for:</strong> people who already have a setup they love and run one or two agents. <strong>Watch out:</strong> past three agents, the bookkeeping is yours.</p>
+
+      <h2 id="how-to-choose">How to choose</h2>
+      <ul class="list">
+        <li><strong>You're on a Mac and want everything built in, free:</strong> <a href="/">Farol</a>.</li>
+        <li><strong>You need Linux, cloud workspaces or scheduled agents:</strong> Paradev.</li>
+        <li><strong>You want a fast terminal with notifications and will script the rest:</strong> cmux, or Ghostty with tmux.</li>
+        <li><strong>You need Windows:</strong> Warp.</li>
+      </ul>
+      <p>Whichever you pick, use a worktree per agent. It's the one habit that makes running agents in parallel work at all.</p>
+
+      <h2 id="sources">Sources</h2>
+      <ul class="list sources">
+        <li><a href="https://paradev.com/">paradev.com</a>, <a href="https://paradev.com/pricing">its pricing</a> and <a href="https://github.com/paradevai/paradev">its GitHub</a></li>
+        <li><a href="https://www.conductor.build">conductor.build</a></li>
+        <li><a href="https://github.com/manaflow-ai/cmux">manaflow-ai/cmux on GitHub</a></li>
+        <li><a href="https://www.warp.dev/">warp.dev</a></li>
+        <li><a href="https://ghostty.org">ghostty.org</a> and <a href="https://iterm2.com">iterm2.com</a></li>
+      </ul>
+      <p class="sources">All checked on October 27, 2026. Spotted something out of date? <a href="https://github.com/snowztech/farol/issues/new?title=Blog%3A%20best%20terminal%20for%20Claude%20Code">Open an issue</a>.</p>
+
+      <div class="try">
+        <p><a href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Download Farol</a> · <a href="/compare/paradev">Farol vs Paradev</a> · <a href="/docs">Read the docs</a></p>
+      </div>
+    </article>
+  </main>
+
+  <script>
+    if (matchMedia("(min-width: 1000px)").matches) document.querySelector(".toc details").open = true;
+  </script>
+
+  <footer>
+    <span>© 2026 Lucas Neves Pereira, <a href="https://github.com/snowztech">snowztech</a></span>
+    <span><a href="/">Home</a> · <a href="/docs">Docs</a> · <a href="/blog/">Blog</a> · <a href="https://discord.gg/XGY4jHU29d">Discord</a></span>
+  </footer>
+</body>
+</html>

@@ -6,5 +6,7 @@
 - [Remote](https://farol.sh/remote): answer Claude Code and Codex from your iPhone, for agents in Farol on a Mac or in tmux on a server, end-to-end encrypted
 - [Docs](https://farol.sh/docs): install, connect agents, tasks and worktrees, agent status, review, configuration, shortcuts
 - [Blog](https://farol.sh/blog/): posts on building Farol, like how Remote answers Claude Code from a phone through a relay that cannot read the messages
+- [Best terminal for Claude Code and Codex](https://farol.sh/blog/best-terminal-for-claude-code): Farol, Paradev, Conductor, cmux, Warp, Ghostty and iTerm2 compared for running coding agents in parallel
+- [Farol vs Paradev](https://farol.sh/compare/paradev): Farol compared with Paradev, formerly Superset, feature by feature
 - [Source](https://github.com/snowztech/farol): README, roadmap and releases
 - [Changelog](https://github.com/snowztech/farol/blob/main/CHANGELOG.md)
