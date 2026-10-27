@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Open a session's folder in your editor with ⌘O, or use the button above the files or right-click a session or a file to show it in Finder or open it in Cursor, VS Code, Zed, Xcode, a JetBrains IDE or another editor you have. ⌘O goes to the one you picked last.
+
 ### Changed
 
 - In the review panel, a file's header stays at the top while you scroll its diff, so you can fold it or leave it out of the commit from anywhere in it.

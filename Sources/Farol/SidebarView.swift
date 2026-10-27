@@ -103,6 +103,11 @@ private struct SessionRow: View {
         .contextMenu {
             Button("Rename", action: startEditing)
             Button("Close Session", action: onClose)
+            // Over ssh the folder is on the server, where the Mac's apps can't reach it.
+            if !session.isRemote {
+                Divider()
+                OpenInItems(path: session.topLevel ?? session.directory)
+            }
         }
     }
 
