@@ -194,7 +194,7 @@ private struct FileRow: View {
                 .rotationEffect(.degrees(row.expanded ? 90 : 0))
                 .frame(width: 10)
                 .opacity(row.entry.isDirectory ? 1 : 0)
-            Image(systemName: FileIcon.symbol(for: row.entry.name, folder: row.entry.isDirectory))
+            FileIcon(path: row.entry.name, folder: row.entry.isDirectory)
                 .font(.system(size: 10.5))
                 .foregroundStyle(palette.muted)
                 .frame(width: 15)
