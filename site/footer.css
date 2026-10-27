@@ -1,0 +1,12 @@
+/* The one stylesheet every page shares. The footer markup is still copied into each page, so a new link means editing all of them. */
+footer {
+  margin: 96px auto 0; padding: 40px 20px; max-width: 1040px;
+  border-top: 1px solid var(--sn-border-subtle);
+  color: var(--sn-fg-subtle); font-size: var(--sn-text-xs);
+}
+footer a { color: var(--sn-fg-muted); text-decoration: none; }
+footer a:hover { color: var(--sn-fg); }
+footer nav { display: grid; grid-template-columns: repeat(3, minmax(0, 200px)); gap: 24px; }
+footer h2 { font-size: inherit; font-weight: 500; color: var(--sn-fg); margin: 0 0 12px; letter-spacing: 0; }
+footer ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+footer .legal { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 40px; }
