@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.52.0] - 2026-10-27
+
+Open a session or a file in your editor or in Finder, and a file's header stays in view while you scroll its diff.
+
 ### Added
 
 - Open a session's folder in your editor with ⌘O, or use the button above the files or right-click a session or a file to show it in Finder or open it in Cursor, VS Code, Zed, Xcode, a JetBrains IDE or another editor you have. ⌘O goes to the one you picked last.
@@ -1045,7 +1049,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.51.1...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.52.0...HEAD
+[0.52.0]: https://github.com/snowztech/farol/releases/tag/v0.52.0
 [0.51.1]: https://github.com/snowztech/farol/releases/tag/v0.51.1
 [0.51.0]: https://github.com/snowztech/farol/releases/tag/v0.51.0
 [0.50.0]: https://github.com/snowztech/farol/releases/tag/v0.50.0
