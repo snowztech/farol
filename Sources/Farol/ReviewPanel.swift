@@ -944,7 +944,7 @@ private struct FileHeader: View {
                     .buttonStyle(.plain)
                     .hoverTip(ticked ? "In the next commit. Click to leave it out" : "Left out of the next commit. Click to take it")
             }
-            FileIcon(path: file.path)
+            Image(systemName: FileIcon.symbol(for: file.path))
                 .font(.system(size: 11))
                 .foregroundStyle(palette.muted)
                 .frame(width: 15)
