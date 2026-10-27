@@ -1,12 +1,15 @@
-/* The one stylesheet every page shares. The footer markup is still copied into each page, so a new link means editing all of them. */
 footer {
-  margin: 96px auto 0; padding: 40px 20px; max-width: 1040px;
+  width: min(1040px, calc(100% - 40px)); margin: 96px auto 0; padding: 48px 0 40px;
   border-top: 1px solid var(--sn-border-subtle);
   color: var(--sn-fg-subtle); font-size: var(--sn-text-xs);
 }
 footer a { color: var(--sn-fg-muted); text-decoration: none; }
 footer a:hover { color: var(--sn-fg); }
-footer nav { display: grid; grid-template-columns: repeat(3, minmax(0, 200px)); gap: 24px; }
+footer .top { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 40px 64px; }
+footer .home { display: inline-flex; align-items: center; gap: 10px; color: var(--sn-fg); font-size: var(--sn-text-base); font-weight: 600; }
+footer .home img { width: 24px; height: 24px; }
+footer .top p { margin: 12px 0 0; }
+footer nav { display: flex; flex-wrap: wrap; gap: 32px 64px; }
 footer h2 { font-size: inherit; font-weight: 500; color: var(--sn-fg); margin: 0 0 12px; letter-spacing: 0; }
 footer ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-footer .legal { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 40px; }
+footer .legal { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 48px; }
