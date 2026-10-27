@@ -17,6 +17,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="icon.png">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.2/dist/snowztech-ui.min.css">
+  <link rel="stylesheet" href="/footer.css">
   <script>
     if (matchMedia("(prefers-color-scheme: light)").matches) document.documentElement.dataset.theme = "light";
   </script>
@@ -114,14 +115,6 @@
     }
     .phone-shot { width: 300px; max-width: 100%; border-radius: 28px; }
 
-    footer {
-      margin: 96px auto 0; padding: 20px 20px 40px; max-width: 1040px;
-      border-top: 1px solid var(--sn-border-subtle); display: flex;
-      justify-content: space-between; flex-wrap: wrap; gap: 8px;
-      color: var(--sn-fg-subtle); font-size: var(--sn-text-xs);
-    }
-    footer a { color: var(--sn-fg-muted); text-decoration: none; }
-    footer a:hover { color: var(--sn-fg); }
 
     @media (max-width: 760px) {
       .docs-hero { padding: 36px 0 44px; }
@@ -333,8 +326,34 @@ font-size = 14</code></pre>
   </main>
 
   <footer>
-    <span>© 2026 Lucas Neves Pereira, <a href="https://github.com/snowztech">snowztech</a></span>
-    <span><a href="./">Home</a> · <a href="blog/">Blog</a> · <a href="https://discord.gg/XGY4jHU29d">Discord</a> · <a href="https://github.com/snowztech/farol/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://github.com/snowztech/farol/blob/main/LICENSE">MIT</a></span>
+    <nav aria-label="Footer">
+      <div>
+        <h2>Product</h2>
+        <ul>
+          <li><a href="/docs">Docs</a></li>
+          <li><a href="/remote">iPhone</a></li>
+          <li><a href="https://github.com/snowztech/farol/blob/main/CHANGELOG.md">Changelog</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Compare</h2>
+        <ul>
+          <li><a href="/compare/paradev">vs Paradev</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Community</h2>
+        <ul>
+          <li><a href="/blog/">Blog</a></li>
+          <li><a href="https://discord.gg/XGY4jHU29d">Discord</a></li>
+          <li><a href="https://github.com/snowztech/farol">GitHub</a></li>
+        </ul>
+      </div>
+    </nav>
+    <div class="legal">
+      <span>© 2026 Lucas Neves Pereira, <a href="https://github.com/snowztech">snowztech</a></span>
+      <span><a href="/privacy">Privacy</a> · <a href="https://github.com/snowztech/farol/blob/main/LICENSE">MIT</a></span>
+    </div>
   </footer>
   <script>
     for (const button of document.querySelectorAll(".sn-copy-btn")) {
