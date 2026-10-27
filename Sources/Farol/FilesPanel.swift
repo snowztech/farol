@@ -209,5 +209,6 @@ private struct FileRow: View {
         .contentShape(Rectangle())
         .onClickableHover { hovering = $0 }
         .onTapGesture(perform: action)
+        .contextMenu { OpenInItems(path: row.entry.path) }
     }
 }

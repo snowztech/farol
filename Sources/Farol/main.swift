@@ -104,6 +104,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func findPrevious(_ sender: Any?) { windowController.findPrevious() }
     @objc func findSelection(_ sender: Any?) { windowController.findSelection() }
     @objc func saveFile(_ sender: Any?) { windowController.saveFile() }
+    @objc func openInEditor(_ sender: Any?) {
+        guard let session = store.selected, !session.isRemote else { return }
+        Editors.open(session.topLevel ?? session.directory)
+    }
 
     @objc private func toggleInspector() {
         Inspector.shared.toggle(state: windowController.state, over: windowController.window)
@@ -112,7 +116,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// ⌘S only means something while a file has focus, and stays free for the terminal otherwise.
     /// Check for Updates is there only in builds that update themselves.
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
-        switch item.action {
+        if item.action == #selector(openInEditor) {
+            // Named after where it goes, which changes with the editor you picked last.
+            item.title = "Open in \(Editors.preferred?.name ?? "Finder")"
+            return store.selected.map { !$0.isRemote } ?? false
+        }
+        return switch item.action {
         case #selector(saveFile): windowController.canSaveFile
         case #selector(checkForUpdates): windowController.canCheckForUpdates
         case #selector(nextResult), #selector(previousResult): windowController.canStepResult
@@ -177,6 +186,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         sessions.addItem(withTitle: "Close Session", action: #selector(closeSession), keyEquivalent: "w")
         sessions.addItem(withTitle: "Save File", action: #selector(saveFile), keyEquivalent: "s")
         sessions.addItem(withTitle: "Name Pane…", action: #selector(namePane), keyEquivalent: "R")
+        sessions.addItem(withTitle: "Open in Editor", action: #selector(openInEditor), keyEquivalent: "o")
         sessions.addItem(withTitle: "Run Project Command…", action: #selector(showRunMenu), keyEquivalent: "k")
             .keyEquivalentModifierMask = [.command, .option]
         sessions.addItem(.separator())
