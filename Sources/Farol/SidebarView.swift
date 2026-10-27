@@ -130,7 +130,7 @@ private struct SessionRow: View {
                         .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
                     Spacer(minLength: 4)
                     // Where the close button shows on hover, so the two never crowd the name.
-                    if !hovering { AgentMark(session: session, palette: palette) }
+                    if !hovering { Waited(session: session, palette: palette) }
                 }
             }
             if let waiting = session.waitingFor {
@@ -142,6 +142,10 @@ private struct SessionRow: View {
                     .hoverTip(waiting)
             } else {
                 HStack(spacing: 6) {
+                    // Text, as on the phone: it reads at this size, and names an agent Farol has no picture for.
+                    if let agent = session.agentName {
+                        Text(agent).fixedSize().hoverTip(AgentFolder.Kind(rawValue: agent)?.title ?? agent)
+                    }
                     if let branch = gitLine {
                         HStack(spacing: 4) {
                             BranchMark(color: palette.muted)
@@ -191,38 +195,19 @@ private struct SessionRow: View {
     }
 }
 
-/// Which agent runs in the session, and how long it has waited for you or been done.
-private struct AgentMark: View {
+/// How long the session's agent has waited for you or been done.
+private struct Waited: View {
     @ObservedObject var session: Session
     let palette: Palette
 
     var body: some View {
-        let kind = session.agentKind
-        let since = [.waiting, .done].contains(session.activity) ? session.lastReport : nil
-        HStack(spacing: 4) {
-            if let since {
-                // From the report itself, so the label turns over a whole minute after it, not at the clock's next minute.
-                TimelineView(.periodic(from: since, by: 60)) { context in
-                    Text(Self.age(since, now: context.date)).font(.system(size: 10.5).monospacedDigit())
-                }
+        if [.waiting, .done].contains(session.activity), let since = session.lastReport {
+            // From the report itself, so the label turns over a whole minute after it, not at the clock's next minute.
+            TimelineView(.periodic(from: since, by: 60)) { context in
+                Text(Self.age(since, now: context.date)).font(.system(size: 10.5).monospacedDigit())
             }
-            if let kind {
-                Image(systemName: Self.symbol(kind))
-                    .font(.system(size: 9.5, weight: .semibold))
-                    .frame(width: 12)
-                    .hoverTip(kind.title)
-            }
-        }
-        .foregroundStyle(palette.muted)
-        .fixedSize()
-    }
-
-    private static func symbol(_ kind: AgentFolder.Kind) -> String {
-        switch kind {
-        case .claude: "asterisk"
-        case .codex: "hexagon"
-        case .opencode: "curlybraces"
-        case .pi: "pi"
+            .foregroundStyle(palette.muted)
+            .fixedSize()
         }
     }
 
