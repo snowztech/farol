@@ -36,6 +36,8 @@ cp "$root"/assets/themes/* "$app/Contents/Resources/ghostty/themes/"
 cp "$root/assets/Farol.icns" "$app/Contents/Resources/"
 mkdir -p "$app/Contents/Resources/icons"
 cp "$root"/assets/icons/*.png "$app/Contents/Resources/icons/"
+mkdir -p "$app/Contents/Resources/fonts"
+cp "$root"/assets/fonts/* "$app/Contents/Resources/fonts/"
 
 # Sparkle installs updates. Its XPC services are only for sandboxed apps, which Farol isn't.
 sparkle="$app/Contents/Frameworks/Sparkle.framework"
