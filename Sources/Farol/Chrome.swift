@@ -535,7 +535,7 @@ private struct FileChoice: View {
             HStack(spacing: 9) {
                 // The room of a session's check and lamp, so every name starts at the same place.
                 Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).hidden()
-                Image(systemName: path.hasSuffix("/") ? "folder" : "doc").font(.system(size: 11)).foregroundStyle(palette.muted).frame(width: 7)
+                FileIcon(path: path).font(.system(size: 11)).foregroundStyle(palette.muted).frame(width: 7)
                 Text((path as NSString).lastPathComponent).lineLimit(1).truncationMode(.middle).layoutPriority(1)
                 Text((path as NSString).deletingLastPathComponent)
                     .font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.head)

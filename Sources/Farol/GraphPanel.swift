@@ -1105,7 +1105,7 @@ private struct ChangedFile: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "doc").font(.system(size: 10.5)).foregroundStyle(palette.muted)
+            FileIcon(path: file.path).font(.system(size: 10.5)).foregroundStyle(palette.muted)
             Text((file.path as NSString).lastPathComponent)
                 .font(.system(size: 12))
                 .foregroundStyle(file.status == .added ? palette.added : file.status == .deleted ? palette.muted : palette.text)

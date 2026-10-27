@@ -912,8 +912,9 @@ struct Counts: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Text("+\(added)").foregroundStyle(palette.added)
-            Text("−\(removed)").foregroundStyle(palette.removed)
+            // A side with nothing to count stays gray, so only real changes take a color.
+            Text("+\(added)").foregroundStyle(added == 0 ? palette.muted : palette.added)
+            Text("−\(removed)").foregroundStyle(removed == 0 ? palette.muted : palette.removed)
         }
         .font(.system(size: 11, weight: .medium, design: .monospaced))
     }
@@ -943,15 +944,21 @@ private struct FileHeader: View {
                     .buttonStyle(.plain)
                     .hoverTip(ticked ? "In the next commit. Click to leave it out" : "Left out of the next commit. Click to take it")
             }
+            FileIcon(path: file.path)
+                .font(.system(size: 11))
+                .foregroundStyle(palette.muted)
+                .frame(width: 15)
             (Text(folder).foregroundColor(palette.muted) + Text(name).foregroundColor(ticked == false ? palette.muted : palette.text))
                 .font(.system(size: 12.5))
                 .lineLimit(1)
                 .truncationMode(.head)
             if let status { Text(status).font(.system(size: 11)).foregroundStyle(palette.muted) }
-            Counts(added: file.added, removed: file.removed, palette: palette)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(palette.line))
+            if !file.isBinary {
+                Counts(added: file.added, removed: file.removed, palette: palette)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(palette.line))
+            }
             Spacer(minLength: 8)
             IconButton(symbol: "square.on.square", help: "Copy path", palette: palette) {
                 NSPasteboard.general.clearContents()
