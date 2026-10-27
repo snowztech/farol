@@ -310,7 +310,7 @@ private struct FileHeader: View {
 
     var body: some View {
         HStack(spacing: 5) {
-            Image(systemName: FileIcon.symbol(for: path)).font(.system(size: 10)).foregroundStyle(palette.muted).frame(width: 14)
+            FileIcon(path: path).font(.system(size: 10)).foregroundStyle(palette.muted).frame(width: 14)
             Text((path as NSString).lastPathComponent).font(.system(size: 12, weight: .semibold)).lineLimit(1).layoutPriority(1)
             Text((path as NSString).deletingLastPathComponent)
                 .font(.system(size: 10.5)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.head)
