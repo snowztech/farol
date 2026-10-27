@@ -37,10 +37,17 @@ public struct Worktrees {
         let cleaned = String(words.unicodeScalars.filter(allowed.contains))
             .replacingOccurrences(of: "..", with: ".")
             .trimmingCharacters(in: CharacterSet(charactersIn: "-./"))
-        guard !cleaned.isEmpty, (try? Git.run(["check-ref-format", "--branch", cleaned], in: "/")) != nil else {
-            return nil
-        }
+        guard !cleaned.isEmpty, isBranchName(cleaned) else { return nil }
         return cleaned
+    }
+
+    /// Git's rules for a branch name (`git check-ref-format --branch`), for the characters `branchName(from:)` keeps.
+    /// Checked here rather than by running git, since the New Task sheet asks on every keystroke.
+    static func isBranchName(_ name: String) -> Bool {
+        name != "HEAD" && !name.hasPrefix("-") && !name.hasSuffix(".") && !name.contains("..")
+            && name.split(separator: "/", omittingEmptySubsequences: false).allSatisfy { part in
+                !part.isEmpty && !part.hasPrefix(".") && !part.hasSuffix(".lock")
+            }
     }
 
     /// Creates a worktree for `branch` from the repo containing `directory`.

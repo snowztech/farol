@@ -4,10 +4,19 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Paste or drop a screenshot, a picture or a file on a New task, and the agent gets its path with the task. Each one shows under the task, with a way to remove it.
+
 ### Changed
 
+- In a New task, Shift-Return adds a line, as in Claude Code, and Return still starts it. A line under the task says so.
 - Files in the files panel, the review, ⌘P and search show an icon for their kind, like code, config, images or scripts.
 - A change count with nothing on one side, like `−0`, stays gray, and binary files in the review no longer show `+0 −0`.
+
+### Fixed
+
+- Typing a New task no longer lags. Checking the branch name ran git several times on every key.
 
 ## [0.52.0] - 2026-10-27
 
