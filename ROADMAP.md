@@ -37,6 +37,8 @@ Someone who downloads Farol understands what it is for in the first minute.
 - [x] Farol themes in the colors of the app icons, with Farol Beam as the default
 - [x] Install updates in place (Sparkle), behind the same button
 - [x] Homebrew cask
+- [ ] A setup script for new worktrees: `.farol/setup` runs once in the new session's terminal, so dependencies are installed and the project's services are up before the agent needs them. The agent starts only if it succeeds. `.farol/teardown` runs when the worktree is removed
+- [ ] More agents set up in one click, like Gemini CLI and Cursor Agent, next to Claude Code, Codex, OpenCode and Pi
 
 ## Next: review
 
@@ -131,6 +133,7 @@ It needs an iPhone for now. For Android or the web, [say so in an issue](https:/
 ## Later
 
 - Linear as a ticket source
+- Scheduled tasks: a New task that starts at a set time or every day, like a nightly dependency bump or a morning issue triage, and waits for you as a session when it's done or needs you. On the Mac while it's awake, or on a `farol-host` server that stays on
 - The server's repo in the panels over ssh, which needs git run on the server
 - Command palette: Farol's actions, like push, commit or new task, in the ⌘P list
 - A live terminal on the phone, with colors, once libghostty lets the app around it read a pane's output. Until then the phone shows a pane as text
