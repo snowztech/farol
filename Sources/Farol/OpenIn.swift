@@ -65,6 +65,34 @@ enum Editors {
     }
 }
 
+/// The same items as a right-click, behind a button you can see.
+struct OpenInButton: View {
+    let path: String
+    let palette: Palette
+
+    @State private var hovering = false
+
+    var body: some View {
+        Menu {
+            OpenInItems(path: path)
+        } label: {
+            Image(systemName: "arrow.up.forward.app")
+                .font(.system(size: 12.5, weight: .medium))
+                .frame(width: 26, height: 20)
+                .foregroundStyle(hovering ? palette.text : palette.muted)
+                .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised : .clear))
+                .contentShape(Rectangle())
+        }
+        // Plain keeps the label as drawn here. The bordered styles put AppKit's own, larger arrow in.
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .onClickableHover { hovering = $0 }
+        .hoverTip("Open in… (⌘O)")
+    }
+}
+
 /// Finder first, as every Mac app has it, then each editor you have.
 struct OpenInItems: View {
     let path: String

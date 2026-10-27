@@ -145,6 +145,7 @@ struct FilesPanel: View {
                 .foregroundStyle(tree.root == nil ? p.muted : p.text)
                 .lineLimit(1)
             Spacer(minLength: 0)
+            if let root = tree.root { OpenInButton(path: root, palette: p) }
             // Lit only while searching, like the gear while Settings shows. Clicked again, it goes back to the tree, as Esc does.
             IconButton(symbol: "magnifyingglass", help: state.filesSearching ? "Back to the files (esc)" : "Find in Files (⇧⌘F)",
                        active: state.filesSearching, palette: p) {
