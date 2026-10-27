@@ -6,7 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Changed
 
-- Files in the files panel, the review, ⌘P and search show an icon for their kind, like code, config, images or scripts.
+- Files in the files panel, the review, ⌘P and search show an icon for their kind, like config, images or scripts. Code shows its language's mark, like Go, Rust or TypeScript, in gray.
 - A change count with nothing on one side, like `−0`, stays gray, and binary files in the review no longer show `+0 −0`.
 
 ## [0.52.0] - 2026-10-27

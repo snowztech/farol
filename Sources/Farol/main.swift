@@ -33,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         NSApp.mainMenu = makeMenu()
 
         AppIcon.apply()
+        FileIcon.registerFont()
         windowController.showWindow(nil)
         store.restore()
         restored = true
