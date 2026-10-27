@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.53.0] - 2026-10-27
+
+Paste a screenshot or a file into a New task, and code files show their language's mark.
+
 ### Added
 
 - Paste or drop a screenshot, a picture or a file on a New task, and the agent gets its path with the task. Each one shows under the task, with a way to remove it.
@@ -1063,7 +1067,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.52.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.53.0...HEAD
+[0.53.0]: https://github.com/snowztech/farol/releases/tag/v0.53.0
 [0.52.0]: https://github.com/snowztech/farol/releases/tag/v0.52.0
 [0.51.1]: https://github.com/snowztech/farol/releases/tag/v0.51.1
 [0.51.0]: https://github.com/snowztech/farol/releases/tag/v0.51.0
