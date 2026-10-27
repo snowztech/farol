@@ -1,4 +1,3 @@
-import FarolCore
 import SwiftUI
 
 struct SidebarView: View {
@@ -124,14 +123,9 @@ private struct SessionRow: View {
                     .onExitCommand { editing = false }
                     .onChange(of: fieldFocused) { _, focused in if !focused { commit() } }
             } else {
-                HStack(spacing: 5) {
-                    Text(session.displayName)
-                        .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
-                        .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
-                    Spacer(minLength: 4)
-                    // Where the close button shows on hover, so the two never crowd the name.
-                    if !hovering { Waited(session: session, palette: palette) }
-                }
+                Text(session.displayName)
+                    .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
+                    .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
             }
             if let waiting = session.waitingFor {
                 // In place of the branch while the agent waits, so the row says what for without being opened.
@@ -142,17 +136,11 @@ private struct SessionRow: View {
                     .hoverTip(waiting)
             } else {
                 HStack(spacing: 6) {
-                    // Text, as on the phone: it reads at this size, and names an agent Farol has no picture for.
-                    if let agent = session.agentName {
-                        Text(agent).fixedSize().hoverTip(AgentFolder.Kind(rawValue: agent)?.title ?? agent)
-                    }
                     if let branch = gitLine {
                         HStack(spacing: 4) {
                             BranchMark(color: palette.muted)
                             Text(branch).truncationMode(.middle)
                         }
-                        // Most sessions are worktrees, so saying so on every row only took room from the branch.
-                        .hoverTip(session.isWorktreeCheckout ? "Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)" : "")
                     } else if let location = session.remoteLocation ?? session.location {
                         Text(location).truncationMode(.head)
                     }
@@ -160,6 +148,13 @@ private struct SessionRow: View {
                     Spacer(minLength: 4)
                     ForEach(session.ports.prefix(2), id: \.self) { PortLink(port: $0, palette: palette) }
                     if session.ports.count > 2 { Text(verbatim: "+\(session.ports.count - 2)").fixedSize() }
+                    if session.isWorktreeCheckout {
+                        Text("worktree")
+                            .foregroundStyle(palette.muted.opacity(0.65))
+                            .fixedSize()
+                            .padding(.leading, 4)
+                            .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
+                    }
                 }
                 .font(.system(size: 10.5, design: .monospaced))
                 .foregroundStyle(palette.muted)
@@ -192,28 +187,6 @@ private struct SessionRow: View {
     private var background: some View {
         RoundedRectangle(cornerRadius: 6)
             .fill(selected ? palette.selection : hovering ? palette.hover : .clear)
-    }
-}
-
-/// How long the session's agent has waited for you or been done.
-private struct Waited: View {
-    @ObservedObject var session: Session
-    let palette: Palette
-
-    var body: some View {
-        if [.waiting, .done].contains(session.activity), let since = session.lastReport {
-            // From the report itself, so the label turns over a whole minute after it, not at the clock's next minute.
-            TimelineView(.periodic(from: since, by: 60)) { context in
-                Text(Self.age(since, now: context.date)).font(.system(size: 10.5).monospacedDigit())
-            }
-            .foregroundStyle(palette.muted)
-            .fixedSize()
-        }
-    }
-
-    private static func age(_ date: Date, now: Date) -> String {
-        let minutes = Int(now.timeIntervalSince(date) / 60)
-        return minutes < 1 ? "now" : minutes < 60 ? "\(minutes)m" : minutes < 1440 ? "\(minutes / 60)h" : "\(minutes / 1440)d"
     }
 }
 

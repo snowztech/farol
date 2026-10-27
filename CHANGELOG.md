@@ -6,7 +6,6 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Changed
 
-- Each session in the sidebar shows which agent runs in it, and how long it has waited for you or been done. The branch gets the whole row, without the word "worktree" on every line.
 - Files in the files panel, the review, ⌘P and search show an icon for their kind, like code, config, images or scripts.
 - A change count with nothing on one side, like `−0`, stays gray, and binary files in the review no longer show `+0 −0`.
 

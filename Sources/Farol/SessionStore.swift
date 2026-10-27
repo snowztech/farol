@@ -195,17 +195,6 @@ final class Session: ObservableObject, Identifiable {
     /// What each pane's screen asked when last read, so a list sent often does not read every screen each time.
     private var screenAsking: [UUID: (at: Date, text: String?)] = [:]
 
-    /// The agent the sidebar names, as its program is called: the focused pane's, or else the first pane's that runs one.
-    /// A program Farol doesn't know counts once it reports its status, so an editor or a dev server is never named.
-    var agentName: String? {
-        ([panes.focused] + panes.terminals).lazy.compactMap { terminal in
-            self.agent(in: terminal).flatMap { AgentFolder.Kind(rawValue: $0) != nil || self.agentRuns(in: terminal.id) ? $0 : nil }
-        }.first
-    }
-
-    /// When an agent in the session last said what it does, so the sidebar can say how long one has waited or been done.
-    var lastReport: Date? { agents.values.compactMap(\.since).max() }
-
     /// An agent runs in the pane, from its first report until it ends. Before its first message it may have no log yet.
     func agentRuns(in pane: UUID) -> Bool { agents[pane]?.reports == true }
 
