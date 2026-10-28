@@ -29,6 +29,27 @@ private func addScript(_ name: String, text: String, to repo: String, executable
     #expect(try String(contentsOfFile: marker, encoding: .utf8) == "setup\nagent\n")
 }
 
+@Test func startsCustomCommandInUsersShell() throws {
+    let box = try Sandbox()
+    let marker = URL(fileURLWithPath: box.repo).deletingLastPathComponent().appendingPathComponent("shell").path
+    try addScript("setup", text: "#!/bin/sh\nexit 0\n", to: box.repo)
+    let path = try box.worktrees.create(branch: "user-shell", from: box.repo)
+    let command = WorktreeScripts.starting("print -r -- zsh > \(NewTask.shellQuoted(marker))", in: path)!
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/sh")
+    process.arguments = ["-c", command]
+    process.currentDirectoryURL = URL(fileURLWithPath: path)
+    process.environment = ProcessInfo.processInfo.environment.merging(["SHELL": "/bin/zsh", "ZDOTDIR": path]) { $1 }
+    process.standardOutput = FileHandle.nullDevice
+    process.standardError = FileHandle.nullDevice
+
+    try process.run()
+    process.waitUntilExit()
+
+    #expect(process.terminationStatus == 0)
+    #expect(try String(contentsOfFile: marker, encoding: .utf8) == "zsh\n")
+}
+
 @Test func failedSetupKeepsAgentStopped() throws {
     let box = try Sandbox()
     let marker = URL(fileURLWithPath: box.repo).deletingLastPathComponent().appendingPathComponent("agent").path

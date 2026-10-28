@@ -17,7 +17,8 @@ public enum WorktreeScripts {
                     "printf '%s\\n' '.farol/setup must be executable (chmod +x .farol/setup).' >&2",
                     "false", "fi)"].joined(separator: "\n")
         }.joined(separator: " &&\n")
-        let body = ["if \(steps)", "then", command ?? ":", "else",
+        let start = command.map { "\"${SHELL:-/bin/sh}\" -ic \(NewTask.shellQuoted($0))" } ?? ":"
+        let body = ["if \(steps)", "then", start, "else",
                     "printf '%s\\n' 'Setup failed. The agent was not started. Fix the script, then press Up and Return to retry.'",
                     "fi"].joined(separator: "\n")
         return "sh -c \(NewTask.shellQuoted(body))"
