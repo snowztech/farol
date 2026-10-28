@@ -206,6 +206,18 @@
           <p>You can start from one of your open Jira tickets or the repository's GitHub issues. Farol names the branch from the ticket and gives the agent its full description.</p>
           <div class="note"><p><strong>Why worktrees?</strong> Each task gets its own checkout, so agents on different branches never write to the same files.</p></div>
           <p>Press <kbd>⇧⌘T</kbd> when you want a worktree session without starting an agent. Closing a worktree session offers to remove the checkout and always keeps its branch.</p>
+
+          <h3>Run project commands</h3>
+          <p>Press <kbd>⌘P</kbd> to find commands from the project's Makefile, package.json or justfile. Return runs a command in the current pane, or in a new pane below when an agent is working there. You can also add and manage commands from the pane's Run menu.</p>
+          <p>Save a script in <code>.farol/commands/</code> to share it with a project, or in <code>~/.farol/commands/</code> to use it everywhere. Commit project commands to Git and they appear in new worktrees automatically. Farol does not copy untracked commands from another checkout.</p>
+
+          <h3>Prepare each worktree</h3>
+          <p>Commit an executable <code>.farol/setup</code> script to your repo. Farol runs it in the new worktree's terminal after copying ignored <code>.env</code> files and before starting the agent or chosen command. For a task across repos, each repo's setup runs before the agent starts.</p>
+          <pre><code>#!/bin/sh
+set -e
+npm ci</code></pre>
+          <p>Run <code>chmod +x .farol/setup</code> before committing it. The script must exit when setup is ready. If it fails, Farol keeps the worktree and terminal open without starting the agent. Fix the script, then press Up and Return in that terminal to retry.</p>
+          <p>You can also commit an executable <code>.farol/teardown</code> to stop services when you choose to remove a worktree. Farol keeps the worktree if teardown fails. Keep both scripts safe to run again after a partial failure.</p>
         </section>
 
         <section id="status">

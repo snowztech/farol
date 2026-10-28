@@ -37,7 +37,7 @@ Someone who downloads Farol understands what it is for in the first minute.
 - [x] Farol themes in the colors of the app icons, with Farol Beam as the default
 - [x] Install updates in place (Sparkle), behind the same button
 - [x] Homebrew cask
-- [ ] A setup script for new worktrees: `.farol/setup` runs once in the new session's terminal, so dependencies are installed and the project's services are up before the agent needs them. The agent starts only if it succeeds. `.farol/teardown` runs when the worktree is removed
+- [x] A setup script for new worktrees: `.farol/setup` runs once in the new session's terminal, so dependencies are installed and the project's services are up before the agent needs them. The agent starts only if it succeeds. `.farol/teardown` runs when the worktree is removed
 - [ ] More agents set up in one click, like Gemini CLI and Cursor Agent, next to Claude Code, Codex, OpenCode and Pi
 
 ## Next: review

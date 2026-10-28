@@ -72,11 +72,12 @@ extension MainWindowController {
         DispatchQueue.global(qos: .userInitiated).async {
             let repo = Git.repoRoot(of: directory).map { URL(fileURLWithPath: $0).lastPathComponent } ?? "repository"
             let base = Git.branch(of: directory) ?? "the current commit"
-            DispatchQueue.main.async { [weak self] in self?.askForBranch(from: directory, repo: repo, base: base) }
+            let setup = WorktreeScripts.hasSetup(in: Git.topLevel(of: directory) ?? directory)
+            DispatchQueue.main.async { [weak self] in self?.askForBranch(from: directory, repo: repo, base: base, setup: setup) }
         }
     }
 
-    private func askForBranch(from directory: String, repo: String, base: String) {
+    private func askForBranch(from directory: String, repo: String, base: String, setup: Bool) {
         // Checked here too: a second press can arrive while git is still answering the first.
         guard let window, window.attachedSheet == nil else { return }
         let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
@@ -84,6 +85,7 @@ extension MainWindowController {
         let alert = NSAlert()
         alert.messageText = "New worktree session in \(repo)"
         alert.informativeText = "A new branch starts from \(base). An existing branch opens as it is."
+            + (setup ? " Farol runs .farol/setup in the new worktree before starting a command." : "")
         alert.accessoryView = field
         alert.addButton(withTitle: "Create")
         alert.addButton(withTitle: "Cancel")
@@ -183,6 +185,12 @@ extension MainWindowController {
             alert.informativeText = "The branch \(session.branch.map { "\($0) " } ?? "")stays, so no commits are lost. Only the folder goes."
             alert.addButton(withTitle: "Remove Worktree")
             alert.addButton(withTitle: "Keep Worktree")
+        }
+        let repos = isTask ? TaskFolders.repos(in: worktree) : [worktree]
+        let teardown = repos.filter { WorktreeScripts.hasTeardown(in: $0) }
+        if !teardown.isEmpty {
+            let names = teardown.map { URL(fileURLWithPath: $0).lastPathComponent }.joined(separator: ", ")
+            alert.informativeText += " Farol runs .farol/teardown in \(names) before removal."
         }
         alert.addButton(withTitle: "Cancel")
 

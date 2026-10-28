@@ -102,6 +102,9 @@ public struct TaskFolders {
         guard root(of: folder) == URL(fileURLWithPath: folder).resolvingSymlinksInPath().path else {
             throw GitError(description: "\(folder) is not a Farol task folder.")
         }
+        for repo in contents(of: folder).filter(isWorktree).sorted() where !Worktrees.default.hasUncommittedChanges(repo) {
+            try WorktreeScripts.tearDown(in: repo)
+        }
         let kept = contents(of: folder).filter(isWorktree).filter { item in
             guard let repo = Git.repoRoot(of: item) else { return true }
             return (try? Git.run(["worktree", "remove", item], in: repo)) == nil

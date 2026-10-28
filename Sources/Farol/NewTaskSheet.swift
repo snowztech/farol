@@ -120,6 +120,12 @@ struct NewTaskSheet: View {
         listed.isEmpty ? [directory] : listed.filter(chosen.contains).map { $0 == root ? directory : $0 }
     }
     private var duplicateRepoName: String? { TaskFolders.duplicateName(in: listed.filter(chosen.contains)) }
+    private var setupNames: [String] {
+        sources.compactMap { source in
+            let folder = source == directory ? checkout ?? directory : source
+            return WorktreeScripts.hasSetup(in: folder) ? URL(fileURLWithPath: folder).lastPathComponent : nil
+        }
+    }
     private var subtitle: String {
         if repos.isEmpty, sources.count < 2 { return "The agent starts in its own worktree, on a new branch from \(base)." }
         return "Each repo you pick gets its own worktree on the same branch, side by side in one folder. The agent starts there and sees them all."
@@ -193,6 +199,11 @@ struct NewTaskSheet: View {
                     }
                 }
                 agentSelect(p)
+                if !setupNames.isEmpty {
+                    Text("Runs .farol/setup in \(setupNames.joined(separator: ", ")) before the agent starts.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(p.muted)
+                }
             }
             .padding(20)
             Rectangle().fill(p.line).frame(height: 1)
