@@ -4,7 +4,14 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
-- New worktrees run an executable `.farol/setup` before starting the agent or chosen command. A failed setup leaves the worktree and terminal open without starting the agent. When you remove a worktree, Farol runs `.farol/teardown` first and keeps the worktree if teardown fails.
+## [0.54.0] - 2026-10-28
+
+Prepare each new worktree before its agent starts, and clean up when you remove it.
+
+### Added
+
+- An executable `.farol/setup` runs in each new worktree before the agent or chosen command starts. In a task across repos, each setup finishes before the agent starts. If setup fails, the worktree and terminal stay open without starting the agent.
+- An executable `.farol/teardown` runs when you remove its worktree. Farol keeps the worktree if teardown fails.
 
 ## [0.53.0] - 2026-10-27
 
@@ -1069,7 +1076,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.53.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.54.0...HEAD
+[0.54.0]: https://github.com/snowztech/farol/releases/tag/v0.54.0
 [0.53.0]: https://github.com/snowztech/farol/releases/tag/v0.53.0
 [0.52.0]: https://github.com/snowztech/farol/releases/tag/v0.52.0
 [0.51.1]: https://github.com/snowztech/farol/releases/tag/v0.51.1
