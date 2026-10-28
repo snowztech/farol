@@ -215,7 +215,7 @@
           <p>Save a script in <code>.farol/commands/</code> to share it with a project, or in <code>~/.farol/commands/</code> to use it everywhere. Commit project commands to Git and they appear in new worktrees automatically. Farol does not copy untracked commands from another checkout.</p>
 
           <h3>Prepare each worktree</h3>
-          <p>Commit an executable <code>.farol/setup</code> script to your repo. Farol runs it in the new worktree's terminal after copying ignored <code>.env</code> files and before starting the agent or chosen command. For a task across repos, each repo's setup runs before the agent starts.</p>
+          <p>Commit an executable <code>.farol/setup</code> script to your repo. Farol runs it in the new worktree's terminal before starting the agent or chosen command. If <strong>Settings → Worktrees → Copy local environment files</strong> is on, ignored <code>.env</code> files are copied first. Agents in that worktree can read their values. For a task across repos, each repo's setup runs before the agent starts.</p>
           <figure class="code-example">
             <figcaption>Example <code>.farol/setup</code> for a Node project</figcaption>
             <pre><code>#!/bin/sh
