@@ -532,7 +532,10 @@ final class SessionStore: ObservableObject {
             }
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
-                done(result.map { self.create(directory: $0, run: command, environment: environment, select: select) })
+                done(result.map {
+                    self.create(directory: $0, run: WorktreeScripts.starting(command, in: $0),
+                                environment: environment, select: select)
+                })
             }
         }
     }

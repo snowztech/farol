@@ -4,6 +4,8 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+- New worktrees run an executable `.farol/setup` before starting the agent or chosen command. A failed setup leaves the worktree and terminal open without starting the agent. When you remove a worktree, Farol runs `.farol/teardown` first and keeps the worktree if teardown fails.
+
 ## [0.53.0] - 2026-10-27
 
 Paste a screenshot or a file into a New task, and code files show their language's mark.

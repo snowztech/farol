@@ -124,6 +124,10 @@ public struct Worktrees {
         guard contains(path), let root = Git.repoRoot(of: path) else {
             throw GitError(description: "\(path) is not a Farol worktree.")
         }
+        guard !hasUncommittedChanges(path) else {
+            throw GitError(description: "\(path) has uncommitted changes.")
+        }
+        try WorktreeScripts.tearDown(in: path)
         try Git.run(["worktree", "remove", path], in: root)
     }
 }
