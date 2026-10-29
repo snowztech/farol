@@ -791,7 +791,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         store.selected?.panes.focused.searchSelection()
     }
 
+    /// A commit named by a file's blame: the git graph opens, if it was closed, on that commit.
+    private func showInGraph(_ hash: String) {
+        if !state.graphVisible { toggleGraph() }
+        graph.reveal(hash)
+    }
+
     private func host(_ session: Session) {
+        session.panes.onShowCommit = { [weak self] in self?.showInGraph($0) }
         session.panes.frame = terminalContainer.bounds
         session.panes.autoresizingMask = [.width, .height]
         session.panes.theme = theme

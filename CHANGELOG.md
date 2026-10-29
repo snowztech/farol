@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- A button in a file's header shows git blame beside the line numbers: the commit, who and when, once per run of lines. Click a hash to open that commit in the git graph.
+
 ## [0.54.0] - 2026-10-28
 
 Prepare each new worktree before its agent starts, and clean up when you remove it.
