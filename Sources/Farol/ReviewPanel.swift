@@ -127,6 +127,22 @@ final class ReviewModel: ObservableObject {
     private var defaultScopes: [String: Diff.Scope] = [:]
 
     private var files: [Diff.File] = []
+    /// What each checkout showed when you left it, so coming back paints that at once and the refresh only corrects it.
+    private struct Snapshot {
+        var files: [Diff.File]
+        var collapsed: Set<String>
+        var stat: Diff.Stat
+        var changes: Diff.Stat
+        var uncommittedPaths: Set<String>
+        var ahead: Int
+        var unpushed: Int
+        var forge: Forge?
+        var ignored: [String]
+        var branches: [String]
+        var scope: Diff.Scope
+        var yourScope: Diff.Scope?
+    }
+    private var snapshots: [String: Snapshot] = [:]
     private var collapsed: Set<String> = []
     /// Your choice per checkout, so switching sessions doesn't reset it.
     private var chosenScope: [String: Diff.Scope] = [:]
@@ -158,20 +174,32 @@ final class ReviewModel: ObservableObject {
         request = .unknown
         checks = []
         let rootChanged = root != self.root
+        let oldRoot = self.root
         self.root = root
         if rootChanged {
             watcher = nil
-            files = []
-            collapsed = []
-            rows = []
-            stat = Diff.Stat()
-            changes = Diff.Stat()
-            uncommittedPaths = []
-            ahead = 0
-            unpushed = 0
-            forge = nil
-            ignored = []
+            if let left = oldRoot {
+                snapshots[left] = Snapshot(files: files, collapsed: collapsed, stat: stat, changes: changes,
+                                           uncommittedPaths: uncommittedPaths, ahead: ahead, unpushed: unpushed, forge: forge,
+                                           ignored: ignored, branches: branches, scope: scope, yourScope: yourScope)
+            }
+            let kept = root.flatMap { snapshots[$0] }
+            files = kept?.files ?? []
+            collapsed = kept?.collapsed ?? []
+            stat = kept?.stat ?? Diff.Stat()
+            changes = kept?.changes ?? Diff.Stat()
+            uncommittedPaths = kept?.uncommittedPaths ?? []
+            ahead = kept?.ahead ?? 0
+            unpushed = kept?.unpushed ?? 0
+            forge = kept?.forge
+            ignored = kept?.ignored ?? []
             fetchedRequest = nil
+            if let kept {
+                branches = kept.branches
+                scope = kept.scope
+                yourScope = kept.yourScope
+            }
+            rebuild()
         }
         guard let root else { return }
         if rootChanged { watcher = FolderWatcher(root) { [weak self] in self?.changed($0) } }
@@ -528,7 +556,9 @@ final class ReviewModel: ObservableObject {
                     for file in files where !known.contains(file.path) && file.added + file.removed > Self.foldedAbove {
                         self.collapsed.insert(file.path)
                     }
+                    let unchanged = self.files == files
                     self.files = files
+                    if unchanged, self.pendingFocus == nil { return }
                     if let path = self.pendingFocus, files.contains(where: { $0.path == path }) {
                         // A big file starts folded, which would scroll to a header with nothing under it.
                         self.collapsed.remove(path)

@@ -34,6 +34,17 @@ final class GraphModel: ObservableObject {
     var onShowInReview: ((History.Commit, _ file: String?) -> Void)?
     /// Opens the review panel on an open request.
     var onShowRequest: ((Forge.Request) -> Void)?
+    /// What each checkout showed when you left it, so coming back paints that at once and the reload only corrects it.
+    private struct Snapshot {
+        var rows: [History.Row]
+        var local: [String]
+        var remote: [String]
+        var upstreams: [String: History.Upstream]
+        var requests: [String: Forge.Request]
+        var selected: History.Commit?
+        var selectedFiles: [Diff.File]?
+    }
+    private var snapshots: [String: Snapshot] = [:]
     private var watcher: FolderWatcher?
     private var pending: DispatchWorkItem?
     /// The checkout whose .git a watcher was asked for, so each is looked up once while git answers.
@@ -43,16 +54,25 @@ final class GraphModel: ObservableObject {
     func show(_ root: String?, current: String?) {
         guard root != self.root || current != self.current || (root != nil && watcher == nil) else { return }
         let rootChanged = root != self.root
+        let oldRoot = self.root
         self.root = root
         self.current = current
         if rootChanged {
             watcher = nil
             watching = nil
-            rows = []
+            if let left = oldRoot {
+                snapshots[left] = Snapshot(rows: rows, local: local, remote: remote, upstreams: upstreams, requests: requests,
+                                           selected: selected, selectedFiles: selectedFiles)
+            }
+            let kept = root.flatMap { snapshots[$0] }
+            rows = kept?.rows ?? []
+            local = kept?.local ?? []
+            remote = kept?.remote ?? []
+            upstreams = kept?.upstreams ?? [:]
+            requests = kept?.requests ?? [:]
+            selected = kept?.selected
+            selectedFiles = kept?.selectedFiles
             error = nil
-            selected = nil
-            selectedFiles = nil
-            requests = [:]
         }
         guard let root else {
             watcher = nil
@@ -196,10 +216,11 @@ final class GraphModel: ObservableObject {
             let rows = (try? commits.get()).map { History.graph($0, oneSided: oneSided) }
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root else { return }
-                self.local = branches.local
-                self.remote = branches.remote
-                self.upstreams = upstreams
-                self.rows = rows ?? []
+                // Only what changed is assigned, so a reload that finds the same history redraws nothing.
+                if self.local != branches.local { self.local = branches.local }
+                if self.remote != branches.remote { self.remote = branches.remote }
+                if self.upstreams != upstreams { self.upstreams = upstreams }
+                if self.rows != rows ?? [] { self.rows = rows ?? [] }
                 self.error = rows == nil ? "Couldn't read the history." : nil
             }
         }
