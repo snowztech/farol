@@ -26,13 +26,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// Follows the selected session's folder while the files panel is open.
     private var filesRoot: AnyCancellable?
     private var fileSearchLive: AnyCancellable?
-    private static let filesVisibleKey = "files.visible"
     private static let filesWidthKey = "files.width"
     private var graphWidth: NSLayoutConstraint!
     private let graph = GraphModel()
     /// Follows the selected session's checkout and branch while the graph panel is open.
     private var graphFollow: AnyCancellable?
-    private static let graphVisibleKey = "graph.visible"
     private static let graphWidthKey = "graph.width"
     private var reviewWidth: NSLayoutConstraint!
     private let review = ReviewModel()
@@ -131,8 +129,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             close: { [weak self] in self?.toggleReview(closing: true) },
             resize: { [weak self] in self?.setReviewWidth($0) }))
         reviewPanel.clipsToBounds = true
-        state.filesVisible = UserDefaults.standard.bool(forKey: Self.filesVisibleKey)
-        state.graphVisible = UserDefaults.standard.bool(forKey: Self.graphVisibleKey)
         settingsView = hosting(SettingsPage(
             settings: settings, agents: agents, worktrees: worktrees, state: state, updates: updates, remote: remote,
             runInTerminal: { [weak self] command in
@@ -292,7 +288,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         store.onSelectionChange = { [weak self] in
             self?.state.showingSettings = false
             self?.state.showingMerge = false
-            self?.show($0)
+            self?.arrange($0)
             self?.leaveAskToTerminal()
             self?.notch.refresh()
         }
@@ -387,7 +383,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func toggleSidebar() {
-        let open = sidebarWidth.constant == 0
+        setSidebar(visible: sidebarWidth.constant == 0)
+    }
+
+    private func setSidebar(visible open: Bool) {
+        remember { $0.sidebar = open }
         withAnimation(.easeOut(duration: 0.18)) { state.sidebarVisible = open }
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.18
@@ -397,14 +397,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    /// Opens or closes the files panel. It remembers the choice, and only watches the disk while open.
+    /// Opens or closes the files panel. The session remembers the choice, and the disk is only watched while open.
     func toggleFiles() {
         setFiles(visible: !state.filesVisible)
     }
 
     private func setFiles(visible open: Bool) {
         if !open { state.filesSearching = false }
-        UserDefaults.standard.set(open, forKey: Self.filesVisibleKey)
+        remember { $0.files = open }
         withAnimation(.easeOut(duration: 0.18)) { state.filesVisible = open }
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.18
@@ -415,10 +415,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         followFiles(store.selected)
     }
 
-    /// Opens or closes the git graph. It remembers the choice, and only asks git while open.
+    /// Opens or closes the git graph. The session remembers the choice, and git is only asked while open.
     func toggleGraph() {
-        let open = !state.graphVisible
-        UserDefaults.standard.set(open, forKey: Self.graphVisibleKey)
+        setGraph(visible: !state.graphVisible)
+    }
+
+    private func setGraph(visible open: Bool) {
+        remember { $0.graph = open }
         let width = open ? clampedGraphWidth(savedGraphWidth) : 0
         withAnimation(.easeOut(duration: 0.18)) {
             state.graphVisible = open
@@ -471,6 +474,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         // Over a commit or a request, "Review changes" brings your changes back. Closing the panel there would hide what you asked for.
         if !closing, review.showYours() { return graph.select(nil) }
         review.isOpen.toggle()
+        remember { $0.review = review.isOpen }
         let saved = UserDefaults.standard.double(forKey: Self.reviewWidthKey)
         let width = review.isOpen ? clampedReviewWidth(saved > 0 ? saved : ReviewPanel.defaultWidth) : 0
         withAnimation(.easeOut(duration: 0.18)) { state.reviewWidth = width }
@@ -840,6 +844,24 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
         alert.addButton(withTitle: "Cancel")
         alert.beginSheetModal(for: window) { reply($0 == .alertFirstButtonReturn) }
+    }
+
+    /// Brings back the panels the session had open. The review closes before the switch and opens after it, so it never reads the other session's diff.
+    private func arrange(_ session: Session?) {
+        let panels = session?.panels ?? Panels()
+        if state.sidebarVisible != panels.sidebar { setSidebar(visible: panels.sidebar) }
+        if state.filesVisible != panels.files { setFiles(visible: panels.files) }
+        if state.graphVisible != panels.graph { setGraph(visible: panels.graph) }
+        if !panels.review, review.isOpen { toggleReview(closing: true) }
+        show(session)
+        if panels.review, !review.isOpen { toggleReview(closing: true) }
+    }
+
+    private func remember(_ change: (inout Panels) -> Void) {
+        guard let session = store.selected else { return }
+        var panels = session.panels
+        change(&panels)
+        store.setPanels(panels, for: session)
     }
 
     /// Only the terminal on screen renders. Settings replaces it and pauses it too.

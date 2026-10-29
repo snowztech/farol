@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- Each session remembers which panels are open (sidebar, files, git graph, review) and brings them back when you return to it. A new session starts with the files, graph and review closed, and the sidebar as you left it.
+
 ## [0.54.0] - 2026-10-28
 
 Prepare each new worktree before its agent starts, and clean up when you remove it.
