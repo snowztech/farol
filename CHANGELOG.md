@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Press ⌘F with the cursor in the review to search every file of the changes, with the matches marked, a count, and ⌘G or Return for the next one. The bar has match case, whole word and regular expression, and a word selected in the diff becomes the search.
+
 ## [0.54.0] - 2026-10-28
 
 Prepare each new worktree before its agent starts, and clean up when you remove it.
