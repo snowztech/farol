@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Show the unmodified lines between changes in the review with the arrows in the gutter, 20 at a time from either side, or all at once in a small gap.
+
 ## [0.54.0] - 2026-10-28
 
 Prepare each new worktree before its agent starts, and clean up when you remove it.

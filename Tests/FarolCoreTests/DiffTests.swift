@@ -127,3 +127,42 @@ private func write(_ text: String, _ name: String, in box: Sandbox) throws {
     #expect(file.oldLine(forNew: 11) == nil)
     #expect(file.oldLine(forNew: 99) == nil)
 }
+
+@Test func expandingJoinsUnmodifiedLinesToTheHunkAround() {
+    let app = Diff.parse(sample)[0]
+    let text = (1...15).map { "line \($0)" }
+    #expect(app.gaps == [1..<10])
+
+    let above = app.expanding(5..<10, from: text)
+    #expect(above.gaps == [1..<5])
+    #expect(above.hunks.count == 1)
+    #expect((above.hunks[0].oldStart, above.hunks[0].newStart) == (5, 5))
+    #expect(above.hunks[0].lines.prefix(5).map(\.text) == ["line 5", "line 6", "line 7", "line 8", "line 9"])
+    #expect(above.hunks[0].lines.prefix(5).map(\.number) == [5, 6, 7, 8, 9])
+
+    // Lines the diff already shows are left alone, which used to build a backwards range and crash.
+    #expect(above.expanding(5..<10, from: text) == above)
+
+    // The hunk added a line, so the old file is one line behind after it.
+    let below = app.expanding(14..<30, from: text)
+    #expect(below.hunks[0].lines.suffix(2).map(\.text) == ["line 14", "line 15"])
+    #expect(below.hunks[0].lines.suffix(2).map(\.number) == [14, 15])
+}
+
+@Test func expandingKeepsAGapBetweenHunksThatDontTouch() {
+    let hunks = [
+        Diff.Hunk(oldStart: 2, newStart: 2, lines: [.init(kind: .added, text: "x", number: 2)]),
+        Diff.Hunk(oldStart: 9, newStart: 10, lines: [.init(kind: .added, text: "y", number: 10)]),
+    ]
+    let file = Diff.File(path: "a.txt", hunks: hunks)
+    let text = (1...12).map { "line \($0)" }
+    #expect(file.gaps == [1..<2, 3..<10])
+
+    let part = file.expanding(3..<6, from: text)
+    #expect(part.gaps == [1..<2, 6..<10])
+    #expect(part.hunks.count == 2)
+
+    let all = file.expanding(3..<10, from: text)
+    #expect(all.gaps == [1..<2])
+    #expect(all.hunks.count == 1)
+}

@@ -35,6 +35,11 @@ public enum Diff {
         public let oldStart: Int
         public let newStart: Int
         public var lines: [Line]
+
+        /// The first line of the new file this hunk covers. Git numbers a hunk that only removes lines by the line before it.
+        public var newBegin: Int { lines.contains { $0.kind != .removed } ? newStart : newStart + 1 }
+        /// The line after the last one of the new file this hunk covers.
+        public var newEnd: Int { newBegin + lines.filter { $0.kind != .removed }.count }
     }
 
     public struct File: Equatable {
@@ -67,6 +72,51 @@ public enum Diff {
                 number = (line.number ?? number) + 1
             }
             return hunk.newStart
+        }
+
+        /// The unmodified lines the diff leaves out before and between its hunks, by their numbers in the new file.
+        public var gaps: [Range<Int>] {
+            var next = 1
+            var gaps: [Range<Int>] = []
+            for hunk in hunks {
+                if hunk.newBegin > next { gaps.append(next..<hunk.newBegin) }
+                next = hunk.newEnd
+            }
+            return gaps
+        }
+
+        /// The file with some of the unmodified lines shown as context. `text` holds every line of the new file.
+        /// Lines in `range` that the diff already shows, or that lie past the end of the file, are left alone.
+        public func expanding(_ range: Range<Int>, from text: [String]) -> File {
+            var file = self
+            var shown: [Hunk] = []
+            var next = 1
+            var shift = 0
+            func fill(upTo end: Int) {
+                // Compared before the range is built, since a range that ends before it starts traps.
+                let (low, high) = (max(range.lowerBound, next), min(range.upperBound, end, text.count + 1))
+                guard low < high else { return }
+                let part = low..<high
+                let lines = part.map { Line(kind: .context, text: text[$0 - 1], number: $0) }
+                shown.append(Hunk(oldStart: part.lowerBound - shift, newStart: part.lowerBound, lines: lines))
+            }
+            for hunk in hunks {
+                fill(upTo: hunk.newBegin)
+                shown.append(hunk)
+                next = hunk.newEnd
+                shift += hunk.lines.filter { $0.kind == .added }.count - hunk.lines.filter { $0.kind == .removed }.count
+            }
+            fill(upTo: text.count + 1)
+            // Context that reaches a hunk becomes part of it, so no gap is drawn between them.
+            file.hunks = shown.reduce(into: []) { merged, hunk in
+                if let last = merged.last, last.newEnd == hunk.newBegin {
+                    // Numbered by its own first line from here on, even if it began as a removal.
+                    merged[merged.count - 1] = Hunk(oldStart: last.oldStart, newStart: last.newBegin, lines: last.lines + hunk.lines)
+                } else {
+                    merged.append(hunk)
+                }
+            }
+            return file
         }
 
         public var added: Int { hunks.reduce(0) { $0 + $1.lines.filter { $0.kind == .added }.count } }
@@ -114,6 +164,24 @@ public enum Diff {
         guard let base = baseBranch(in: directory), let branch = Git.branch(of: directory),
               branch != base, "origin/\(branch)" != base else { return .uncommitted }
         return .branch(base: base)
+    }
+
+    /// Every line of a file as the scope's new side has it, to show the lines a diff leaves out.
+    /// Nil when it can't be read as text, and for a request, whose files aren't in the checkout.
+    public static func newLines(of path: String, in directory: String, _ scope: Scope) -> [String]? {
+        let text: String?
+        switch scope {
+        case .uncommitted, .branch:
+            text = try? String(contentsOfFile: (directory as NSString).appendingPathComponent(path), encoding: .utf8)
+        case .commit(let hash):
+            text = try? Git.run(["show", "\(hash):\(path)"], in: directory, trimming: false)
+        case .request:
+            text = nil
+        }
+        guard var lines = text?.components(separatedBy: "\n") else { return nil }
+        // The newline that ends the last line isn't a line of its own.
+        if lines.last == "" { lines.removeLast() }
+        return lines
     }
 
     public static func files(in directory: String, _ scope: Scope) throws -> [File] {
