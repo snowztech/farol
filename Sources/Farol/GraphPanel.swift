@@ -45,6 +45,7 @@ final class GraphModel: ObservableObject {
         var selectedFiles: [Diff.File]?
     }
     private var snapshots: [String: Snapshot] = [:]
+    let scroll = ScrollMemory()
     private var watcher: FolderWatcher?
     private var pending: DispatchWorkItem?
     /// The checkout whose .git a watcher was asked for, so each is looked up once while git answers.
@@ -311,6 +312,7 @@ struct GraphPanel: View {
                             }
                             .padding(.horizontal, 6)
                             .padding(.bottom, 4)
+                            .background(ScrollKeeper(key: graph.root, memory: graph.scroll))
                         }
                         .scrollIndicators(.hidden)
                         // Arrows walk the history from the selected commit, and Return opens its changes.
