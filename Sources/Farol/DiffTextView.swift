@@ -102,6 +102,8 @@ final class DiffTextView: NSTextView {
     private var hoveredRow: CGFloat? {
         didSet { if hoveredRow != oldValue { needsDisplay = true } }
     }
+    /// The id of the review row this view draws, to find it again in the list.
+    var rowID: String? { shown.map { "\($0.file.path)#body\($0.rows?.lowerBound ?? 0)" } }
     /// The width the longest line needs, so the scroll view knows how far it can go.
     private(set) var contentWidth: CGFloat = 0
     private let diffLayout = NSLayoutManager()
