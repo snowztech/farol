@@ -143,6 +143,7 @@ final class ReviewModel: ObservableObject {
         var yourScope: Diff.Scope?
     }
     private var snapshots: [String: Snapshot] = [:]
+    let anchors = DiffAnchors()
     private var collapsed: Set<String> = []
     /// Your choice per checkout, so switching sessions doesn't reset it.
     private var chosenScope: [String: Diff.Scope] = [:]
@@ -739,6 +740,8 @@ struct ReviewPanel: View {
                             }
                         }
                         .padding(.bottom, 12)
+                        .background(DiffScrollKeeper(key: review.root, anchors: review.anchors,
+                                                     jump: { proxy.scrollTo($0, anchor: .top) }))
                     }
                     .onChange(of: review.focus?.id) {
                         guard let path = review.focus?.path else { return }

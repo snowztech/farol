@@ -6,7 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Fixed
 
-- The review and the git graph keep what each session showed, and the graph keeps how far it was scrolled, so switching back no longer empties them while they reload.
+- The review and the git graph keep what each session showed and how far it was scrolled, so switching back no longer empties them while they reload.
 
 ### Changed
 
