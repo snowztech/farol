@@ -81,6 +81,8 @@ final class PaneContainer: NSView {
     var onFocusChange: ((TerminalView) -> Void)?
     /// Panes were added, removed or resized, so the saved layout is out of date.
     var onLayoutChange: (() -> Void)?
+    /// A file's blame asked for a commit, by its hash.
+    var onShowCommit: ((String) -> Void)?
 
     var terminals: [TerminalView] { root.leaves }
 
@@ -813,6 +815,7 @@ final class PaneContainer: NSView {
         }
         file.onClose = { [weak self] in self?.closeFile() }
         file.onOpenFile = { [weak self] in self?.open($0) }
+        file.onShowCommit = { [weak self] in self?.onShowCommit?($0) }
         addSubview(file)
         needsLayout = true
     }

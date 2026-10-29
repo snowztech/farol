@@ -27,6 +27,8 @@ final class FileView: NSView {
     var onClose: (() -> Void)?
     /// Opens another file in this pane, from a link in the Markdown preview.
     var onOpenFile: ((String) -> Void)?
+    /// Shows a commit, by its hash, in the git graph, from a click on a line's hash in the blame.
+    var onShowCommit: ((String) -> Void)?
 
     /// The file as last read or saved, to tell our own save from someone else's change.
     private var onDisk: String?
@@ -39,6 +41,15 @@ final class FileView: NSView {
     private static let dotSize: CGFloat = 7
     private lazy var closeButton = QuietButton(symbol: "xmark", help: "Close file (⌘W)") { [weak self] in self?.onClose?() }
     private lazy var previewButton = QuietButton(symbol: "eye", help: "Preview") { [weak self] in self?.togglePreview() }
+    private lazy var blameButton = QuietButton(symbol: "person.text.rectangle", help: "Show git blame") { [weak self] in self?.toggleBlame() }
+    /// Who last changed each line, beside the numbers. Your choice holds for every file, like the Markdown preview.
+    private var blaming = false
+    private static let blameKey = "FarolFileBlame"
+    private static let blameWidth: CGFloat = 236
+    /// The file is in a git checkout, so there is something to blame.
+    private var inCheckout = false
+    private var blameLines: [Blame.Line] = []
+    private let blame: BlameColumn
     /// Markdown reads as source or rendered. Source until you first pick the preview, then your choice holds for every Markdown file.
     private var previewing = false
     private static let previewKey = "FarolMarkdownPreview"
@@ -67,6 +78,7 @@ final class FileView: NSView {
         layout.addTextContainer(container)
         text = CodeTextView(frame: .zero, textContainer: container)
         gutter = LineNumbers(textView: text)
+        blame = BlameColumn(gutter: gutter)
         super.init(frame: .zero)
         wantsLayer = true
 
@@ -82,6 +94,9 @@ final class FileView: NSView {
         header.addSubview(unsavedDot)
         header.addSubview(closeButton)
         header.addSubview(previewButton)
+        blameButton.isHidden = true
+        header.addSubview(blameButton)
+        blame.onShowCommit = { [weak self] in self?.onShowCommit?($0) }
 
         conflict.wantsLayer = true
         conflict.isHidden = true
@@ -127,7 +142,10 @@ final class FileView: NSView {
         scroll.contentView.postsBoundsChangedNotifications = true
         NotificationCenter.default.addObserver(
             forName: NSView.boundsDidChangeNotification, object: scroll.contentView, queue: .main
-        ) { [weak self] _ in self?.gutter.needsDisplay = true }
+        ) { [weak self] _ in
+            self?.gutter.needsDisplay = true
+            self?.blame.needsDisplay = true
+        }
 
         message.alignment = .center
         message.isHidden = true
@@ -136,7 +154,7 @@ final class FileView: NSView {
         preview.onOpenFile = { [weak self] in self?.onOpenFile?($0) }
 
         gutter.onResize = { [weak self] in self?.needsLayout = true }
-        for view in [header, conflict, gutter, scroll, preview, message] { addSubview(view) }
+        for view in [header, conflict, gutter, blame, scroll, preview, message] { addSubview(view) }
         show(path)
     }
 
@@ -181,6 +199,7 @@ final class FileView: NSView {
         preview.isHidden = !showsPreview
         scroll.isHidden = !message.isHidden || showsPreview
         gutter.isHidden = scroll.isHidden
+        blame.isHidden = !showsBlame
         if showsPreview { preview.show(text.string, path: path) }
         needsLayout = true
     }
@@ -190,6 +209,11 @@ final class FileView: NSView {
         self.path = path
         // Read for each file, so a choice made in another pane holds here too.
         previewing = UserDefaults.standard.bool(forKey: Self.previewKey)
+        blaming = UserDefaults.standard.bool(forKey: Self.blameKey)
+        inCheckout = false
+        blameLines = []
+        blame.lines = []
+        blameButton.isHidden = true
         folder = ""
         language = Syntax.language(for: path)
         updateTitle()
@@ -209,6 +233,39 @@ final class FileView: NSView {
                 guard let self, self.path == path, let top, directory.hasPrefix(top + "/") else { return }
                 self.folder = String(directory.dropFirst(top.count + 1)) + "/"
                 self.updateTitle()
+                self.inCheckout = true
+                self.blameButton.isHidden = false
+                self.loadBlame()
+                self.needsLayout = true
+            }
+        }
+    }
+
+    // MARK: Git blame
+
+    /// The blame fits the file as git has it, so it hides while you have unsaved edits, and comes back once they are saved.
+    private var showsBlame: Bool { blaming && inCheckout && !isDirty && !blameLines.isEmpty && !scroll.isHidden }
+
+    private func toggleBlame() {
+        blaming.toggle()
+        UserDefaults.standard.set(blaming, forKey: Self.blameKey)
+        blameButton.show(symbol: "person.text.rectangle", help: blaming ? "Hide git blame" : "Show git blame")
+        if blaming { loadBlame() }
+        updateMode()
+    }
+
+    /// Asks git who changed each line, off the main thread, and only while the blame is on.
+    private func loadBlame() {
+        blameButton.show(symbol: "person.text.rectangle", help: blaming ? "Hide git blame" : "Show git blame")
+        guard blaming, inCheckout else { return updateMode() }
+        let path = path
+        DispatchQueue.global(qos: .userInitiated).async {
+            let lines = Blame.lines(of: path) ?? []
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.path == path else { return }
+                self.blameLines = lines
+                self.blame.lines = lines
+                self.updateMode()
             }
         }
     }
@@ -308,6 +365,7 @@ final class FileView: NSView {
         needsLayout = true
         gutter.textChanged()
         highlight()
+        loadBlame()
         if keepingPosition {
             let length = (text.string as NSString).length
             text.setSelectedRange(NSRange(location: min(selection.location, length), length: 0))
@@ -348,6 +406,7 @@ final class FileView: NSView {
         isDirty = false
         conflict.isHidden = true
         needsLayout = true
+        loadBlame()
     }
 
     /// Runs `proceed` once unsaved edits are saved or thrown away. Asks first, and runs `cancelled` on Cancel.
@@ -438,6 +497,7 @@ final class FileView: NSView {
         updateTitle()
         closeButton.apply(background: background, foreground: foreground)
         previewButton.apply(background: background, foreground: foreground)
+        blameButton.apply(background: background, foreground: foreground)
         themeColors = (background, foreground)
         preview.apply(background: background, foreground: foreground, syntax: syntax)
         message.textColor = background.mixed(with: foreground, 0.55)
@@ -446,6 +506,7 @@ final class FileView: NSView {
         plainColor = foreground
         highlight()
         gutter.colors = (background, background.mixed(with: foreground, 0.35))
+        blame.colors = (background, background.mixed(with: foreground, 0.5), foreground.withAlphaComponent(0.85))
     }
 
     // MARK: Syntax colors
@@ -484,8 +545,10 @@ final class FileView: NSView {
         header.frame = NSRect(x: 0, y: 0, width: bounds.width, height: h)
         closeButton.frame = NSRect(x: bounds.width - 28, y: 3, width: 20, height: 20)
         previewButton.frame = NSRect(x: bounds.width - 52, y: 3, width: 20, height: 20)
+        let blameX = bounds.width - 52 - (previewButton.isHidden ? 0 : 24)
+        blameButton.frame = NSRect(x: blameX, y: 3, width: 20, height: 20)
         // The dot follows the name, and the name gives up room first when the pane is narrow.
-        let room = max(0, bounds.width - 48 - Self.dotSize - 8 - (previewButton.isHidden ? 0 : 24))
+        let room = max(0, bounds.width - 48 - Self.dotSize - 8 - (previewButton.isHidden ? 0 : 24) - (blameButton.isHidden ? 0 : 24))
         let titleWidth = min(ceil(title.attributedStringValue.size().width) + 4, room)
         title.frame = NSRect(x: 12, y: 5, width: titleWidth, height: 16)
         unsavedDot.frame = NSRect(x: title.frame.maxX + 4, y: (h - Self.dotSize) / 2, width: Self.dotSize, height: Self.dotSize)
@@ -498,7 +561,11 @@ final class FileView: NSView {
         conflictText.frame = NSRect(x: 12, y: (bar - 16) / 2, width: max(0, reloadButton.frame.minX - 20), height: 16)
         let body = max(0, bounds.height - h - bar)
         gutter.frame = NSRect(x: 0, y: h + bar, width: gutter.width, height: body)
-        scroll.frame = NSRect(x: gutter.width, y: h + bar, width: max(0, bounds.width - gutter.width), height: body)
+        let blameWidth = showsBlame ? Self.blameWidth : 0
+        blame.frame = NSRect(x: gutter.width, y: h + bar, width: blameWidth, height: body)
+        blame.isHidden = !showsBlame
+        let start = gutter.width + blameWidth
+        scroll.frame = NSRect(x: start, y: h + bar, width: max(0, bounds.width - start), height: body)
         preview.frame = NSRect(x: 0, y: h + bar, width: bounds.width, height: body)
         // At least as big as the visible area, so short files still fill it and clicks land in the text.
         text.minSize = scroll.contentSize
@@ -587,6 +654,22 @@ private final class LineNumbers: NSView {
         }
     }
 
+    /// The lines on screen, each with its top and height in this view's own coordinates.
+    func forEachVisibleLine(_ body: (_ line: Int, _ top: CGFloat, _ height: CGFloat) -> Void) {
+        guard let textView, let layout = textView.layoutManager, let container = textView.textContainer,
+              !textView.string.isEmpty else { return }
+        let visible = textView.visibleRect
+        let glyphs = layout.glyphRange(forBoundingRect: visible, in: container)
+        let characters = layout.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
+        var line = firstLine(atOrBefore: characters.location)
+        while line < lineStarts.count, lineStarts[line] <= NSMaxRange(characters) {
+            let glyph = layout.glyphIndexForCharacter(at: lineStarts[line])
+            let fragment = layout.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+            body(line, fragment.minY + textView.textContainerOrigin.y - visible.minY, fragment.height)
+            line += 1
+        }
+    }
+
     private func firstLine(atOrBefore location: Int) -> Int {
         var low = 0, high = lineStarts.count - 1
         while low < high {
@@ -594,5 +677,97 @@ private final class LineNumbers: NSView {
             if lineStarts[mid] <= location { low = mid } else { high = mid - 1 }
         }
         return low
+    }
+}
+
+/// Who last changed each line, between the numbers and the text: the commit's short hash, who, and when, once per run of lines.
+/// A click on a hash opens that commit in the git graph. Drawn like the numbers, for the lines on screen only.
+private final class BlameColumn: NSView {
+    private static let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+    private static let small = NSFont.systemFont(ofSize: 11)
+    private static let hashWidth: CGFloat = 62
+    private static let dates: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter
+    }()
+
+    private unowned let gutter: LineNumbers
+    var lines: [Blame.Line] = [] { didSet { needsDisplay = true } }
+    var colors = (background: NSColor.black, text: NSColor.gray, hash: NSColor.white) { didSet { needsDisplay = true } }
+    var onShowCommit: ((String) -> Void)?
+
+    init(gutter: LineNumbers) {
+        self.gutter = gutter
+        super.init(frame: .zero)
+        isHidden = true
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    override var isFlipped: Bool { true }
+
+    override func draw(_ dirtyRect: NSRect) {
+        colors.background.setFill()
+        bounds.fill()
+        let hash: [NSAttributedString.Key: Any] = [.font: Self.font, .foregroundColor: colors.hash]
+        let muted: [NSAttributedString.Key: Any] = [.font: Self.small, .foregroundColor: colors.text]
+        let divider = colors.text.withAlphaComponent(0.25)
+        gutter.forEachVisibleLine { line, top, height in
+            guard lines.indices.contains(line), line == 0 || lines[line].hash != lines[line - 1].hash else { return }
+            let entry = lines[line]
+            divider.setFill()
+            if line > 0 { NSRect(x: 0, y: top, width: bounds.width, height: 1).fill() }
+            func draw(_ text: String, _ attributes: [NSAttributedString.Key: Any], at x: CGFloat, width: CGFloat, right: Bool = false) {
+                let label = text as NSString
+                let size = label.size(withAttributes: attributes)
+                let origin = right ? x + max(0, width - size.width) : x
+                label.draw(in: NSRect(x: origin, y: top + (height - size.height) / 2, width: min(size.width, width), height: size.height),
+                           withAttributes: attributes)
+            }
+            let when = Self.dates.localizedString(for: entry.date, relativeTo: Date())
+            if entry.isCommitted {
+                draw(entry.shortHash, hash, at: 10, width: Self.hashWidth)
+                draw(entry.author, muted, at: 10 + Self.hashWidth + 8, width: bounds.width - Self.hashWidth - 26 - 56)
+                draw(when, muted, at: bounds.width - 62, width: 52, right: true)
+            } else {
+                draw("Not committed yet", muted, at: 10, width: bounds.width - 20)
+            }
+        }
+    }
+
+    /// The commit of the line under the point, with the line.
+    private func entry(at point: NSPoint) -> Blame.Line? {
+        var found: Blame.Line?
+        gutter.forEachVisibleLine { line, top, height in
+            if point.y >= top, point.y < top + height, lines.indices.contains(line) { found = lines[line] }
+        }
+        return found
+    }
+
+    private func overHash(_ point: NSPoint) -> Blame.Line? {
+        guard point.x < 10 + Self.hashWidth, let entry = entry(at: point), entry.isCommitted else { return nil }
+        return entry
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow], owner: self))
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        let entry = entry(at: point)
+        toolTip = entry.map { $0.isCommitted ? "\($0.summary)\n\($0.author), \($0.date.formatted(date: .abbreviated, time: .omitted))" : "Not committed yet" }
+        if overHash(point) != nil { NSCursor.pointingHand.set() } else { NSCursor.arrow.set() }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        if let entry = overHash(convert(event.locationInWindow, from: nil)) {
+            onShowCommit?(entry.hash)
+        } else {
+            super.mouseDown(with: event)
+        }
     }
 }
