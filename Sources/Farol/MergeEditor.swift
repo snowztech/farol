@@ -38,8 +38,6 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
     private static var gutterWidth: CGFloat { buttonsWidth + MergeNumbers.width + waveWidth }
     /// Unchanged lines kept around each change, like a diff.
     private static let context = 3
-    /// A change this close to a conflict stays in view, since it may depend on how the conflict goes.
-    private static let near = 3
 
     /// After every decision or edit, so the counts around the editor follow.
     var onChange: (() -> Void)?
@@ -62,7 +60,6 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
     /// The three versions as text, for the check above.
     private var versionTexts: [String] = []
     private var checks = 0
-    private var nearConflict: [Bool] = []
     /// Folds you opened, by their first unit.
     private var expanded: Set<Int> = []
     var showAll = false {
@@ -193,13 +190,6 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
                 shiftOther = chunk.other.upperBound - chunk.base.upperBound
             }
         }
-        let conflicts = merge.chunks.filter { $0.kind == .conflict }
-        nearConflict = merge.chunks.map { chunk in
-            conflicts.contains { other in
-                let gap = max(other.base.lowerBound - chunk.base.upperBound, chunk.base.lowerBound - other.base.upperBound)
-                return gap <= Self.near
-            }
-        }
         versionTexts = [merge.base, merge.mine, merge.other].map { $0.joined(separator: "\n") }
         warnings = []
         centerView.breakUndoCoalescing()
@@ -309,12 +299,12 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
         return style
     }
 
-    /// Which units show. Folded: unchanged lines away from any change, and changes taken on their own away from conflicts.
+    /// Which units show. Folded: unchanged lines away from any change. Every change shows, including the ones git took on its own.
     private func visibility() -> [Bool] {
         if showAll { return units.map { _ in true } }
         var visible = units.map { unit -> Bool in
-            guard case .chunk(let index) = unit else { return false }
-            return !(decisions[index].auto && !nearConflict[index])
+            if case .chunk = unit { return true }
+            return false
         }
         let chunksShown = visible
         for (position, shown) in chunksShown.enumerated() where shown {
@@ -377,7 +367,7 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
                 var end = position
                 while end < units.count, !visible[end] { end += 1 }
                 let block = startBlock()
-                var hiddenMine = 0, hiddenOther = 0, hiddenCenter = 0, autos = 0
+                var hiddenMine = 0, hiddenOther = 0, hiddenCenter = 0
                 for unit in position..<end {
                     switch units[unit] {
                     case .line:
@@ -386,14 +376,12 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
                     case .chunk(let index):
                         hiddenMine += merge.chunks[index].mine.count
                         hiddenOther += merge.chunks[index].other.count
-                        if decisions[index].auto { autos += 1 }
                     }
                     hiddenCenter += lineCount(resolution.texts[unit])
                 }
-                let changes = autos == 0 ? "" : ", \(autos) auto-merged"
                 sideFolds.mine.append((append("⋯ \(hiddenMine) lines\n", to: mineText, foldAttributes), position))
                 sideFolds.other.append((append("⋯ \(hiddenOther) lines\n", to: otherText, foldAttributes), position))
-                let range = append("⋯ \(hiddenCenter) lines\(changes)\n", to: centerText, foldAttributes)
+                let range = append("⋯ \(hiddenCenter) lines\n", to: centerText, foldAttributes)
                 items.append((.fold(position..<end), range))
                 mineNumbers.append(nil)
                 otherNumbers.append(nil)

@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- The merge view shows every change, including the ones Git merged on its own, instead of folding those away from conflicts. Only unchanged lines fold.
+
 ## [0.54.0] - 2026-10-28
 
 Prepare each new worktree before its agent starts, and clean up when you remove it.
