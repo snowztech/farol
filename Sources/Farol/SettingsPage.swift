@@ -270,6 +270,11 @@ struct SettingsPage: View {
             palette: p) {
             toggle($agents.agentControl)
         }
+        Row(title: "Let Farol Voice control sessions",
+            detail: "Farol Voice can go to a session, type to its agent and start tasks when you tell it to. Farol checks that it's really Farol Voice asking.",
+            palette: p) {
+            toggle($agents.voiceControl)
+        }
 
         GroupTitle(title: "When Farol opens", palette: p)
         Row(title: "Resume agent conversations",

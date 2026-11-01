@@ -15,6 +15,8 @@ final class AgentControl {
     /// So neither an agent still starting nor the end of its turn before is taken for the answer.
     private var told: [UUID: Date] = [:]
     private let reading = DispatchQueue(label: "sh.farol.control.reading", qos: .userInitiated)
+    /// Brings the window forward, since Farol Voice works from any app.
+    var onBringForward: (() -> Void)?
 
     private struct Wait {
         let pane: UUID
@@ -38,7 +40,7 @@ final class AgentControl {
         case .sessions:
             connection.reply(ControlReply(sessions: sessions(caller: caller)))
         case .task(let text, let repo, let agent):
-            guard agents.agentControl else { return connection.reply(ControlReply.failed(Self.turnOn("start a task"))) }
+            guard agents.agentControl || voiceAllowed(connection) else { return connection.reply(ControlReply.failed(Self.turnOn("start a task"))) }
             task(text, in: repo, with: agent, caller: caller, connection)
         case .send(let session, let text):
             guard agents.agentControl else { return connection.reply(ControlReply.failed(Self.turnOn("send a message to another session"))) }
@@ -47,11 +49,60 @@ final class AgentControl {
             wait(for: session, timeout: timeout, caller: caller, connection)
         case .read(let session):
             read(session, caller: caller, connection)
+        case .focus(let session):
+            guard let refusal = voiceRefusal(connection) else { return focus(session, connection) }
+            connection.reply(ControlReply.failed(refusal))
+        case .type(let session, let text, let submit, let asking):
+            guard let refusal = voiceRefusal(connection) else { return type(text, into: session, submit: submit, answering: asking, connection) }
+            connection.reply(ControlReply.failed(refusal))
         }
     }
 
     private static func turnOn(_ what: String) -> String {
         "Farol lets agents \(what) only when the user turns on Settings → Agents → Let agents start tasks and message sessions. Ask them to."
+    }
+
+    // MARK: Farol Voice
+
+    private func voiceAllowed(_ connection: HeldConnection) -> Bool {
+        connection.isFarolVoice && agents.voiceControl
+    }
+
+    private func voiceRefusal(_ connection: HeldConnection) -> String? {
+        guard connection.isFarolVoice else { return "Only Farol Voice can do this." }
+        return agents.voiceControl ? nil : "Turn on Settings → Agents → Let Farol Voice control sessions in Farol."
+    }
+
+    private func focus(_ name: String, _ connection: HeldConnection) {
+        switch target(name, caller: nil) {
+        case .failure(let error):
+            connection.reply(ControlReply.failed(error.description))
+        case .success(let (session, terminal)):
+            onBringForward?()
+            store.select(session)
+            session.panes.focus(terminal)
+            connection.reply(ControlReply(session: info(session, terminal, caller: nil)))
+        }
+    }
+
+    private func type(_ text: String, into name: String, submit: Bool, answering asking: String?, _ connection: HeldConnection) {
+        switch target(name, caller: nil) {
+        case .failure(let error):
+            connection.reply(ControlReply.failed(error.description))
+        case .success(let (session, terminal)):
+            let now = info(session, terminal, caller: nil)
+            if let refusal = now.typingRefusal(of: text, answering: asking) {
+                return connection.reply(ControlReply.failed(refusal))
+            }
+            terminal.pasteText(text)
+            if submit {
+                told[terminal.id] = .now
+                DispatchQueue.main.asyncAfter(deadline: .now() + RemoteTyping.returnDelay(afterPasteOf: text, elapsed: 0)) { [weak terminal] in
+                    terminal?.press(.enter)
+                }
+            }
+            connection.reply(ControlReply(session: now))
+        }
     }
 
     // MARK: Sessions

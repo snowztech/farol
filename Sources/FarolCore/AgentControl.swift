@@ -15,6 +15,18 @@ public struct ControlRequest: Codable, Equatable, Sendable {
         /// Answered once the session needs someone or is done, or after `timeout` seconds with how it is then.
         case wait(session: String, timeout: TimeInterval)
         case read(session: String)
+        /// Farol Voice only: go to a session and bring Farol forward.
+        case focus(session: String)
+        /// Farol Voice only: type one line into a session, pressing Return if `submit`. `asking` is the question it's answering, when it's answering one, so an answer can't land on a different question.
+        case type(session: String, text: String, submit: Bool, asking: String?)
+
+        /// What Farol Voice can do, and what's worth checking the caller's signature for.
+        var isForVoice: Bool {
+            switch self {
+            case .focus, .type, .task: true
+            case .sessions, .send, .wait, .read: false
+            }
+        }
     }
 
     public init(pane: String?, action: Action) {
@@ -102,6 +114,18 @@ extension SessionInfo {
         case .idle: worked
         case .working: false
         }
+    }
+}
+
+extension SessionInfo {
+    /// Why text can't be typed here now, or nil if it can. Typing into a waiting session could answer a menu nobody read, so that takes naming the exact question.
+    public func typingRefusal(of text: String, answering asking: String?) -> String? {
+        // A newline would press Return and a control character could drive the terminal, whatever `submit` says.
+        if text.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains) { return "That isn't one line of plain text." }
+        if let asking {
+            return status == .waiting && self.asking == asking ? nil : "\(name) is no longer waiting on that question."
+        }
+        return status == .waiting ? "\(name) is waiting for an answer." : nil
     }
 }
 
