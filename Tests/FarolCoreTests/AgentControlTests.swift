@@ -144,3 +144,23 @@ private func voiceSession(_ status: SessionInfo.Status, asking: String? = nil) -
     defer { server.stop() }
     #expect(try StatusClient.control(ControlRequest(pane: nil, action: .focus(session: "A")), to: path)?.error == "refused")
 }
+
+@Test func onlyAnAnswerNeedsFarolVoiceAmongTheNewActions() {
+    #expect(ControlRequest.Action.answer(session: "a", asking: "Allow rm?", choice: 1).isForVoice)
+    #expect(!ControlRequest.Action.watch(after: 0, timeout: 25).isForVoice)
+}
+
+@Test func aWatchAndItsAnswerCrossTheSocket() throws {
+    let path = "/tmp/farol-control-\(UUID().uuidString.prefix(8))"
+    let server = StatusServer(path: path, deliverOn: DispatchQueue(label: "test.watch"))
+    let session = SessionInfo(id: "s", name: "auth", folder: "/tmp", status: .waiting, asking: "Allow rm?", choices: ["Yes", "No"], inFront: true)
+    server.onControl = { request, connection in
+        #expect(request.action == .watch(after: 3, timeout: 25))
+        connection.reply(ControlReply(sessions: [session], generation: 4))
+    }
+    try server.start()
+    defer { server.stop() }
+    let reply = try StatusClient.control(ControlRequest(pane: nil, action: .watch(after: 3, timeout: 25)), to: path)
+    #expect(reply?.generation == 4)
+    #expect(reply?.sessions == [session])
+}

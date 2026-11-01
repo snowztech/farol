@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Farol Voice can hear when a session starts waiting or finishes, and pick an answer on the menu an agent waits on.
+
 ## [0.54.1] - 2026-11-01
 
 Let Farol Voice control your sessions, if you turn it on.

@@ -192,6 +192,16 @@ final class Session: ObservableObject, Identifiable {
         return text
     }
 
+    /// The answers a waiting pane offers, in the agent's numbering. Nil for a form of several questions, which one number can't answer.
+    func choices(in terminal: TerminalView) -> [String]? {
+        guard status(of: terminal) == .waiting else { return nil }
+        if let ask, ask.pane == terminal.id {
+            return ask.questions.count == 1 ? ask.questions[0].options.map(\.label) : nil
+        }
+        guard let menu = Prompt(screen: terminal.screenText), menu.steps.isEmpty else { return nil }
+        return menu.options.map(\.label)
+    }
+
     /// What each pane's screen asked when last read, so a list sent often does not read every screen each time.
     private var screenAsking: [UUID: (at: Date, text: String?)] = [:]
 
