@@ -220,6 +220,8 @@ public final class StatusServer {
         }
         if let line = lines.first, let request = try? JSONDecoder().decode(ControlRequest.self, from: Data(line)) {
             let connection = HeldConnection(descriptor: client, deliverOn: delivery)
+            // Here and not on delivery, since checking a signature can take a moment and delivery is the main thread.
+            connection.isFarolVoice = request.action.isForVoice && VoicePeer.isFarolVoice(descriptor: client)
             delivery.async { [weak self] in
                 if let handler = self?.onControl { handler(request, connection) } else { connection.reply(ControlReply.failed("Farol is not ready yet.")) }
             }
@@ -236,6 +238,8 @@ public final class StatusServer {
 /// The open end of a request, like a question or a `farol` command, answered once.
 /// Closing a question without answers sends the agent back to its own prompt.
 public final class HeldConnection: @unchecked Sendable {
+    /// Set once before delivery, for requests that Farol Voice can make.
+    public internal(set) var isFarolVoice = false
     private let descriptor: Int32
     private let delivery: DispatchQueue
     private let lock = NSLock()
