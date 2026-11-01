@@ -1,5 +1,6 @@
 import AppKit
 import FarolCore
+import FarolRemote
 import GhosttyTerminal
 
 /// Answers the `farol` commands agents run in their panes: the sessions as they are, a task started in a new worktree, a message typed to another agent, a wait until one needs someone, and an agent's last message.
@@ -15,6 +16,11 @@ final class AgentControl {
     /// So neither an agent still starting nor the end of its turn before is taken for the answer.
     private var told: [UUID: Date] = [:]
     private let reading = DispatchQueue(label: "sh.farol.control.reading", qos: .userInitiated)
+    /// Counts changes, so a watch that starts late still hears about one it missed.
+    private var generation = 0
+    /// Watches not answered yet, each held on its own connection.
+    private var watches: [HeldConnection] = []
+    private var flushing = false
     /// Brings the window forward, since Farol Voice works from any app.
     var onBringForward: (() -> Void)?
 
@@ -54,6 +60,11 @@ final class AgentControl {
             connection.reply(ControlReply.failed(refusal))
         case .type(let session, let text, let submit, let asking):
             guard let refusal = voiceRefusal(connection) else { return type(text, into: session, submit: submit, answering: asking, connection) }
+            connection.reply(ControlReply.failed(refusal))
+        case .watch(let after, let timeout):
+            watch(after: after, timeout: timeout, connection)
+        case .answer(let session, let asking, let choice):
+            guard let refusal = voiceRefusal(connection) else { return answer(session, asking: asking, choice: choice, connection) }
             connection.reply(ControlReply.failed(refusal))
         }
     }
@@ -105,6 +116,62 @@ final class AgentControl {
         }
     }
 
+    /// Picks a number the way the phone does, after checking the menu is still the one you heard about.
+    private func answer(_ name: String, asking: String, choice: Int, _ connection: HeldConnection) {
+        switch target(name, caller: nil) {
+        case .failure(let error):
+            connection.reply(ControlReply.failed(error.description))
+        case .success(let (session, terminal)):
+            let now = info(session, terminal, caller: nil)
+            guard now.status == .waiting, now.asking == asking, now.choices?.indices.contains(choice - 1) == true else {
+                return connection.reply(ControlReply.failed("\(now.name) is no longer waiting on that question."))
+            }
+            // Gone at once, so a second answer can't land on whatever the agent asks next.
+            if session.request?.pane == terminal.id { session.request = nil }
+            // While Farol holds a question through its hook, the agent shows nothing to type into.
+            if let ask = session.ask, ask.pane == terminal.id, let question = ask.questions.first {
+                store.answer(session, with: [question.text: question.options[choice - 1].label])
+            } else {
+                terminal.type(String(choice))
+            }
+            told[terminal.id] = .now
+            connection.reply(ControlReply(session: now))
+        }
+    }
+
+    // MARK: Watch
+
+    private func watch(after: Int, timeout: TimeInterval, _ connection: HeldConnection) {
+        guard after == generation else { return connection.reply(snapshot()) }
+        watches.append(connection)
+        connection.watch { [weak self, weak connection] in self?.watches.removeAll { $0 === connection } }
+        DispatchQueue.main.asyncAfter(deadline: .now() + min(timeout, 3600)) { [weak self, weak connection] in
+            guard let self, let connection, watches.contains(where: { $0 === connection }) else { return }
+            watches.removeAll { $0 === connection }
+            connection.reply(snapshot())
+        }
+    }
+
+    private func snapshot() -> ControlReply {
+        ControlReply(sessions: sessions(caller: nil), generation: generation)
+    }
+
+    /// A session started working, waits, or is done.
+    func activityChanged() {
+        generation += 1
+        guard !flushing, !watches.isEmpty else { return }
+        flushing = true
+        // A moment later, since an agent's menu reaches the screen just after its hook reports it.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            guard let self else { return }
+            flushing = false
+            let waiting = watches
+            watches = []
+            let reply = snapshot()
+            waiting.forEach { $0.reply(reply) }
+        }
+    }
+
     // MARK: Sessions
 
     /// Every pane, as the phone lists them, in the sidebar's order.
@@ -116,7 +183,8 @@ final class AgentControl {
         let status = SessionInfo.Status(rawValue: "\(session.status(of: terminal))") ?? .idle
         return SessionInfo(id: terminal.id.uuidString, name: session.label(of: terminal), folder: terminal.workingDirectory ?? session.directory,
                            branch: session.branch, agent: session.agent(in: terminal), status: status, asking: session.asking(in: terminal),
-                           isCaller: terminal.id == caller)
+                           isCaller: terminal.id == caller, choices: session.choices(in: terminal),
+                           inFront: NSApp.isActive && store.selected === session && session.panes.focused === terminal)
     }
 
     /// The pane a command names, with its session, or a reply that says why there is none.
