@@ -251,6 +251,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         store.onPaneExit = { [weak self] in self?.paneExited($1, in: $0) }
         runtime.onRequest = { [weak self] in self?.handle($0) }
         store.onControl = { [weak self] in self?.control.handle($0, $1) }
+        control.onBringForward = { [weak self] in
+            NSApp.activate(ignoringOtherApps: true)
+            self?.window?.makeKeyAndOrderFront(nil)
+        }
         store.onActivityChange = { [weak self] session, before, after in
             guard let self else { return }
             notifier.activityChanged(session, from: before, to: after)

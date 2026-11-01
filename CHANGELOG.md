@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Settings → Agents → Let Farol Voice control sessions, for [Farol Voice](https://voice.farol.sh) to go to a session, type to its agent and start tasks. Off by default, and Farol checks the signature of what's asking.
+
 ## [0.54.0] - 2026-10-28
 
 Prepare each new worktree before its agent starts, and clean up when you remove it.
