@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.54.1] - 2026-11-01
+
+Let Farol Voice control your sessions, if you turn it on.
+
 ### Added
 
 - Settings → Agents → Let Farol Voice control sessions, for [Farol Voice](https://voice.farol.sh) to go to a session, type to its agent and start tasks. Off by default, and Farol checks the signature of what's asking.
@@ -1080,7 +1084,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.54.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.54.1...HEAD
+[0.54.1]: https://github.com/snowztech/farol/releases/tag/v0.54.1
 [0.54.0]: https://github.com/snowztech/farol/releases/tag/v0.54.0
 [0.53.0]: https://github.com/snowztech/farol/releases/tag/v0.53.0
 [0.52.0]: https://github.com/snowztech/farol/releases/tag/v0.52.0
