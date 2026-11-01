@@ -21,6 +21,9 @@ final class AgentSettings: ObservableObject {
     /// Lets an agent start tasks and type to other agents with `farol task` and `farol send`. Off until turned on, since one agent then acts on others.
     @Published var agentControl: Bool { didSet { Self.defaults.set(agentControl, forKey: "agents.control") } }
 
+    /// Lets Farol Voice go to sessions, type to them and start tasks. Off until turned on, since it acts on what it heard.
+    @Published var voiceControl: Bool { didSet { Self.defaults.set(voiceControl, forKey: "agents.voiceControl") } }
+
     /// Also read by the session store at launch.
     static let resumeKey = "agents.resume"
 
@@ -39,5 +42,6 @@ final class AgentSettings: ObservableObject {
         remote = Self.defaults.bool(forKey: RemoteBridge.enabledKey)
         remoteKeepAwake = Self.defaults.bool(forKey: "remote.keepAwake")
         agentControl = Self.defaults.bool(forKey: "agents.control")
+        voiceControl = Self.defaults.bool(forKey: "agents.voiceControl")
     }
 }

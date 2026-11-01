@@ -378,7 +378,7 @@ private struct MatchRow: View {
 }
 
 /// A search option in the field, lit while on.
-private struct OptionToggle<Label: View>: View {
+struct OptionToggle<Label: View>: View {
     let label: Label
     let help: String
     @Binding var on: Bool

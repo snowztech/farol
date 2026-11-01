@@ -302,10 +302,7 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
     /// Which units show. Folded: unchanged lines away from any change. Every change shows, including the ones git took on its own.
     private func visibility() -> [Bool] {
         if showAll { return units.map { _ in true } }
-        var visible = units.map { unit -> Bool in
-            if case .chunk = unit { return true }
-            return false
-        }
+        var visible = units.map { if case .chunk = $0 { true } else { false } }
         let chunksShown = visible
         for (position, shown) in chunksShown.enumerated() where shown {
             for offset in 1...Self.context {
@@ -367,20 +364,10 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
                 var end = position
                 while end < units.count, !visible[end] { end += 1 }
                 let block = startBlock()
-                var hiddenMine = 0, hiddenOther = 0, hiddenCenter = 0
-                for unit in position..<end {
-                    switch units[unit] {
-                    case .line:
-                        hiddenMine += 1
-                        hiddenOther += 1
-                    case .chunk(let index):
-                        hiddenMine += merge.chunks[index].mine.count
-                        hiddenOther += merge.chunks[index].other.count
-                    }
-                    hiddenCenter += lineCount(resolution.texts[unit])
-                }
-                sideFolds.mine.append((append("⋯ \(hiddenMine) lines\n", to: mineText, foldAttributes), position))
-                sideFolds.other.append((append("⋯ \(hiddenOther) lines\n", to: otherText, foldAttributes), position))
+                // Only unchanged lines fold, so the side columns hide one line for each.
+                let hiddenCenter = (position..<end).reduce(0) { $0 + lineCount(resolution.texts[$1]) }
+                sideFolds.mine.append((append("⋯ \(end - position) lines\n", to: mineText, foldAttributes), position))
+                sideFolds.other.append((append("⋯ \(end - position) lines\n", to: otherText, foldAttributes), position))
                 let range = append("⋯ \(hiddenCenter) lines\n", to: centerText, foldAttributes)
                 items.append((.fold(position..<end), range))
                 mineNumbers.append(nil)
@@ -456,12 +443,9 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
     /// Returns false when the columns need a full rebuild.
     private func patch(_ visible: [Bool]) -> Bool {
         guard let built, built.visible == visible, let storage = centerView.textStorage, let colors else { return false }
-        // Fold labels count the lines and automatic changes they hide.
+        // Fold labels count the lines they hide.
         for (unit, shown) in visible.enumerated() where !shown {
             guard resolution.texts[unit] == built.resolution.texts[unit] else { return false }
-            if case .chunk(let index) = units[unit], resolution.decisions[index].auto != built.resolution.decisions[index].auto {
-                return false
-            }
         }
         let selection = centerView.selectedRange()
         let base = baseAttributes(colors)

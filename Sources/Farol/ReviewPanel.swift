@@ -54,6 +54,7 @@ final class ReviewModel: ObservableObject {
                 scope = yourScope ?? .uncommitted
                 fetchedRequest = nil
             }
+            if !isOpen { findOpen = false }
             refresh()
             if isOpen { checkRequest() }
         }
@@ -127,6 +128,144 @@ final class ReviewModel: ObservableObject {
     private var defaultScopes: [String: Diff.Scope] = [:]
 
     private var files: [Diff.File] = []
+    /// Files with unmodified lines opened, as the diff gave them and as shown. Kept while the diff of the file stays the same.
+    private var expanded: [String: (base: Diff.File, shown: Diff.File)] = [:]
+    private var expandedScope: Diff.Scope?
+
+    // MARK: Find
+
+    /// Where the search wants the list to scroll to, a new id each time so asking again for the same match scrolls again.
+    struct Reveal: Equatable {
+        let path: String
+        let row: Int
+        let id = UUID()
+    }
+
+    /// The search bar under the title. Closing it clears the marks and keeps the text for next time.
+    @Published var findOpen = false {
+        didSet {
+            guard findOpen != oldValue else { return }
+            pendingSearch?.cancel()
+            pendingSearch = nil
+            search(keeping: false)
+            if !findOpen { onFindClose?() }
+        }
+    }
+    @Published var query = "" {
+        didSet { if query != oldValue { queryChanged() } }
+    }
+    @Published var findOptions = FileSearch.Options() {
+        didSet { if findOptions != oldValue { search() } }
+    }
+    /// Bumped to put the cursor back in the field, as when ⌘F is pressed with the bar already open.
+    @Published private(set) var findFocus = 0
+    @Published private(set) var matches: [DiffSearch.Match] = []
+    @Published private(set) var current: Int?
+    @Published private(set) var marks: [String: DiffMarks] = [:]
+    @Published private(set) var reveal: Reveal?
+    /// More matches than this are counted but not marked, so a one letter search can't make the panel crawl.
+    static let matchLimit = 5000
+    private var searchGeneration = 0
+    private var searching = false
+    private var pendingSearch: DispatchWorkItem?
+    private var stepAfterSearch: Int?
+    /// The bar closed, so the keyboard has to go somewhere.
+    var onFindClose: (() -> Void)?
+
+    var isQueryValid: Bool { FileSearch.isValid(query, options: findOptions) }
+
+    /// ⌘F: opens the bar, or puts the cursor back in it. A word selected in the diff becomes the query.
+    func startFind(selection: String? = nil) {
+        if let word = selection?.trimmingCharacters(in: .whitespacesAndNewlines), !word.isEmpty, !word.contains("\n"), word.count <= 200 {
+            query = word
+        }
+        findOpen = true
+        findFocus += 1
+    }
+
+    /// The next match, or the previous with a negative step, wrapping around the ends.
+    func step(_ by: Int) {
+        // Return right after typing means the search still on its way, not the one before it.
+        if let pendingSearch {
+            pendingSearch.cancel()
+            self.pendingSearch = nil
+            search(keeping: false)
+        }
+        if searching {
+            stepAfterSearch = by
+            return
+        }
+        guard !matches.isEmpty else { return }
+        let next = ((current ?? (by > 0 ? -1 : 0)) + by + matches.count) % matches.count
+        select(next)
+    }
+
+    private func select(_ index: Int) {
+        current = index
+        let match = matches[index]
+        // A folded file has no rows to scroll to.
+        if collapsed.remove(match.path) != nil { rebuild() }
+        buildMarks()
+        reveal = Reveal(path: match.path, row: match.row)
+    }
+
+    /// Short queries match almost everything, so they wait a moment, like the terminal's search.
+    private func queryChanged() {
+        pendingSearch?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            self?.pendingSearch = nil
+            self?.search(keeping: false)
+        }
+        pendingSearch = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + (query.isEmpty || query.count >= 3 ? 0 : 0.3), execute: work)
+    }
+
+    /// Reads the diffs held in memory, so files below the fold and folded ones count too. Off the main thread, and the last asked wins.
+    /// Only marks and counts: the list moves when you step, never while you type or an agent changes a file.
+    private func search(keeping: Bool = true) {
+        // A typed search is about to run, and reads the same diffs.
+        if keeping, pendingSearch != nil { return }
+        searchGeneration += 1
+        let generation = searchGeneration
+        guard findOpen, !query.isEmpty, isQueryValid else {
+            searching = false
+            stepAfterSearch = nil
+            matches = []
+            current = nil
+            marks = [:]
+            return
+        }
+        searching = true
+        let (files, query, options, limit) = (files, query, findOptions, Self.matchLimit)
+        let at = keeping ? current.flatMap { matches.indices.contains($0) ? $0 : nil } : nil
+        let before = at.map { matches[$0] }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let lines = files.filter { !$0.isBinary }.map { (path: $0.path, lines: DiffTextView.lines($0)) }
+            let found = DiffSearch.matches(in: lines, query: query, options: options, limit: limit)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.searchGeneration == generation else { return }
+                searching = false
+                matches = found
+                current = before.flatMap { DiffSearch.follow($0, in: found) }
+                    ?? at.flatMap { found.isEmpty ? nil : min($0, found.count - 1) }
+                buildMarks()
+                if let by = stepAfterSearch {
+                    stepAfterSearch = nil
+                    step(by)
+                }
+            }
+        }
+    }
+
+    private func buildMarks() {
+        var built: [String: DiffMarks] = [:]
+        for match in matches { built[match.path, default: DiffMarks()].ranges[match.row, default: []].append(match.range) }
+        if let current, matches.indices.contains(current) {
+            built[matches[current].path]?.currentRow = matches[current].row
+            built[matches[current].path]?.currentLocation = matches[current].range.location
+        }
+        marks = built
+    }
     private var collapsed: Set<String> = []
     /// Your choice per checkout, so switching sessions doesn't reset it.
     private var chosenScope: [String: Diff.Scope] = [:]
@@ -162,6 +301,8 @@ final class ReviewModel: ObservableObject {
         if rootChanged {
             watcher = nil
             files = []
+            expanded = [:]
+            search()
             collapsed = []
             rows = []
             stat = Diff.Stat()
@@ -501,6 +642,31 @@ final class ReviewModel: ObservableObject {
         rebuild()
     }
 
+    /// Lines shown by one click on a gap's button. A smaller gap opens whole.
+    private static let expandStep = 20
+
+    var canExpand: Bool { !scope.isRequest }
+
+    /// Shows more of the unmodified lines in `gap`, from its top, next to the change above, or from its bottom.
+    func expand(_ path: String, gap: Range<Int>, fromTop: Bool) {
+        guard canExpand, let root, let file = files.first(where: { $0.path == path }) else { return }
+        let scope = scope
+        let part = gap.count <= Self.expandStep * 2 ? gap
+            : fromTop ? gap.lowerBound..<(gap.lowerBound + Self.expandStep) : (gap.upperBound - Self.expandStep)..<gap.upperBound
+        DispatchQueue.global(qos: .userInitiated).async {
+            let text = Diff.newLines(of: path, in: root, scope)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.root == root, self.scope == scope, let text,
+                      let at = self.files.firstIndex(where: { $0.path == file.path }) else { return }
+                let shown = self.files[at].expanding(part, from: text)
+                self.expanded[path] = (self.expanded[path]?.base ?? file, shown)
+                self.files[at] = shown
+                self.rebuild()
+                self.search()
+            }
+        }
+    }
+
     /// Reads the counts, and the whole diff when the panel is open, off the main thread.
     func refresh() {
         pending?.cancel()
@@ -528,7 +694,14 @@ final class ReviewModel: ObservableObject {
                     for file in files where !known.contains(file.path) && file.added + file.removed > Self.foldedAbove {
                         self.collapsed.insert(file.path)
                     }
-                    self.files = files
+                    if self.expandedScope != scope { self.expanded = [:] }
+                    self.expandedScope = scope
+                    self.files = files.map { file in
+                        if let kept = self.expanded[file.path], kept.base == file { return kept.shown }
+                        self.expanded[file.path] = nil
+                        return file
+                    }
+                    self.search()
                     if let path = self.pendingFocus, files.contains(where: { $0.path == path }) {
                         // A big file starts folded, which would scroll to a header with nothing under it.
                         self.collapsed.remove(path)
@@ -657,6 +830,7 @@ struct ReviewPanel: View {
     let resize: (CGFloat) -> Void
 
     @State private var dragStart: CGFloat?
+    @FocusState private var findFocused: Bool
 
     var body: some View {
         let p = state.palette
@@ -686,6 +860,7 @@ struct ReviewPanel: View {
             .padding(.horizontal, 10)
             .padding(.bottom, 8)
             Rectangle().fill(p.line).frame(height: 1)
+            if review.findOpen { findBar(p) }
             if let error = review.error {
                 message(error, p)
             } else if review.rows.isEmpty {
@@ -709,6 +884,16 @@ struct ReviewPanel: View {
                             }
                         }
                         .padding(.bottom, 12)
+                        .background(RevealKeeper(request: review.reveal))
+                    }
+                    .onChange(of: review.reveal) {
+                        guard let reveal = review.reveal else { return }
+                        // The part of the file that holds the line has to be laid out before it can be measured.
+                        let part = review.rows.first { row in
+                            guard case .body(let file, let rows) = row, file.path == reveal.path else { return false }
+                            return rows?.contains(reveal.row) ?? true
+                        }
+                        if let part { proxy.scrollTo(part.id, anchor: .top) }
                     }
                     .onChange(of: review.focus?.id) {
                         guard let path = review.focus?.path else { return }
@@ -721,6 +906,8 @@ struct ReviewPanel: View {
         .background(p.background)
         .overlay(alignment: .leading) { edge(p) }
         .commitSheet(review, palette: p)
+        // ⌘F with the bar already open puts the cursor back in it.
+        .onChange(of: review.findFocus) { DispatchQueue.main.async { findFocused = true } }
     }
 
     private struct FileSection: Identifiable {
@@ -776,7 +963,9 @@ struct ReviewPanel: View {
                        open: review.scope.isRequest ? nil : { review.root.map { open(($0 as NSString).appendingPathComponent(file.path), file.firstChange) } })
         case .body(let file, let rows):
             DiffText(file: file, rows: rows, colors: p.diff, syntax: p.code,
-                     comment: review.canComment ? { review.startComment(on: .init(path: file.path, line: $0, old: $1)) } : nil)
+                     comment: review.canComment ? { review.startComment(on: .init(path: file.path, line: $0, old: $1)) } : nil,
+                     expand: review.canExpand ? { review.expand(file.path, gap: $0, fromTop: $1) } : nil,
+                     marks: review.marks[file.path])
                 .padding(.horizontal, 8)
         case .thread(_, let comments):
             VStack(alignment: .leading, spacing: 0) {
@@ -791,6 +980,50 @@ struct ReviewPanel: View {
         case .note(_, let text):
             Text(text).font(.system(size: 12)).foregroundStyle(p.muted).padding(.leading, 58).frame(height: 24)
         }
+    }
+
+    /// ⌘F: the text to look for in every file of the diff, with Return or ⌘G for the next match and ⇧Return or ⇧⌘G for the previous.
+    private func findBar(_ p: Palette) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass").font(.system(size: 11)).foregroundStyle(p.muted)
+            TextField("Find in the changes", text: $review.query)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12.5))
+                .focused($findFocused)
+                .onSubmit { review.step(1) }
+                .onKeyPress(.return, phases: .down) { press in
+                    guard press.modifiers.contains(.shift) else { return .ignored }
+                    review.step(-1)
+                    return .handled
+                }
+                .onKeyPress(.escape) {
+                    review.findOpen = false
+                    return .handled
+                }
+            Text(findCount).font(.system(size: 11).monospacedDigit()).foregroundStyle(p.muted).lineLimit(1).fixedSize()
+            OptionToggle(label: Text("Aa"), help: "Match case", on: $review.findOptions.caseSensitive, palette: p)
+            OptionToggle(label: Text("ab").underline(), help: "Whole word", on: $review.findOptions.wholeWord, palette: p)
+            OptionToggle(label: Text(".*"), help: "Regular expression", on: $review.findOptions.regex, palette: p)
+            IconButton(symbol: "chevron.up", help: "Previous match (⇧↩)", palette: p) { review.step(-1) }
+            IconButton(symbol: "chevron.down", help: "Next match (↩)", palette: p) { review.step(1) }
+            CloseButton(help: "Close (esc)", palette: p) { review.findOpen = false }
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 26)
+        .background(RoundedRectangle(cornerRadius: 6).fill(p.raised))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        // A turn later, since the field is only just on screen and can't take focus before then.
+        .onAppear { DispatchQueue.main.async { findFocused = true } }
+    }
+
+    private var findCount: String {
+        if review.query.isEmpty { return "" }
+        if !review.isQueryValid { return "Invalid" }
+        if review.matches.isEmpty { return "No matches" }
+        let total = "\(review.matches.count)\(review.matches.count >= ReviewModel.matchLimit ? "+" : "")"
+        guard let current = review.current else { return "\(total) \(review.matches.count == 1 ? "match" : "matches")" }
+        return "\(current + 1) of \(total)"
     }
 
     private func message(_ text: String, _ p: Palette) -> some View {

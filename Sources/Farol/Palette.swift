@@ -92,7 +92,8 @@ struct Palette: Equatable {
         accent = Color(nsColor: fg)
         control = Color(nsColor: bg.mixed(with: fg, 0.42))
         code = SyntaxColors(background: bg, foreground: fg, ansi: ansi)
-        diff = DiffColors(background: bg, foreground: fg, added: ansi.count > 2 ? ansi[2] : fg, removed: ansi.count > 1 ? ansi[1] : fg)
+        diff = DiffColors(background: bg, foreground: fg, added: ansi.count > 2 ? ansi[2] : fg, removed: ansi.count > 1 ? ansi[1] : fg,
+                          highlight: ansi.count > 3 ? ansi[3] : fg)
         lanes = Self.lanes(matching: Array(ansi.dropFirst().prefix(6)), dark: bg.isDark)
         let ansi = { (i: Int) in Color(nsColor: ansi.count > i ? ansi[i] : fg) }
         working = ansi(6)
@@ -130,9 +131,12 @@ struct SyntaxColors: Equatable {
     let string: NSColor
     let number: NSColor
     let comment: NSColor
+    /// The theme's hues, for telling commits apart at a glance. Not its red, which reads as removed next to a diff.
+    let hues: [NSColor]
 
     init(background: NSColor, foreground: NSColor, ansi: [NSColor]) {
         let color = { (i: Int) in ansi.count > i ? ansi[i] : foreground }
+        hues = (2...6).map(color)
         keyword = color(5)
         string = color(2)
         number = color(3)
