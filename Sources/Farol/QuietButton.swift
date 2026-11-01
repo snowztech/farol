@@ -6,6 +6,8 @@ final class QuietButton: NSButton {
     private let run: () -> Void
     private var colors = (muted: NSColor.secondaryLabelColor, hover: NSColor.labelColor, background: NSColor.clear)
     private var hovering = false { didSet { refresh() } }
+    /// Stays lit while what it switches is on.
+    var isOn = false { didSet { refresh() } }
 
     init(symbol: String, help: String, action: @escaping () -> Void) {
         run = action
@@ -37,8 +39,8 @@ final class QuietButton: NSButton {
     }
 
     private func refresh() {
-        contentTintColor = hovering ? colors.hover : colors.muted
-        layer?.backgroundColor = hovering ? colors.background.cgColor : nil
+        contentTintColor = hovering || isOn ? colors.hover : colors.muted
+        layer?.backgroundColor = hovering || isOn ? colors.background.cgColor : nil
     }
 
     private var hoverArea: NSTrackingArea?

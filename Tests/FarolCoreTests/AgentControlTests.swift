@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import Testing
 @testable import FarolCore
 
@@ -83,4 +84,83 @@ private extension Result where Failure == ControlError {
     #expect(ControlCommand.parse(["send", "8f3b"]) == .failure(ControlUsage("Say which session and what to send: farol send 8f3b99d0 run the tests")))
     #expect(ControlCommand.parse(["wait", "8f3b", "--timeout", "soon"]) == .failure(ControlUsage("--timeout takes a number of seconds.")))
     #expect(ControlCommand.parse(["task", "x", "--agent"]) == .failure(ControlUsage("--agent needs a value.")))
+}
+
+private func voiceSession(_ status: SessionInfo.Status, asking: String? = nil) -> SessionInfo {
+    SessionInfo(id: "A", name: "auth", folder: "/tmp", status: status, asking: asking)
+}
+
+@Test func typesIntoASessionThatIsNotWaiting() {
+    #expect(voiceSession(.working).typingRefusal(of: "run the tests", answering: nil) == nil)
+    #expect(voiceSession(.idle).typingRefusal(of: "run the tests", answering: nil) == nil)
+}
+
+@Test func neverTypesIntoAWaitingSessionUninvited() {
+    #expect(voiceSession(.waiting, asking: "Allow rm?").typingRefusal(of: "yes", answering: nil) != nil)
+}
+
+@Test func anAnswerOnlyLandsOnTheSameQuestion() {
+    let waiting = voiceSession(.waiting, asking: "Allow rm?")
+    #expect(waiting.typingRefusal(of: "yes", answering: "Allow rm?") == nil)
+    #expect(waiting.typingRefusal(of: "yes", answering: "Allow push?") != nil)
+    #expect(voiceSession(.working).typingRefusal(of: "yes", answering: "Allow rm?") != nil)
+}
+
+@Test func typedTextCanNeverPressReturnOrDriveTheTerminal() {
+    let idle = voiceSession(.idle)
+    #expect(idle.typingRefusal(of: "ls\nrm -rf x", answering: nil) != nil)
+    #expect(idle.typingRefusal(of: "hi\u{1B}[31m", answering: nil) != nil)
+    #expect(idle.typingRefusal(of: "Olá, ça va?", answering: nil) == nil)
+}
+
+@Test func voiceRequestsSurviveTheSocket() throws {
+    let request = ControlRequest(pane: nil, action: .type(session: "A", text: "hi", submit: true, asking: "Allow rm?"))
+    let line = try JSONEncoder().encode(request)
+    #expect(try JSONDecoder().decode(ControlRequest.self, from: line) == request)
+}
+
+@Test func onlyVoiceActionsCheckTheCallersSignature() {
+    #expect(ControlRequest.Action.focus(session: "A").isForVoice)
+    #expect(ControlRequest.Action.task(text: "x", repo: nil, agent: nil).isForVoice)
+    #expect(!ControlRequest.Action.sessions.isForVoice)
+    #expect(!ControlRequest.Action.send(session: "A", text: "x").isForVoice)
+}
+
+@Test func theVoiceSignatureRuleCompiles() {
+    var compiled: SecRequirement?
+    #expect(SecRequirementCreateWithString(VoicePeer.requirement as CFString, [], &compiled) == errSecSuccess)
+}
+
+@Test func aProgramThatIsNotFarolVoiceIsNotTrusted() throws {
+    let path = "/tmp/farol-voice-\(UUID().uuidString.prefix(8))"
+    let server = StatusServer(path: path, deliverOn: DispatchQueue(label: "test.delivery"))
+    server.onControl = { request, connection in
+        // These tests aren't signed as Farol Voice, so even a request asking for its actions isn't believed.
+        #expect(request.action == .focus(session: "A"))
+        #expect(!connection.isFarolVoice)
+        connection.reply(ControlReply.failed("refused"))
+    }
+    try server.start()
+    defer { server.stop() }
+    #expect(try StatusClient.control(ControlRequest(pane: nil, action: .focus(session: "A")), to: path)?.error == "refused")
+}
+
+@Test func onlyAnAnswerNeedsFarolVoiceAmongTheNewActions() {
+    #expect(ControlRequest.Action.answer(session: "a", asking: "Allow rm?", choice: 1).isForVoice)
+    #expect(!ControlRequest.Action.watch(after: 0, timeout: 25).isForVoice)
+}
+
+@Test func aWatchAndItsAnswerCrossTheSocket() throws {
+    let path = "/tmp/farol-control-\(UUID().uuidString.prefix(8))"
+    let server = StatusServer(path: path, deliverOn: DispatchQueue(label: "test.watch"))
+    let session = SessionInfo(id: "s", name: "auth", folder: "/tmp", status: .waiting, asking: "Allow rm?", choices: ["Yes", "No"], inFront: true)
+    server.onControl = { request, connection in
+        #expect(request.action == .watch(after: 3, timeout: 25))
+        connection.reply(ControlReply(sessions: [session], generation: 4))
+    }
+    try server.start()
+    defer { server.stop() }
+    let reply = try StatusClient.control(ControlRequest(pane: nil, action: .watch(after: 3, timeout: 25)), to: path)
+    #expect(reply?.generation == 4)
+    #expect(reply?.sessions == [session])
 }

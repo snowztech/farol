@@ -38,6 +38,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private let review = ReviewModel()
     /// Follows the selected session's checkout and branch, so the count in the title bar stays current.
     private var reviewFollow: AnyCancellable?
+    private weak var reviewHost: NSView?
+    /// The diff the cursor was in when the review's search opened.
+    private weak var findReturn: DiffTextView?
     private static let reviewWidthKey = "review.width"
     private var settingsView: NSView!
     private let merge = MergeModel()
@@ -131,6 +134,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             close: { [weak self] in self?.toggleReview(closing: true) },
             resize: { [weak self] in self?.setReviewWidth($0) }))
         reviewPanel.clipsToBounds = true
+        reviewHost = reviewPanel
         state.filesVisible = UserDefaults.standard.bool(forKey: Self.filesVisibleKey)
         state.graphVisible = UserDefaults.standard.bool(forKey: Self.graphVisibleKey)
         settingsView = hosting(SettingsPage(
@@ -232,6 +236,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             self?.reportConfigErrors()
         }
         graph.onGitChange = { [weak self] in self?.store.selected?.refreshGit() }
+        review.onFindClose = { [weak self] in
+            guard let self else { return }
+            // Back in the diff, so ⌘F opens the search again. A closed panel can't hold the keyboard.
+            let diff = review.isOpen && findReturn?.window != nil ? findReturn : nil
+            self.window?.makeFirstResponder(diff ?? store.selected?.panes.focusTarget)
+        }
         graph.onShowInReview = { [weak self] commit, file in
             guard let self else { return }
             review.show(commit: commit.hash, subject: commit.subject, file: file)
@@ -251,10 +261,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         store.onPaneExit = { [weak self] in self?.paneExited($1, in: $0) }
         runtime.onRequest = { [weak self] in self?.handle($0) }
         store.onControl = { [weak self] in self?.control.handle($0, $1) }
+        control.onBringForward = { [weak self] in
+            NSApp.activate(ignoringOtherApps: true)
+            self?.window?.makeKeyAndOrderFront(nil)
+        }
         store.onActivityChange = { [weak self] session, before, after in
             guard let self else { return }
             notifier.activityChanged(session, from: before, to: after)
             remote.activityChanged(session, from: before, to: after)
+            control.activityChanged()
             refreshBadge(enabled: agents.dockBadge)
             menuBar.refresh()
             notch.refresh()
@@ -774,19 +789,39 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    /// The cursor is in the review panel: its diff or its search field. Find then looks through the changes.
+    private var reviewFocused: Bool {
+        guard review.isOpen, let responder = window?.firstResponder as? NSView, let host = reviewHost else { return false }
+        return responder.isDescendant(of: host)
+    }
+
+    private var selectedDiffText: String? {
+        guard let text = window?.firstResponder as? DiffTextView else { return nil }
+        return text.selectedRange().length > 0 ? (text.string as NSString).substring(with: text.selectedRange()) : nil
+    }
+
+    private func startReviewFind() {
+        if let diff = window?.firstResponder as? DiffTextView { findReturn = diff }
+        review.startFind(selection: selectedDiffText)
+    }
+
     func find() {
+        if reviewFocused { return startReviewFind() }
         if let file = focusedFile { return file.find(.showFindInterface) }
         store.selected?.panes.focused.startSearch()
     }
     func findNext() {
+        if reviewFocused, review.findOpen { return review.step(1) }
         if let file = focusedFile { return file.find(.nextMatch) }
         store.selected?.panes.searchTarget.searchNext()
     }
     func findPrevious() {
+        if reviewFocused, review.findOpen { return review.step(-1) }
         if let file = focusedFile { return file.find(.previousMatch) }
         store.selected?.panes.searchTarget.searchPrevious()
     }
     func findSelection() {
+        if reviewFocused { return startReviewFind() }
         if let file = focusedFile { return file.find(.setSearchString) }
         store.selected?.panes.focused.searchSelection()
     }

@@ -15,6 +15,22 @@ public struct ControlRequest: Codable, Equatable, Sendable {
         /// Answered once the session needs someone or is done, or after `timeout` seconds with how it is then.
         case wait(session: String, timeout: TimeInterval)
         case read(session: String)
+        /// Farol Voice only: go to a session and bring Farol forward.
+        case focus(session: String)
+        /// Farol Voice only: type one line into a session, pressing Return if `submit`. `asking` is the question it's answering, when it's answering one, so an answer can't land on a different question.
+        case type(session: String, text: String, submit: Bool, asking: String?)
+        /// Answered as soon as anything has changed since `after`, the generation of the last answer, or after `timeout` seconds with how things are.
+        case watch(after: Int, timeout: TimeInterval)
+        /// Farol Voice only: pick option `choice` of the menu a session waits on, while it still asks `asking`.
+        case answer(session: String, asking: String, choice: Int)
+
+        /// What Farol Voice can do, and what's worth checking the caller's signature for.
+        var isForVoice: Bool {
+            switch self {
+            case .focus, .type, .task, .answer: true
+            case .sessions, .send, .wait, .read, .watch: false
+            }
+        }
     }
 
     public init(pane: String?, action: Action) {
@@ -33,13 +49,17 @@ public struct ControlReply: Codable, Equatable, Sendable {
     /// Why a wait ended before the session needed someone or was done, in words for the agent.
     public var note: String?
     public var error: String?
+    /// What to pass to the next `watch`, so nothing that changes between two of them is missed.
+    public var generation: Int?
 
-    public init(sessions: [SessionInfo]? = nil, session: SessionInfo? = nil, text: String? = nil, note: String? = nil, error: String? = nil) {
+    public init(sessions: [SessionInfo]? = nil, session: SessionInfo? = nil, text: String? = nil, note: String? = nil, error: String? = nil,
+                generation: Int? = nil) {
         self.sessions = sessions
         self.session = session
         self.text = text
         self.note = note
         self.error = error
+        self.generation = generation
     }
 
     public static func failed(_ error: String) -> ControlReply { ControlReply(error: error) }
@@ -62,9 +82,13 @@ public struct SessionInfo: Codable, Equatable, Sendable {
     public var asking: String?
     /// The pane the request came from.
     public var isCaller: Bool
+    /// The answers on the menu it waits on, in the agent's numbering. Nil with no menu to answer, so only words or the screen will do.
+    public var choices: [String]?
+    /// Farol is in front with this pane focused, so you can already see it.
+    public var inFront: Bool
 
     public init(id: String, name: String, folder: String, branch: String? = nil, agent: String? = nil, status: Status,
-                asking: String? = nil, isCaller: Bool = false) {
+                asking: String? = nil, isCaller: Bool = false, choices: [String]? = nil, inFront: Bool = false) {
         self.id = id
         self.name = name
         self.folder = folder
@@ -73,6 +97,8 @@ public struct SessionInfo: Codable, Equatable, Sendable {
         self.status = status
         self.asking = asking
         self.isCaller = isCaller
+        self.choices = choices
+        self.inFront = inFront
     }
 
     /// How a session is named on the command line, short enough to type.
@@ -102,6 +128,18 @@ extension SessionInfo {
         case .idle: worked
         case .working: false
         }
+    }
+}
+
+extension SessionInfo {
+    /// Why text can't be typed here now, or nil if it can. Typing into a waiting session could answer a menu nobody read, so that takes naming the exact question.
+    public func typingRefusal(of text: String, answering asking: String?) -> String? {
+        // A newline would press Return and a control character could drive the terminal, whatever `submit` says.
+        if text.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains) { return "That isn't one line of plain text." }
+        if let asking {
+            return status == .waiting && self.asking == asking ? nil : "\(name) is no longer waiting on that question."
+        }
+        return status == .waiting ? "\(name) is waiting for an answer." : nil
     }
 }
 
