@@ -31,19 +31,22 @@ struct DiffText: NSViewRepresentable {
     let syntax: SyntaxColors
     /// Called with a line's number, and whether it counts in the old file, when its "+" in the gutter is clicked. Nil offers no "+".
     var comment: ((Int, _ old: Bool) -> Void)? = nil
+    /// Called with a gap's unmodified lines, by their numbers in the new file, and whether to show them from the top, next to the hunk above.
+    /// Nil leaves gaps closed.
+    var expand: ((Range<Int>, _ fromTop: Bool) -> Void)? = nil
 
     func makeNSView(context: Context) -> DiffScrollView { DiffScrollView() }
 
     func updateNSView(_ view: DiffScrollView, context: Context) {
         view.text.onComment = comment
+        view.text.onExpand = expand
         view.text.show(file, rows: rows, colors: colors, syntax: syntax)
         view.needsLayout = true
     }
 
     /// Every row has the same height, so the size is known without laying the text out.
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: DiffScrollView, context: Context) -> CGSize? {
-        let count = rows?.count ?? DiffTextView.rowCount(file)
-        return CGSize(width: proposal.width ?? 400, height: CGFloat(count) * DiffTextView.rowHeight)
+        return CGSize(width: proposal.width ?? 400, height: DiffTextView.height(file, rows: rows, expandable: expand != nil))
     }
 }
 
@@ -51,6 +54,8 @@ private extension NSAttributedString.Key {
     static let diffKind = NSAttributedString.Key("farol.diffKind")
     static let diffNumber = NSAttributedString.Key("farol.diffNumber")
     static let diffGap = NSAttributedString.Key("farol.diffGap")
+    /// The first and last line number of a gap, for the click that expands it.
+    static let diffGapRange = NSAttributedString.Key("farol.diffGapRange")
     /// A removed line's number in the old file, for a comment left on it.
     static let diffOldNumber = NSAttributedString.Key("farol.diffOldNumber")
 }
@@ -94,7 +99,10 @@ final class DiffTextView: NSTextView {
     static let rowHeight: CGFloat = 20
     static let gutter: CGFloat = 58
 
-    private var shown: (file: Diff.File, rows: Range<Int>?, colors: DiffColors, syntax: SyntaxColors)?
+    private var shown: (file: Diff.File, rows: Range<Int>?, colors: DiffColors, syntax: SyntaxColors, expandable: Bool)?
+    var onExpand: ((Range<Int>, _ fromTop: Bool) -> Void)? {
+        didSet { if (onExpand == nil) != (oldValue == nil) { needsDisplay = true } }
+    }
     var onComment: ((Int, _ old: Bool) -> Void)? {
         didSet { if (onComment == nil) != (oldValue == nil) { hoveredRow = nil } }
     }
@@ -136,23 +144,33 @@ final class DiffTextView: NSTextView {
         rows(file).count
     }
 
+    /// A gap with a hunk above holds two buttons, one over the other, so it is two rows tall while they show.
+    static func height(_ file: Diff.File, rows slice: Range<Int>?, expandable: Bool) -> CGFloat {
+        let all = rows(file)
+        return all[slice ?? all.indices].reduce(0) { total, row in
+            if case .gap(_, above: true) = row, expandable { return total + rowHeight * 2 }
+            return total + rowHeight
+        }
+    }
+
     private enum Row {
         /// A line, with its number in the old file when it is a removed one.
         case line(Diff.Line, old: Int?)
-        case gap(Int)
+        /// `above` is whether a hunk comes before it, so lines can be shown from either end.
+        case gap(Range<Int>, above: Bool)
     }
 
     private static func rows(_ file: Diff.File) -> [Row] {
         var rows: [Row] = []
         var next = 1
         for hunk in file.hunks {
-            if hunk.newStart - next > 0 { rows.append(.gap(hunk.newStart - next)) }
+            if hunk.newBegin > next { rows.append(.gap(next..<hunk.newBegin, above: next > 1)) }
             var old = hunk.oldStart
             for line in hunk.lines {
                 rows.append(.line(line, old: line.kind == .removed ? old : nil))
                 if line.kind != .added { old += 1 }
             }
-            next = hunk.newStart + hunk.lines.filter { $0.kind != .removed }.count
+            next = hunk.newEnd
         }
         return rows
     }
@@ -167,8 +185,10 @@ final class DiffTextView: NSTextView {
 
     /// Rebuilds the text only when the diff or the theme changed, so a refresh keeps your selection.
     func show(_ file: Diff.File, rows slice: Range<Int>? = nil, colors: DiffColors, syntax: SyntaxColors) {
-        if let shown, shown.file == file, shown.rows == slice, shown.colors == colors, shown.syntax == syntax { return }
-        shown = (file, slice, colors, syntax)
+        let expandable = onExpand != nil
+        if let shown, shown.file == file, shown.rows == slice, shown.colors == colors, shown.syntax == syntax,
+           shown.expandable == expandable { return }
+        shown = (file, slice, colors, syntax, expandable)
         diffColors = colors
         CodeText.apply(to: self, background: colors.background, foreground: colors.foreground)
 
@@ -186,8 +206,15 @@ final class DiffTextView: NSTextView {
             var attributes = base
             var line = ""
             switch row {
-            case .gap(let count):
-                attributes[.diffGap] = count
+            case .gap(let lines, let above):
+                attributes[.diffGap] = lines.count
+                attributes[.diffGapRange] = [lines.lowerBound, lines.upperBound, above ? 1 : 0]
+                if above, expandable {
+                    let tall = NSMutableParagraphStyle()
+                    tall.minimumLineHeight = Self.rowHeight * 2
+                    tall.maximumLineHeight = Self.rowHeight * 2
+                    attributes[.paragraphStyle] = tall
+                }
             case .line(let diffLine, let old):
                 // Tabs would line up differently from the file, so they show as four spaces.
                 line = diffLine.text.replacingOccurrences(of: "\t", with: "    ")
@@ -230,6 +257,10 @@ extension DiffTextView {
             if let gap = attributes[.diffGap] as? Int {
                 colors.band.setFill()
                 row.fill()
+                if self.onExpand != nil {
+                    let both = (attributes[.diffGapRange] as? [Int])?.last == 1
+                    Self.drawExpanders(in: row, both: both, colors: colors)
+                }
                 let label = "\(gap) unmodified \(gap == 1 ? "line" : "lines")" as NSString
                 let style: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: colors.muted]
                 let size = label.size(withAttributes: style)
@@ -268,6 +299,37 @@ extension DiffTextView {
         NSRect(x: box.midX - 0.6, y: box.midY - 3.5, width: 1.2, height: 7).fill()
     }
 
+    /// The buttons in a gap's gutter, as on GitHub but quieter. The upper one shows lines below the hunk above, the lower one lines above the hunk below.
+    /// A gap at the top of the file only has the lower one.
+    fileprivate static func drawExpanders(in row: NSRect, both: Bool, colors: DiffColors) {
+        let center = gutter / 2
+        colors.muted.setStroke()
+        colors.muted.setFill()
+        func dots(at y: CGFloat) {
+            for offset in [-5, 0, 5] as [CGFloat] { NSRect(x: center + offset - 1, y: y - 0.75, width: 2, height: 1.5).fill() }
+        }
+        func arrow(from tail: CGFloat, to tip: CGFloat) {
+            let path = NSBezierPath()
+            path.lineWidth = 1.4
+            path.lineCapStyle = .round
+            path.lineJoinStyle = .round
+            path.move(to: NSPoint(x: center, y: tail))
+            path.line(to: NSPoint(x: center, y: tip))
+            let back: CGFloat = tip > tail ? -3.5 : 3.5
+            path.move(to: NSPoint(x: center - 3.5, y: tip + back))
+            path.line(to: NSPoint(x: center, y: tip))
+            path.line(to: NSPoint(x: center + 3.5, y: tip + back))
+            path.stroke()
+        }
+        if both {
+            dots(at: row.minY + 5)
+            arrow(from: row.minY + 8, to: row.minY + 16)
+        }
+        let lower = both ? row.minY + rowHeight : row.minY
+        arrow(from: lower + 12, to: lower + 4)
+        dots(at: lower + 15)
+    }
+
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         // Only ours: the text view keeps its own, for the cursor.
@@ -280,6 +342,7 @@ extension DiffTextView {
         super.mouseMoved(with: event)
         let point = convert(event.locationInWindow, from: nil)
         hoveredRow = commentable(at: point).map(\.row.minY)
+        if gap(at: point) != nil, point.x < Self.gutter { NSCursor.pointingHand.set() }
         // The text view has just set its I-beam. Over the gutter, where a click starts a comment, it's a hand.
         if hoveredRow != nil, point.x < Self.gutter { NSCursor.pointingHand.set() }
     }
@@ -291,8 +354,23 @@ extension DiffTextView {
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
+        if point.x < Self.gutter, let target = gap(at: point) { return onExpand?(target.lines, target.fromTop) ?? () }
         guard point.x < Self.gutter, let line = commentable(at: point) else { return super.mouseDown(with: event) }
         onComment?(line.number, line.old)
+    }
+
+    /// The unmodified lines of the gap row under `point`, and whether the point is on its upper button, while gaps can be expanded.
+    private func gap(at point: NSPoint) -> (lines: Range<Int>, fromTop: Bool)? {
+        guard onExpand != nil, let layout = layoutManager, let container = textContainer, let storage = textStorage,
+              storage.length > 0 else { return nil }
+        let origin = textContainerOrigin
+        let glyph = layout.glyphIndex(for: NSPoint(x: 0, y: point.y - origin.y), in: container)
+        let index = layout.characterIndexForGlyph(at: glyph)
+        guard index < storage.length,
+              let bounds = storage.attributes(at: index, effectiveRange: nil)[.diffGapRange] as? [Int], bounds.count == 3 else { return nil }
+        let fragment = layout.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+        let top = bounds[2] == 1 && point.y - origin.y < fragment.minY + fragment.height / 2
+        return (bounds[0]..<bounds[1], top)
     }
 
     /// The line under `point` that a comment can go on: a line of the diff, not a run of unmodified ones, while comments are offered.

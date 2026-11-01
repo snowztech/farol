@@ -127,6 +127,9 @@ final class ReviewModel: ObservableObject {
     private var defaultScopes: [String: Diff.Scope] = [:]
 
     private var files: [Diff.File] = []
+    /// Files with unmodified lines opened, as the diff gave them and as shown. Kept while the diff of the file stays the same.
+    private var expanded: [String: (base: Diff.File, shown: Diff.File)] = [:]
+    private var expandedScope: Diff.Scope?
     private var collapsed: Set<String> = []
     /// Your choice per checkout, so switching sessions doesn't reset it.
     private var chosenScope: [String: Diff.Scope] = [:]
@@ -162,6 +165,7 @@ final class ReviewModel: ObservableObject {
         if rootChanged {
             watcher = nil
             files = []
+            expanded = [:]
             collapsed = []
             rows = []
             stat = Diff.Stat()
@@ -501,6 +505,30 @@ final class ReviewModel: ObservableObject {
         rebuild()
     }
 
+    /// Lines shown by one click on a gap's button. A smaller gap opens whole.
+    private static let expandStep = 20
+
+    var canExpand: Bool { !scope.isRequest }
+
+    /// Shows more of the unmodified lines in `gap`, from its top, next to the change above, or from its bottom.
+    func expand(_ path: String, gap: Range<Int>, fromTop: Bool) {
+        guard canExpand, let root, let file = files.first(where: { $0.path == path }) else { return }
+        let scope = scope
+        let part = gap.count <= Self.expandStep * 2 ? gap
+            : fromTop ? gap.lowerBound..<(gap.lowerBound + Self.expandStep) : (gap.upperBound - Self.expandStep)..<gap.upperBound
+        DispatchQueue.global(qos: .userInitiated).async {
+            let text = Diff.newLines(of: path, in: root, scope)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.root == root, self.scope == scope, let text,
+                      let at = self.files.firstIndex(where: { $0.path == file.path }) else { return }
+                let shown = self.files[at].expanding(part, from: text)
+                self.expanded[path] = (self.expanded[path]?.base ?? file, shown)
+                self.files[at] = shown
+                self.rebuild()
+            }
+        }
+    }
+
     /// Reads the counts, and the whole diff when the panel is open, off the main thread.
     func refresh() {
         pending?.cancel()
@@ -528,7 +556,13 @@ final class ReviewModel: ObservableObject {
                     for file in files where !known.contains(file.path) && file.added + file.removed > Self.foldedAbove {
                         self.collapsed.insert(file.path)
                     }
-                    self.files = files
+                    if self.expandedScope != scope { self.expanded = [:] }
+                    self.expandedScope = scope
+                    self.files = files.map { file in
+                        if let kept = self.expanded[file.path], kept.base == file { return kept.shown }
+                        self.expanded[file.path] = nil
+                        return file
+                    }
                     if let path = self.pendingFocus, files.contains(where: { $0.path == path }) {
                         // A big file starts folded, which would scroll to a header with nothing under it.
                         self.collapsed.remove(path)
@@ -776,7 +810,8 @@ struct ReviewPanel: View {
                        open: review.scope.isRequest ? nil : { review.root.map { open(($0 as NSString).appendingPathComponent(file.path), file.firstChange) } })
         case .body(let file, let rows):
             DiffText(file: file, rows: rows, colors: p.diff, syntax: p.code,
-                     comment: review.canComment ? { review.startComment(on: .init(path: file.path, line: $0, old: $1)) } : nil)
+                     comment: review.canComment ? { review.startComment(on: .init(path: file.path, line: $0, old: $1)) } : nil,
+                     expand: review.canExpand ? { review.expand(file.path, gap: $0, fromTop: $1) } : nil)
                 .padding(.horizontal, 8)
         case .thread(_, let comments):
             VStack(alignment: .leading, spacing: 0) {
