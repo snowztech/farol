@@ -63,7 +63,7 @@ enum Control {
             }
         case .read:
             print(reply.text ?? "")
-        case .focus, .type:
+        case .focus, .type, .watch, .answer:
             // Only Farol Voice sends these, and parse never makes one.
             break
         }

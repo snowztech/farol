@@ -6,6 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
+- Farol Voice can hear when a session starts waiting or finishes, and pick an answer on the menu an agent waits on.
 - Show the unmodified lines between changes in the review with the arrows in the gutter, 20 at a time from either side, or all at once in a small gap.
 
 ## [0.54.1] - 2026-11-01
