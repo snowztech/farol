@@ -92,15 +92,49 @@ final class GraphModel: ObservableObject {
         run(failed) { try History.checkout(commit, in: $0) }
     }
 
+    /// Where the list should scroll to, a new id each time so asking for the same commit again scrolls again.
+    @Published private(set) var scrollTarget: (hash: String, id: UUID)?
+    /// A commit asked for before the history was read.
+    private var pendingReveal: String?
+
+    /// Selects a commit named from elsewhere, like a file's blame, and scrolls to it. One the list is too short to hold is looked up alone.
+    func reveal(_ hash: String) {
+        pendingReveal = hash
+        applyReveal()
+    }
+
+    private func applyReveal() {
+        guard let hash = pendingReveal, let root else { return }
+        if let row = rows.first(where: { $0.commit.hash == hash }) {
+            pendingReveal = nil
+            open(row.commit)
+            // The list may only now be on screen, if the panel was closed, and can't scroll before it is.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in self?.scrollTarget = (hash, UUID()) }
+        } else if !rows.isEmpty {
+            pendingReveal = nil
+            DispatchQueue.global(qos: .userInitiated).async {
+                let commit = History.commit(hash, in: root)
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.root == root, let commit else { return }
+                    self.open(commit)
+                }
+            }
+        }
+    }
+
     /// Clicking the selected commit again closes the pane.
     func select(_ commit: History.Commit?) {
-        guard commit?.hash != selected?.hash else {
+        guard commit?.hash != selected?.hash, let commit else {
             selected = nil
             return selectedFiles = nil
         }
+        open(commit)
+    }
+
+    private func open(_ commit: History.Commit) {
         selected = commit
         selectedFiles = nil
-        guard let root, let commit else { return }
+        guard let root else { return }
         DispatchQueue.global(qos: .userInitiated).async {
             let files = (try? Diff.files(in: root, .commit(commit.hash))) ?? []
             DispatchQueue.main.async { [weak self] in
@@ -200,6 +234,7 @@ final class GraphModel: ObservableObject {
                 self.remote = branches.remote
                 self.upstreams = upstreams
                 self.rows = rows ?? []
+                self.applyReveal()
                 self.error = rows == nil ? "Couldn't read the history." : nil
             }
         }
@@ -292,6 +327,9 @@ struct GraphPanel: View {
                             .padding(.bottom, 4)
                         }
                         .scrollIndicators(.hidden)
+                        .onChange(of: graph.scrollTarget?.id) {
+                            if let hash = graph.scrollTarget?.hash { proxy.scrollTo(hash, anchor: .center) }
+                        }
                         // Arrows walk the history from the selected commit, and Return opens its changes.
                         // Takes the keyboard like a text field does, on a click, so the terminal keeps it until then.
                         .focusable(interactions: .edit)

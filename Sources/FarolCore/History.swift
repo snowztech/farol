@@ -68,6 +68,13 @@ public enum History {
         return parse(output)
     }
 
+    /// One commit by its hash, for one the log's limit leaves out. Nil when git doesn't know it.
+    public static func commit(_ hash: String, in directory: String) -> Commit? {
+        let format = ["%H", "%P", "%an", "%at", "%D", "%ae", "%s"].joined(separator: "%x1f")
+        let output = try? Git.run(["log", "--no-color", "--format=\(format)", "-n", "1", hash], in: directory)
+        return output.flatMap { parse($0).first }
+    }
+
     /// Local branches first, then remote ones, each most recently committed first.
     public static func branches(in directory: String) -> (local: [String], remote: [String]) {
         let output = (try? Git.run(["for-each-ref", "--sort=-committerdate", "--format=%(refname)", "refs/heads", "refs/remotes"],
