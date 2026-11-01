@@ -11,6 +11,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - Press ⌘F with the cursor in the review to search every file of the changes, with the matches marked, a count, and ⌘G or Return for the next one. The bar has match case, whole word and regular expression, and a word selected in the diff becomes the search.
 - Show git blame beside the line numbers, from the button in a file's header or by right-clicking the numbers. Each commit has its own color, hovering shows its details, and a click opens it in the git graph.
 
+### Changed
+
+- The merge view shows every change, including the ones Git merged on its own, instead of folding those away from conflicts. Only unchanged lines fold.
+
 ## [0.54.1] - 2026-11-01
 
 Let Farol Voice control your sessions, if you turn it on.
