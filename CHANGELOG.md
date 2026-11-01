@@ -8,6 +8,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - Farol Voice can hear when a session starts waiting or finishes, and pick an answer on the menu an agent waits on.
 - Show the unmodified lines between changes in the review with the arrows in the gutter, 20 at a time from either side, or all at once in a small gap.
+- Press ⌘F with the cursor in the review to search every file of the changes, with the matches marked, a count, and ⌘G or Return for the next one. The bar has match case, whole word and regular expression, and a word selected in the diff becomes the search.
 
 ## [0.54.1] - 2026-11-01
 

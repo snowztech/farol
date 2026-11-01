@@ -92,7 +92,8 @@ struct Palette: Equatable {
         accent = Color(nsColor: fg)
         control = Color(nsColor: bg.mixed(with: fg, 0.42))
         code = SyntaxColors(background: bg, foreground: fg, ansi: ansi)
-        diff = DiffColors(background: bg, foreground: fg, added: ansi.count > 2 ? ansi[2] : fg, removed: ansi.count > 1 ? ansi[1] : fg)
+        diff = DiffColors(background: bg, foreground: fg, added: ansi.count > 2 ? ansi[2] : fg, removed: ansi.count > 1 ? ansi[1] : fg,
+                          highlight: ansi.count > 3 ? ansi[3] : fg)
         lanes = Self.lanes(matching: Array(ansi.dropFirst().prefix(6)), dark: bg.isDark)
         let ansi = { (i: Int) in Color(nsColor: ansi.count > i ? ansi[i] : fg) }
         working = ansi(6)

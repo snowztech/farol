@@ -11,15 +11,28 @@ struct DiffColors: Equatable {
     let muted: NSColor
     /// The band behind "N unmodified lines".
     let band: NSColor
+    /// Behind what the search found, and behind the match it is on.
+    let match: NSColor
+    let currentMatch: NSColor
 
-    init(background: NSColor, foreground: NSColor, added: NSColor, removed: NSColor) {
+    init(background: NSColor, foreground: NSColor, added: NSColor, removed: NSColor, highlight: NSColor) {
         self.background = background
         self.foreground = foreground
         self.added = added
         self.removed = removed
         muted = background.mixed(with: foreground, 0.45)
         band = background.mixed(with: foreground, 0.035)
+        match = background.mixed(with: highlight, 0.3)
+        currentMatch = highlight
     }
+}
+
+/// The matches of the review's search in one file, by row, and the one the search is on.
+struct DiffMarks: Equatable {
+    /// The characters to mark in each row's text, as the diff shows it.
+    var ranges: [Int: [NSRange]] = [:]
+    var currentRow: Int?
+    var currentLocation = 0
 }
 
 /// One file's diff in the review panel, as a SwiftUI view.
@@ -34,13 +47,14 @@ struct DiffText: NSViewRepresentable {
     /// Called with a gap's unmodified lines, by their numbers in the new file, and whether to show them from the top, next to the hunk above.
     /// Nil leaves gaps closed.
     var expand: ((Range<Int>, _ fromTop: Bool) -> Void)? = nil
+    var marks: DiffMarks? = nil
 
     func makeNSView(context: Context) -> DiffScrollView { DiffScrollView() }
 
     func updateNSView(_ view: DiffScrollView, context: Context) {
         view.text.onComment = comment
         view.text.onExpand = expand
-        view.text.show(file, rows: rows, colors: colors, syntax: syntax)
+        view.text.show(file, rows: rows, colors: colors, syntax: syntax, marks: marks)
         view.needsLayout = true
     }
 
@@ -100,6 +114,9 @@ final class DiffTextView: NSTextView {
     static let gutter: CGFloat = 58
 
     private var shown: (file: Diff.File, rows: Range<Int>?, colors: DiffColors, syntax: SyntaxColors, expandable: Bool)?
+    /// Where each row's text starts in the view, for the rows it shows.
+    private var rowStarts: [Int: Int] = [:]
+    private var shownMarks: DiffMarks?
     var onExpand: ((Range<Int>, _ fromTop: Bool) -> Void)? {
         didSet { if (onExpand == nil) != (oldValue == nil) { needsDisplay = true } }
     }
@@ -175,6 +192,22 @@ final class DiffTextView: NSTextView {
         return rows
     }
 
+    /// Each row of lines with the text as the diff shows it, for a search to look through.
+    static func lines(_ file: Diff.File) -> [(row: Int, text: String)] {
+        rows(file).enumerated().compactMap { index, row in
+            guard case .line(let line, _) = row else { return nil }
+            return (index, line.text.replacingOccurrences(of: "\t", with: "    "))
+        }
+    }
+
+    /// Where `row` of `path` is in this view's own coordinates, when this view shows it.
+    func rect(ofRow row: Int, in path: String) -> NSRect? {
+        guard let shown, shown.file.path == path, let start = rowStarts[row], let container = textContainer else { return nil }
+        let glyph = diffLayout.glyphIndexForCharacter(at: start)
+        let fragment = diffLayout.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+        return NSRect(x: 0, y: fragment.minY + textContainerOrigin.y, width: container.size.width, height: fragment.height)
+    }
+
     /// Which row shows `line`, numbered in the new file, or in the old one for a removed line. Nil when the diff doesn't show it.
     static func row(of line: Int, old: Bool, in file: Diff.File) -> Int? {
         rows(file).firstIndex { row in
@@ -184,10 +217,13 @@ final class DiffTextView: NSTextView {
     }
 
     /// Rebuilds the text only when the diff or the theme changed, so a refresh keeps your selection.
-    func show(_ file: Diff.File, rows slice: Range<Int>? = nil, colors: DiffColors, syntax: SyntaxColors) {
+    func show(_ file: Diff.File, rows slice: Range<Int>? = nil, colors: DiffColors, syntax: SyntaxColors, marks: DiffMarks? = nil) {
         let expandable = onExpand != nil
         if let shown, shown.file == file, shown.rows == slice, shown.colors == colors, shown.syntax == syntax,
-           shown.expandable == expandable { return }
+           shown.expandable == expandable {
+            if marks != shownMarks { mark(marks) }
+            return
+        }
         shown = (file, slice, colors, syntax, expandable)
         diffColors = colors
         CodeText.apply(to: self, background: colors.background, foreground: colors.foreground)
@@ -202,7 +238,9 @@ final class DiffTextView: NSTextView {
         ]
         let text = NSMutableAttributedString()
         let rows = Self.rows(file)
-        for row in rows[slice ?? rows.indices] {
+        rowStarts = [:]
+        for (index, row) in zip(rows.indices, rows) where (slice ?? rows.indices).contains(index) {
+            rowStarts[index] = text.length
             var attributes = base
             var line = ""
             switch row {
@@ -229,6 +267,7 @@ final class DiffTextView: NSTextView {
         if let storage = textStorage {
             CodeText.highlight(storage, Syntax.language(for: file.path), syntax, plain: colors.foreground)
         }
+        mark(marks)
         if let container = textContainer {
             diffLayout.ensureLayout(for: container)
             contentWidth = ceil(diffLayout.usedRect(for: container).width) + Self.gutter + 16
@@ -239,6 +278,28 @@ final class DiffTextView: NSTextView {
 }
 
 extension DiffTextView {
+    /// Marks the search's matches, the current one strongest.
+    /// Temporary attributes leave the text alone, so stepping doesn't lay out and color the diff again, and keeps your selection.
+    fileprivate func mark(_ marks: DiffMarks?) {
+        shownMarks = marks
+        guard let storage = textStorage, let colors = shown?.colors else { return }
+        let all = NSRange(location: 0, length: storage.length)
+        diffLayout.removeTemporaryAttribute(.backgroundColor, forCharacterRange: all)
+        diffLayout.removeTemporaryAttribute(.foregroundColor, forCharacterRange: all)
+        guard let marks else { return }
+        for (row, ranges) in marks.ranges {
+            guard let start = rowStarts[row] else { continue }
+            for range in ranges {
+                let located = NSRange(location: start + range.location, length: range.length)
+                guard NSMaxRange(located) <= storage.length else { continue }
+                let current = marks.currentRow == row && marks.currentLocation == range.location
+                diffLayout.addTemporaryAttributes(
+                    current ? [.backgroundColor: colors.currentMatch, .foregroundColor: colors.background] : [.backgroundColor: colors.match],
+                    forCharacterRange: located)
+            }
+        }
+    }
+
     /// Paints each row's full-width tint, colored bar, line number and gap label. AppKit then draws the selection and text on top.
     /// This runs in the view's own background pass, because the layout manager can't draw left of the text.
     override func drawBackground(in rect: NSRect) {
