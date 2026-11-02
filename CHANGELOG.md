@@ -4,12 +4,16 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.55.0] - 2026-11-02
+
+Read the code around a change, search the whole review and see who changed each line.
+
 ### Added
 
 - Farol Voice can hear when a session starts waiting or finishes, and pick an answer on the menu an agent waits on.
 - Show the unmodified lines between changes in the review with the arrows in the gutter, 20 at a time from either side, or all at once in a small gap.
 - Press ⌘F with the cursor in the review to search every file of the changes, with the matches marked, a count, and ⌘G or Return for the next one. The bar has match case, whole word and regular expression, and a word selected in the diff becomes the search.
-- Show git blame beside the line numbers, from the button in a file's header or by right-clicking the numbers. Each commit has its own color, hovering shows its details, and a click opens it in the git graph.
+- Show git blame beside the line numbers, from the button in a file's header or by right-clicking the numbers. Colors tell commits apart, hovering shows a commit's details, and a click opens it in the git graph.
 
 ### Changed
 
@@ -1095,7 +1099,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.54.1...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.55.0...HEAD
+[0.55.0]: https://github.com/snowztech/farol/releases/tag/v0.55.0
 [0.54.1]: https://github.com/snowztech/farol/releases/tag/v0.54.1
 [0.54.0]: https://github.com/snowztech/farol/releases/tag/v0.54.0
 [0.53.0]: https://github.com/snowztech/farol/releases/tag/v0.53.0
