@@ -123,9 +123,20 @@ private struct SessionRow: View {
                     .onExitCommand { editing = false }
                     .onChange(of: fieldFocused) { _, focused in if !focused { commit() } }
             } else {
-                Text(session.displayName)
-                    .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
-                    .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
+                HStack(spacing: 6) {
+                    Text(session.displayName)
+                        .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
+                        .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
+                    if session.isWorktreeCheckout {
+                        // Shrinks before the name does, so a narrow sidebar never clips it.
+                        Text("worktree")
+                            .font(.system(size: 10.5, design: .monospaced))
+                            .foregroundStyle(palette.muted.opacity(0.65))
+                            .lineLimit(1)
+                            .layoutPriority(-1)
+                            .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
+                    }
+                }
             }
             if let waiting = session.waitingFor {
                 // In place of the branch while the agent waits, so the row says what for without being opened.
@@ -139,7 +150,7 @@ private struct SessionRow: View {
                     if let branch = gitLine {
                         HStack(spacing: 4) {
                             BranchMark(color: palette.muted)
-                            Text(branch).truncationMode(.middle)
+                            Text(branch).lineLimit(1).truncationMode(.middle).layoutPriority(1)
                         }
                     } else if let location = session.remoteLocation ?? session.location {
                         Text(location).truncationMode(.head)
@@ -148,13 +159,6 @@ private struct SessionRow: View {
                     Spacer(minLength: 4)
                     ForEach(session.ports.prefix(2), id: \.self) { PortLink(port: $0, palette: palette) }
                     if session.ports.count > 2 { Text(verbatim: "+\(session.ports.count - 2)").fixedSize() }
-                    if session.isWorktreeCheckout {
-                        Text("worktree")
-                            .foregroundStyle(palette.muted.opacity(0.65))
-                            .fixedSize()
-                            .padding(.leading, 4)
-                            .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
-                    }
                 }
                 .font(.system(size: 10.5, design: .monospaced))
                 .foregroundStyle(palette.muted)
