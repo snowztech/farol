@@ -4,6 +4,14 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- The review and the git graph keep what each session showed and how far it was scrolled, so switching back no longer empties them while they reload.
+
+### Changed
+
+- Each session remembers which panels are open (sidebar, files, git graph, review) and brings them back when you return to it. A new session starts with the files, graph and review closed, and the sidebar as you left it.
+
 ## [0.56.0] - 2026-11-03
 
 Fold projects in the sidebar, review a pull request without leaving Farol and see what's new before you update.

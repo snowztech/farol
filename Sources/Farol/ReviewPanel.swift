@@ -270,6 +270,23 @@ final class ReviewModel: ObservableObject {
         }
         marks = built
     }
+    /// What each checkout showed when you left it, so coming back paints that at once and the refresh only corrects it.
+    private struct Snapshot {
+        var files: [Diff.File]
+        var collapsed: Set<String>
+        var stat: Diff.Stat
+        var changes: Diff.Stat
+        var uncommittedPaths: Set<String>
+        var ahead: Int
+        var unpushed: Int
+        var forge: Forge?
+        var ignored: [String]
+        var branches: [String]
+        var scope: Diff.Scope
+        var yourScope: Diff.Scope?
+    }
+    private var snapshots: [String: Snapshot] = [:]
+    let anchors = DiffAnchors()
     private var collapsed: Set<String> = []
     /// Your choice per checkout, so switching sessions doesn't reset it.
     private var chosenScope: [String: Diff.Scope] = [:]
@@ -301,22 +318,34 @@ final class ReviewModel: ObservableObject {
         request = .unknown
         checks = []
         let rootChanged = root != self.root
+        let oldRoot = self.root
         self.root = root
         if rootChanged {
             watcher = nil
-            files = []
+            if let left = oldRoot {
+                snapshots[left] = Snapshot(files: files, collapsed: collapsed, stat: stat, changes: changes,
+                                           uncommittedPaths: uncommittedPaths, ahead: ahead, unpushed: unpushed, forge: forge,
+                                           ignored: ignored, branches: branches, scope: scope, yourScope: yourScope)
+            }
+            let kept = root.flatMap { snapshots[$0] }
+            files = kept?.files ?? []
+            collapsed = kept?.collapsed ?? []
+            stat = kept?.stat ?? Diff.Stat()
+            changes = kept?.changes ?? Diff.Stat()
+            uncommittedPaths = kept?.uncommittedPaths ?? []
+            ahead = kept?.ahead ?? 0
+            unpushed = kept?.unpushed ?? 0
+            forge = kept?.forge
+            ignored = kept?.ignored ?? []
             expanded = [:]
             search()
-            collapsed = []
-            rows = []
-            stat = Diff.Stat()
-            changes = Diff.Stat()
-            uncommittedPaths = []
-            ahead = 0
-            unpushed = 0
-            forge = nil
-            ignored = []
             fetchedRequest = nil
+            if let kept {
+                branches = kept.branches
+                scope = kept.scope
+                yourScope = kept.yourScope
+            }
+            rebuild()
         }
         guard let root else { return }
         if rootChanged { watcher = FolderWatcher(root) { [weak self] in self?.changed($0) } }
@@ -725,11 +754,14 @@ final class ReviewModel: ObservableObject {
                     }
                     if self.expandedScope != scope { self.expanded = [:]; self.requestLines = [:] }
                     self.expandedScope = scope
-                    self.files = files.map { file in
+                    let shown = files.map { file -> Diff.File in
                         if let kept = self.expanded[file.path], kept.base == file { return kept.shown }
                         self.expanded[file.path] = nil
                         return file
                     }
+                    let unchanged = self.files == shown
+                    self.files = shown
+                    if unchanged, self.pendingFocus == nil { return }
                     self.search()
                     if let path = self.pendingFocus, files.contains(where: { $0.path == path }) {
                         // A big file starts folded, which would scroll to a header with nothing under it.
@@ -915,6 +947,8 @@ struct ReviewPanel: View {
                         }
                         .padding(.bottom, 12)
                         .background(RevealKeeper(request: review.reveal))
+                        .background(DiffScrollKeeper(key: review.root, anchors: review.anchors,
+                                                     jump: { proxy.scrollTo($0, anchor: .top) }))
                     }
                     .onChange(of: review.reveal) {
                         guard let reveal = review.reveal else { return }
