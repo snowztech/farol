@@ -28,6 +28,9 @@ public enum Ports {
     /// A server meant to be opened picks its port, like 3000 or 5173, so these are left out.
     static let picked = 49152...65535
 
+    /// Vite's default port for the websocket that pushes changes to the open page. It serves no page, so a link to it opens nothing.
+    static let hotReload = 24678
+
     /// lsof's field output: a `p1234` line for each process, then a line like `n*:3000` or `n127.0.0.1:5173` for each of its sockets.
     /// IPv4 and IPv6 often list the same port.
     static func ports(fromLsof output: String, of pids: Set<pid_t>) -> [Int] {
@@ -37,7 +40,7 @@ public enum Ports {
             if line.hasPrefix("p") {
                 pid = pid_t(line.dropFirst())
             } else if line.hasPrefix("n"), let pid, pids.contains(pid), let colon = line.lastIndex(of: ":"),
-                      let port = Int(line[line.index(after: colon)...]), !picked.contains(port) {
+                      let port = Int(line[line.index(after: colon)...]), !picked.contains(port), port != hotReload {
                 ports.insert(port)
             }
         }

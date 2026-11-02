@@ -20,3 +20,8 @@ import Testing
     let output = "p12\nf8\nn127.0.0.1:55150\np13\nf20\nn*:3000\n"
     #expect(Ports.ports(fromLsof: output, of: [12, 13]) == [3000])
 }
+
+@Test func leavesOutViteHotReloadSocket() {
+    let output = "p13\nf20\nn*:3000\nf21\nn*:24678\n"
+    #expect(Ports.ports(fromLsof: output, of: [13]) == [3000])
+}
