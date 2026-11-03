@@ -130,22 +130,16 @@ extension View {
     }
 }
 
-/// A sheet's title beside the tile of the Settings section it belongs to, so a color means the same thing everywhere.
+/// A sheet's title and the line under it. No tile: a sheet is opened mid-work for one thing, and its title already says what.
 struct SheetHeader<Detail: View>: View {
     let title: String
-    let section: SettingsPage.Section
     let palette: Palette
     @ViewBuilder let detail: Detail
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Tile(color: section.tint(palette), size: 28) {
-                Image(systemName: section.symbol).font(.system(size: 15, weight: .bold))
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.system(size: 15, weight: .semibold))
-                detail.foregroundStyle(palette.muted)
-            }
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.system(size: 15, weight: .semibold))
+            detail.foregroundStyle(palette.muted)
         }
     }
 }

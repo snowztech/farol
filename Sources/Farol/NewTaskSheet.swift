@@ -135,7 +135,7 @@ struct NewTaskSheet: View {
         let p = palette
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 16) {
-                SheetHeader(title: "New task in \(repo)", section: .agents, palette: p) {
+                SheetHeader(title: "New task in \(repo)", palette: p) {
                     Text(subtitle).fixedSize(horizontal: false, vertical: true)
                 }
                 if !tickets.isEmpty {

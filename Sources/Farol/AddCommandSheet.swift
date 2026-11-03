@@ -31,7 +31,7 @@ struct AddCommandSheet: View {
         let p = palette
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 16) {
-                SheetHeader(title: "Add command", section: .terminal, palette: p) {
+                SheetHeader(title: "Add command", palette: p) {
                     Text("Save a command to run from a pane or ⌘P.")
                 }
                 VStack(alignment: .leading, spacing: 6) {
