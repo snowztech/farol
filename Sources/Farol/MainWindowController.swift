@@ -9,6 +9,10 @@ import GhosttyTerminal
 final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// Same height as the native title bar, so the buttons line up with the traffic lights.
     private static let topBarHeight: CGFloat = 28
+    /// Panels open fast and settle softly. The same curve drives the AppKit widths and the SwiftUI views that follow them.
+    private static let panelDuration: TimeInterval = 0.28
+    private static let panelCurve = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.25, 1)
+    private static let panelMotion = Animation.timingCurve(0.2, 0.9, 0.25, 1, duration: panelDuration)
 
     let store: SessionStore
     private let runtime: TerminalRuntime
@@ -430,10 +434,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     func toggleSidebar() {
         let open = sidebarWidth.constant == 0
-        withAnimation(.easeOut(duration: 0.18)) { state.sidebarVisible = open }
+        withAnimation(Self.panelMotion) { state.sidebarVisible = open }
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.18
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            ctx.duration = Self.panelDuration
+            ctx.timingFunction = Self.panelCurve
             sidebarWidth.animator().constant = open ? state.sidebarWidth : 0
             layoutGaps(animated: true)
         }
@@ -447,10 +451,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private func setFiles(visible open: Bool) {
         if !open { state.filesSearching = false }
         remember { $0.files = open }
-        withAnimation(.easeOut(duration: 0.18)) { state.filesVisible = open }
+        withAnimation(Self.panelMotion) { state.filesVisible = open }
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.18
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            ctx.duration = Self.panelDuration
+            ctx.timingFunction = Self.panelCurve
             filesWidth.animator().constant = open ? state.filesWidth : 0
             layoutGaps(animated: true)
         }
@@ -465,13 +469,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private func setGraph(visible open: Bool) {
         remember { $0.graph = open }
         let width = open ? clampedGraphWidth(savedGraphWidth) : 0
-        withAnimation(.easeOut(duration: 0.18)) {
+        withAnimation(Self.panelMotion) {
             state.graphVisible = open
             state.graphWidth = width
         }
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.18
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            ctx.duration = Self.panelDuration
+            ctx.timingFunction = Self.panelCurve
             graphWidth.animator().constant = width
             layoutGaps(animated: true)
         }
@@ -519,10 +523,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         remember { $0.review = review.isOpen }
         let saved = UserDefaults.standard.double(forKey: Self.reviewWidthKey)
         let width = review.isOpen ? clampedReviewWidth(saved > 0 ? saved : ReviewPanel.defaultWidth) : 0
-        withAnimation(.easeOut(duration: 0.18)) { state.reviewWidth = width }
+        withAnimation(Self.panelMotion) { state.reviewWidth = width }
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.18
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            ctx.duration = Self.panelDuration
+            ctx.timingFunction = Self.panelCurve
             reviewWidth.animator().constant = width
             layoutGaps(animated: true)
         }

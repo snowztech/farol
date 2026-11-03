@@ -611,10 +611,13 @@ extension View {
     }
 }
 
-/// A plain button that dims while the mouse is down, so a click is felt before its panel opens.
+/// A plain button that dims and shrinks a little while the mouse is down, so a click is felt before its panel opens.
 struct QuietPress: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label.opacity(configuration.isPressed ? 0.6 : 1)
+        configuration.label
+            .opacity(configuration.isPressed ? 0.7 : 1)
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
