@@ -261,9 +261,39 @@ public final class TerminalView: NSView {
 
     public override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
+        resize()
+    }
+
+    /// The size in cells a phone gave the pane while it shows it and nobody uses the Mac, so programs draw for the phone.
+    /// Ghostty draws the smaller grid in the pane's top left. Nil when the pane fills its view.
+    public private(set) var phoneGrid: (cols: Int, rows: Int)?
+
+    public func fit(cols: Int, rows: Int) {
+        guard phoneGrid?.cols != cols || phoneGrid?.rows != rows else { return }
+        phoneGrid = (cols, rows)
+        resize()
+    }
+
+    public func unfit() {
+        guard phoneGrid != nil else { return }
+        phoneGrid = nil
+        resize()
+    }
+
+    private func resize() {
         guard let surface else { return }
-        let px = convertToBacking(newSize)
-        ghostty_surface_set_size(surface, UInt32(px.width), UInt32(px.height))
+        let px = convertToBacking(frame.size)
+        var width = px.width, height = px.height
+        if let grid = phoneGrid {
+            // The cells and the padding around them as they are now, which a grid of the phone's size keeps. Never larger than the view.
+            let now = ghostty_surface_size(surface)
+            let cell = CGSize(width: CGFloat(now.cell_width_px), height: CGFloat(now.cell_height_px))
+            let padding = CGSize(width: CGFloat(now.width_px) - CGFloat(now.columns) * cell.width,
+                                 height: CGFloat(now.height_px) - CGFloat(now.rows) * cell.height)
+            width = min(width, CGFloat(grid.cols) * cell.width + padding.width)
+            height = min(height, CGFloat(grid.rows) * cell.height + padding.height)
+        }
+        ghostty_surface_set_size(surface, UInt32(width), UInt32(height))
     }
 
     /// Runs when the window moves to a screen with another pixel density, like Retina to an external monitor.
