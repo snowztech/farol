@@ -123,9 +123,24 @@ private struct SessionRow: View {
                     .onExitCommand { editing = false }
                     .onChange(of: fieldFocused) { _, focused in if !focused { commit() } }
             } else {
-                Text(session.displayName)
+                let name = Text(session.displayName)
                     .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
+                if session.isWorktreeCheckout {
+                    // Whole or not at all, so a narrow row or the close button never leaves a stray "w…".
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 6) {
+                            name
+                            Text("worktree")
+                                .font(.system(size: 10.5, design: .monospaced))
+                                .foregroundStyle(palette.muted.opacity(0.65))
+                                .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
+                        }
+                        name
+                    }
+                } else {
+                    name
+                }
             }
             if let waiting = session.waitingFor {
                 // In place of the branch while the agent waits, so the row says what for without being opened.
@@ -136,24 +151,25 @@ private struct SessionRow: View {
                     .hoverTip(waiting)
             } else {
                 HStack(spacing: 6) {
-                    if let branch = gitLine {
-                        HStack(spacing: 4) {
-                            BranchMark(color: palette.muted)
-                            Text(branch).truncationMode(.middle)
+                    // Ahead of the spacer, which would otherwise take half the room and cut the branch short.
+                    Group {
+                        if let branch = gitLine {
+                            HStack(spacing: 4) {
+                                BranchMark(color: palette.muted)
+                                Text(branch).truncationMode(.middle)
+                            }
+                        } else if let location = session.remoteLocation ?? session.location {
+                            Text(location).truncationMode(.head)
                         }
-                    } else if let location = session.remoteLocation ?? session.location {
-                        Text(location).truncationMode(.head)
                     }
+                    .layoutPriority(1)
                     // The branch gives way first, so a port is always whole.
                     Spacer(minLength: 4)
-                    ForEach(session.ports.prefix(2), id: \.self) { PortLink(port: $0, palette: palette) }
-                    if session.ports.count > 2 { Text(verbatim: "+\(session.ports.count - 2)").fixedSize() }
-                    if session.isWorktreeCheckout {
-                        Text("worktree")
-                            .foregroundStyle(palette.muted.opacity(0.65))
+                    if let port = session.ports.first { PortLink(port: port, palette: palette) }
+                    if session.ports.count > 1 {
+                        Text(verbatim: "+\(session.ports.count - 1)")
                             .fixedSize()
-                            .padding(.leading, 4)
-                            .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
+                            .hoverTip("Also on " + session.ports.dropFirst().map { "localhost:\($0)" }.joined(separator: ", "))
                     }
                 }
                 .font(.system(size: 10.5, design: .monospaced))

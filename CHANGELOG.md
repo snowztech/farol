@@ -4,6 +4,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- A narrow sidebar no longer hides the branch behind the worktree tag, which now sits beside the session name and shrinks first.
+- A session lists only the ports that serve a page, so a database or Vite's hot reload no longer shows next to the dev server. The sidebar shows the first one and how many more.
+
 ## [0.55.0] - 2026-11-02
 
 Read the code around a change, search the whole review and see who changed each line.
