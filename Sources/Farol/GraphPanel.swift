@@ -169,8 +169,12 @@ final class GraphModel: ObservableObject {
         run(failed) { try History.createBranch(name, from: start, in: $0) }
     }
 
-    func delete(_ branch: String, force: Bool, failed: @escaping (String) -> Void) {
-        run(failed) { try History.deleteBranch(branch, force: force, in: $0) }
+    /// The server's copy, `alsoRemote`, only goes once the local branch is gone, so a refused delete leaves both.
+    func delete(_ branch: String, force: Bool, alsoRemote: String? = nil, failed: @escaping (String) -> Void) {
+        run(failed) {
+            try History.deleteBranch(branch, force: force, in: $0)
+            if let alsoRemote { try History.deleteRemoteBranch(alsoRemote, in: $0) }
+        }
     }
 
     func deleteRemote(_ branch: String, failed: @escaping (String) -> Void) {
@@ -637,7 +641,7 @@ private struct BranchList: View {
         // A local branch and its twin on the server can go separately, since deleting either doesn't touch the other.
         let twin = remote ? branch : graph.remote.first { $0.drop { $0 != "/" }.dropFirst() == branch }
         if !remote {
-            Button("Delete Local Branch…") { delete(branch) }
+            Button("Delete Local Branch…") { delete(branch, twin: twin) }
                 .disabled(current)
         }
         if let twin {
@@ -646,14 +650,13 @@ private struct BranchList: View {
     }
 
     /// A branch that isn't merged anywhere asks a second time, since deleting it loses its commits.
-    private func delete(_ branch: String) {
-        confirm("Delete the local branch \(branch)?", "Only your copy goes. The branch on the server, if there is one, stays.",
-                button: "Delete", destructive: true) {
-            graph.delete(branch, force: false) { message in
+    private func delete(_ branch: String, twin: String?) {
+        confirmDelete(branch, twin: twin) { alsoRemote in
+            graph.delete(branch, force: false, alsoRemote: alsoRemote) { message in
                 guard message.contains("not fully merged") else { return gitError("Couldn't delete the branch")(message) }
                 confirm("\(branch) isn't merged. Delete it anyway?",
                         "Commits that are only on \(branch) will be lost.", button: "Delete Anyway", destructive: true) {
-                    graph.delete(branch, force: true, failed: gitError("Couldn't delete the branch"))
+                    graph.delete(branch, force: true, alsoRemote: alsoRemote, failed: gitError("Couldn't delete the branch"))
                 }
             }
         }
@@ -1221,6 +1224,19 @@ private func confirm(_ title: String, _ info: String, button: String, destructiv
     ok.hasDestructiveAction = destructive
     alert.addButton(withTitle: "Cancel")
     show(alert) { if $0 == .alertFirstButtonReturn { action() } }
+}
+
+/// The checkbox is only there when the branch has a twin on a server, and starts unchecked since that delete reaches everyone.
+private func confirmDelete(_ branch: String, twin: String?, _ action: @escaping (String?) -> Void) {
+    let alert = NSAlert()
+    alert.messageText = "Delete the local branch \(branch)?"
+    alert.informativeText = "Only your copy goes. The branch on the server, if there is one, stays."
+    let box = NSButton(checkboxWithTitle: twin.map { "Also delete \($0) on the server" } ?? "", target: nil, action: nil)
+    if twin != nil { alert.accessoryView = box }
+    let ok = alert.addButton(withTitle: "Delete")
+    ok.hasDestructiveAction = true
+    alert.addButton(withTitle: "Cancel")
+    show(alert) { if $0 == .alertFirstButtonReturn { action(twin != nil && box.state == .on ? twin : nil) } }
 }
 
 private func askBranchName(from start: String, suggested: String, _ action: @escaping (String) -> Void) {
