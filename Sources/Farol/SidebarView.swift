@@ -25,7 +25,8 @@ struct SidebarView: View {
                         let name = group.key.map { URL(fileURLWithPath: $0).lastPathComponent }
                         let shut = group.key.map(isFolded) ?? false
                         if let key = group.key, let name {
-                            ProjectHeader(name: name, sessions: group.items, folded: shut, palette: p,
+                            ProjectHeader(name: name, sessions: group.items, folded: shut,
+                                          holdsSelection: group.items.contains { $0.id == store.selectedID }, palette: p,
                                           onToggle: { toggleFold(key) }, onNew: { commands.newSessionIn(key) })
                         }
                         ForEach(shut ? [] : group.items) { session in
@@ -53,11 +54,10 @@ struct SidebarView: View {
             NewTaskRow(palette: p, action: commands.newTask)
                 .padding(8)
         }
-        // Reaching a session in a folded project, with ⌘1 to ⌘9 or a notification, opens the project so the row is there.
-        .onChange(of: store.selectedID) { _, id in
-            guard let key = store.sessions.first(where: { $0.id == id })?.repoRoot, isFolded(key) else { return }
-            toggleFold(key)
-        }
+        // Reaching a session in a folded project, with ⌘1 to ⌘9, a notification or a new session, opens the project so the row is there.
+        // A new session's repo is found a moment after it's selected, so the repo is watched too.
+        .onChange(of: store.selectedID) { revealSelected() }
+        .onChange(of: store.selected?.repoRoot) { revealSelected() }
         // Fixed width, so collapsing the sidebar clips it instead of reflowing every row.
         .frame(width: state.sidebarWidth)
         .frame(maxHeight: .infinity)
@@ -75,6 +75,11 @@ struct SidebarView: View {
                     }
                     .onEnded { _ in dragStart = nil })
         }
+    }
+
+    private func revealSelected() {
+        guard let key = store.selected?.repoRoot, isFolded(key) else { return }
+        toggleFold(key)
     }
 
     private func isFolded(_ key: String) -> Bool {
@@ -283,11 +288,14 @@ struct RepoHeader: View {
     }
 }
 
-/// A project's name above its sessions. Click to fold them away. Folded, it shows how many there are and the most pressing lamp among them.
+/// A project's name above its sessions, the whole row a button that folds them away.
+/// Folded, it shows how many there are and, in the lamp column, the most pressing lamp among them.
 private struct ProjectHeader: View {
     let name: String
     let sessions: [Session]
     let folded: Bool
+    /// Folded with the session on screen inside, it takes the selection's highlight so you can see where it went.
+    let holdsSelection: Bool
     let palette: Palette
     let onToggle: () -> Void
     let onNew: () -> Void
@@ -295,40 +303,46 @@ private struct ProjectHeader: View {
     @State private var hovering = false
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 10) {
+            // The session lamps' column, so the project name lines up with session names.
+            ZStack {
+                if folded { FoldedLamp(sessions: sessions, palette: palette) }
+            }
+            .frame(width: 7)
             Text(name.uppercased())
                 .font(.system(size: 10.5, weight: .semibold))
                 .tracking(0.6)
-                .foregroundStyle(palette.vivid ? palette.pull : palette.muted)
+                .foregroundStyle(hovering ? palette.text : palette.vivid ? palette.pull : palette.muted)
             if folded {
                 Text(verbatim: "\(sessions.count)")
                     .font(.system(size: 10.5, design: .monospaced))
                     .foregroundStyle(palette.muted.opacity(0.7))
-                FoldedLamp(sessions: sessions, palette: palette)
             }
             Spacer(minLength: 0)
             if hovering {
                 CloseButton(symbol: "plus", help: "New session in \(name)", palette: palette, action: onNew)
             }
             Image(systemName: "chevron.right")
-                .font(.system(size: 8, weight: .bold))
-                .foregroundStyle(palette.muted)
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(hovering ? palette.text : palette.muted)
                 .rotationEffect(.degrees(folded ? 0 : 90))
-                .frame(width: 20)
-                .opacity(hovering || folded ? 1 : 0)
+                .frame(width: 20, height: 20)
         }
         .lineLimit(1)
-        .frame(height: 20)
         .padding(.leading, 10)
         .padding(.trailing, 6)
-        .padding(.top, 8)
+        .padding(.vertical, 4)
+        .background(RoundedRectangle(cornerRadius: 6)
+            .fill(folded && holdsSelection ? palette.selection : hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
         .onTapGesture(perform: onToggle)
         .onClickableHover { hovering = $0 }
+        .hoverTip(folded ? "Show \(name)'s sessions" : "Fold \(name)")
+        .padding(.top, 6)
     }
 }
 
-/// The lamp a folded project shows for its sessions, so an agent waiting inside never goes unseen. Nothing while they all sit idle.
+/// The lamp a folded project shows for its sessions, so an agent waiting inside never goes unseen.
 private struct FoldedLamp: View {
     let sessions: [Session]
     let palette: Palette
@@ -341,10 +355,7 @@ private struct FoldedLamp: View {
         // Ordered by who needs you: git stopped, an agent asking, an agent finished, then one still working.
         let pressing: [Session.Activity] = [.stopped, .waiting, .done, .working]
         let activity = pressing.first { level in sessions.contains { $0.activity == level } } ?? .idle
-        // Hidden rather than removed while idle, so it keeps listening for a session to wake.
         Lamp(activity: activity, selected: false, palette: palette)
-            .opacity(activity == .idle ? 0 : 1)
-            .frame(width: activity == .idle ? 0 : nil)
             .onReceive(Publishers.MergeMany(sessions.map(\.objectWillChange))) { _ in changes += 1 }
     }
 }
