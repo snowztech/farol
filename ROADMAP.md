@@ -90,8 +90,8 @@ An agent running in Farol can change Farol when you ask, so you stay in the conv
 The UI follows [DESIGN.md](DESIGN.md). What it still has to reach:
 
 - [ ] A first run that explains Farol in a minute: the first session says how to start a task and connect an agent, where today it opens a bare shell
-- [ ] The sheets on the shared views: New Task, Commit, Add command and Manage commands
-- [ ] Commit subjects in the git graph with room to read, from a narrower time column
+- [x] The sheets on the shared views: New Task, Commit, Add command and Manage commands
+- [x] Commit subjects in the git graph with room to read, from a narrower time column
 - [ ] The menu bar and notch status panels checked against DESIGN.md
 
 ## Speed and upkeep
