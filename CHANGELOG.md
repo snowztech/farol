@@ -8,10 +8,6 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - Click a project's header in the sidebar to fold its sessions. A folded project shows how many it holds and lights up when one needs you. Hover the header for a button that opens a new session there.
 
-### Changed
-
-- Under a project's header, a session named after the project shows its branch as its name.
-
 ### Fixed
 
 - A narrow sidebar no longer hides the branch behind the worktree tag, which now sits beside the session name and steps aside when there is no room.

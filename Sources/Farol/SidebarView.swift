@@ -34,7 +34,6 @@ struct SidebarView: View {
                                 session: session,
                                 selected: session.id == store.selectedID && !state.showingSettings,
                                 palette: p,
-                                groupName: name,
                                 // Reselecting would pull focus back into the terminal, which a rename would lose.
                                 onSelect: {
                                     if session.id != store.selectedID || state.showingSettings { store.select(session) }
@@ -89,8 +88,6 @@ private struct SessionRow: View {
     @ObservedObject var session: Session
     let selected: Bool
     let palette: Palette
-    /// The project section's name, when the sidebar is grouped.
-    let groupName: String?
     let onSelect: () -> Void
     let onRename: (String) -> Void
     let onClose: () -> Void
@@ -143,8 +140,7 @@ private struct SessionRow: View {
                     .onExitCommand { editing = false }
                     .onChange(of: fieldFocused) { _, focused in if !focused { commit() } }
             } else {
-                let name = Text(branchTitle ?? session.displayName)
-                    .truncationMode(branchTitle == nil ? .tail : .middle)
+                let name = Text(session.displayName)
                     .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
                 if session.isWorktreeCheckout {
@@ -170,16 +166,16 @@ private struct SessionRow: View {
                     .foregroundStyle(palette.muted)
                     .truncationMode(.tail)
                     .hoverTip(waiting)
-            } else if branchTitle == nil || gitLine != nil || !session.ports.isEmpty {
+            } else {
                 HStack(spacing: 6) {
                     // Ahead of the spacer, which would otherwise take half the room and cut the branch short.
                     Group {
-                        if let line = gitLine {
+                        if let branch = gitLine {
                             HStack(spacing: 4) {
-                                if branchTitle == nil { BranchMark(color: palette.muted) }
-                                Text(line).truncationMode(.middle)
+                                BranchMark(color: palette.muted)
+                                Text(branch).truncationMode(.middle)
                             }
-                        } else if branchTitle == nil, let location = session.remoteLocation ?? session.location {
+                        } else if let location = session.remoteLocation ?? session.location {
                             Text(location).truncationMode(.head)
                         }
                     }
@@ -201,17 +197,10 @@ private struct SessionRow: View {
 
     /// The branch, and what is left to do while git is stopped. In the row's usual gray, since the lamp already asks for you.
     private var gitLine: String? {
-        let branch = branchTitle == nil ? session.branch : nil
-        guard session.stopped != nil else { return session.remoteLocation == nil ? branch : nil }
+        guard session.stopped != nil else { return session.remoteLocation == nil ? session.branch : nil }
         let left = session.conflicts == 0 ? "ready to continue"
             : "\(session.conflicts) \(session.conflicts == 1 ? "conflict" : "conflicts")"
-        return [branch, left].compactMap { $0 }.joined(separator: " · ")
-    }
-
-    /// Under a project's header, a session named after the project reads as its branch, so three farol rows don't all say farol.
-    private var branchTitle: String? {
-        guard let groupName, session.displayName == groupName, session.remoteLocation == nil else { return nil }
-        return session.branch
+        return [session.branch, left].compactMap { $0 }.joined(separator: " · ")
     }
 
     private func startEditing() {
@@ -335,7 +324,7 @@ private struct ProjectHeader: View {
     }
 }
 
-/// The lamp a folded project shows for its sessions, so an agent waiting inside never goes unseen.
+/// The lamp a folded project shows for its sessions, so an agent waiting inside never goes unseen. Nothing while they all sit idle.
 private struct FoldedLamp: View {
     let sessions: [Session]
     let palette: Palette
@@ -348,7 +337,10 @@ private struct FoldedLamp: View {
         // Ordered by who needs you: git stopped, an agent asking, an agent finished, then one still working.
         let pressing: [Session.Activity] = [.stopped, .waiting, .done, .working]
         let activity = pressing.first { level in sessions.contains { $0.activity == level } } ?? .idle
+        // Hidden rather than removed while idle, so it keeps listening for a session to wake.
         Lamp(activity: activity, selected: false, palette: palette)
+            .opacity(activity == .idle ? 0 : 1)
+            .frame(width: activity == .idle ? 0 : nil)
             .onReceive(Publishers.MergeMany(sessions.map(\.objectWillChange))) { _ in changes += 1 }
     }
 }
