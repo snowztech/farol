@@ -94,7 +94,7 @@ struct QuestionForm: View {
             if !question.header.isEmpty {
                 Text(question.header.uppercased()).font(.system(size: 11, weight: .semibold)).foregroundStyle(colors.muted)
             }
-            Text(question.text).font(.system(size: 14, weight: .semibold)).fixedSize(horizontal: false, vertical: true)
+            Text(question.text).font(.system(size: 15, weight: .semibold)).fixedSize(horizontal: false, vertical: true)
             ForEach(Array(question.options.enumerated()), id: \.offset) { position, option in
                 ChoiceRow(
                     title: option.label, detail: option.detail, selected: picks[index]?.contains(position) == true,
@@ -208,8 +208,8 @@ private struct QuestionButton: ButtonStyle {
                 .foregroundStyle(primary ? colors.primaryText : colors.text)
                 .padding(.horizontal, 14)
                 .frame(height: 28)
-                .background(RoundedRectangle(cornerRadius: 7).fill(primary ? colors.primaryFill : colors.raised))
-                .overlay(RoundedRectangle(cornerRadius: 7)
+                .background(RoundedRectangle(cornerRadius: 8).fill(primary ? colors.primaryFill : colors.raised))
+                .overlay(RoundedRectangle(cornerRadius: 8)
                     .fill((primary ? colors.primaryText : colors.text).opacity(hovering && enabled ? 0.12 : 0)))
                 .opacity(!enabled ? 0.35 : configuration.isPressed ? 0.8 : 1)
                 .contentShape(Rectangle())

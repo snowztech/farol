@@ -132,6 +132,7 @@ public final class TerminalView: NSView {
             rect: .zero,
             options: [.mouseMoved, .cursorUpdate, .activeInKeyWindow, .inVisibleRect],
             owner: self))
+        NotificationCenter.default.addObserver(self, selector: #selector(takeHeldSize), name: Self.sizeReleased, object: nil)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -261,6 +262,7 @@ public final class TerminalView: NSView {
 
     public override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
+        guard Self.holds == 0 else { return }
         resize()
     }
 
@@ -295,6 +297,20 @@ public final class TerminalView: NSView {
         }
         ghostty_surface_set_size(surface, UInt32(width), UInt32(height))
     }
+
+    /// While a panel slides, every terminal keeps its grid and takes the new size once the slide ends.
+    /// Resizing on each frame makes a program like an agent redraw and rewrap its whole screen many times over.
+    public static func holdSize() { holds += 1 }
+
+    public static func releaseSize() {
+        holds = max(holds - 1, 0)
+        if holds == 0 { NotificationCenter.default.post(name: sizeReleased, object: nil) }
+    }
+
+    private static var holds = 0
+    private static let sizeReleased = Notification.Name("TerminalView.sizeReleased")
+
+    @objc private func takeHeldSize() { setFrameSize(frame.size) }
 
     /// Runs when the window moves to a screen with another pixel density, like Retina to an external monitor.
     public override func viewDidChangeBackingProperties() {

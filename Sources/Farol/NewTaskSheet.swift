@@ -471,7 +471,7 @@ struct NewTaskSheet: View {
 
     private func agentSelect(_ p: Palette) -> some View {
         SheetSelect(palette: p, open: $pickingAgent) {
-            Image(systemName: "terminal").foregroundStyle(p.muted)
+            ToolTile(agent: choice.kind, size: 18)
             Text(choice.label)
         } choices: {
             VStack(spacing: 1) {
@@ -480,6 +480,7 @@ struct NewTaskSheet: View {
                         agent = option.id
                         pickingAgent = false
                     } label: {
+                        ToolTile(agent: option.kind, size: 16)
                         Text(option.label)
                         Spacer()
                         if option.id == choice.id { Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)) }
@@ -535,7 +536,7 @@ private struct AttachmentChip: View {
     var body: some View {
         HStack(spacing: 6) {
             if let thumbnail {
-                Image(nsImage: thumbnail).resizable().scaledToFill().frame(width: 18, height: 18).clipShape(RoundedRectangle(cornerRadius: 3))
+                Image(nsImage: thumbnail).resizable().scaledToFill().frame(width: 18, height: 18).clipShape(RoundedRectangle(cornerRadius: 4))
             } else {
                 Image(systemName: "doc").foregroundStyle(palette.muted)
             }

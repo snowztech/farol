@@ -490,7 +490,7 @@ private struct NotchRow: View {
                 .fill(color ?? .clear)
                 .overlay(Circle().strokeBorder(Color.white.opacity(color == nil ? 0.35 : 0), lineWidth: 1.2))
                 .frame(width: 7, height: 7)
-            Text(row.name).font(.system(size: 12.5)).foregroundStyle(.white).lineLimit(1)
+            Text(row.name).font(.system(size: 13)).foregroundStyle(.white).lineLimit(1)
             Spacer(minLength: 8)
             Text(state).font(.system(size: 11)).foregroundStyle(.white.opacity(0.5))
         }

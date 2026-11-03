@@ -20,7 +20,7 @@ final class RunChip: NSView {
     init() {
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.cornerRadius = 5
+        layer?.cornerRadius = 6
         addSubview(button)
         rebuild()
     }

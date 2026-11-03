@@ -145,14 +145,14 @@ private struct ThemeCard: View {
             .font(.system(size: 10, design: .monospaced))
             .padding(10)
             .frame(maxWidth: .infinity, minHeight: 70, alignment: .topLeading)
-            .background(t.background, in: RoundedRectangle(cornerRadius: 7))
+            .background(t.background, in: RoundedRectangle(cornerRadius: 8))
             .overlay(
-                RoundedRectangle(cornerRadius: 7)
+                RoundedRectangle(cornerRadius: 8)
                     .strokeBorder(selected ? palette.accent : hovering ? palette.muted : palette.line,
                                   lineWidth: selected ? 2 : 1))
 
             Text(name)
-                .font(.system(size: 11.5, weight: selected ? .semibold : .regular))
+                .font(.system(size: 12, weight: selected ? .semibold : .regular))
                 .foregroundStyle(selected ? palette.text : palette.muted)
                 .lineLimit(1)
         }

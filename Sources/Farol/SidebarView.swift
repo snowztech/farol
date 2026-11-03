@@ -10,6 +10,8 @@ struct SidebarView: View {
     let resize: (CGFloat) -> Void
 
     @State private var dragging: Session?
+    /// The selection's highlight is one shape that moves to the row you pick.
+    @Namespace private var selection
     @State private var dragStart: CGFloat?
     /// Only read so the sidebar redraws when the setting changes. The store applies it.
     @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = false
@@ -34,6 +36,7 @@ struct SidebarView: View {
                                 session: session,
                                 selected: session.id == store.selectedID && !state.showingSettings,
                                 palette: p,
+                                highlight: selection,
                                 // Reselecting would pull focus back into the terminal, which a rename would lose.
                                 onSelect: {
                                     if session.id != store.selectedID || state.showingSettings { store.select(session) }
@@ -49,6 +52,7 @@ struct SidebarView: View {
                     }
                 }
                 .padding(8)
+                .animation(Motion.enabled ? .spring(response: 0.32, dampingFraction: 0.86) : nil, value: store.selectedID)
             }
             // Pinned below the list, so it stays in the same place however many sessions there are.
             NewTaskRow(palette: p, action: commands.newTask)
@@ -61,7 +65,7 @@ struct SidebarView: View {
         // Fixed width, so collapsing the sidebar clips it instead of reflowing every row.
         .frame(width: state.sidebarWidth)
         .frame(maxHeight: .infinity)
-        .background(p.surface)
+        .background(p.panel)
         .overlay(alignment: .trailing) {
             Rectangle().fill(p.boxed ? .clear : p.line).frame(width: 1)
                 .frame(width: 7, alignment: .trailing)
@@ -97,6 +101,7 @@ private struct SessionRow: View {
     @ObservedObject var session: Session
     let selected: Bool
     let palette: Palette
+    let highlight: Namespace.ID
     let onSelect: () -> Void
     let onRename: (String) -> Void
     let onClose: () -> Void
@@ -119,7 +124,7 @@ private struct SessionRow: View {
             }
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 7)
+        .padding(.vertical, 8)
         .background { background }
         .contentShape(Rectangle())
         .onTapGesture(perform: onSelect)
@@ -142,7 +147,7 @@ private struct SessionRow: View {
             if editing {
                 TextField("", text: $draft)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 12.5, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(palette.text)
                     .focused($fieldFocused)
                     .onSubmit(commit)
@@ -150,16 +155,14 @@ private struct SessionRow: View {
                     .onChange(of: fieldFocused) { _, focused in if !focused { commit() } }
             } else {
                 let name = Text(session.displayName)
-                    .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
-                    .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
+                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                    .foregroundStyle(selected ? palette.text : palette.text.opacity(0.8))
                 if session.isWorktreeCheckout {
                     // Whole or not at all, so a narrow row or the close button never leaves a stray "w…".
                     ViewThatFits(in: .horizontal) {
                         HStack(spacing: 6) {
                             name
-                            Text("worktree")
-                                .font(.system(size: 10.5, design: .monospaced))
-                                .foregroundStyle(palette.muted.opacity(0.65))
+                            Badge(text: "worktree", small: true, palette: palette)
                                 .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
                         }
                         name
@@ -171,7 +174,7 @@ private struct SessionRow: View {
             if let waiting = session.waitingFor {
                 // In place of the branch while the agent waits, so the row says what for without being opened.
                 Text(waiting)
-                    .font(.system(size: 10.5))
+                    .font(.system(size: 11))
                     .foregroundStyle(palette.muted)
                     .truncationMode(.tail)
                     .hoverTip(waiting)
@@ -198,7 +201,7 @@ private struct SessionRow: View {
                             .hoverTip("Also on " + session.ports.dropFirst().map { "localhost:\($0)" }.joined(separator: ", "))
                     }
                 }
-                .font(.system(size: 10.5, design: .monospaced))
+                .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(palette.muted)
             }
         }
@@ -225,10 +228,16 @@ private struct SessionRow: View {
         onRename(draft)
     }
 
-    /// Selection stays neutral, so color only ever means agent status.
-    private var background: some View {
-        RoundedRectangle(cornerRadius: 6)
-            .fill(selected ? palette.selection : hovering ? palette.hover : .clear)
+    /// Selection stays neutral, so color only ever means agent status. A faint edge lifts it off the panel.
+    @ViewBuilder private var background: some View {
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        if selected {
+            shape.fill(palette.selection)
+                .overlay(shape.strokeBorder(palette.line))
+                .matchedGeometryEffect(id: "selection", in: highlight)
+        } else {
+            shape.fill(hovering ? palette.hover : .clear)
+        }
     }
 }
 
@@ -250,22 +259,20 @@ private struct NewTaskRow: View {
             // Same width as the status dots, so the label lines up with session names.
             Image(systemName: "plus")
                 .font(.system(size: 9, weight: .semibold))
-                .frame(width: 7)
+                .frame(width: Lamp.size)
             Text("New task")
-                .font(.system(size: 12.5))
+                .font(.system(size: 13))
             Spacer(minLength: 0)
             if hovering {
                 Text("⇧⌘N")
-                    .font(.system(size: 10.5, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(palette.muted)
             }
         }
-        .foregroundStyle(hovering || palette.vivid ? palette.text : palette.muted)
+        .foregroundStyle(hovering ? palette.text : palette.muted)
         .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        // With color, starting a task is the one filled button in the sidebar.
-        .background(RoundedRectangle(cornerRadius: 6)
-            .fill(palette.vivid ? palette.selection.opacity(hovering ? 1 : 0.6) : hovering ? palette.hover : .clear))
+        .padding(.vertical, 8)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
     }
 }
@@ -276,10 +283,9 @@ struct RepoHeader: View {
     let palette: Palette
 
     var body: some View {
-        Text(name.uppercased())
-            .font(.system(size: 10.5, weight: .semibold))
-            .tracking(0.6)
-            .foregroundStyle(palette.vivid ? palette.pull : palette.muted)
+        Text(name)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(palette.muted)
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 10)
@@ -308,37 +314,38 @@ private struct ProjectHeader: View {
             ZStack {
                 if folded { FoldedLamp(sessions: sessions, palette: palette) }
             }
-            .frame(width: 7)
-            Text(name.uppercased())
-                .font(.system(size: 10.5, weight: .semibold))
-                .tracking(0.6)
-                .foregroundStyle(hovering ? palette.text : palette.vivid ? palette.pull : palette.muted)
+            .frame(width: Lamp.size)
+            Text(name)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(hovering ? palette.text : palette.muted)
             if folded {
                 Text(verbatim: "\(sessions.count)")
-                    .font(.system(size: 10.5, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(palette.muted.opacity(0.7))
             }
             Spacer(minLength: 0)
             if hovering {
                 CloseButton(symbol: "plus", help: "New session in \(name)", palette: palette, action: onNew)
             }
+            // Faint while open, so the header still reads as one that folds, and full when folded or hovered.
             Image(systemName: "chevron.right")
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(hovering ? palette.text : palette.muted)
                 .rotationEffect(.degrees(folded ? 0 : 90))
                 .frame(width: 20, height: 20)
+                .opacity(hovering || folded ? 1 : 0.35)
         }
         .lineLimit(1)
         .padding(.leading, 10)
         .padding(.trailing, 6)
         .padding(.vertical, 4)
-        .background(RoundedRectangle(cornerRadius: 6)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
             .fill(folded && holdsSelection ? palette.selection : hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
         .onTapGesture(perform: onToggle)
         .onClickableHover { hovering = $0 }
         .hoverTip(folded ? "Show \(name)'s sessions" : "Fold \(name)")
-        .padding(.top, 6)
+        .padding(.top, 10)
     }
 }
 
@@ -385,6 +392,9 @@ private struct Reorder: DropDelegate {
 
 /// Hollow when nothing is happening, breathing while the agent works, rippling when it waits for you, filled when it is done.
 struct Lamp: View {
+    /// Every column that lines up with the lamps uses this width.
+    static let size: CGFloat = 7
+
     let activity: Session.Activity
     /// A session you are looking at has no need to ripple.
     let selected: Bool
@@ -402,7 +412,7 @@ struct Lamp: View {
             case .done: Circle().fill(palette.done)
             }
         }
-        .frame(width: 7, height: 7)
+        .frame(width: Self.size, height: Self.size)
         .hoverTip(help)
     }
 
@@ -474,7 +484,7 @@ private struct PortLink: View {
 }
 
 /// The system branch symbol's arrow draws too much attention beside a small branch name.
-private struct BranchMark: View {
+struct BranchMark: View {
     let color: Color
 
     var body: some View {

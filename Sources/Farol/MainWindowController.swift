@@ -9,6 +9,10 @@ import GhosttyTerminal
 final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// Same height as the native title bar, so the buttons line up with the traffic lights.
     private static let topBarHeight: CGFloat = 28
+    /// Panels open fast and settle softly. The same curve drives the AppKit widths and the SwiftUI views that follow them.
+    private static let panelDuration: TimeInterval = 0.28
+    private static let panelCurve = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.25, 1)
+    private static var panelMotion: Animation? { Motion.enabled ? .timingCurve(0.2, 0.9, 0.25, 1, duration: panelDuration) : nil }
 
     let store: SessionStore
     private let runtime: TerminalRuntime
@@ -17,6 +21,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     private lazy var notifier = AgentNotifier(settings: agents)
     private let content = NSView()
+    /// What the glass style shows through its side panels: the desktop blurred, under a tint of the theme.
+    private let blur = NSVisualEffectView()
+    private let blurTint = NSView()
+    /// Liquid Glass behind each side panel, on macOS 26 and later.
+    private var glassPanels: [NSView] = []
     private let terminalContainer = NSView()
     private var sidebarWidth: NSLayoutConstraint!
     private static let sidebarWidthKey = "sidebar.width"
@@ -152,6 +161,19 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         mergeView.clipsToBounds = true
 
         content.wantsLayer = true
+        blur.blendingMode = .behindWindow
+        blur.material = .sidebar
+        blur.state = .active
+        blurTint.wantsLayer = true
+        blur.addSubview(blurTint)
+        root.addSubview(blur)
+        for v in [blur, blurTint] {
+            v.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                v.topAnchor.constraint(equalTo: root.topAnchor), v.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+                v.leadingAnchor.constraint(equalTo: root.leadingAnchor), v.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            ])
+        }
         for v in [topBar, sidebar, filesPanel, graphPanel, content, reviewPanel] { root.addSubview(v) }
         for v in [terminalContainer, settingsView!] { content.addSubview(v) }
         // Over the side panels too: three columns of code need the whole width.
@@ -180,6 +202,19 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             gaps.before.append(panel.leadingAnchor.constraint(equalTo: edge))
             gaps.under.append(root.bottomAnchor.constraint(equalTo: panel.bottomAnchor))
             edge = panel.trailingAnchor
+        }
+        if #available(macOS 26, *) {
+            for panel in [sidebar, filesPanel, graphPanel] {
+                let glass = NSGlassEffectView()
+                glass.translatesAutoresizingMaskIntoConstraints = false
+                root.addSubview(glass, positioned: .above, relativeTo: blur)
+                // Up into the top bar, as the panels' color does in the classic style.
+                NSLayoutConstraint.activate([
+                    glass.topAnchor.constraint(equalTo: root.topAnchor), glass.bottomAnchor.constraint(equalTo: panel.bottomAnchor),
+                    glass.leadingAnchor.constraint(equalTo: panel.leadingAnchor), glass.trailingAnchor.constraint(equalTo: panel.trailingAnchor),
+                ])
+                glassPanels.append(glass)
+            }
         }
         gaps.after = root.trailingAnchor.constraint(equalTo: edge)
         NSLayoutConstraint.activate(gaps.before + gaps.under + [gaps.after!])
@@ -397,15 +432,21 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         store.create(directory: directory ?? store.selected?.panes.focused.workingDirectory ?? NSHomeDirectory(), run: agents.startCommand)
     }
 
+    /// Slides the panels. The terminals keep their size until the end, so a program redraws once rather than on every frame.
+    private func animatePanels(_ change: @escaping () -> Void) {
+        TerminalView.holdSize()
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = Motion.enabled ? Self.panelDuration : 0
+            ctx.timingFunction = Self.panelCurve
+            change()
+            layoutGaps(animated: true)
+        }, completionHandler: { TerminalView.releaseSize() })
+    }
+
     func toggleSidebar() {
         let open = sidebarWidth.constant == 0
-        withAnimation(.easeOut(duration: 0.18)) { state.sidebarVisible = open }
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.18
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            sidebarWidth.animator().constant = open ? state.sidebarWidth : 0
-            layoutGaps(animated: true)
-        }
+        withAnimation(Self.panelMotion) { state.sidebarVisible = open }
+        animatePanels { self.sidebarWidth.animator().constant = open ? self.state.sidebarWidth : 0 }
     }
 
     /// Opens or closes the files panel. The session remembers the choice, and the disk is only watched while open.
@@ -416,13 +457,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private func setFiles(visible open: Bool) {
         if !open { state.filesSearching = false }
         remember { $0.files = open }
-        withAnimation(.easeOut(duration: 0.18)) { state.filesVisible = open }
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.18
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            filesWidth.animator().constant = open ? state.filesWidth : 0
-            layoutGaps(animated: true)
-        }
+        withAnimation(Self.panelMotion) { state.filesVisible = open }
+        animatePanels { self.filesWidth.animator().constant = open ? self.state.filesWidth : 0 }
         followFiles(store.selected)
     }
 
@@ -434,16 +470,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private func setGraph(visible open: Bool) {
         remember { $0.graph = open }
         let width = open ? clampedGraphWidth(savedGraphWidth) : 0
-        withAnimation(.easeOut(duration: 0.18)) {
+        withAnimation(Self.panelMotion) {
             state.graphVisible = open
             state.graphWidth = width
         }
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.18
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            graphWidth.animator().constant = width
-            layoutGaps(animated: true)
-        }
+        animatePanels { self.graphWidth.animator().constant = width }
         followGraph(store.selected)
     }
 
@@ -488,13 +519,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         remember { $0.review = review.isOpen }
         let saved = UserDefaults.standard.double(forKey: Self.reviewWidthKey)
         let width = review.isOpen ? clampedReviewWidth(saved > 0 ? saved : ReviewPanel.defaultWidth) : 0
-        withAnimation(.easeOut(duration: 0.18)) { state.reviewWidth = width }
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.18
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            reviewWidth.animator().constant = width
-            layoutGaps(animated: true)
-        }
+        withAnimation(Self.panelMotion) { state.reviewWidth = width }
+        animatePanels { self.reviewWidth.animator().constant = width }
     }
 
     /// Room for the terminal stays, however wide the sidebar is dragged.
@@ -735,7 +761,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// Boxed, every panel is a card: round corners, a border, and the backdrop showing in the gaps around it.
     private func applyStyle() {
         let palette = state.palette
-        window?.backgroundColor = NSColor(palette.backdrop)
+        window?.isOpaque = !palette.glass
+        window?.backgroundColor = palette.glass ? .clear : NSColor(palette.backdrop)
+        blur.isHidden = !palette.glass
+        blurTint.layer?.backgroundColor = NSColor(palette.backdrop).cgColor
+        glassPanels.forEach { $0.isHidden = !palette.glass }
         // The side panels already clip, which a closed one relies on to hide what is in it, so their corners come for free.
         // The terminal stays clear of its card's corners by its own margin, which spares it a mask.
         for panel in panels {
@@ -744,8 +774,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             panel.layer?.borderColor = NSColor(palette.line).cgColor
         }
         // Settings fills the terminal's card to its edges, so it is cut to the same corners.
+        // Cut in every style, so a page wider than the room never draws over the panels beside it.
         settingsView.layer?.cornerRadius = palette.style.radius
-        settingsView.layer?.masksToBounds = palette.boxed
+        settingsView.layer?.masksToBounds = true
         mergeView.layer?.cornerRadius = palette.style.radius
         mergeView.layer?.masksToBounds = palette.boxed
         layoutGaps()

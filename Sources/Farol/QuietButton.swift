@@ -20,7 +20,7 @@ final class QuietButton: NSButton {
         target = self
         self.action = #selector(fire)
         wantsLayer = true
-        layer?.cornerRadius = 5
+        layer?.cornerRadius = 6
         refresh()
     }
 
@@ -66,7 +66,7 @@ final class QuietButton: NSButton {
 
     override func mouseExited(with event: NSEvent) {
         hovering = false
-        HoverTip.shared.hide()
+        HoverTip.shared.hide(leaving: true)
     }
 
     @objc private func fire() { run() }

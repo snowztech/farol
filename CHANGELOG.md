@@ -4,6 +4,27 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Settings → Appearance → Style → Glass puts the sidebar, files and graph panels on Liquid Glass, with the desktop blurred through them. Older macOS gets a plain blur.
+
+### Changed
+
+- Settings groups its rows into cards, with an icon for each section.
+- The sidebar has larger rows, quieter project headers and a selection that slides to the row you pick. Panels open on a softer curve, buttons give a little when pressed, and tooltips fade in, with the next one showing at once as you move along.
+- Agents, integrations and each Settings section have a colored icon, and states like Connected share one badge. Pi shows its own mark.
+- Empty panels show a quiet symbol with their message, and the review panel's header reads like the sidebar.
+- Boxed with color is gone. If you used it, Farol switches you to Boxed.
+
+- Settings → Appearance → Animations turns the motion off. Reduce Motion in macOS does too.
+
+### Fixed
+
+- Opening or closing a panel no longer makes an agent redraw its screen on every frame. The terminal takes its new size once the panel stops.
+- A new session in a project opens in its place in the sidebar, with its branch, instead of jumping there a moment later.
+- Switches in Settings that are on no longer look off in a light theme.
+- A narrow Settings page no longer squeezes a row's words to one letter per line or draws over the panels beside it.
+
 ## [0.57.0] - 2026-11-03
 
 Each session keeps its own panels, and switching back shows them at once.
