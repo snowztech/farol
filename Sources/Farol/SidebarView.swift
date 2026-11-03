@@ -481,7 +481,7 @@ private struct PortLink: View {
 }
 
 /// The system branch symbol's arrow draws too much attention beside a small branch name.
-private struct BranchMark: View {
+struct BranchMark: View {
     let color: Color
 
     var body: some View {
