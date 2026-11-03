@@ -341,11 +341,9 @@ private struct CommitSheet: View {
         let p = palette
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Commit changes").font(.system(size: 15, weight: .semibold))
-                    if let branch = review.branch {
-                        Label(branch, systemImage: "arrow.triangle.branch").foregroundStyle(p.muted)
-                    }
+                SheetHeader(title: "Commit changes", section: .worktrees, palette: p) {
+                    // The tile is already the branch symbol, so the name stands alone, set like the sidebar's.
+                    if let branch = review.branch { Text(branch).font(.system(size: 12, design: .monospaced)) }
                 }
                 changes(p)
                 // Return confirms. Option-Return adds a line, for a body under the subject.

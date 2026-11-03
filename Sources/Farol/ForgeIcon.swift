@@ -106,3 +106,14 @@ struct ToolTile: View {
 
     var body: some View { Tile(color: color, size: size) { icon } }
 }
+
+extension ToolTile {
+    /// Where a ticket comes from, on the same tile as the tool in Settings.
+    init(source: Ticket.Source, size: CGFloat = 20) {
+        switch source {
+        case .github: self.init(kind: .github, size: size)
+        case .gitlab: self.init(kind: .gitlab, size: size)
+        case .jira: self.init(jira: size)
+        }
+    }
+}

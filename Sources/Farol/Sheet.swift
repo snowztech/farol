@@ -129,3 +129,23 @@ extension View {
             .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(focused ? palette.muted : palette.line))
     }
 }
+
+/// A sheet's title beside the tile of the Settings section it belongs to, so a color means the same thing everywhere.
+struct SheetHeader<Detail: View>: View {
+    let title: String
+    let section: SettingsPage.Section
+    let palette: Palette
+    @ViewBuilder let detail: Detail
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Tile(color: section.tint(palette), size: 28) {
+                Image(systemName: section.symbol).font(.system(size: 15, weight: .bold))
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(.system(size: 15, weight: .semibold))
+                detail.foregroundStyle(palette.muted)
+            }
+        }
+    }
+}
