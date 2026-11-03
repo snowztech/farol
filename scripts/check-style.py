@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Keeps Farol's comments and docs short and plain.
+"""Keeps Farol's comments and docs short and plain, and its type and corners on one scale.
 
 Usage:
   python3 scripts/check-style.py            check the whole repo
@@ -26,6 +26,12 @@ SLOP = re.compile(
     r"it'?s worth noting|in today'?s|moreover|furthermore)\b",
     re.IGNORECASE,
 )
+
+# Farol's type and corner scales. A size between two steps reads as a mistake next to the ones around it.
+FONT_SIZES = {"8", "9", "10", "11", "12", "13", "15", "20", "26"}
+RADII = {"4", "6", "8", "10"}
+FONT_SIZE = re.compile(r"(?:\.system\(size: |ofSize: )([0-9.]+)(?![0-9.])")
+RADIUS = re.compile(r"cornerRadius(?:: | = )([0-9.]+)(?![0-9.])")
 
 
 def comment_text(line: str, suffix: str) -> str | None:
@@ -73,6 +79,14 @@ def check(path: Path) -> list[str]:
         open_sentence = is_comment and not prose.strip().startswith("MARK:") and not re.search(r"[.:?!)]$", prose.strip())
         if comment_run == MAX_COMMENT_LINES + 1:
             problems.append(f"{where}: comment block over {MAX_COMMENT_LINES} lines. Keep only the non-obvious why.")
+
+        if suffix == ".swift" and prose is None:
+            for size in FONT_SIZE.findall(line):
+                if size not in FONT_SIZES:
+                    problems.append(f"{where}: font size {size} is off the scale. Use one of {', '.join(sorted(FONT_SIZES, key=float))}.")
+            for radius in RADIUS.findall(line):
+                if radius not in RADII:
+                    problems.append(f"{where}: corner radius {radius} is off the scale. Use one of {', '.join(sorted(RADII, key=float))}.")
 
         # Interface text in Swift strings is prose too, and reads as badly as a doc with the same slip.
         if suffix == ".swift" and prose is None:
