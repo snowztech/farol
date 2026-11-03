@@ -338,6 +338,8 @@ final class ReviewModel: ObservableObject {
             forge = kept?.forge
             ignored = kept?.ignored ?? []
             expanded = [:]
+            // Kept by path only, so another checkout's request would read this one's lines.
+            requestLines = [:]
             search()
             fetchedRequest = nil
             if let kept {
@@ -759,9 +761,8 @@ final class ReviewModel: ObservableObject {
                         self.expanded[file.path] = nil
                         return file
                     }
-                    let unchanged = self.files == shown
+                    if self.files == shown, self.pendingFocus == nil { return }
                     self.files = shown
-                    if unchanged, self.pendingFocus == nil { return }
                     self.search()
                     if let path = self.pendingFocus, files.contains(where: { $0.path == path }) {
                         // A big file starts folded, which would scroll to a header with nothing under it.
