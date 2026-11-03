@@ -8,6 +8,7 @@ final class WindowState: ObservableObject {
     /// The selected session is over ssh, so the panels have nothing local to show.
     @Published var remote = false
     var noRepoMessage: String { remote ? "Not available over ssh." : "Not a git repository." }
+    var noRepoSymbol: String { remote ? "network" : "folder.badge.questionmark" }
     /// Kept here so the About menu item can open settings on its page.
     @Published var settingsSection = SettingsPage.Section.terminal
     /// The three column merge view replaces the terminal while git is stopped on conflicts.
@@ -212,7 +213,7 @@ private struct GitButton: View {
                 Half(active: state.graphVisible, help: "Git graph (⌥⌘G)", palette: p, action: graph) { color in
                     // The size of the gear next to it.
                     Image(systemName: "point.3.filled.connected.trianglepath.dotted")
-                        .font(.system(size: 12.5, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(color)
                 }
                 if counts {
@@ -497,7 +498,7 @@ private struct CommandChoice: View {
             HStack(spacing: 9) {
                 // The room of a session's check and lamp, so every name starts at the same place.
                 Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).hidden()
-                Image(systemName: "play").font(.system(size: 9)).foregroundStyle(palette.muted).frame(width: 7)
+                Image(systemName: "play").font(.system(size: 9)).foregroundStyle(palette.muted).frame(width: Lamp.size)
                 Text(command.name).lineLimit(1).layoutPriority(1)
                 Text(command.displayCommand)
                     .font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.tail)
@@ -509,8 +510,8 @@ private struct CommandChoice: View {
                 }
             }
             .padding(.horizontal, 9)
-            .frame(height: 28)
-            .background(RoundedRectangle(cornerRadius: 6).fill(lit ? palette.selection : .clear))
+            .frame(height: 30)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(lit ? palette.selection : .clear))
             .contentShape(Rectangle())
             .hoverTip(command.global ? "Available in all projects" : "\(command.source) in \((command.folder as NSString).abbreviatingWithTildeInPath)")
         }
@@ -533,7 +534,7 @@ private struct FileChoice: View {
             HStack(spacing: 9) {
                 // The room of a session's check and lamp, so every name starts at the same place.
                 Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).hidden()
-                FileIcon(path: path).font(.system(size: 11)).foregroundStyle(palette.muted).frame(width: 7)
+                FileIcon(path: path).font(.system(size: 11)).foregroundStyle(palette.muted).frame(width: Lamp.size)
                 Text((path as NSString).lastPathComponent).lineLimit(1).truncationMode(.middle).layoutPriority(1)
                 Text((path as NSString).deletingLastPathComponent)
                     .font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.head)
@@ -546,8 +547,8 @@ private struct FileChoice: View {
                 }
             }
             .padding(.horizontal, 9)
-            .frame(height: 28)
-            .background(RoundedRectangle(cornerRadius: 6).fill(lit ? palette.selection : .clear))
+            .frame(height: 30)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(lit ? palette.selection : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(QuietPress())
@@ -584,10 +585,7 @@ private struct SessionChoice: View {
                 }
                 Spacer(minLength: 8)
                 if session.isWorktreeCheckout {
-                    Text("worktree")
-                        .font(.system(size: 10))
-                        .foregroundStyle(palette.muted.opacity(0.65))
-                        .fixedSize()
+                    Badge(text: "worktree", small: true, palette: palette)
                         .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
                 }
                 if let shortcut {
@@ -595,8 +593,8 @@ private struct SessionChoice: View {
                 }
             }
             .padding(.horizontal, 9)
-            .frame(height: 28)
-            .background(RoundedRectangle(cornerRadius: 6).fill(lit ? palette.selection : .clear))
+            .frame(height: 30)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(lit ? palette.selection : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(QuietPress())
@@ -608,6 +606,53 @@ extension View {
     /// Hover for anything clickable: runs `action` and shows the pointing hand while the mouse is over it.
     func onClickableHover(_ action: @escaping (Bool) -> Void) -> some View {
         modifier(ClickableHover { inside in withAnimation(.easeOut(duration: 0.1)) { action(inside) } })
+    }
+}
+
+/// What a panel shows when it has nothing to show: a quiet symbol and a line, in the middle of the panel.
+struct EmptyState: View {
+    let symbol: String
+    let text: String
+    let palette: Palette
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: symbol)
+                .font(.system(size: 20))
+                .foregroundStyle(palette.muted)
+                .frame(width: 48, height: 48)
+                .background(palette.raised.opacity(0.7), in: Circle())
+            Text(text)
+                .font(.system(size: 12))
+                .foregroundStyle(palette.muted)
+                .multilineTextAlignment(.center)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// A short word in a soft capsule. With a tint it is a state, like Connected in green. Without, it names a kind of thing, like worktree.
+struct Badge: View {
+    let text: String
+    var tint: Color? = nil
+    /// A dot before the word, for a state that can change.
+    var dot = false
+    /// Small sits beside a name in a list. Regular sits on the right of a row in Settings.
+    var small = false
+    let palette: Palette
+
+    var body: some View {
+        let color = tint ?? palette.muted
+        HStack(spacing: 5) {
+            if dot { Circle().fill(color).frame(width: 6, height: 6) }
+            Text(text).font(.system(size: small ? 10 : 12, weight: .medium))
+        }
+        .foregroundStyle(color)
+        .padding(.horizontal, small ? 6 : 9)
+        .frame(height: small ? 16 : 24)
+        .background(color.opacity(tint == nil ? 0.12 : 0.15), in: Capsule())
+        .fixedSize()
     }
 }
 
@@ -668,7 +713,7 @@ struct CloseButton: View {
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(hovering ? palette.text : palette.muted)
                 .frame(width: 20, height: 20)
-                .background(RoundedRectangle(cornerRadius: 5).fill(hovering ? palette.raised : .clear))
+                .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised : .clear))
                 .contentShape(Rectangle())
         }
         .buttonStyle(QuietPress())
@@ -689,7 +734,7 @@ struct IconButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 12.5, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .frame(width: 26, height: 20)
                 .foregroundStyle(active ? palette.accent : hovering ? palette.text : palette.muted)
                 .background(RoundedRectangle(cornerRadius: 6).fill(hovering || active ? palette.raised : .clear))

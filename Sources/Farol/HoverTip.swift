@@ -131,7 +131,7 @@ private final class Bubble: NSView {
     var edge = NSColor.gray
 
     override func draw(_ dirtyRect: NSRect) {
-        let shape = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 7, yRadius: 7)
+        let shape = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 8, yRadius: 8)
         fill.setFill()
         shape.fill()
         edge.setStroke()

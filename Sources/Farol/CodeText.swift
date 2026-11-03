@@ -3,7 +3,7 @@ import FarolCore
 
 /// How Farol shows code, shared by the file pane and the review so they look and behave the same.
 enum CodeText {
-    static let font = NSFont.monospacedSystemFont(ofSize: 12.5, weight: .regular)
+    static let font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
 
     /// Plain code: no rich text, no smart quotes, spelling or link helpers.
     static func configure(_ text: NSTextView) {

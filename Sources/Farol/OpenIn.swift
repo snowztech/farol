@@ -77,7 +77,7 @@ struct OpenInButton: View {
             OpenInItems(path: path)
         } label: {
             Image(systemName: "arrow.up.forward.app")
-                .font(.system(size: 12.5, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .frame(width: 26, height: 20)
                 .foregroundStyle(hovering ? palette.text : palette.muted)
                 .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised : .clear))

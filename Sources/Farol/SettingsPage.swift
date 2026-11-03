@@ -173,6 +173,7 @@ struct SettingsPage: View {
                 }
                 .labelsHidden()
                 .fixedSize()
+                .hoverRing(p)
             }
         }
 
@@ -195,6 +196,7 @@ struct SettingsPage: View {
                 }
                 .labelsHidden()
                 .fixedSize()
+                .hoverRing(p)
             }
             Row(title: "Run button on panes",
                 detail: "▶ in a pane's corner, under the mouse, runs one of the project's commands, and ■ stops it with the port it listens on. ⌘P and the right-click menu run them too.",
@@ -221,8 +223,8 @@ struct SettingsPage: View {
             .font(.system(size: 13))
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
-            .background(p.surface, in: RoundedRectangle(cornerRadius: 7))
-            .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(p.line))
+            .background(p.surface, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(p.line))
 
             ShipButton(title: "Themes folder", busy: false, palette: p, action: openThemesFolder)
         }
@@ -251,9 +253,10 @@ struct SettingsPage: View {
                 }
                 .labelsHidden()
                 .fixedSize()
+                .hoverRing(p)
             }
             Row(title: "Size", palette: p) {
-                Stepper("\(settings.fontSize) pt", value: $settings.fontSize, in: 8...32)
+                Stepper("\(settings.fontSize) pt", value: $settings.fontSize, in: 8...32).hoverRing(p)
             }
         }
 
@@ -268,6 +271,7 @@ struct SettingsPage: View {
                 .labelsHidden()
                 .pickerStyle(.segmented)
                 .fixedSize()
+                .hoverRing(p)
             }
             Row(title: "Blink", palette: p) {
                 toggle($settings.cursorBlink)
@@ -288,6 +292,7 @@ struct SettingsPage: View {
                 .labelsHidden()
                 .pickerStyle(.segmented)
                 .fixedSize()
+                .hoverRing(p)
             }
             Row(title: "Copy on select", detail: "Selecting text copies it to the clipboard.", palette: p) {
                 toggle($settings.copyOnSelect)
@@ -370,6 +375,7 @@ struct SettingsPage: View {
                 }
                 .labelsHidden()
                 .fixedSize()
+                .hoverRing(p)
             }
         }
 
@@ -383,6 +389,7 @@ struct SettingsPage: View {
                 }
                 .labelsHidden()
                 .fixedSize()
+                .hoverRing(p)
             }
             if isCustomStart {
                 Row(title: "Command", palette: p) {
@@ -418,7 +425,7 @@ struct SettingsPage: View {
 
         GroupTitle(title: "Pull requests", palette: p)
         Text("Farol creates pull requests and shows their state through these tools. Without them it opens the new request page in your browser.")
-            .font(.system(size: 11.5))
+            .font(.system(size: 12))
             .foregroundStyle(p.muted)
             .padding(.bottom, 4)
         Card(palette: p) {
@@ -427,11 +434,11 @@ struct SettingsPage: View {
 
         GroupTitle(title: "Tickets", palette: p)
         Text("New Task lists your open Jira tickets, next to the open issues of a repo on GitHub. Picking one names the branch after it and hands the agent the ticket in full.")
-            .font(.system(size: 11.5))
+            .font(.system(size: 12))
             .foregroundStyle(p.muted)
             .padding(.bottom, 4)
         Card(palette: p) {
-            Row(title: "Jira", detail: jiraDetail, icon: ForgeIcon(source: .jira, size: 13), link: ("Jira CLI (jira)", Jira.docs), palette: p) {
+            Row(title: "Jira", detail: jiraDetail, icon: ToolTile(jira: 26), link: ("Jira CLI (jira)", Jira.docs), palette: p) {
                 toolControl(jira, avatar: jiraAvatar, setup: Jira.setupCommand(from:), p)
             }
             if listsBoards {
@@ -450,6 +457,7 @@ struct SettingsPage: View {
                     // The menu would grow as wide as the longest board's name and squeeze the words beside it.
                     .frame(width: 220)
                     .disabled(jira == nil)
+                    .hoverRing(p)
                 }
             }
         }
@@ -481,7 +489,7 @@ struct SettingsPage: View {
         case .loggedOut: "\(cli.prefix(1).uppercased() + cli.dropFirst()) is installed but not logged in."
         case .missing: "\(cli.prefix(1).uppercased() + cli.dropFirst()) isn't installed."
         }
-        return Row(title: kind.name, detail: detail, icon: ForgeIcon(kind: kind, size: 13),
+        return Row(title: kind.name, detail: detail, icon: ToolTile(kind: kind, size: 26),
                    link: ("\(kind.name) CLI (\(kind.tool))", kind.docs), palette: p) {
             toolControl(state, avatar: avatars[kind], setup: kind.setupCommand(from:), p)
         }
@@ -518,7 +526,7 @@ struct SettingsPage: View {
         // ponytail: looks only where installers put the command. One installed elsewhere, as with nvm, reads as not found and still connects.
         let path = folder.kind.executable.map { ($0 as NSString).abbreviatingWithTildeInPath }
         return Row(title: agent.name, subtitle: shared ? (folder.directory.path as NSString).abbreviatingWithTildeInPath : nil,
-                   detail: path ?? "Not found", mono: path != nil, icon: ForgeIcon(agent: folder.kind, size: 13), palette: p) {
+                   detail: path ?? "Not found", mono: path != nil, icon: ToolTile(agent: folder.kind, size: 26), palette: p) {
             switch state {
             case .connected:
                 ConnectedPill(palette: p) { agentChange = AgentChange(agent: agent, connect: false) }
@@ -580,11 +588,8 @@ struct SettingsPage: View {
             set: { agents.startCommand = $0 == Self.custom ? (isCustomStart ? agents.startCommand : " ") : $0 })
     }
 
-    /// Brighter than the pickers' tint, so a switch that is on can't be taken for one that is off.
     private func toggle(_ value: Binding<Bool>) -> some View {
-        let p = state.palette
-        return Toggle("", isOn: value).labelsHidden().toggleStyle(.switch).controlSize(.small)
-            .tint(p.muted)
+        SettingsSwitch(isOn: value, palette: state.palette)
     }
 
     private func refreshAgents() {
@@ -778,7 +783,7 @@ struct SettingsPage: View {
             } label: {
                 HStack(spacing: 6) {
                     Text("Version \(Self.version)").font(.system(size: 12, design: .monospaced))
-                    Image(systemName: versionCopied ? "checkmark" : "doc.on.doc").font(.system(size: 10.5))
+                    Image(systemName: versionCopied ? "checkmark" : "doc.on.doc").font(.system(size: 11))
                 }
                 .foregroundStyle(p.muted)
                 .padding(.horizontal, 10)
@@ -804,7 +809,7 @@ struct SettingsPage: View {
                 link("Changelog", Self.repo + "/blob/main/CHANGELOG.md")
                 link("Report an issue", Self.repo + "/issues/new")
             }
-            .font(.system(size: 12.5))
+            .font(.system(size: 13))
             .padding(.top, 24)
 
             // The string literal is read as Markdown, so snowztech becomes a quiet link in the same line.
@@ -906,19 +911,18 @@ private struct Heading: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(title).font(.system(size: 20, weight: .semibold))
-                if beta {
-                    Text("Beta")
-                        .font(.system(size: 10.5, weight: .medium))
-                        .foregroundStyle(palette.muted)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 1)
-                        .overlay(Capsule().strokeBorder(palette.muted.opacity(0.4)))
+            HStack(alignment: .center, spacing: 10) {
+                // The section's tile from the list on the left, so the page carries its color.
+                if let section = SettingsPage.Section(rawValue: title) {
+                    Tile(color: section.tint(palette), size: 28) {
+                        Image(systemName: section.symbol).font(.system(size: 15, weight: .semibold))
+                    }
                 }
+                Text(title).font(.system(size: 20, weight: .semibold))
+                if beta { Badge(text: "Beta", palette: palette) }
             }
             if let detail {
-                Text(detail).font(.system(size: 12.5)).foregroundStyle(palette.muted)
+                Text(detail).font(.system(size: 13)).foregroundStyle(palette.muted)
             }
         }
         .padding(.bottom, 20)
@@ -932,7 +936,7 @@ private struct Row<Control: View>: View {
     var detail: String? = nil
     /// The detail is a path or a command, set in the terminal's kind of type.
     var mono = false
-    var icon: ForgeIcon? = nil
+    var icon: ToolTile? = nil
     /// Words of the detail that open a page, like a tool's name and its documentation.
     var link: (words: String, url: String)? = nil
     let palette: Palette
@@ -955,11 +959,17 @@ private struct Row<Control: View>: View {
     }
 
     private var words: some View {
+        HStack(spacing: 10) {
+            if let icon { icon }
+            text
+        }
+    }
+
+    private var text: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 6) {
-                if let icon { icon }
                 Text(title).font(.system(size: 13))
-                if let subtitle { Text(subtitle).font(.system(size: 11.5)).foregroundStyle(palette.muted) }
+                if let subtitle { Text(subtitle).font(.system(size: 12)).foregroundStyle(palette.muted) }
             }
             if let detail {
                 // The link is a view of its own between the words around it. Inside one text it couldn't tell when it is hovered.
@@ -972,7 +982,7 @@ private struct Row<Control: View>: View {
                         Text(detail)
                     }
                 }
-                .font(.system(size: 11.5, design: mono ? .monospaced : .default))
+                .font(.system(size: 12, design: mono ? .monospaced : .default))
                 .foregroundStyle(palette.muted)
             }
         }
@@ -1013,6 +1023,40 @@ private struct Card<Content: View>: View {
     }
 }
 
+/// Brighter than the pickers' tint, so a switch that is on can't be taken for one that is off. Brighter still under the mouse.
+private struct SettingsSwitch: View {
+    @Binding var isOn: Bool
+    let palette: Palette
+
+    @State private var hovering = false
+
+    var body: some View {
+        Toggle("", isOn: $isOn).labelsHidden().toggleStyle(.switch).controlSize(.small)
+            .tint(hovering ? palette.text.opacity(0.75) : palette.muted)
+            .onClickableHover { hovering = $0 }
+    }
+}
+
+/// macOS menus and steppers have no hover of their own, so a soft ring says the mouse is on one, like the buttons beside them.
+private struct HoverRing: ViewModifier {
+    let palette: Palette
+
+    @State private var hovering = false
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(palette.muted.opacity(hovering ? 0.55 : 0))
+                .padding(-2)
+                .allowsHitTesting(false))
+            .onClickableHover { hovering = $0 }
+    }
+}
+
+extension View {
+    fileprivate func hoverRing(_ palette: Palette) -> some View { modifier(HoverRing(palette: palette)) }
+}
+
 /// A small heading between rows. Sentence case, a step above the rows, no rule of its own.
 private struct GroupTitle: View {
     let title: String
@@ -1033,18 +1077,12 @@ private struct SetupState: View {
     let palette: Palette
 
     var body: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(state == .connected ? palette.done : state == .outdated ? palette.waiting : palette.muted.opacity(0.5))
-                .frame(width: 6, height: 6)
-            Text(state == .connected ? "Connected" : state == .outdated ? "Needs update" : "Not connected")
-                .font(.system(size: 12))
-                .foregroundStyle(palette.muted)
-        }
+        Badge(text: state == .connected ? "Connected" : state == .outdated ? "Needs update" : "Not connected",
+              tint: state == .connected ? palette.done : state == .outdated ? palette.waiting : nil, dot: true, palette: palette)
     }
 }
 
-/// A connected agent, in the same pill as an account in Integrations. Disconnecting is rare, so it's behind a click on it, which asks first.
+/// A connected agent, in the same badge as the other states. Disconnecting is rare, so it's behind a click on it, which asks first.
 private struct ConnectedPill: View {
     let palette: Palette
     let disconnect: () -> Void
@@ -1053,15 +1091,9 @@ private struct ConnectedPill: View {
 
     var body: some View {
         Button(action: disconnect) {
-            HStack(spacing: 6) {
-                Circle().fill(palette.done).frame(width: 6, height: 6)
-                Text("Connected").font(.system(size: 12, weight: .medium))
-            }
-            .padding(.horizontal, 10)
-            .frame(height: 26)
-            .background(hovering ? palette.raised : palette.surface, in: Capsule())
-            .overlay(Capsule().strokeBorder(palette.line))
-            .contentShape(Capsule())
+            Badge(text: "Connected", tint: palette.done, dot: true, palette: palette)
+                .overlay(Capsule().fill(palette.done.opacity(hovering ? 0.12 : 0)))
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .onClickableHover { hovering = $0 }
@@ -1084,16 +1116,15 @@ private struct AccountPill: View {
                     Circle().fill(palette.done)
                         .frame(width: 7, height: 7)
                         // A ring in the pill's color, so the dot reads as sitting on the picture.
-                        .overlay(Circle().strokeBorder(palette.surface, lineWidth: 1.5).padding(-1.5))
+                        .overlay(Circle().strokeBorder(palette.surface, lineWidth: 2).padding(-2))
                         .offset(x: 2, y: 2)
                 }
             Text(name).font(.system(size: 12, weight: .medium))
         }
-        .padding(.leading, 4)
-        .padding(.trailing, 10)
-        .frame(height: 26)
-        .background(palette.surface, in: Capsule())
-        .overlay(Capsule().strokeBorder(palette.line))
+        .padding(.leading, 3)
+        .padding(.trailing, 9)
+        .frame(height: 24)
+        .background(palette.muted.opacity(0.12), in: Capsule())
         .hoverTip("Connected")
     }
 }
@@ -1113,7 +1144,7 @@ private struct Avatar: View {
         ZStack {
             Circle().fill(palette.line)
             Text(name.prefix(1).uppercased())
-                .font(.system(size: 9.5, weight: .semibold))
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(palette.muted)
             if let image {
                 Image(nsImage: image).resizable().interpolation(.high).clipShape(Circle())
@@ -1139,14 +1170,8 @@ private struct ToolStateLabel: View {
     let palette: Palette
 
     var body: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(state == .missing ? palette.muted.opacity(0.5) : state == .loggedOut ? palette.waiting : palette.done)
-                .frame(width: 6, height: 6)
-            Text(state == .missing ? "Not installed" : state == .loggedOut ? "Not logged in" : "Connected")
-                .font(.system(size: 12))
-                .foregroundStyle(palette.muted)
-        }
+        Badge(text: state == .missing ? "Not installed" : state == .loggedOut ? "Not logged in" : "Connected",
+              tint: state == .missing ? nil : state == .loggedOut ? palette.waiting : palette.done, dot: true, palette: palette)
     }
 }
 
@@ -1165,8 +1190,8 @@ private struct OpenConfigRow: View {
 
     private var label: some View {
         HStack(spacing: 8) {
-            Image(systemName: "doc.text").font(.system(size: 11.5))
-            Text("Open config file").font(.system(size: 12.5))
+            Image(systemName: "doc.text").font(.system(size: 12))
+            Text("Open config file").font(.system(size: 13))
             Spacer(minLength: 0)
         }
         .foregroundStyle(hovering ? palette.text : palette.muted)
@@ -1183,10 +1208,10 @@ private struct Keycap: View {
 
     var body: some View {
         Text(keys)
-            .font(.system(size: 11.5, weight: .medium, design: .monospaced))
+            .font(.system(size: 12, weight: .medium, design: .monospaced))
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
-            .background(palette.raised, in: RoundedRectangle(cornerRadius: 5))
+            .background(palette.raised, in: RoundedRectangle(cornerRadius: 6))
     }
 }
 
@@ -1204,11 +1229,7 @@ private struct NavItem: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 9) {
-                Image(systemName: symbol)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 20, height: 20)
-                    .background(tint.gradient, in: RoundedRectangle(cornerRadius: 5.5, style: .continuous))
+                Tile(color: tint) { Image(systemName: symbol).font(.system(size: 11, weight: .semibold)) }
                 Text(title)
                     .font(.system(size: 13, weight: selected ? .medium : .regular))
                     .foregroundStyle(selected ? palette.text : palette.text.opacity(0.85))
@@ -1217,7 +1238,7 @@ private struct NavItem: View {
             .padding(.vertical, 5)
             .padding(.horizontal, 8)
             .background {
-                let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
+                let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
                 if selected {
                     shape.fill(palette.selection).matchedGeometryEffect(id: "selection", in: highlight)
                 } else {

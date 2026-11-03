@@ -162,9 +162,7 @@ private struct SessionRow: View {
                     ViewThatFits(in: .horizontal) {
                         HStack(spacing: 6) {
                             name
-                            Text("worktree")
-                                .font(.system(size: 10.5, design: .monospaced))
-                                .foregroundStyle(palette.muted.opacity(0.65))
+                            Badge(text: "worktree", small: true, palette: palette)
                                 .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
                         }
                         name
@@ -232,7 +230,7 @@ private struct SessionRow: View {
 
     /// Selection stays neutral, so color only ever means agent status. A faint edge lifts it off the panel.
     @ViewBuilder private var background: some View {
-        let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
         if selected {
             shape.fill(palette.selection)
                 .overlay(shape.strokeBorder(palette.line))
@@ -261,20 +259,20 @@ private struct NewTaskRow: View {
             // Same width as the status dots, so the label lines up with session names.
             Image(systemName: "plus")
                 .font(.system(size: 9, weight: .semibold))
-                .frame(width: 7)
+                .frame(width: Lamp.size)
             Text("New task")
                 .font(.system(size: 13))
             Spacer(minLength: 0)
             if hovering {
                 Text("⇧⌘N")
-                    .font(.system(size: 10.5, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(palette.muted)
             }
         }
         .foregroundStyle(hovering ? palette.text : palette.muted)
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(hovering ? palette.hover : .clear))
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
     }
 }
@@ -286,7 +284,7 @@ struct RepoHeader: View {
 
     var body: some View {
         Text(name)
-            .font(.system(size: 11.5, weight: .medium))
+            .font(.system(size: 12, weight: .medium))
             .foregroundStyle(palette.muted)
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -316,38 +314,38 @@ private struct ProjectHeader: View {
             ZStack {
                 if folded { FoldedLamp(sessions: sessions, palette: palette) }
             }
-            .frame(width: 7)
+            .frame(width: Lamp.size)
             Text(name)
-                .font(.system(size: 11.5, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(hovering ? palette.text : palette.muted)
             if folded {
                 Text(verbatim: "\(sessions.count)")
-                    .font(.system(size: 10.5, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(palette.muted.opacity(0.7))
             }
             Spacer(minLength: 0)
             if hovering {
                 CloseButton(symbol: "plus", help: "New session in \(name)", palette: palette, action: onNew)
             }
-            // Only while hovered, or folded so a shut project still says it holds more. The name alone is quieter.
+            // Faint while open, so the header still reads as one that folds, and full when folded or hovered.
             Image(systemName: "chevron.right")
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(hovering ? palette.text : palette.muted)
                 .rotationEffect(.degrees(folded ? 0 : 90))
                 .frame(width: 20, height: 20)
-                .opacity(hovering || folded ? 1 : 0)
+                .opacity(hovering || folded ? 1 : 0.35)
         }
         .lineLimit(1)
         .padding(.leading, 10)
         .padding(.trailing, 6)
         .padding(.vertical, 4)
-        .background(RoundedRectangle(cornerRadius: 9, style: .continuous)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
             .fill(folded && holdsSelection ? palette.selection : hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
         .onTapGesture(perform: onToggle)
         .onClickableHover { hovering = $0 }
         .hoverTip(folded ? "Show \(name)'s sessions" : "Fold \(name)")
-        .padding(.top, 6)
+        .padding(.top, 10)
     }
 }
 
@@ -394,6 +392,9 @@ private struct Reorder: DropDelegate {
 
 /// Hollow when nothing is happening, breathing while the agent works, rippling when it waits for you, filled when it is done.
 struct Lamp: View {
+    /// Every column that lines up with the lamps uses this width.
+    static let size: CGFloat = 7
+
     let activity: Session.Activity
     /// A session you are looking at has no need to ripple.
     let selected: Bool
@@ -411,7 +412,7 @@ struct Lamp: View {
             case .done: Circle().fill(palette.done)
             }
         }
-        .frame(width: 7, height: 7)
+        .frame(width: Self.size, height: Self.size)
         .hoverTip(help)
     }
 
@@ -483,7 +484,7 @@ private struct PortLink: View {
 }
 
 /// The system branch symbol's arrow draws too much attention beside a small branch name.
-private struct BranchMark: View {
+struct BranchMark: View {
     let color: Color
 
     var body: some View {

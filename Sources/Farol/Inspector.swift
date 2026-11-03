@@ -249,7 +249,7 @@ private struct InspectorView: View {
             .padding(.horizontal, 16)
             .frame(height: 34)
         }
-        .font(.system(size: 11.5))
+        .font(.system(size: 12))
         .foregroundStyle(p.text)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         // The content starts below the title bar, and the theme's color reaches under it.
@@ -340,7 +340,7 @@ private struct Explained<Content: View>: View {
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 5).fill(hovering ? palette.raised : open ? palette.surface : .clear))
+        .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised : open ? palette.surface : .clear))
         // The highlight reaches past the text, so the text stays lined up with the section titles.
         .padding(.horizontal, -6)
         .contentShape(Rectangle())
