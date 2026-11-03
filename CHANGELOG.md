@@ -4,9 +4,16 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.58.0] - 2026-11-04
+
+A Glass style and a design pass across Farol, and the phone draws the terminal itself.
+
 ### Added
 
 - Settings → Appearance → Style → Glass puts the sidebar, files and graph panels on Liquid Glass, with the desktop blurred through them. Older macOS gets a plain blur.
+- Settings → Appearance → Animations turns the motion off. Reduce Motion in macOS does too.
+- Deleting a local branch from the git graph offers to delete its branch on the server too. The box starts unchecked, and the server's copy only goes once the local one is gone.
+- A phone that draws the terminal itself gets the pane with its colors and cursor, and what you type there reaches the terminal key for key.
 
 ### Changed
 
@@ -15,8 +22,6 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - Agents, integrations and each Settings section have a colored icon, and states like Connected share one badge. Pi shows its own mark.
 - Empty panels show a quiet symbol with their message, and the review panel's header reads like the sidebar.
 - Boxed with color is gone. If you used it, Farol switches you to Boxed.
-
-- Settings → Appearance → Animations turns the motion off. Reduce Motion in macOS does too.
 
 ### Fixed
 
