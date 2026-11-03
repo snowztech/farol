@@ -611,12 +611,22 @@ extension View {
     }
 }
 
+/// Settings → Appearance → Animations. Off, or with Reduce Motion on in macOS, panels and highlights change at once.
+/// The agent lamps keep moving, since their motion is how a waiting agent asks for you.
+enum Motion {
+    static let key = "appearance.animations"
+
+    static var enabled: Bool {
+        (UserDefaults.standard.object(forKey: key) as? Bool ?? true) && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    }
+}
+
 /// A plain button that dims and shrinks a little while the mouse is down, so a click is felt before its panel opens.
 struct QuietPress: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .opacity(configuration.isPressed ? 0.7 : 1)
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .scaleEffect(configuration.isPressed && Motion.enabled ? 0.96 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }

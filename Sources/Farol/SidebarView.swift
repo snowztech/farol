@@ -12,7 +12,6 @@ struct SidebarView: View {
     @State private var dragging: Session?
     /// The selection's highlight is one shape that moves to the row you pick.
     @Namespace private var selection
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dragStart: CGFloat?
     /// Only read so the sidebar redraws when the setting changes. The store applies it.
     @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = false
@@ -53,7 +52,7 @@ struct SidebarView: View {
                     }
                 }
                 .padding(8)
-                .animation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.86), value: store.selectedID)
+                .animation(Motion.enabled ? .spring(response: 0.32, dampingFraction: 0.86) : nil, value: store.selectedID)
             }
             // Pinned below the list, so it stays in the same place however many sessions there are.
             NewTaskRow(palette: p, action: commands.newTask)

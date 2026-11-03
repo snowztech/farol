@@ -79,7 +79,7 @@ final class HoverTip {
         }
         let frame = NSRect(origin: origin, size: NSSize(width: width, height: height))
         // Fades in and settles a few points away from the control, so it arrives rather than blinks on.
-        let still = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        let still = !Motion.enabled
         panel.setFrame(still ? frame : frame.offsetBy(dx: 0, dy: frame.minY < rect.minY ? 3 : -3), display: true)
         panel.alphaValue = 0
         if owner !== window {

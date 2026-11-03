@@ -12,7 +12,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// Panels open fast and settle softly. The same curve drives the AppKit widths and the SwiftUI views that follow them.
     private static let panelDuration: TimeInterval = 0.28
     private static let panelCurve = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.25, 1)
-    private static let panelMotion = Animation.timingCurve(0.2, 0.9, 0.25, 1, duration: panelDuration)
+    private static var panelMotion: Animation? { Motion.enabled ? .timingCurve(0.2, 0.9, 0.25, 1, duration: panelDuration) : nil }
 
     let store: SessionStore
     private let runtime: TerminalRuntime
@@ -432,15 +432,21 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         store.create(directory: directory ?? store.selected?.panes.focused.workingDirectory ?? NSHomeDirectory(), run: agents.startCommand)
     }
 
+    /// Slides the panels. The terminals keep their size until the end, so a program redraws once rather than on every frame.
+    private func animatePanels(_ change: @escaping () -> Void) {
+        TerminalView.holdSize()
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = Motion.enabled ? Self.panelDuration : 0
+            ctx.timingFunction = Self.panelCurve
+            change()
+            layoutGaps(animated: true)
+        }, completionHandler: { TerminalView.releaseSize() })
+    }
+
     func toggleSidebar() {
         let open = sidebarWidth.constant == 0
         withAnimation(Self.panelMotion) { state.sidebarVisible = open }
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = Self.panelDuration
-            ctx.timingFunction = Self.panelCurve
-            sidebarWidth.animator().constant = open ? state.sidebarWidth : 0
-            layoutGaps(animated: true)
-        }
+        animatePanels { self.sidebarWidth.animator().constant = open ? self.state.sidebarWidth : 0 }
     }
 
     /// Opens or closes the files panel. The session remembers the choice, and the disk is only watched while open.
@@ -452,12 +458,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         if !open { state.filesSearching = false }
         remember { $0.files = open }
         withAnimation(Self.panelMotion) { state.filesVisible = open }
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = Self.panelDuration
-            ctx.timingFunction = Self.panelCurve
-            filesWidth.animator().constant = open ? state.filesWidth : 0
-            layoutGaps(animated: true)
-        }
+        animatePanels { self.filesWidth.animator().constant = open ? self.state.filesWidth : 0 }
         followFiles(store.selected)
     }
 
@@ -473,12 +474,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             state.graphVisible = open
             state.graphWidth = width
         }
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = Self.panelDuration
-            ctx.timingFunction = Self.panelCurve
-            graphWidth.animator().constant = width
-            layoutGaps(animated: true)
-        }
+        animatePanels { self.graphWidth.animator().constant = width }
         followGraph(store.selected)
     }
 
@@ -524,12 +520,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let saved = UserDefaults.standard.double(forKey: Self.reviewWidthKey)
         let width = review.isOpen ? clampedReviewWidth(saved > 0 ? saved : ReviewPanel.defaultWidth) : 0
         withAnimation(Self.panelMotion) { state.reviewWidth = width }
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = Self.panelDuration
-            ctx.timingFunction = Self.panelCurve
-            reviewWidth.animator().constant = width
-            layoutGaps(animated: true)
-        }
+        animatePanels { self.reviewWidth.animator().constant = width }
     }
 
     /// Room for the terminal stays, however wide the sidebar is dragged.

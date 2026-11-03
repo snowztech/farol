@@ -53,7 +53,7 @@ struct SettingsPage: View {
     }
     @State private var themeQuery = ""
     @Namespace private var navHighlight
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(Motion.key) private var animations = true
     @State private var themes = Theme.all()
 
     enum Section: String, CaseIterable {
@@ -114,7 +114,7 @@ struct SettingsPage: View {
             .padding(.horizontal, 10)
             .frame(width: 180)
             // Only the list, so the page that comes in doesn't slide about with it.
-            .animation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.86), value: section)
+            .animation(Motion.enabled ? .spring(response: 0.32, dampingFraction: 0.86) : nil, value: section)
 
             Rectangle().fill(p.line).frame(width: 1)
 
@@ -200,6 +200,11 @@ struct SettingsPage: View {
                 detail: "▶ in a pane's corner, under the mouse, runs one of the project's commands, and ■ stops it with the port it listens on. ⌘P and the right-click menu run them too.",
                 palette: p) {
                 toggle($runButton)
+            }
+            Row(title: "Animations",
+                detail: "Panels slide, highlights glide and tips fade in. Off, everything changes at once. Reduce Motion in macOS turns them off too.",
+                palette: p) {
+                toggle($animations)
             }
         }
         .padding(.bottom, 32)
