@@ -261,9 +261,39 @@ public final class TerminalView: NSView {
 
     public override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
+        resize()
+    }
+
+    /// The size in cells a phone gave the pane while it shows it and nobody uses the Mac, so programs draw for the phone.
+    /// Ghostty draws the smaller grid in the pane's top left. Nil when the pane fills its view.
+    public private(set) var phoneGrid: (cols: Int, rows: Int)?
+
+    public func fit(cols: Int, rows: Int) {
+        guard phoneGrid?.cols != cols || phoneGrid?.rows != rows else { return }
+        phoneGrid = (cols, rows)
+        resize()
+    }
+
+    public func unfit() {
+        guard phoneGrid != nil else { return }
+        phoneGrid = nil
+        resize()
+    }
+
+    private func resize() {
         guard let surface else { return }
-        let px = convertToBacking(newSize)
-        ghostty_surface_set_size(surface, UInt32(px.width), UInt32(px.height))
+        let px = convertToBacking(frame.size)
+        var width = px.width, height = px.height
+        if let grid = phoneGrid {
+            // The cells and the padding around them as they are now, which a grid of the phone's size keeps. Never larger than the view.
+            let now = ghostty_surface_size(surface)
+            let cell = CGSize(width: CGFloat(now.cell_width_px), height: CGFloat(now.cell_height_px))
+            let padding = CGSize(width: CGFloat(now.width_px) - CGFloat(now.columns) * cell.width,
+                                 height: CGFloat(now.height_px) - CGFloat(now.rows) * cell.height)
+            width = min(width, CGFloat(grid.cols) * cell.width + padding.width)
+            height = min(height, CGFloat(grid.rows) * cell.height + padding.height)
+        }
+        ghostty_surface_set_size(surface, UInt32(width), UInt32(height))
     }
 
     /// Runs when the window moves to a screen with another pixel density, like Retina to an external monitor.
@@ -316,6 +346,42 @@ public final class TerminalView: NSView {
             kept = kept.dropFirst()
         }
         return kept.joined(separator: "\n")
+    }
+
+    /// The screen as VT sequences, with its size in cells, for a phone that draws the terminal itself.
+    public var screenVT: (cols: Int, rows: Int, data: Data)? {
+        guard let surface else { return nil }
+        let size = ghostty_surface_size(surface)
+        var text = ghostty_text_s()
+        guard ghostty_surface_read_vt_screen(surface, &text) else { return nil }
+        defer { ghostty_surface_free_text(surface, &text) }
+        guard let bytes = text.text else { return nil }
+        return (Int(size.columns), Int(size.rows), Data(bytes: bytes, count: Int(text.text_len)))
+    }
+
+    /// What scrolled off the top as VT sequences with their colors, oldest first: as many of the last `rows` as fit in `bytes`.
+    /// Like `historyText`, it is for when someone asks.
+    public func historyVT(rows: Int = 2000, bytes: Int) -> Data {
+        guard let surface else { return Data() }
+        // A row's size depends on its colors, so fewer are read until they fit.
+        var rows = rows
+        while rows > 0 {
+            var text = ghostty_text_s()
+            guard ghostty_surface_read_vt_history(surface, UInt32(rows), &text) else { return Data() }
+            defer { ghostty_surface_free_text(surface, &text) }
+            if text.text_len <= bytes, let pointer = text.text { return Data(bytes: pointer, count: Int(text.text_len)) }
+            rows /= 2
+        }
+        return Data()
+    }
+
+    /// Bytes straight to the program, as a keyboard sends them, already encoded for it. Not a paste, so nothing is bracketed.
+    public func input(_ data: Data) {
+        // Ghostty's `text` action writes them as they are, given in Zig's string syntax.
+        perform("text:" + data.map { byte in
+            let character = Character(UnicodeScalar(byte))
+            return character.isASCII && (character.isLetter || character.isNumber) ? String(character) : String(format: "\\x%02x", byte)
+        }.joined())
     }
 
     /// A key that isn't text.
