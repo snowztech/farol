@@ -779,8 +779,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             panel.layer?.borderColor = NSColor(palette.line).cgColor
         }
         // Settings fills the terminal's card to its edges, so it is cut to the same corners.
+        // Cut in every style, so a page wider than the room never draws over the panels beside it.
         settingsView.layer?.cornerRadius = palette.style.radius
-        settingsView.layer?.masksToBounds = palette.boxed
+        settingsView.layer?.masksToBounds = true
         mergeView.layer?.cornerRadius = palette.style.radius
         mergeView.layer?.masksToBounds = palette.boxed
         layoutGaps()

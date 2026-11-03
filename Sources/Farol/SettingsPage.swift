@@ -858,33 +858,43 @@ private struct Row<Control: View>: View {
     @ViewBuilder let control: Control
 
     var body: some View {
-        HStack(alignment: .center, spacing: 24) {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    if let icon { icon }
-                    Text(title).font(.system(size: 13))
-                    if let subtitle { Text(subtitle).font(.system(size: 11.5)).foregroundStyle(palette.muted) }
-                }
-                if let detail {
-                    // The link is a view of its own between the words around it. Inside one text it couldn't tell when it is hovered.
-                    HStack(alignment: .firstTextBaseline, spacing: 0) {
-                        if let link, let url = URL(string: link.url), let words = detail.range(of: link.words) {
-                            Text(detail[..<words.lowerBound])
-                            QuietLink(words: link.words, url: url, palette: palette)
-                            Text(detail[words.upperBound...])
-                        } else {
-                            Text(detail)
-                        }
-                    }
-                    .font(.system(size: 11.5, design: mono ? .monospaced : .default))
-                    .foregroundStyle(palette.muted)
-                }
+        // Side by side while the words keep a readable width, else the control goes under them.
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 24) {
+                words.frame(minWidth: 220, idealWidth: 220, maxWidth: .infinity, alignment: .leading)
+                control
             }
-            Spacer(minLength: 0)
-            control
+            VStack(alignment: .leading, spacing: 8) {
+                words
+                control
+            }
         }
         .padding(.vertical, 10)
         .overlay(alignment: .bottom) { Rectangle().fill(palette.line).frame(height: 1) }
+    }
+
+    private var words: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+                if let icon { icon }
+                Text(title).font(.system(size: 13))
+                if let subtitle { Text(subtitle).font(.system(size: 11.5)).foregroundStyle(palette.muted) }
+            }
+            if let detail {
+                // The link is a view of its own between the words around it. Inside one text it couldn't tell when it is hovered.
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    if let link, let url = URL(string: link.url), let words = detail.range(of: link.words) {
+                        Text(detail[..<words.lowerBound])
+                        QuietLink(words: link.words, url: url, palette: palette)
+                        Text(detail[words.upperBound...])
+                    } else {
+                        Text(detail)
+                    }
+                }
+                .font(.system(size: 11.5, design: mono ? .monospaced : .default))
+                .foregroundStyle(palette.muted)
+            }
+        }
     }
 }
 
