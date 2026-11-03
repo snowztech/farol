@@ -509,8 +509,8 @@ private struct CommandChoice: View {
                 }
             }
             .padding(.horizontal, 9)
-            .frame(height: 28)
-            .background(RoundedRectangle(cornerRadius: 6).fill(lit ? palette.selection : .clear))
+            .frame(height: 30)
+            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(lit ? palette.selection : .clear))
             .contentShape(Rectangle())
             .hoverTip(command.global ? "Available in all projects" : "\(command.source) in \((command.folder as NSString).abbreviatingWithTildeInPath)")
         }
@@ -546,8 +546,8 @@ private struct FileChoice: View {
                 }
             }
             .padding(.horizontal, 9)
-            .frame(height: 28)
-            .background(RoundedRectangle(cornerRadius: 6).fill(lit ? palette.selection : .clear))
+            .frame(height: 30)
+            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(lit ? palette.selection : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(QuietPress())
@@ -595,8 +595,8 @@ private struct SessionChoice: View {
                 }
             }
             .padding(.horizontal, 9)
-            .frame(height: 28)
-            .background(RoundedRectangle(cornerRadius: 6).fill(lit ? palette.selection : .clear))
+            .frame(height: 30)
+            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(lit ? palette.selection : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(QuietPress())

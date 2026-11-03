@@ -499,8 +499,8 @@ private struct SectionTitle: View {
     let palette: Palette
 
     var body: some View {
-        Text(text.uppercased())
-            .font(.system(size: 10, weight: .semibold))
+        Text(text.prefix(1).uppercased() + text.dropFirst().lowercased())
+            .font(.system(size: 11.5, weight: .medium))
             .foregroundStyle(palette.muted)
     }
 }
