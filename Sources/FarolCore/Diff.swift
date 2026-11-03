@@ -167,7 +167,7 @@ public enum Diff {
     }
 
     /// Every line of a file as the scope's new side has it, to show the lines a diff leaves out.
-    /// Nil when it can't be read as text. A request's files come from its forge, as they aren't in the checkout.
+    /// Nil when it can't be read as text, and for a request, whose files aren't in the checkout. `Forge.lines(of:at:in:)` reads those.
     public static func newLines(of path: String, in directory: String, _ scope: Scope) -> [String]? {
         let text: String?
         switch scope {
@@ -175,8 +175,8 @@ public enum Diff {
             text = try? String(contentsOfFile: (directory as NSString).appendingPathComponent(path), encoding: .utf8)
         case .commit(let hash):
             text = try? Git.run(["show", "\(hash):\(path)"], in: directory, trimming: false)
-        case .request(let number):
-            return Forge.detect(in: directory)?.lines(ofRequest: number, path: path, in: directory)
+        case .request:
+            text = nil
         }
         return text.map(lines(of:))
     }

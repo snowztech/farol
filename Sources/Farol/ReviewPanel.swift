@@ -680,9 +680,11 @@ final class ReviewModel: ObservableObject {
         }
         // A request's file comes from the forge, which takes a while, so it is asked for once.
         if let text = requestLines[path] { return show(text) }
+        // The commit loaded with the request, so the lines match the diff on screen even after a push.
+        let forge = forge, head = discussion?.head
         expanding.insert(path)
         DispatchQueue.global(qos: .userInitiated).async {
-            let text = Diff.newLines(of: path, in: root, scope)
+            let text = scope.isRequest ? head.flatMap { forge?.lines(of: path, at: $0, in: root) } : Diff.newLines(of: path, in: root, scope)
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 self.expanding.remove(path)

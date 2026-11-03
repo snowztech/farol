@@ -234,27 +234,23 @@ public struct Forge: Equatable {
         return Diff.parse(try Git.run(path, arguments, in: directory, trimming: false))
     }
 
-    /// Every line of `path` as request `number` has it, for the unmodified lines its diff leaves out.
+    /// Every line of `file` at `commit`, a request's head, for the unmodified lines its diff leaves out.
     /// Nil when the forge can't give it, like a binary file. Talks to the forge, so call it off the main thread.
-    public func lines(ofRequest number: Int, path file: String, in directory: String) -> [String]? {
+    public func lines(of file: String, at commit: String, in directory: String) -> [String]? {
         guard let path = kind.toolPath else { return nil }
         var allowed = CharacterSet.urlPathAllowed
-        allowed.remove("?")
-        allowed.remove("#")
-        guard let encoded = file.addingPercentEncoding(withAllowedCharacters: allowed) else { return nil }
+        allowed.remove(charactersIn: "?#")
         let text: String?
         switch kind {
         case .github:
-            guard let head = try? Git.run(path, ["pr", "view", "\(number)", "--json", "headRefOid", "--jq", ".headRefOid"], in: directory),
-                  !head.isEmpty else { return nil }
+            guard let encoded = file.addingPercentEncoding(withAllowedCharacters: allowed) else { return nil }
             text = try? Git.run(path, ["api", "-H", "Accept: application/vnd.github.raw",
-                                       "repos/{owner}/{repo}/contents/\(encoded)?ref=\(head)"], in: directory, trimming: false)
+                                       "repos/{owner}/{repo}/contents/\(encoded)?ref=\(commit)"], in: directory, trimming: false)
         case .gitlab:
-            guard let head = try? Git.run(path, ["mr", "view", "\(number)", "--output", "json"], in: directory),
-                  let sha = (Self.json(head) as? [String: Any])?["sha"] as? String else { return nil }
             // GitLab wants the slashes of the path encoded too.
-            let whole = file.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? encoded
-            text = try? Git.run(path, ["api", "projects/:id/repository/files/\(whole)/raw?ref=\(sha)"], in: directory, trimming: false)
+            allowed.remove("/")
+            guard let encoded = file.addingPercentEncoding(withAllowedCharacters: allowed) else { return nil }
+            text = try? Git.run(path, ["api", "projects/:id/repository/files/\(encoded)/raw?ref=\(commit)"], in: directory, trimming: false)
         }
         return text.map(Diff.lines(of:))
     }
