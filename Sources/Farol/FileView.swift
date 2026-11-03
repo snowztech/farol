@@ -39,7 +39,7 @@ final class FileView: NSView {
     private let title = NSTextField(labelWithString: "")
     /// Same size as the sidebar's status dots, but muted, since colored dots mean agent states.
     private let unsavedDot = NSView()
-    private static let dotSize: CGFloat = 7
+    private static let dotSize = Lamp.size
     private lazy var closeButton = QuietButton(symbol: "xmark", help: "Close file (⌘W)") { [weak self] in self?.onClose?() }
     private lazy var previewButton = QuietButton(symbol: "eye", help: "Preview") { [weak self] in self?.togglePreview() }
     private lazy var blameButton = QuietButton(symbol: "person.text.rectangle", help: "Show git blame") { [weak self] in self?.toggleBlame() }

@@ -27,9 +27,9 @@ struct SheetButton: ButtonStyle {
                 .foregroundStyle(primary ? palette.background : palette.text)
                 .padding(.horizontal, 14)
                 .frame(height: 28)
-                .background(RoundedRectangle(cornerRadius: 7).fill(primary ? palette.text : palette.raised))
+                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(primary ? palette.text : palette.raised))
                 // A wash of the label's color, so both buttons shift the same way under the mouse.
-                .overlay(RoundedRectangle(cornerRadius: 7)
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill((primary ? palette.background : palette.text).opacity(hovering && enabled ? 0.12 : 0)))
                 .opacity(!enabled ? 0.35 : configuration.isPressed ? 0.8 : 1)
                 .contentShape(Rectangle())
@@ -112,7 +112,7 @@ struct SheetChoice<Label: View>: View {
             }
             .padding(.horizontal, 8)
             .frame(height: 28)
-            .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised : .clear))
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(hovering ? palette.raised : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

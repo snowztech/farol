@@ -899,35 +899,42 @@ struct ReviewPanel: View {
         VStack(alignment: .leading, spacing: 0) {
             TaskRepoTabs(review: review, palette: p, pick: pick)
             header(p)
-            HStack(spacing: 8) {
-                ScopeMenu(review: review, palette: p)
-                Spacer(minLength: 0)
-                // The slot holds the next step: commit what's there, then open the request for the branch.
-                // Where there is no request to open, as on main or once the branch has one, the next step is a push.
-                if let forge = review.forge, let request = review.shownRequest, review.scope == .request(request.number) {
-                    ShipButton(title: "View on \(forge.name)", help: "Open \(forge.request) #\(request.number) in the browser",
-                               busy: false, icon: forge.kind, palette: p) { NSWorkspace.shared.open(request.url) }
-                    if forge.takesLineComments { SubmitReviewButton(review: review, forge: forge, palette: p) }
-                }
-                if !isCommit {
-                    RequestBadge(review: review, palette: p)
-                    if review.uncommitted > 0 {
-                        CommitButton(review: review, palette: p)
-                    } else if review.canStartRequest, review.ahead > 0 {
-                        RequestButton(review: review, palette: p)
-                    } else if review.canPush {
-                        PushButton(review: review, palette: p)
+            // Outside a repo there is nothing to compare with, so only the empty state shows below.
+            if review.root != nil {
+                HStack(spacing: 8) {
+                    ScopeMenu(review: review, palette: p)
+                    Spacer(minLength: 0)
+                    // The slot holds the next step: commit what's there, then open the request for the branch.
+                    // Where there is no request to open, as on main or once the branch has one, the next step is a push.
+                    if let forge = review.forge, let request = review.shownRequest, review.scope == .request(request.number) {
+                        ShipButton(title: "View on \(forge.name)", help: "Open \(forge.request) #\(request.number) in the browser",
+                                   busy: false, icon: forge.kind, palette: p) { NSWorkspace.shared.open(request.url) }
+                        if forge.takesLineComments { SubmitReviewButton(review: review, forge: forge, palette: p) }
+                    }
+                    if !isCommit {
+                        RequestBadge(review: review, palette: p)
+                        if review.uncommitted > 0 {
+                            CommitButton(review: review, palette: p)
+                        } else if review.canStartRequest, review.ahead > 0 {
+                            RequestButton(review: review, palette: p)
+                        } else if review.canPush {
+                            PushButton(review: review, palette: p)
+                        }
                     }
                 }
+                .padding(.horizontal, 10)
+                .padding(.bottom, 8)
             }
-            .padding(.horizontal, 10)
-            .padding(.bottom, 8)
             Rectangle().fill(p.line).frame(height: 1)
             if review.findOpen { findBar(p) }
             if let error = review.error {
-                message(error, p)
+                EmptyState(symbol: "exclamationmark.triangle", text: error, palette: p)
             } else if review.rows.isEmpty {
-                message(review.root == nil ? state.noRepoMessage : "No changes.", p)
+                if review.root == nil {
+                    EmptyState(symbol: state.noRepoSymbol, text: state.noRepoMessage, palette: p)
+                } else {
+                    EmptyState(symbol: "checkmark.circle", text: "No changes.", palette: p)
+                }
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -1001,14 +1008,26 @@ struct ReviewPanel: View {
 
     private func header(_ p: Palette) -> some View {
         HStack(spacing: 8) {
-            Text([review.root.map { ($0 as NSString).lastPathComponent }, review.branch].compactMap { $0 }.joined(separator: ": "))
-                .font(.system(size: 12, weight: .medium))
-                .lineLimit(1)
-            if !review.stat.isEmpty {
-                Text("\(review.stat.files) \(review.stat.files == 1 ? "file" : "files")").foregroundStyle(p.muted)
-                Counts(added: review.stat.added, removed: review.stat.removed, palette: p)
+            if let root = review.root {
+                Text((root as NSString).lastPathComponent)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                    .layoutPriority(1)
             }
-            Spacer()
+            // The branch as the sidebar shows it, so the two read as the same thing.
+            if let branch = review.branch {
+                HStack(spacing: 4) {
+                    BranchMark(color: p.muted)
+                    Text(branch).font(.system(size: 11, design: .monospaced)).truncationMode(.middle)
+                }
+                .foregroundStyle(p.muted)
+                .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            if !review.stat.isEmpty {
+                Text("\(review.stat.files) \(review.stat.files == 1 ? "file" : "files")").foregroundStyle(p.muted).fixedSize()
+                Counts(added: review.stat.added, removed: review.stat.removed, palette: p).fixedSize()
+            }
             CloseButton(help: "Close review (⌥⌘R)", palette: p, action: close)
         }
         .font(.system(size: 12))
@@ -1054,7 +1073,7 @@ struct ReviewPanel: View {
             Image(systemName: "magnifyingglass").font(.system(size: 11)).foregroundStyle(p.muted)
             TextField("Find in the changes", text: $review.query)
                 .textFieldStyle(.plain)
-                .font(.system(size: 12.5))
+                .font(.system(size: 13))
                 .focused($findFocused)
                 .onSubmit { review.step(1) }
                 .onKeyPress(.return, phases: .down) { press in
@@ -1092,13 +1111,6 @@ struct ReviewPanel: View {
         return "\(current + 1) of \(total)"
     }
 
-    private func message(_ text: String, _ p: Palette) -> some View {
-        Text(text)
-            .font(.system(size: 12))
-            .foregroundStyle(p.muted)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
     /// The line between the terminal and the panel, wide enough to grab and drag.
     private func edge(_ p: Palette) -> some View {
         // At the very edge, so it continues the title bar's column line.
@@ -1128,7 +1140,7 @@ private struct ScopeMenu: View {
         Button(action: showMenu) {
             HStack(spacing: 6) {
                 Image(systemName: "arrow.left.arrow.right")
-                    .font(.system(size: 9.5, weight: .semibold))
+                    .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(palette.muted)
                 Text(title).font(.system(size: 12, weight: .medium))
                 Image(systemName: "chevron.up.chevron.down")
@@ -1248,7 +1260,7 @@ private struct FileHeader: View {
                 .foregroundStyle(palette.muted)
                 .frame(width: 15)
             (Text(folder).foregroundColor(palette.muted) + Text(name).foregroundColor(ticked == false ? palette.muted : palette.text))
-                .font(.system(size: 12.5))
+                .font(.system(size: 13))
                 .lineLimit(1)
                 .truncationMode(.head)
             if let status { Text(status).font(.system(size: 11)).foregroundStyle(palette.muted) }
@@ -1368,7 +1380,7 @@ private struct Conversation: View {
                     .rotationEffect(.degrees(folded ? 0 : 90))
                     .foregroundStyle(palette.muted)
                     .frame(width: 12)
-                Text("Conversation").font(.system(size: 12.5)).foregroundStyle(palette.text)
+                Text("Conversation").font(.system(size: 13)).foregroundStyle(palette.text)
                 Text(comments.count == 1 ? "1 comment" : "\(comments.count) comments")
                     .font(.system(size: 11))
                     .foregroundStyle(palette.muted)
@@ -1516,11 +1528,11 @@ private struct MarkdownBlocks: View {
             Self.inline(text).fixedSize(horizontal: false, vertical: true)
         case .code(_, let text):
             Text(text)
-                .font(.system(size: 11.5, design: .monospaced))
+                .font(.system(size: 12, design: .monospaced))
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(8)
-                .background(RoundedRectangle(cornerRadius: 5).fill(palette.surface))
+                .background(RoundedRectangle(cornerRadius: 6).fill(palette.surface))
         case .quote(let blocks):
             MarkdownBlocks(blocks: blocks, palette: palette)
                 .foregroundStyle(palette.muted)

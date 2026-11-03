@@ -38,6 +38,16 @@ final class Session: ObservableObject, Identifiable {
     @Published private(set) var repoName: String?
     /// The main checkout's path, the same for every worktree of a repo. Sessions are grouped by it.
     @Published private(set) var repoRoot: String?
+
+    /// The repo a new session is known to be in before git answers, so it opens in its project instead of moving there.
+    /// Git's own answer replaces it moments later.
+    func assume(repo root: String?, branch: String? = nil) {
+        guard repoRoot == nil, let root else { return }
+        repoRoot = root
+        repoName = URL(fileURLWithPath: root).lastPathComponent
+        // Shown in place of the folder until git answers, which would otherwise swap the row's second line.
+        if self.branch == nil { self.branch = branch }
+    }
     /// The top of the checkout the session is in, a worktree's own folder for worktrees. The files panel starts there.
     @Published private(set) var topLevel: String?
     /// The checkout the git panels and the branch follow: the one you are in, or in a task the repo you picked.
@@ -508,8 +518,10 @@ final class SessionStore: ObservableObject {
     /// `environment` holds what is too long to type, which `run` can name as a variable.
     /// `select` false opens it in the sidebar without leaving the session on screen, as a task an agent starts does.
     @discardableResult
-    func create(directory: String = NSHomeDirectory(), run: String? = nil, environment: [String: String] = [:], select: Bool = true) -> Session {
-        create(PaneContainer(makeTerminal(in: directory, run: run, environment: environment)), directory: directory, select: select)
+    func create(directory: String = NSHomeDirectory(), run: String? = nil, environment: [String: String] = [:], select: Bool = true,
+                repo: String? = nil) -> Session {
+        create(PaneContainer(makeTerminal(in: directory, run: run, environment: environment)), directory: directory, select: select,
+               repo: repo)
     }
 
     /// An agent on `task` in a new worktree of the repository `directory` is in, on a branch no other has, with the task as its first prompt.
@@ -546,7 +558,7 @@ final class SessionStore: ObservableObject {
                 guard let self else { return }
                 done(result.map {
                     self.create(directory: $0, run: WorktreeScripts.starting(command, in: $0),
-                                environment: environment, select: select)
+                                environment: environment, select: select, repo: repos.count == 1 ? repos[0] : nil)
                 })
             }
         }
@@ -567,8 +579,11 @@ final class SessionStore: ObservableObject {
         save()
     }
 
-    private func create(_ panes: PaneContainer, directory: String, select: Bool = true) -> Session {
+    private func create(_ panes: PaneContainer, directory: String, select: Bool = true, repo: String? = nil) -> Session {
         let session = Session(panes: panes, directory: directory)
+        let known = knownCheckout(of: directory)
+        session.assume(repo: repo ?? known?.repoRoot, branch: repo == nil ? known?.branch : nil)
+        remember(session)
         panes.terminals.forEach { wire($0, to: session) }
         panes.onFocusChange = { [weak self, weak session] in
             session?.show($0)
@@ -597,6 +612,14 @@ final class SessionStore: ObservableObject {
         onSessionCreated?(session)
         if select { self.select(session) }
         return session
+    }
+
+    /// An open session in the same checkout as a folder, found without asking git. Its repo and branch are the folder's too.
+    private func knownCheckout(of directory: String) -> Session? {
+        sessions.first { session in
+            guard let top = session.topLevel else { return false }
+            return directory == top || directory.hasPrefix(top + "/")
+        }
     }
 
     /// Splits the focused pane. The new one opens in the same folder, and runs `run` when given.
