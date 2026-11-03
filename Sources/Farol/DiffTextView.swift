@@ -132,6 +132,8 @@ final class DiffTextView: NSTextView {
     }
     private var spinner: Timer?
     private var turn: CGFloat = 0
+    /// The gutter of the clicked gap's row, the only part the spinner redraws.
+    private var spinnerRow = NSRect.zero
 
     private func spin() {
         spinner?.invalidate()
@@ -141,7 +143,7 @@ final class DiffTextView: NSTextView {
         spinner = Timer.scheduledTimer(withTimeInterval: 1 / 30, repeats: true) { [weak self] _ in
             guard let self else { return }
             self.turn += 0.2
-            self.needsDisplay = true
+            self.setNeedsDisplay(self.spinnerRow)
         }
     }
 
@@ -462,7 +464,8 @@ extension DiffTextView {
         if point.x < Self.gutter, let target = gap(at: point) {
             // One read at a time: a second click would only ask the forge again.
             guard waiting == nil else { return }
-            waiting = target
+            spinnerRow = target.row
+            waiting = (target.lines, target.fromTop)
             return onExpand?(target.lines, target.fromTop) ?? ()
         }
         guard point.x < Self.gutter, let line = commentable(at: point) else { return super.mouseDown(with: event) }
@@ -470,7 +473,7 @@ extension DiffTextView {
     }
 
     /// The unmodified lines of the gap row under `point`, and whether the point is on its upper button, while gaps can be expanded.
-    private func gap(at point: NSPoint) -> (lines: Range<Int>, fromTop: Bool)? {
+    private func gap(at point: NSPoint) -> (lines: Range<Int>, fromTop: Bool, row: NSRect)? {
         guard onExpand != nil, let layout = layoutManager, let container = textContainer, let storage = textStorage,
               storage.length > 0 else { return nil }
         let origin = textContainerOrigin
@@ -480,7 +483,7 @@ extension DiffTextView {
               let bounds = storage.attributes(at: index, effectiveRange: nil)[.diffGapRange] as? [Int], bounds.count == 3 else { return nil }
         let fragment = layout.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
         let top = bounds[2] == 1 && point.y - origin.y < fragment.minY + fragment.height / 2
-        return (bounds[0]..<bounds[1], top)
+        return (bounds[0]..<bounds[1], top, NSRect(x: 0, y: fragment.minY + origin.y, width: Self.gutter, height: fragment.height))
     }
 
     /// The line under `point` that a comment can go on: a line of the diff, not a run of unmodified ones, while comments are offered.
