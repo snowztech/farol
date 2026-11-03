@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- The worktree tag stays visible when the sidebar is narrow. The session name is shortened instead.
+
 ## [0.57.0] - 2026-11-03
 
 Each session keeps its own panels, and switching back shows them at once.
