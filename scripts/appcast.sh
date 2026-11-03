@@ -22,6 +22,8 @@ fi
 signature=$("$tools/bin/sign_update" --ed-key-file "$SPARKLE_KEY_FILE" "$zip")
 build=$(defaults read "$root/build/Farol.app/Contents/Info.plist" CFBundleVersion)
 date=$(LC_ALL=C date -u "+%a, %d %b %Y %H:%M:%S +0000")
+# Shown in the update dialog before installing. A "]]>" in the notes would end the CDATA early, so it is split across two.
+notes=$("$root/scripts/release-notes.sh" "$version" | sed 's/]]>/]]]]><![CDATA[>/g')
 
 cat <<XML
 <?xml version="1.0" encoding="utf-8"?>
@@ -33,6 +35,8 @@ cat <<XML
       <pubDate>$date</pubDate>
       <sparkle:version>$build</sparkle:version>
       <sparkle:shortVersionString>$version</sparkle:shortVersionString>
+      <description sparkle:format="markdown"><![CDATA[$notes]]></description>
+      <sparkle:fullReleaseNotesLink>https://github.com/snowztech/farol/blob/main/CHANGELOG.md</sparkle:fullReleaseNotesLink>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <enclosure url="https://github.com/snowztech/farol/releases/download/v$version/Farol.zip" type="application/octet-stream" $signature/>
     </item>
