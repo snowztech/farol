@@ -584,10 +584,7 @@ private struct SessionChoice: View {
                 }
                 Spacer(minLength: 8)
                 if session.isWorktreeCheckout {
-                    Text("worktree")
-                        .font(.system(size: 10))
-                        .foregroundStyle(palette.muted.opacity(0.65))
-                        .fixedSize()
+                    Badge(text: "worktree", small: true, palette: palette)
                         .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
                 }
                 if let shortcut {
@@ -608,6 +605,30 @@ extension View {
     /// Hover for anything clickable: runs `action` and shows the pointing hand while the mouse is over it.
     func onClickableHover(_ action: @escaping (Bool) -> Void) -> some View {
         modifier(ClickableHover { inside in withAnimation(.easeOut(duration: 0.1)) { action(inside) } })
+    }
+}
+
+/// A short word in a soft capsule. With a tint it is a state, like Connected in green. Without, it names a kind of thing, like worktree.
+struct Badge: View {
+    let text: String
+    var tint: Color? = nil
+    /// A dot before the word, for a state that can change.
+    var dot = false
+    /// Small sits beside a name in a list. Regular sits on the right of a row in Settings.
+    var small = false
+    let palette: Palette
+
+    var body: some View {
+        let color = tint ?? palette.muted
+        HStack(spacing: 5) {
+            if dot { Circle().fill(color).frame(width: 6, height: 6) }
+            Text(text).font(.system(size: small ? 10 : 12, weight: .medium))
+        }
+        .foregroundStyle(color)
+        .padding(.horizontal, small ? 6 : 9)
+        .frame(height: small ? 16 : 24)
+        .background(color.opacity(tint == nil ? 0.12 : 0.15), in: Capsule())
+        .fixedSize()
     }
 }
 

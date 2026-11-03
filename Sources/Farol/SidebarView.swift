@@ -162,9 +162,7 @@ private struct SessionRow: View {
                     ViewThatFits(in: .horizontal) {
                         HStack(spacing: 6) {
                             name
-                            Text("worktree")
-                                .font(.system(size: 11, design: .monospaced))
-                                .foregroundStyle(palette.muted.opacity(0.65))
+                            Badge(text: "worktree", small: true, palette: palette)
                                 .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
                         }
                         name

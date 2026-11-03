@@ -914,14 +914,7 @@ private struct Heading: View {
                     }
                 }
                 Text(title).font(.system(size: 20, weight: .semibold))
-                if beta {
-                    Text("Beta")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(palette.muted)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 1)
-                        .overlay(Capsule().strokeBorder(palette.muted.opacity(0.4)))
-                }
+                if beta { Badge(text: "Beta", palette: palette) }
             }
             if let detail {
                 Text(detail).font(.system(size: 13)).foregroundStyle(palette.muted)
@@ -1045,18 +1038,12 @@ private struct SetupState: View {
     let palette: Palette
 
     var body: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(state == .connected ? palette.done : state == .outdated ? palette.waiting : palette.muted.opacity(0.5))
-                .frame(width: 6, height: 6)
-            Text(state == .connected ? "Connected" : state == .outdated ? "Needs update" : "Not connected")
-                .font(.system(size: 12))
-                .foregroundStyle(palette.muted)
-        }
+        Badge(text: state == .connected ? "Connected" : state == .outdated ? "Needs update" : "Not connected",
+              tint: state == .connected ? palette.done : state == .outdated ? palette.waiting : nil, dot: true, palette: palette)
     }
 }
 
-/// A connected agent, in the same pill as an account in Integrations. Disconnecting is rare, so it's behind a click on it, which asks first.
+/// A connected agent, in the same badge as the other states. Disconnecting is rare, so it's behind a click on it, which asks first.
 private struct ConnectedPill: View {
     let palette: Palette
     let disconnect: () -> Void
@@ -1065,15 +1052,9 @@ private struct ConnectedPill: View {
 
     var body: some View {
         Button(action: disconnect) {
-            HStack(spacing: 6) {
-                Circle().fill(palette.done).frame(width: 6, height: 6)
-                Text("Connected").font(.system(size: 12, weight: .medium))
-            }
-            .padding(.horizontal, 10)
-            .frame(height: 26)
-            .background(hovering ? palette.raised : palette.surface, in: Capsule())
-            .overlay(Capsule().strokeBorder(palette.line))
-            .contentShape(Capsule())
+            Badge(text: "Connected", tint: palette.done, dot: true, palette: palette)
+                .overlay(Capsule().fill(palette.done.opacity(hovering ? 0.12 : 0)))
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .onClickableHover { hovering = $0 }
@@ -1096,16 +1077,15 @@ private struct AccountPill: View {
                     Circle().fill(palette.done)
                         .frame(width: 7, height: 7)
                         // A ring in the pill's color, so the dot reads as sitting on the picture.
-                        .overlay(Circle().strokeBorder(palette.surface, lineWidth: 1.5).padding(-1.5))
+                        .overlay(Circle().strokeBorder(palette.surface, lineWidth: 2).padding(-2))
                         .offset(x: 2, y: 2)
                 }
             Text(name).font(.system(size: 12, weight: .medium))
         }
-        .padding(.leading, 4)
-        .padding(.trailing, 10)
-        .frame(height: 26)
-        .background(palette.surface, in: Capsule())
-        .overlay(Capsule().strokeBorder(palette.line))
+        .padding(.leading, 3)
+        .padding(.trailing, 9)
+        .frame(height: 24)
+        .background(palette.muted.opacity(0.12), in: Capsule())
         .hoverTip("Connected")
     }
 }
@@ -1151,14 +1131,8 @@ private struct ToolStateLabel: View {
     let palette: Palette
 
     var body: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(state == .missing ? palette.muted.opacity(0.5) : state == .loggedOut ? palette.waiting : palette.done)
-                .frame(width: 6, height: 6)
-            Text(state == .missing ? "Not installed" : state == .loggedOut ? "Not logged in" : "Connected")
-                .font(.system(size: 12))
-                .foregroundStyle(palette.muted)
-        }
+        Badge(text: state == .missing ? "Not installed" : state == .loggedOut ? "Not logged in" : "Connected",
+              tint: state == .missing ? nil : state == .loggedOut ? palette.waiting : palette.done, dot: true, palette: palette)
     }
 }
 
