@@ -12,6 +12,8 @@ final class Session: ObservableObject, Identifiable {
     @Published var title = ""
     /// Set by renaming the session in the sidebar. Wins over every automatic name.
     @Published var customName: String?
+    /// Set through the store, which saves it.
+    var panels = Panels()
     @Published var directory: String
     /// Reported per pane by agent hooks or interactive terminal titles.
     @Published private(set) var agents: [UUID: AgentActivity] = [:]
@@ -687,6 +689,7 @@ final class SessionStore: ObservableObject {
             }
             let session = create(panes, directory: panes.focused.workingDirectory ?? NSHomeDirectory())
             session.customName = entry.name
+            session.panels = entry.panels ?? Panels()
             // Kept before the agent reports again, so quitting right away still resumes it next time.
             session.conversations = resumed
         }
@@ -696,11 +699,20 @@ final class SessionStore: ObservableObject {
     /// Saved on every change rather than at quit, so a crash keeps the sessions too.
     private func save() {
         let defaults = UserDefaults.standard
-        let saved = sessions.map { SavedSession(layout: $0.panes.layoutSnapshot(conversations: $0.conversations), name: $0.customName) }
+        let saved = sessions.map {
+            SavedSession(layout: $0.panes.layoutSnapshot(conversations: $0.conversations), name: $0.customName, panels: $0.panels)
+        }
         defaults.set(try? JSONEncoder().encode(saved), forKey: Self.savedSessions)
         defaults.removeObject(forKey: Self.savedLayouts)
         defaults.removeObject(forKey: Self.savedDirectories)
         defaults.set(sessions.firstIndex { $0.id == selectedID } ?? 0, forKey: Self.savedSelection)
+    }
+
+    /// Remembers which panels the session has open, so coming back to it brings them back.
+    func setPanels(_ panels: Panels, for session: Session) {
+        guard session.panels != panels else { return }
+        session.panels = panels
+        save()
     }
 
     func select(_ session: Session) {
@@ -768,8 +780,17 @@ final class SessionStore: ObservableObject {
     }
 }
 
+/// The panels a session had open when you left it. A new session starts with them closed.
+/// The sidebar isn't one of them: it's how you move between sessions, so it stays as you set it.
+struct Panels: Codable, Equatable {
+    var files = false
+    var graph = false
+    var review = false
+}
+
 /// What a session keeps between launches.
 private struct SavedSession: Codable {
     var layout: PaneLayout
     var name: String?
+    var panels: Panels?
 }
