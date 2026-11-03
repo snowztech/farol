@@ -173,6 +173,7 @@ struct SettingsPage: View {
                 }
                 .labelsHidden()
                 .fixedSize()
+                .hoverRing(p)
             }
         }
 
@@ -195,6 +196,7 @@ struct SettingsPage: View {
                 }
                 .labelsHidden()
                 .fixedSize()
+                .hoverRing(p)
             }
             Row(title: "Run button on panes",
                 detail: "▶ in a pane's corner, under the mouse, runs one of the project's commands, and ■ stops it with the port it listens on. ⌘P and the right-click menu run them too.",
@@ -251,9 +253,10 @@ struct SettingsPage: View {
                 }
                 .labelsHidden()
                 .fixedSize()
+                .hoverRing(p)
             }
             Row(title: "Size", palette: p) {
-                Stepper("\(settings.fontSize) pt", value: $settings.fontSize, in: 8...32)
+                Stepper("\(settings.fontSize) pt", value: $settings.fontSize, in: 8...32).hoverRing(p)
             }
         }
 
@@ -268,6 +271,7 @@ struct SettingsPage: View {
                 .labelsHidden()
                 .pickerStyle(.segmented)
                 .fixedSize()
+                .hoverRing(p)
             }
             Row(title: "Blink", palette: p) {
                 toggle($settings.cursorBlink)
@@ -288,6 +292,7 @@ struct SettingsPage: View {
                 .labelsHidden()
                 .pickerStyle(.segmented)
                 .fixedSize()
+                .hoverRing(p)
             }
             Row(title: "Copy on select", detail: "Selecting text copies it to the clipboard.", palette: p) {
                 toggle($settings.copyOnSelect)
@@ -370,6 +375,7 @@ struct SettingsPage: View {
                 }
                 .labelsHidden()
                 .fixedSize()
+                .hoverRing(p)
             }
         }
 
@@ -383,6 +389,7 @@ struct SettingsPage: View {
                 }
                 .labelsHidden()
                 .fixedSize()
+                .hoverRing(p)
             }
             if isCustomStart {
                 Row(title: "Command", palette: p) {
@@ -450,6 +457,7 @@ struct SettingsPage: View {
                     // The menu would grow as wide as the longest board's name and squeeze the words beside it.
                     .frame(width: 220)
                     .disabled(jira == nil)
+                    .hoverRing(p)
                 }
             }
         }
@@ -580,11 +588,8 @@ struct SettingsPage: View {
             set: { agents.startCommand = $0 == Self.custom ? (isCustomStart ? agents.startCommand : " ") : $0 })
     }
 
-    /// Brighter than the pickers' tint, so a switch that is on can't be taken for one that is off.
     private func toggle(_ value: Binding<Bool>) -> some View {
-        let p = state.palette
-        return Toggle("", isOn: value).labelsHidden().toggleStyle(.switch).controlSize(.small)
-            .tint(p.muted)
+        SettingsSwitch(isOn: value, palette: state.palette)
     }
 
     private func refreshAgents() {
@@ -1016,6 +1021,40 @@ private struct Card<Content: View>: View {
             .clipShape(shape)
             .overlay(shape.strokeBorder(palette.line.opacity(0.7)))
     }
+}
+
+/// Brighter than the pickers' tint, so a switch that is on can't be taken for one that is off. Brighter still under the mouse.
+private struct SettingsSwitch: View {
+    @Binding var isOn: Bool
+    let palette: Palette
+
+    @State private var hovering = false
+
+    var body: some View {
+        Toggle("", isOn: $isOn).labelsHidden().toggleStyle(.switch).controlSize(.small)
+            .tint(hovering ? palette.text.opacity(0.75) : palette.muted)
+            .onClickableHover { hovering = $0 }
+    }
+}
+
+/// macOS menus and steppers have no hover of their own, so a soft ring says the mouse is on one, like the buttons beside them.
+private struct HoverRing: ViewModifier {
+    let palette: Palette
+
+    @State private var hovering = false
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(palette.muted.opacity(hovering ? 0.55 : 0))
+                .padding(-2)
+                .allowsHitTesting(false))
+            .onClickableHover { hovering = $0 }
+    }
+}
+
+extension View {
+    fileprivate func hoverRing(_ palette: Palette) -> some View { modifier(HoverRing(palette: palette)) }
 }
 
 /// A small heading between rows. Sentence case, a step above the rows, no rule of its own.
