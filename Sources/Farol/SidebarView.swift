@@ -158,14 +158,12 @@ private struct SessionRow: View {
                     .font(.system(size: 13, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? palette.text : palette.text.opacity(0.8))
                 if session.isWorktreeCheckout {
-                    // Whole or not at all, so a narrow row or the close button never leaves a stray "w…".
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 6) {
-                            name
-                            Badge(text: "worktree", small: true, palette: palette)
-                                .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
-                        }
-                        name
+                    // The name gives way first, so the tag stays whole and never shrinks to a stray "w…".
+                    HStack(spacing: 6) {
+                        name.lineLimit(1).truncationMode(.tail)
+                        Badge(text: "worktree", small: true, palette: palette)
+                            .layoutPriority(1)
+                            .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
                     }
                 } else {
                     name
