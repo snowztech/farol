@@ -128,7 +128,7 @@ private struct SessionRow: View {
                         .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
                         .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
                     if session.isWorktreeCheckout {
-                        // Shrinks before the name does, so a narrow sidebar never clips it.
+                        // Shrinks before the name does, so a narrow sidebar never clips the name.
                         Text("worktree")
                             .font(.system(size: 10.5, design: .monospaced))
                             .foregroundStyle(palette.muted.opacity(0.65))
@@ -150,15 +150,19 @@ private struct SessionRow: View {
                     if let branch = gitLine {
                         HStack(spacing: 4) {
                             BranchMark(color: palette.muted)
-                            Text(branch).lineLimit(1).truncationMode(.middle).layoutPriority(1)
+                            Text(branch).truncationMode(.middle)
                         }
                     } else if let location = session.remoteLocation ?? session.location {
                         Text(location).truncationMode(.head)
                     }
                     // The branch gives way first, so a port is always whole.
                     Spacer(minLength: 4)
-                    ForEach(session.ports.prefix(2), id: \.self) { PortLink(port: $0, palette: palette) }
-                    if session.ports.count > 2 { Text(verbatim: "+\(session.ports.count - 2)").fixedSize() }
+                    if let port = session.ports.first { PortLink(port: port, palette: palette) }
+                    if session.ports.count > 1 {
+                        Text(verbatim: "+\(session.ports.count - 1)")
+                            .fixedSize()
+                            .hoverTip("Also on " + session.ports.dropFirst().map { "localhost:\($0)" }.joined(separator: ", "))
+                    }
                 }
                 .font(.system(size: 10.5, design: .monospaced))
                 .foregroundStyle(palette.muted)
