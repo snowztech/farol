@@ -4,6 +4,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- The unmodified lines around a change can be expanded in a pull request or merge request too.
+- A pull request or merge request can be reviewed from its page: Submit review comments, approves or asks for changes.
+
 ### Fixed
 
 - A narrow sidebar no longer hides the branch behind the worktree tag, which now sits beside the session name and shrinks first.

@@ -47,6 +47,8 @@ struct DiffText: NSViewRepresentable {
     /// Called with a gap's unmodified lines, by their numbers in the new file, and whether to show them from the top, next to the hunk above.
     /// Nil leaves gaps closed.
     var expand: ((Range<Int>, _ fromTop: Bool) -> Void)? = nil
+    /// While the lines of a gap are being read, which takes a moment for a request. The clicked gap shows a spinner meanwhile.
+    var loading = false
     var marks: DiffMarks? = nil
 
     func makeNSView(context: Context) -> DiffScrollView { DiffScrollView() }
@@ -54,6 +56,7 @@ struct DiffText: NSViewRepresentable {
     func updateNSView(_ view: DiffScrollView, context: Context) {
         view.text.onComment = comment
         view.text.onExpand = expand
+        view.text.loading = loading
         view.text.show(file, rows: rows, colors: colors, syntax: syntax, marks: marks)
         view.needsLayout = true
     }
@@ -120,6 +123,30 @@ final class DiffTextView: NSTextView {
     var onExpand: ((Range<Int>, _ fromTop: Bool) -> Void)? {
         didSet { if (onExpand == nil) != (oldValue == nil) { needsDisplay = true } }
     }
+    /// The gap clicked and still waiting for its lines.
+    private var waiting: (lines: Range<Int>, fromTop: Bool)? {
+        didSet { if (waiting == nil) != (oldValue == nil) { spin() } else if waiting?.lines != oldValue?.lines { needsDisplay = true } }
+    }
+    var loading = false {
+        didSet { if !loading { waiting = nil } }
+    }
+    private var spinner: Timer?
+    private var turn: CGFloat = 0
+
+    private func spin() {
+        spinner?.invalidate()
+        spinner = nil
+        needsDisplay = true
+        guard waiting != nil else { return }
+        spinner = Timer.scheduledTimer(withTimeInterval: 1 / 30, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            self.turn += 0.2
+            self.needsDisplay = true
+        }
+    }
+
+    deinit { spinner?.invalidate() }
+
     var onComment: ((Int, _ old: Bool) -> Void)? {
         didSet { if (onComment == nil) != (oldValue == nil) { hoveredRow = nil } }
     }
@@ -320,7 +347,11 @@ extension DiffTextView {
                 row.fill()
                 if self.onExpand != nil {
                     let both = (attributes[.diffGapRange] as? [Int])?.last == 1
-                    Self.drawExpanders(in: row, both: both, colors: colors)
+                    if let lines = (attributes[.diffGapRange] as? [Int]).map({ $0[0]..<$0[1] }), let waiting = self.waiting, waiting.lines == lines {
+                        Self.drawSpinner(in: row, upper: both && waiting.fromTop, turn: self.turn, colors: colors)
+                    } else {
+                        Self.drawExpanders(in: row, both: both, colors: colors)
+                    }
                 }
                 let label = "\(gap) unmodified \(gap == 1 ? "line" : "lines")" as NSString
                 let style: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: colors.muted]
@@ -391,6 +422,19 @@ extension DiffTextView {
         dots(at: lower + 15)
     }
 
+    /// Stands in for the buttons of the gap that was clicked: an open ring turning in the gutter.
+    fileprivate static func drawSpinner(in row: NSRect, upper: Bool, turn: CGFloat, colors: DiffColors) {
+        let lower = row.minY + (row.height > rowHeight && !upper ? rowHeight : 0)
+        let center = NSPoint(x: gutter / 2, y: lower + 10)
+        let path = NSBezierPath()
+        path.lineWidth = 1.4
+        path.lineCapStyle = .round
+        let start = turn * 180 / .pi
+        path.appendArc(withCenter: center, radius: 5, startAngle: start, endAngle: start + 270)
+        colors.muted.setStroke()
+        path.stroke()
+    }
+
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         // Only ours: the text view keeps its own, for the cursor.
@@ -415,7 +459,12 @@ extension DiffTextView {
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
-        if point.x < Self.gutter, let target = gap(at: point) { return onExpand?(target.lines, target.fromTop) ?? () }
+        if point.x < Self.gutter, let target = gap(at: point) {
+            // One read at a time: a second click would only ask the forge again.
+            guard waiting == nil else { return }
+            waiting = target
+            return onExpand?(target.lines, target.fromTop) ?? ()
+        }
         guard point.x < Self.gutter, let line = commentable(at: point) else { return super.mouseDown(with: event) }
         onComment?(line.number, line.old)
     }
