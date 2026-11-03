@@ -41,10 +41,12 @@ final class Session: ObservableObject, Identifiable {
 
     /// The repo a new session is known to be in before git answers, so it opens in its project instead of moving there.
     /// Git's own answer replaces it moments later.
-    func assume(repo root: String?) {
+    func assume(repo root: String?, branch: String? = nil) {
         guard repoRoot == nil, let root else { return }
         repoRoot = root
         repoName = URL(fileURLWithPath: root).lastPathComponent
+        // Shown in place of the folder until git answers, which would otherwise swap the row's second line.
+        if self.branch == nil { self.branch = branch }
     }
     /// The top of the checkout the session is in, a worktree's own folder for worktrees. The files panel starts there.
     @Published private(set) var topLevel: String?
@@ -579,7 +581,8 @@ final class SessionStore: ObservableObject {
 
     private func create(_ panes: PaneContainer, directory: String, select: Bool = true, repo: String? = nil) -> Session {
         let session = Session(panes: panes, directory: directory)
-        session.assume(repo: repo ?? knownRepo(of: directory))
+        let known = knownCheckout(of: directory)
+        session.assume(repo: repo ?? known?.repoRoot, branch: repo == nil ? known?.branch : nil)
         remember(session)
         panes.terminals.forEach { wire($0, to: session) }
         panes.onFocusChange = { [weak self, weak session] in
@@ -611,12 +614,12 @@ final class SessionStore: ObservableObject {
         return session
     }
 
-    /// The repo of a folder some open session already sits in or under, without asking git.
-    private func knownRepo(of directory: String) -> String? {
+    /// An open session in the same checkout as a folder, found without asking git. Its repo and branch are the folder's too.
+    private func knownCheckout(of directory: String) -> Session? {
         sessions.first { session in
             guard let top = session.topLevel else { return false }
             return directory == top || directory.hasPrefix(top + "/")
-        }?.repoRoot
+        }
     }
 
     /// Splits the focused pane. The new one opens in the same folder, and runs `run` when given.
