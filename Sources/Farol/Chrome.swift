@@ -498,7 +498,7 @@ private struct CommandChoice: View {
             HStack(spacing: 9) {
                 // The room of a session's check and lamp, so every name starts at the same place.
                 Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).hidden()
-                Image(systemName: "play").font(.system(size: 9)).foregroundStyle(palette.muted).frame(width: 7)
+                Image(systemName: "play").font(.system(size: 9)).foregroundStyle(palette.muted).frame(width: Lamp.size)
                 Text(command.name).lineLimit(1).layoutPriority(1)
                 Text(command.displayCommand)
                     .font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.tail)
@@ -534,7 +534,7 @@ private struct FileChoice: View {
             HStack(spacing: 9) {
                 // The room of a session's check and lamp, so every name starts at the same place.
                 Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).hidden()
-                FileIcon(path: path).font(.system(size: 11)).foregroundStyle(palette.muted).frame(width: 7)
+                FileIcon(path: path).font(.system(size: 11)).foregroundStyle(palette.muted).frame(width: Lamp.size)
                 Text((path as NSString).lastPathComponent).lineLimit(1).truncationMode(.middle).layoutPriority(1)
                 Text((path as NSString).deletingLastPathComponent)
                     .font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.head)

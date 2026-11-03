@@ -259,7 +259,7 @@ private struct NewTaskRow: View {
             // Same width as the status dots, so the label lines up with session names.
             Image(systemName: "plus")
                 .font(.system(size: 9, weight: .semibold))
-                .frame(width: 7)
+                .frame(width: Lamp.size)
             Text("New task")
                 .font(.system(size: 13))
             Spacer(minLength: 0)
@@ -314,7 +314,7 @@ private struct ProjectHeader: View {
             ZStack {
                 if folded { FoldedLamp(sessions: sessions, palette: palette) }
             }
-            .frame(width: 7)
+            .frame(width: Lamp.size)
             Text(name)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(hovering ? palette.text : palette.muted)
@@ -327,13 +327,13 @@ private struct ProjectHeader: View {
             if hovering {
                 CloseButton(symbol: "plus", help: "New session in \(name)", palette: palette, action: onNew)
             }
-            // Only while hovered, or folded so a shut project still says it holds more. The name alone is quieter.
+            // Faint while open, so the header still reads as one that folds, and full when folded or hovered.
             Image(systemName: "chevron.right")
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(hovering ? palette.text : palette.muted)
                 .rotationEffect(.degrees(folded ? 0 : 90))
                 .frame(width: 20, height: 20)
-                .opacity(hovering || folded ? 1 : 0)
+                .opacity(hovering || folded ? 1 : 0.35)
         }
         .lineLimit(1)
         .padding(.leading, 10)
@@ -345,7 +345,7 @@ private struct ProjectHeader: View {
         .onTapGesture(perform: onToggle)
         .onClickableHover { hovering = $0 }
         .hoverTip(folded ? "Show \(name)'s sessions" : "Fold \(name)")
-        .padding(.top, 6)
+        .padding(.top, 10)
     }
 }
 
@@ -392,6 +392,9 @@ private struct Reorder: DropDelegate {
 
 /// Hollow when nothing is happening, breathing while the agent works, rippling when it waits for you, filled when it is done.
 struct Lamp: View {
+    /// Every column that lines up with the lamps uses this width.
+    static let size: CGFloat = 7
+
     let activity: Session.Activity
     /// A session you are looking at has no need to ripple.
     let selected: Bool
@@ -409,7 +412,7 @@ struct Lamp: View {
             case .done: Circle().fill(palette.done)
             }
         }
-        .frame(width: 7, height: 7)
+        .frame(width: Self.size, height: Self.size)
         .hoverTip(help)
     }
 
