@@ -52,6 +52,8 @@ struct SettingsPage: View {
         nonmutating set { state.settingsSection = newValue }
     }
     @State private var themeQuery = ""
+    @Namespace private var navHighlight
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var themes = Theme.all()
 
     enum Section: String, CaseIterable {
@@ -78,16 +80,21 @@ struct SettingsPage: View {
         }
 
         /// The theme's own hues, so the tiles change with it like everything else.
+        /// Pushed to full color, since a pastel theme would leave the white symbol on a tile it barely stands out from.
         func tint(_ p: Palette) -> Color {
-            switch self {
-            case .terminal: p.done
-            case .appearance: Color(nsColor: p.code.keyword)
-            case .agents: p.waiting
-            case .worktrees: p.working
-            case .integrations: p.pull
-            case .remote: p.removed
-            case .shortcuts, .about: p.muted
+            let hue: NSColor? = switch self {
+            case .terminal: NSColor(p.done)
+            case .appearance: p.code.keyword
+            case .agents: NSColor(p.waiting)
+            case .worktrees: NSColor(p.working)
+            case .integrations: NSColor(p.pull)
+            case .remote: NSColor(p.removed)
+            case .shortcuts, .about: nil
             }
+            guard let hue = hue?.usingColorSpace(.sRGB), hue.saturationComponent > 0.1 else {
+                return Color(nsColor: NSColor(white: 0.5, alpha: 1))
+            }
+            return Color(nsColor: NSColor(hue: hue.hueComponent, saturation: max(hue.saturationComponent, 0.7), brightness: 0.78, alpha: 1))
         }
     }
 
@@ -96,7 +103,8 @@ struct SettingsPage: View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(Section.allCases, id: \.self) { s in
-                    NavItem(title: s.rawValue, symbol: s.symbol, tint: s.tint(p), selected: s == section, palette: p) { section = s }
+                    NavItem(title: s.rawValue, symbol: s.symbol, tint: s.tint(p), selected: s == section, palette: p,
+                            highlight: navHighlight) { section = s }
                 }
                 Spacer()
                 OpenConfigRow(palette: p, action: settings.openFile)
@@ -105,6 +113,8 @@ struct SettingsPage: View {
             .padding(.top, 28)
             .padding(.horizontal, 10)
             .frame(width: 180)
+            // Only the list, so the page that comes in doesn't slide about with it.
+            .animation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.86), value: section)
 
             Rectangle().fill(p.line).frame(width: 1)
 
@@ -1181,6 +1191,7 @@ private struct NavItem: View {
     let tint: Color
     let selected: Bool
     let palette: Palette
+    let highlight: Namespace.ID
     let action: () -> Void
 
     @State private var hovering = false
@@ -1189,7 +1200,7 @@ private struct NavItem: View {
         Button(action: action) {
             HStack(spacing: 9) {
                 Image(systemName: symbol)
-                    .font(.system(size: 10.5, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 20, height: 20)
                     .background(tint.gradient, in: RoundedRectangle(cornerRadius: 5.5, style: .continuous))
@@ -1200,7 +1211,14 @@ private struct NavItem: View {
             }
             .padding(.vertical, 5)
             .padding(.horizontal, 8)
-            .background(RoundedRectangle(cornerRadius: 6).fill(selected ? palette.selection : hovering ? palette.hover : .clear))
+            .background {
+                let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
+                if selected {
+                    shape.fill(palette.selection).matchedGeometryEffect(id: "selection", in: highlight)
+                } else {
+                    shape.fill(hovering ? palette.hover : .clear)
+                }
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(QuietPress())
