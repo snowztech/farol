@@ -431,7 +431,7 @@ struct SettingsPage: View {
             .foregroundStyle(p.muted)
             .padding(.bottom, 4)
         Card(palette: p) {
-            Row(title: "Jira", detail: jiraDetail, icon: ForgeIcon(source: .jira, size: 13), link: ("Jira CLI (jira)", Jira.docs), palette: p) {
+            Row(title: "Jira", detail: jiraDetail, icon: ToolTile(jira: 26), link: ("Jira CLI (jira)", Jira.docs), palette: p) {
                 toolControl(jira, avatar: jiraAvatar, setup: Jira.setupCommand(from:), p)
             }
             if listsBoards {
@@ -481,7 +481,7 @@ struct SettingsPage: View {
         case .loggedOut: "\(cli.prefix(1).uppercased() + cli.dropFirst()) is installed but not logged in."
         case .missing: "\(cli.prefix(1).uppercased() + cli.dropFirst()) isn't installed."
         }
-        return Row(title: kind.name, detail: detail, icon: ForgeIcon(kind: kind, size: 13),
+        return Row(title: kind.name, detail: detail, icon: ToolTile(kind: kind, size: 26),
                    link: ("\(kind.name) CLI (\(kind.tool))", kind.docs), palette: p) {
             toolControl(state, avatar: avatars[kind], setup: kind.setupCommand(from:), p)
         }
@@ -518,7 +518,7 @@ struct SettingsPage: View {
         // ponytail: looks only where installers put the command. One installed elsewhere, as with nvm, reads as not found and still connects.
         let path = folder.kind.executable.map { ($0 as NSString).abbreviatingWithTildeInPath }
         return Row(title: agent.name, subtitle: shared ? (folder.directory.path as NSString).abbreviatingWithTildeInPath : nil,
-                   detail: path ?? "Not found", mono: path != nil, icon: ForgeIcon(agent: folder.kind, size: 13), palette: p) {
+                   detail: path ?? "Not found", mono: path != nil, icon: ToolTile(agent: folder.kind, size: 26), palette: p) {
             switch state {
             case .connected:
                 ConnectedPill(palette: p) { agentChange = AgentChange(agent: agent, connect: false) }
@@ -906,7 +906,13 @@ private struct Heading: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+            HStack(alignment: .center, spacing: 10) {
+                // The section's tile from the list on the left, so the page carries its color.
+                if let section = SettingsPage.Section(rawValue: title) {
+                    Tile(color: section.tint(palette), size: 28) {
+                        Image(systemName: section.symbol).font(.system(size: 15, weight: .semibold))
+                    }
+                }
                 Text(title).font(.system(size: 20, weight: .semibold))
                 if beta {
                     Text("Beta")
@@ -932,7 +938,7 @@ private struct Row<Control: View>: View {
     var detail: String? = nil
     /// The detail is a path or a command, set in the terminal's kind of type.
     var mono = false
-    var icon: ForgeIcon? = nil
+    var icon: ToolTile? = nil
     /// Words of the detail that open a page, like a tool's name and its documentation.
     var link: (words: String, url: String)? = nil
     let palette: Palette
@@ -955,9 +961,15 @@ private struct Row<Control: View>: View {
     }
 
     private var words: some View {
+        HStack(spacing: 10) {
+            if let icon { icon }
+            text
+        }
+    }
+
+    private var text: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 6) {
-                if let icon { icon }
                 Text(title).font(.system(size: 13))
                 if let subtitle { Text(subtitle).font(.system(size: 12)).foregroundStyle(palette.muted) }
             }
@@ -1204,11 +1216,7 @@ private struct NavItem: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 9) {
-                Image(systemName: symbol)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 20, height: 20)
-                    .background(tint.gradient, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                Tile(color: tint) { Image(systemName: symbol).font(.system(size: 11, weight: .semibold)) }
                 Text(title)
                     .font(.system(size: 13, weight: selected ? .medium : .regular))
                     .foregroundStyle(selected ? palette.text : palette.text.opacity(0.85))

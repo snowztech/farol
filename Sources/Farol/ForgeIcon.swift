@@ -50,10 +50,58 @@ struct ForgeIcon: View {
     private static let opencode = mark(viewBox: 24, path: "M4 2h16v20H4zM8 6v12h8V6z")
     private static let pi = mark(viewBox: 24, path: "M3 5h18v3h-4v11h-3V8h-4v11H7V8H3z")
 
+    /// Each maker's own color, so the tile is known at a glance. The ones whose mark is black and white get graphite.
+    static func color(agent: AgentFolder.Kind) -> Color {
+        agent == .claude ? Color(red: 0.85, green: 0.47, blue: 0.34) : graphite
+    }
+
+    static func color(kind: Forge.Kind) -> Color {
+        kind == .github ? graphite : Color(red: 0.99, green: 0.43, blue: 0.15)
+    }
+
+    static let jiraBlue = Color(red: 0.15, green: 0.52, blue: 1)
+    private static let graphite = Color(white: 0.32)
+
     private static func mark(viewBox: Int, path: String) -> NSImage {
         let svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 \(viewBox) \(viewBox)\"><path d=\"\(path)\"/></svg>"
         let image = NSImage(data: Data(svg.utf8)) ?? NSImage()
         image.isTemplate = true
         return image
     }
+}
+
+/// A white mark on a small rounded tile of color, for the sections of Settings and the tools Farol works with.
+/// Color on a tile says which thing it is. In the sidebar, color only ever says an agent's status.
+struct Tile<Glyph: View>: View {
+    let color: Color
+    var size: CGFloat = 20
+    @ViewBuilder let glyph: Glyph
+
+    var body: some View {
+        glyph
+            .foregroundStyle(.white)
+            .frame(width: size, height: size)
+            .background(color.gradient, in: RoundedRectangle(cornerRadius: size > 22 ? 8 : 6, style: .continuous))
+    }
+}
+
+/// A tool's mark on its tile, in the tool's own color.
+struct ToolTile: View {
+    private let icon: ForgeIcon
+    private let color: Color
+    private let size: CGFloat
+
+    init(agent: AgentFolder.Kind, size: CGFloat = 20) {
+        (icon, color, self.size) = (ForgeIcon(agent: agent, size: size * 0.6), ForgeIcon.color(agent: agent), size)
+    }
+
+    init(kind: Forge.Kind, size: CGFloat = 20) {
+        (icon, color, self.size) = (ForgeIcon(kind: kind, size: size * 0.6), ForgeIcon.color(kind: kind), size)
+    }
+
+    init(jira size: CGFloat = 20) {
+        (icon, color, self.size) = (ForgeIcon(source: .jira, size: size * 0.55), ForgeIcon.jiraBlue, size)
+    }
+
+    var body: some View { Tile(color: color, size: size) { icon } }
 }
