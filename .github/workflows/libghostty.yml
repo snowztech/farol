@@ -1,12 +1,12 @@
 name: libghostty
 
-# Builds libghostty for the pinned commit and publishes it as the ghostty-<rev> pre-release.
-# Runs when the pin changes, or by hand from the Actions tab.
+# Builds libghostty for the pinned commit and publishes it as the ghostty-<rev>-<patches> pre-release.
+# Runs when the pin or a patch changes, or by hand from the Actions tab.
 on:
   push:
     # Listing branches keeps tag pushes out. GitHub ignores the paths filter for tags.
     branches: ["**"]
-    paths: [scripts/build-ghostty.sh]
+    paths: [scripts/build-ghostty.sh, patches/ghostty/**]
   workflow_dispatch:
 
 permissions:

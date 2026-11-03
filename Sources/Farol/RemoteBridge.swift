@@ -39,6 +39,8 @@ final class RemoteBridge: ObservableObject {
         didSet {
             followLogs()
             retime()
+            // A phone that closed its terminal, or went, gives the pane back at once.
+            refit()
         }
     }
     /// Kept per device and across its connections, since a phone resends on a new one.
@@ -97,6 +99,11 @@ final class RemoteBridge: ObservableObject {
         var terminal: UUID?
         /// It said when it shows a terminal, so its screen goes only then. An older phone never says, and always gets it.
         var saysTerminal = false
+        /// It draws that terminal itself, from VT sequences, and was last sent this of it.
+        var vt = false
+        var vtScreen: Data?
+        /// The size its terminal fits in, which the pane takes while it shows it and nobody uses the Mac.
+        var fit: (session: UUID, cols: Int, rows: Int)?
         /// The session it was told is an empty conversation, an agent started there with no log yet, so it is told once.
         var toldEmpty: UUID?
         /// What it was told the watched session waits on. Nil until told, so the first tick always says, even that it waits on nothing.
@@ -357,10 +364,12 @@ final class RemoteBridge: ObservableObject {
             answer(command, by: device, session: session, request: request, choice: choice, from: id)
         case .respondAsk(let session, let ask, let decision):
             respondAsk(command, by: device, session: session, ask: ask, decision: decision, from: id)
-        case .terminal(let session, let open):
+        case .terminal(let session, let open, let vt):
             phones[id]?.saysTerminal = true
             if open { phones[id]?.terminal = session } else if phones[id]?.terminal == session { phones[id]?.terminal = nil }
             phones[id]?.screen = nil
+            phones[id]?.vt = open && vt == true
+            phones[id]?.vtScreen = nil
             retime()
             tick()
         case .commands(let session):
@@ -381,10 +390,16 @@ final class RemoteBridge: ObservableObject {
             diff(command, of: path, in: session, from: id)
         case .task(let project, let agent, let text):
             task(command, in: project, with: agent, text: text, from: id)
-        case .history(let session):
+        case .history(let session, let vt):
             // Read once, when the phone asks. Reading it on every change would cost the Mac for something rarely looked at.
             guard let terminal = pane(session)?.terminal else { return }
+            // Base64 inside a sealed message that is base64 again, so less of it fits than of plain text.
+            if vt == true { return tell(.vtHistory(session: session, data: terminal.historyVT(bytes: 90_000)), id) }
             tell(.history(session: session, text: terminal.historyText()), id)
+        case .input(let session, let data):
+            act(command, by: device, on: session, from: id) { $0.input(data) }
+        case .fit(let session, let cols, let rows):
+            phones[id]?.fit = (session, cols, rows)
         case .send(let session, let text):
             act(command, by: device, on: session, from: id) { pane in
                 // While Farol holds a question, the agent shows nothing to type into, so a typed reply is the answer, as Other is on the Mac.
@@ -918,6 +933,23 @@ final class RemoteBridge: ObservableObject {
     }
 
     /// The pane a phone means by a session's id, and the session it is in.
+    /// The panes sized for a phone.
+    private var fitted: Set<UUID> = []
+
+    /// Gives a pane a phone shows the phone's size, so Claude Code and the shell draw for the phone, but only while nobody uses the Mac:
+    /// taken after a while without keyboard or mouse, and given back the moment either is touched, or when no phone shows it.
+    private func refit() {
+        let idle = CGEventSource.secondsSinceLastEventType(.hidSystemState, eventType: CGEventType(rawValue: ~0)!)
+        var wanted: [UUID: (cols: Int, rows: Int)] = [:]
+        for phone in phones.values where phone.device != nil {
+            guard let fit = phone.fit, phone.terminal == fit.session, fit.cols > 0, fit.rows > 0 else { continue }
+            if idle >= (fitted.contains(fit.session) ? 2 : 30) { wanted[fit.session] = (fit.cols, fit.rows) }
+        }
+        for id in fitted where wanted[id] == nil { pane(id)?.terminal.unfit() }
+        for (id, size) in wanted { pane(id)?.terminal.fit(cols: size.cols, rows: size.rows) }
+        fitted = Set(wanted.keys)
+    }
+
     private func pane(_ id: UUID) -> (session: Session, terminal: TerminalView)? {
         for session in store.sessions {
             if let terminal = session.panes.terminals.first(where: { $0.id == id }) { return (session, terminal) }
@@ -936,6 +968,7 @@ final class RemoteBridge: ObservableObject {
     private func tick() {
         // A log named before it was written gets its watch once it is.
         followLogs()
+        refit()
         let sessions = remoteSessions
         for (id, phone) in phones where phone.device != nil {
             // Claude Code starts a new log after /clear, and its next hook says so.
@@ -971,6 +1004,11 @@ final class RemoteBridge: ObservableObject {
                         tell(.ask(session: watching, ask: ask), id)
                     }
                 }
+            }
+            if let watching = phone.watching, phone.vt, phone.terminal == watching, let (_, terminal) = pane(watching),
+               let screen = terminal.screenVT, screen.data != phone.vtScreen {
+                phones[id]?.vtScreen = screen.data
+                tell(.vt(session: watching, cols: screen.cols, rows: screen.rows, data: screen.data), id)
             }
             // Codex can keep a question on screen while its title says working. Keep that screen live so the phone can offer the terminal.
             guard let watching = phone.watching, let (session, terminal) = pane(watching),

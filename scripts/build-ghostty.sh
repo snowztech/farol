@@ -8,8 +8,12 @@ GHOSTTY_REV=b40acce58dcf77df52231c3798ea58e924647c89
 root="$(cd "$(dirname "$0")/.." && pwd)"
 src="$root/.ghostty-src"
 
-# A prebuilt copy lives on the ghostty-<rev> release. FROM_SOURCE=1 skips it.
-prebuilt="https://github.com/snowztech/farol/releases/download/ghostty-${GHOSTTY_REV:0:7}/GhosttyKit.zip"
+# Farol's own additions to Ghostty, applied on top of the pinned commit. The release is named after them too, so a new patch is built anew.
+patches=("$root"/patches/ghostty/*.patch)
+tag="ghostty-${GHOSTTY_REV:0:7}-$(cat "${patches[@]}" | shasum | cut -c1-7)"
+
+# A prebuilt copy lives on the release named by $tag. FROM_SOURCE=1 skips it.
+prebuilt="https://github.com/snowztech/farol/releases/download/$tag/GhosttyKit.zip"
 if [ -z "${FROM_SOURCE:-}" ] && curl -fsSL "$prebuilt" -o "$root/.ghostty.zip"; then
   rm -rf "$root/vendor" && mkdir -p "$root/vendor"
   unzip -q "$root/.ghostty.zip" -d "$root/vendor" && rm "$root/.ghostty.zip"
@@ -22,9 +26,9 @@ if [ -n "${CI:-}" ] && [ -z "${FROM_SOURCE:-}" ]; then
   exit 1
 fi
 
-# Publishing is once per Ghostty commit, so there is nothing to build if it is already out.
-if [ "${1:-}" = "--publish" ] && gh release view "ghostty-${GHOSTTY_REV:0:7}" > /dev/null 2>&1; then
-  echo "ghostty-${GHOSTTY_REV:0:7} is already published"
+# Publishing is once per Ghostty commit and set of patches, so there is nothing to build if it is already out.
+if [ "${1:-}" = "--publish" ] && gh release view "$tag" > /dev/null 2>&1; then
+  echo "$tag is already published"
   exit 0
 fi
 
@@ -32,7 +36,8 @@ if [ ! -d "$src/.git" ]; then
   git clone https://github.com/ghostty-org/ghostty.git "$src"
 fi
 git -C "$src" fetch --depth 1 origin "$GHOSTTY_REV"
-git -C "$src" checkout -q "$GHOSTTY_REV"
+git -C "$src" checkout -q -f "$GHOSTTY_REV"
+git -C "$src" apply "${patches[@]}"
 # Fresh CI machines lack it. Locally it is a one time step from the README.
 if [ -n "${CI:-}" ]; then xcodebuild -downloadComponent MetalToolchain; fi
 
@@ -52,11 +57,10 @@ mkdir -p "$root/vendor/ghostty-resources"
 cp -R "$src/zig-out/share/terminfo" "$src/zig-out/share/ghostty" "$root/vendor/ghostty-resources/"
 echo "built vendor/GhosttyKit.xcframework @ $GHOSTTY_REV"
 
-# Publishes the build for everyone else, once per Ghostty commit.
+# Publishes the build for everyone else, once per Ghostty commit and set of patches.
 if [ "${1:-}" = "--publish" ]; then
-  tag="ghostty-${GHOSTTY_REV:0:7}"
   mkdir -p "$root/build"
   (cd "$root/vendor" && zip -qry "$root/build/GhosttyKit.zip" GhosttyKit.xcframework ghostty-resources)
   gh release create "$tag" "$root/build/GhosttyKit.zip" --prerelease --target "$(git -C "$root" rev-parse HEAD)" \
-    --title "libghostty ${GHOSTTY_REV:0:7}" --notes "Prebuilt libghostty for Farol, built from ghostty-org/ghostty@$GHOSTTY_REV."
+    --title "libghostty ${GHOSTTY_REV:0:7}" --notes "Prebuilt libghostty for Farol, built from ghostty-org/ghostty@$GHOSTTY_REV with patches/ghostty."
 fi
