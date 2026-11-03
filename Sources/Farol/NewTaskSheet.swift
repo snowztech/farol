@@ -135,11 +135,8 @@ struct NewTaskSheet: View {
         let p = palette
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("New task in \(repo)").font(.system(size: 15, weight: .semibold))
-                    Text(subtitle)
-                        .foregroundStyle(p.muted)
-                        .fixedSize(horizontal: false, vertical: true)
+                SheetHeader(title: "New task in \(repo)", section: .agents, palette: p) {
+                    Text(subtitle).fixedSize(horizontal: false, vertical: true)
                 }
                 if !tickets.isEmpty {
                     ticketSelect(p)
@@ -463,7 +460,7 @@ struct NewTaskSheet: View {
     /// The mark of where it comes from, its key, then as much of its title as fits on the line.
     private func ticketLabel(_ ticket: Ticket, _ p: Palette) -> some View {
         HStack(spacing: 8) {
-            ForgeIcon(source: ticket.source).foregroundStyle(p.muted)
+            ToolTile(source: ticket.source, size: 16)
             Text(ticket.key).font(.system(size: 12, design: .monospaced)).foregroundStyle(p.muted).fixedSize()
             Text(ticket.summary).lineLimit(1).truncationMode(.tail)
         }

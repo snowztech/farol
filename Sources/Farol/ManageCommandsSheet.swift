@@ -87,10 +87,8 @@ struct ManageCommandsSheet: View {
 
     private var list: some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Saved commands").font(.system(size: 15, weight: .semibold))
+            SheetHeader(title: "Saved commands", section: .terminal, palette: palette) {
                 Text("Edit or remove a command saved for this project or all projects.")
-                    .foregroundStyle(palette.muted)
             }
             .padding(20)
 
@@ -112,10 +110,10 @@ struct ManageCommandsSheet: View {
                             section("This project", commands: projectCommands)
                         }
                         if !globalCommands.isEmpty {
-                            if !projectCommands.isEmpty { Rectangle().fill(palette.line).frame(height: 1).padding(.horizontal, 20) }
                             section("All projects", commands: globalCommands)
                         }
                     }
+                    .padding(.bottom, 16)
                 }
                 .frame(maxHeight: 300)
             }
@@ -131,43 +129,43 @@ struct ManageCommandsSheet: View {
         }
     }
 
+    /// One scope's commands on a card, like a group of rows in Settings.
     private func section(_ title: String, commands: [ProjectCommand]) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(palette.muted)
-                .padding(.horizontal, 20)
-                .padding(.top, 14)
-                .padding(.bottom, 4)
-            ForEach(commands, id: \.self) { command in
-                Button { beginEditing(command) } label: {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(command.name).foregroundStyle(palette.text)
-                            if !command.global {
-                                Text(scope(for: command)).font(.system(size: 11)).foregroundStyle(palette.muted)
+            Card(palette: palette) {
+                ForEach(commands, id: \.self) { command in
+                    Button { beginEditing(command) } label: {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(command.name).foregroundStyle(palette.text)
+                                if !command.global {
+                                    Text(scope(for: command)).font(.system(size: 11)).foregroundStyle(palette.muted)
+                                }
                             }
+                            Spacer(minLength: 8)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(palette.muted)
                         }
-                        Spacer(minLength: 8)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(palette.muted)
+                        .contentShape(Rectangle())
+                        .padding(.vertical, 11)
                     }
-                    .contentShape(Rectangle())
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 11)
+                    .buttonStyle(.plain)
+                    if command != commands.last { Rectangle().fill(palette.line).frame(height: 1) }
                 }
-                .buttonStyle(.plain)
-                if command != commands.last { Rectangle().fill(palette.line).frame(height: 1).padding(.leading, 20) }
             }
         }
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
     }
 
     private func editor(_ command: ProjectCommand) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Edit command").font(.system(size: 15, weight: .semibold))
-                Text(scope(for: command)).font(.system(size: 12)).foregroundStyle(palette.muted)
+            SheetHeader(title: "Edit command", section: .terminal, palette: palette) {
+                Text(scope(for: command)).font(.system(size: 12))
             }
             .padding(20)
 

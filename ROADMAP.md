@@ -21,6 +21,7 @@ Milestones are themes, not version numbers. Releases ship whatever is ready.
 - New sessions can start Claude Code, Codex or any command
 - Settings page and `~/.config/farol/config` kept in sync, custom themes
 - Signed and notarized DMG on GitHub Releases, landing page, CI and a prebuilt libghostty
+- Design: the Glass style, one type and corner scale that `make lint` keeps, shared views, and [DESIGN.md](DESIGN.md)
 
 ## Now: easy to start
 
@@ -82,7 +83,16 @@ An agent running in Farol can change Farol when you ask, so you stay in the conv
 - [x] `farol wait`, `read` and `send`: wait for another agent, read its answer, and message it, behind a setting since one agent then acts on others
 - [x] The `farol` command working from Codex, which passes Farol's environment and asks before leaving its sandbox to reach Farol
 - [ ] An agent's own sub-agents as sessions, so a task it splits shows in the sidebar and on the phone
-- [ ] Claude Code and Codex conversations resumed when Farol restores a session. The hooks already receive the session id, so Farol keeps it and restarts the agent on that conversation (`claude --resume`, `codex resume`)
+- [x] Claude Code and Codex conversations resumed when Farol restores a session. The hooks already receive the session id, so Farol keeps it and restarts the agent on that conversation (`claude --resume`, `codex resume`)
+
+## Design
+
+The UI follows [DESIGN.md](DESIGN.md). What it still has to reach:
+
+- [ ] A first run that explains Farol in a minute: the first session says how to start a task and connect an agent, where today it opens a bare shell
+- [x] The sheets on the shared views: New Task, Commit, Add command and Manage commands
+- [x] Commit subjects in the git graph with room to read, from a narrower time column
+- [ ] The menu bar and notch status panels checked against DESIGN.md
 
 ## Speed and upkeep
 
@@ -122,6 +132,7 @@ It needs an iPhone for now. For Android or the web, [say so in an issue](https:/
 - [x] The Mac kept awake while agents work, as a setting
 - [x] Agents on a machine of your own that stays on, so the Mac can be off: `farol-host` in farol-remote makes each tmux window a session. Still experimental until [what farol-remote lists](https://github.com/snowztech/farol-remote/blob/main/ROADMAP.md#not-done-yet) is done
 - [x] Several Macs and servers in one list on the phone
+- [x] A live terminal on the phone with its colors, sent as VT through a small patch to libghostty
 - [ ] Android or the web, if people ask
 
 ## Hardening
@@ -129,6 +140,7 @@ It needs an iPhone for now. For Android or the web, [say so in an issue](https:/
 - [ ] Checksum for the prebuilt libghostty, checked before every release
 - [ ] Signing secrets in a GitHub environment that only release tags can use
 - [ ] A checksum published next to the DMG
+- [ ] The `read-vt` patch to libghostty proposed upstream, so Farol stops carrying it. Until then it is rebased on each Ghostty update
 
 ## Later
 
@@ -136,7 +148,6 @@ It needs an iPhone for now. For Android or the web, [say so in an issue](https:/
 - Scheduled tasks: a New task that starts at a set time or every day, like a nightly dependency bump or a morning issue triage, and waits for you as a session when it's done or needs you. On the Mac while it's awake, or on a `farol-host` server that stays on
 - The server's repo in the panels over ssh, which needs git run on the server
 - Command palette: Farol's actions, like push, commit or new task, in the ⌘P list
-- A live terminal on the phone, with colors, once libghostty lets the app around it read a pane's output. Until then the phone shows a pane as text
 
 ## Not planned
 

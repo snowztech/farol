@@ -1007,7 +1007,7 @@ private struct QuietLink: View {
 }
 
 /// Rows that belong together, on one rounded card like System Settings. Each row's rule parts it from the next.
-private struct Card<Content: View>: View {
+struct Card<Content: View>: View {
     let palette: Palette
     @ViewBuilder let content: Content
 

@@ -4,6 +4,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- New Task, Commit and the command sheets open with their section's icon, saved commands sit on cards, and a ticket's source shows in its own color.
+- The git graph shows a commit's age as "2w" or "3mo", which gives its subject more room. Hover the commit for the full date.
+
 ## [0.58.0] - 2026-11-04
 
 A Glass style and a design pass across Farol, and the phone draws the terminal itself.

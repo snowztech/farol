@@ -841,7 +841,8 @@ private struct CommitRow: View {
     /// Fixed widths, so the columns line up and a long name can't push the row wider than the panel.
     static let authorWidth: CGFloat = 90
     static let hashWidth: CGFloat = 52
-    static let dateWidth: CGFloat = 64
+    /// Room for the short age, like "3mo", so the subject keeps the rest.
+    static let dateWidth: CGFloat = 30
     /// What the subject keeps in a narrow panel. Under it the author goes, then the hash. Both stay in the row's tooltip.
     static let subjectWidth: CGFloat = 140
 
@@ -916,7 +917,7 @@ private struct CommitRow: View {
                     .onTapGesture(perform: copyHash)
                     .hoverTip("Copy \(row.commit.hash)")
             }
-            Text(Self.age.localizedString(for: row.commit.date, relativeTo: Date()))
+            Text(Blame.age(of: row.commit.date))
                 .font(.system(size: 11))
                 .foregroundStyle(palette.muted)
                 .lineLimit(1)
@@ -929,8 +930,7 @@ private struct CommitRow: View {
         .onHover { hovering = $0 }
         .onTapGesture(count: 2, perform: review)
         .onTapGesture(perform: select)
-        .hoverTip(([row.commit.shortHash + "  " + row.commit.author, row.commit.subject] + refs.flatMap(\.names)
-            + (drift.map { [driftTip($0.branch, $0.upstream)] } ?? []) + ["Double-click to review the changes"]).joined(separator: "\n"))
+        .hoverTip(tip)
         .contextMenu {
             // Says where a checkout lands: the branch pointing here, or the bare commit.
             Button(localBranch.map { "Check Out \u{201C}\(menuName($0))\u{201D}" } ?? "Check Out Commit (Detached)", action: checkout)
@@ -1048,6 +1048,15 @@ private struct CommitRow: View {
     }
 
     /// Says "Copied" for a moment, since a copy otherwise leaves no trace.
+    /// The full date leads, since the column only has room for "2w".
+    private var tip: String {
+        let who: String = [row.commit.shortHash, row.commit.author, row.commit.date.formatted(date: .abbreviated, time: .shortened)]
+            .joined(separator: "  ")
+        let drifted: [String] = drift.map { [driftTip($0.branch, $0.upstream)] } ?? []
+        let lines: [String] = [who, row.commit.subject] + refs.flatMap(\.names) + drifted + ["Double-click to review the changes"]
+        return lines.joined(separator: "\n")
+    }
+
     private func copyHash() {
         copy(row.commit.hash)
         copied = true
@@ -1058,12 +1067,6 @@ private struct CommitRow: View {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
     }
-
-    private static let age: RelativeDateTimeFormatter = {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter
-    }()
 }
 
 /// The selected commit under the history: its title, who and when, and the files it changed by folder.
