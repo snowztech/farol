@@ -318,6 +318,42 @@ public final class TerminalView: NSView {
         return kept.joined(separator: "\n")
     }
 
+    /// The screen as VT sequences, with its size in cells, for a phone that draws the terminal itself.
+    public var screenVT: (cols: Int, rows: Int, data: Data)? {
+        guard let surface else { return nil }
+        let size = ghostty_surface_size(surface)
+        var text = ghostty_text_s()
+        guard ghostty_surface_read_vt_screen(surface, &text) else { return nil }
+        defer { ghostty_surface_free_text(surface, &text) }
+        guard let bytes = text.text else { return nil }
+        return (Int(size.columns), Int(size.rows), Data(bytes: bytes, count: Int(text.text_len)))
+    }
+
+    /// What scrolled off the top as VT sequences with their colors, oldest first: as many of the last `rows` as fit in `bytes`.
+    /// Like `historyText`, it is for when someone asks.
+    public func historyVT(rows: Int = 2000, bytes: Int) -> Data {
+        guard let surface else { return Data() }
+        // A row's size depends on its colors, so fewer are read until they fit.
+        var rows = rows
+        while rows > 0 {
+            var text = ghostty_text_s()
+            guard ghostty_surface_read_vt_history(surface, UInt32(rows), &text) else { return Data() }
+            defer { ghostty_surface_free_text(surface, &text) }
+            if text.text_len <= bytes, let pointer = text.text { return Data(bytes: pointer, count: Int(text.text_len)) }
+            rows /= 2
+        }
+        return Data()
+    }
+
+    /// Bytes straight to the program, as a keyboard sends them, already encoded for it. Not a paste, so nothing is bracketed.
+    public func input(_ data: Data) {
+        // Ghostty's `text` action writes them as they are, given in Zig's string syntax.
+        perform("text:" + data.map { byte in
+            let character = Character(UnicodeScalar(byte))
+            return character.isASCII && (character.isLetter || character.isNumber) ? String(character) : String(format: "\\x%02x", byte)
+        }.joined())
+    }
+
     /// A key that isn't text.
     public enum Key: String {
         case enter, escape, tab, shiftTab, shiftLeft, up, down, left, right, backspace, interrupt
