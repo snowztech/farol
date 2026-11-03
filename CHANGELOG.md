@@ -7,11 +7,12 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Added
 
 - The unmodified lines around a change can be expanded in a pull request or merge request too.
-- A pull request or merge request can be reviewed from its page: Submit review comments, approves or asks for changes.
+- A pull request or merge request can be reviewed from its page: comment, approve or ask for changes.
+- Click a project's header in the sidebar to fold its sessions. A folded project shows how many it holds and lights up when one needs you. Hover the header for a button that opens a new session there.
 
 ### Fixed
 
-- A narrow sidebar no longer hides the branch behind the worktree tag, which now sits beside the session name and shrinks first.
+- A narrow sidebar no longer hides the branch behind the worktree tag, which now sits beside the session name and steps aside when there is no room.
 - A session lists only the ports that serve a page, so a database or Vite's hot reload no longer shows next to the dev server. The sidebar shows the first one and how many more.
 
 ## [0.55.0] - 2026-11-02
