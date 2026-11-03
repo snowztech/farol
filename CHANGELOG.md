@@ -21,6 +21,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Fixed
 
 - Opening or closing a panel no longer makes an agent redraw its screen on every frame. The terminal takes its new size once the panel stops.
+- A new session in a project opens in its place in the sidebar, with its branch, instead of jumping there a moment later.
 - A narrow Settings page no longer squeezes a row's words to one letter per line or draws over the panels beside it.
 
 ## [0.57.0] - 2026-11-03
