@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 struct SidebarView: View {
@@ -12,6 +13,8 @@ struct SidebarView: View {
     @State private var dragStart: CGFloat?
     /// Only read so the sidebar redraws when the setting changes. The store applies it.
     @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = false
+    /// The projects folded shut, by repo path, one per line.
+    @AppStorage("sidebar.folded") private var folded = ""
 
     var body: some View {
         let p = state.palette
@@ -19,14 +22,19 @@ struct SidebarView: View {
             ScrollView {
                 LazyVStack(spacing: 2) {
                     ForEach(store.groups, id: \.key) { group in
-                        if let key = group.key {
-                            RepoHeader(name: URL(fileURLWithPath: key).lastPathComponent, palette: p)
+                        let name = group.key.map { URL(fileURLWithPath: $0).lastPathComponent }
+                        let shut = group.key.map(isFolded) ?? false
+                        if let key = group.key, let name {
+                            ProjectHeader(name: name, sessions: group.items, folded: shut, palette: p,
+                                          onToggle: { toggleFold(key) }, onNew: { commands.newSessionIn(key) })
                         }
-                        ForEach(group.items) { session in
+                        // The session on screen stays in its folded project, so ⌘1 to ⌘9 never select a hidden row.
+                        ForEach(shut ? group.items.filter { $0.id == store.selectedID } : group.items) { session in
                             SessionRow(
                                 session: session,
                                 selected: session.id == store.selectedID && !state.showingSettings,
                                 palette: p,
+                                groupName: name,
                                 // Reselecting would pull focus back into the terminal, which a rename would lose.
                                 onSelect: {
                                     if session.id != store.selectedID || state.showingSettings { store.select(session) }
@@ -65,12 +73,24 @@ struct SidebarView: View {
                     .onEnded { _ in dragStart = nil })
         }
     }
+
+    private func isFolded(_ key: String) -> Bool {
+        folded.split(separator: "\n").contains { $0 == key }
+    }
+
+    private func toggleFold(_ key: String) {
+        var keys = folded.split(separator: "\n").map(String.init)
+        if let index = keys.firstIndex(of: key) { keys.remove(at: index) } else { keys.append(key) }
+        withAnimation(.easeOut(duration: 0.15)) { folded = keys.joined(separator: "\n") }
+    }
 }
 
 private struct SessionRow: View {
     @ObservedObject var session: Session
     let selected: Bool
     let palette: Palette
+    /// The project section's name, when the sidebar is grouped.
+    let groupName: String?
     let onSelect: () -> Void
     let onRename: (String) -> Void
     let onClose: () -> Void
@@ -123,7 +143,8 @@ private struct SessionRow: View {
                     .onExitCommand { editing = false }
                     .onChange(of: fieldFocused) { _, focused in if !focused { commit() } }
             } else {
-                let name = Text(session.displayName)
+                let name = Text(branchTitle ?? session.displayName)
+                    .truncationMode(branchTitle == nil ? .tail : .middle)
                     .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? palette.text : palette.text.opacity(0.78))
                 if session.isWorktreeCheckout {
@@ -149,16 +170,16 @@ private struct SessionRow: View {
                     .foregroundStyle(palette.muted)
                     .truncationMode(.tail)
                     .hoverTip(waiting)
-            } else {
+            } else if branchTitle == nil || gitLine != nil || !session.ports.isEmpty {
                 HStack(spacing: 6) {
                     // Ahead of the spacer, which would otherwise take half the room and cut the branch short.
                     Group {
-                        if let branch = gitLine {
+                        if let line = gitLine {
                             HStack(spacing: 4) {
-                                BranchMark(color: palette.muted)
-                                Text(branch).truncationMode(.middle)
+                                if branchTitle == nil { BranchMark(color: palette.muted) }
+                                Text(line).truncationMode(.middle)
                             }
-                        } else if let location = session.remoteLocation ?? session.location {
+                        } else if branchTitle == nil, let location = session.remoteLocation ?? session.location {
                             Text(location).truncationMode(.head)
                         }
                     }
@@ -180,10 +201,17 @@ private struct SessionRow: View {
 
     /// The branch, and what is left to do while git is stopped. In the row's usual gray, since the lamp already asks for you.
     private var gitLine: String? {
-        guard session.stopped != nil else { return session.remoteLocation == nil ? session.branch : nil }
+        let branch = branchTitle == nil ? session.branch : nil
+        guard session.stopped != nil else { return session.remoteLocation == nil ? branch : nil }
         let left = session.conflicts == 0 ? "ready to continue"
             : "\(session.conflicts) \(session.conflicts == 1 ? "conflict" : "conflicts")"
-        return [session.branch, left].compactMap { $0 }.joined(separator: " · ")
+        return [branch, left].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// Under a project's header, a session named after the project reads as its branch, so three farol rows don't all say farol.
+    private var branchTitle: String? {
+        guard let groupName, session.displayName == groupName, session.remoteLocation == nil else { return nil }
+        return session.branch
     }
 
     private func startEditing() {
@@ -259,6 +287,69 @@ struct RepoHeader: View {
             .padding(.horizontal, 10)
             .padding(.top, 12)
             .padding(.bottom, 4)
+    }
+}
+
+/// A project's name above its sessions. Click to fold them away. Folded, it shows how many there are and the most pressing lamp among them.
+private struct ProjectHeader: View {
+    let name: String
+    let sessions: [Session]
+    let folded: Bool
+    let palette: Palette
+    let onToggle: () -> Void
+    let onNew: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(name.uppercased())
+                .font(.system(size: 10.5, weight: .semibold))
+                .tracking(0.6)
+                .foregroundStyle(palette.vivid ? palette.pull : palette.muted)
+            if folded {
+                Text(verbatim: "\(sessions.count)")
+                    .font(.system(size: 10.5, design: .monospaced))
+                    .foregroundStyle(palette.muted.opacity(0.7))
+                FoldedLamp(sessions: sessions, palette: palette)
+            }
+            Spacer(minLength: 0)
+            if hovering {
+                CloseButton(symbol: "plus", help: "New session in \(name)", palette: palette, action: onNew)
+            }
+            Image(systemName: "chevron.right")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(palette.muted)
+                .rotationEffect(.degrees(folded ? 0 : 90))
+                .frame(width: 20)
+                .opacity(hovering || folded ? 1 : 0)
+        }
+        .lineLimit(1)
+        .frame(height: 20)
+        .padding(.leading, 10)
+        .padding(.trailing, 6)
+        .padding(.top, 8)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onToggle)
+        .onClickableHover { hovering = $0 }
+    }
+}
+
+/// The lamp a folded project shows for its sessions, so an agent waiting inside never goes unseen.
+private struct FoldedLamp: View {
+    let sessions: [Session]
+    let palette: Palette
+
+    /// Bumped whenever a session changes, since the header doesn't observe each one.
+    @State private var changes = 0
+
+    var body: some View {
+        let _ = changes
+        // Ordered by who needs you: git stopped, an agent asking, an agent finished, then one still working.
+        let pressing: [Session.Activity] = [.stopped, .waiting, .done, .working]
+        let activity = pressing.first { level in sessions.contains { $0.activity == level } } ?? .idle
+        Lamp(activity: activity, selected: false, palette: palette)
+            .onReceive(Publishers.MergeMany(sessions.map(\.objectWillChange))) { _ in changes += 1 }
     }
 }
 

@@ -4,9 +4,17 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Click a project's header in the sidebar to fold its sessions. A folded project shows how many it holds and lights up when one needs you. Hover the header for a button that opens a new session there.
+
+### Changed
+
+- Under a project's header, a session named after the project shows its branch as its name.
+
 ### Fixed
 
-- A narrow sidebar no longer hides the branch behind the worktree tag, which now sits beside the session name and shrinks first.
+- A narrow sidebar no longer hides the branch behind the worktree tag, which now sits beside the session name and steps aside when there is no room.
 - A session lists only the ports that serve a page, so a database or Vite's hot reload no longer shows next to the dev server. The sidebar shows the first one and how many more.
 
 ## [0.55.0] - 2026-11-02
