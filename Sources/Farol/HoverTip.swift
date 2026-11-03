@@ -11,6 +11,9 @@ final class HoverTip {
     var colors = (background: NSColor.black, foreground: NSColor.white) { didSet { restyle() } }
 
     private static let delay: TimeInterval = 0.5
+    /// Moving from one control to the next within this long shows the next tip at once, as macOS does.
+    private static let warmth: TimeInterval = 0.5
+    private var leftAt: Date?
     private let panel: NSPanel
     private let bubble = Bubble()
     private var pending: DispatchWorkItem?
@@ -37,7 +40,7 @@ final class HoverTip {
         pending?.cancel()
         let work = DispatchWorkItem { [weak self] in guard let self else { return }; present(styled(text), below: rect, in: window, leading: false) }
         pending = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.delay, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + wait, execute: work)
     }
 
     /// A larger tip with its own styling, starting at the left of `rect` so it reads from where the mouse is.
@@ -45,12 +48,19 @@ final class HoverTip {
         pending?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.present(card, below: rect, in: window, leading: true) }
         pending = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.delay, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + wait, execute: work)
     }
 
-    func hide() {
+    private var wait: TimeInterval {
+        guard let leftAt, Date().timeIntervalSince(leftAt) < Self.warmth else { return Self.delay }
+        return 0
+    }
+
+    /// `leaving` is the mouse moving off a control whose tip showed, which keeps the next one quick. A click or a key resets that.
+    func hide(leaving: Bool = false) {
         pending?.cancel()
         pending = nil
+        leftAt = leaving && panel.isVisible ? Date() : nil
         guard panel.isVisible else { return }
         owner?.removeChildWindow(panel)
         panel.orderOut(nil)
@@ -67,13 +77,23 @@ final class HoverTip {
             origin.x = min(max(origin.x, screen.minX + 4), screen.maxX - width - 4)
             if origin.y < screen.minY { origin.y = rect.maxY + 6 }
         }
-        panel.setFrame(NSRect(origin: origin, size: NSSize(width: width, height: height)), display: true)
+        let frame = NSRect(origin: origin, size: NSSize(width: width, height: height))
+        // Fades in and settles a few points away from the control, so it arrives rather than blinks on.
+        let still = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        panel.setFrame(still ? frame : frame.offsetBy(dx: 0, dy: frame.minY < rect.minY ? 3 : -3), display: true)
+        panel.alphaValue = 0
         if owner !== window {
             owner?.removeChildWindow(panel)
             owner = window
         }
         window.addChildWindow(panel, ordered: .above)
         panel.orderFront(nil)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.14
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().alphaValue = 1
+            panel.animator().setFrame(frame, display: true)
+        }
     }
 
     private func styled(_ text: String) -> NSAttributedString {
@@ -104,14 +124,14 @@ final class HoverTip {
 
 /// The tip's rounded background and its text, drawn directly so every part of the text shows.
 private final class Bubble: NSView {
-    static let padding = NSSize(width: 8, height: 4)
+    static let padding = NSSize(width: 9, height: 5)
 
     var text = NSAttributedString() { didSet { needsDisplay = true } }
     var fill = NSColor.darkGray
     var edge = NSColor.gray
 
     override func draw(_ dirtyRect: NSRect) {
-        let shape = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 6, yRadius: 6)
+        let shape = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 7, yRadius: 7)
         fill.setFill()
         shape.fill()
         edge.setStroke()
@@ -151,7 +171,7 @@ private struct HoverTipAnchor: NSViewRepresentable {
             HoverTip.shared.show(text, below: window.convertToScreen(convert(bounds, to: nil)), in: window)
         }
 
-        override func mouseExited(with event: NSEvent) { HoverTip.shared.hide() }
+        override func mouseExited(with event: NSEvent) { HoverTip.shared.hide(leaving: true) }
 
         override func viewWillMove(toWindow newWindow: NSWindow?) {
             if newWindow == nil { HoverTip.shared.hide() }
