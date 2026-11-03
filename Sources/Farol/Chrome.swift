@@ -120,10 +120,11 @@ struct TopBar: View {
         (state.sidebarVisible ? state.sidebarWidth : 0) + (filesVisible ? state.filesWidth : 0)
     }
 
-    // The merge view covers every panel but the sidebar, so the bar is laid out as if they were closed.
-    private var filesVisible: Bool { state.filesVisible && !state.showingMerge }
-    private var reviewWidth: CGFloat { state.showingMerge ? 0 : state.reviewWidth }
-    private var graphWidth: CGFloat { state.showingMerge ? 0 : state.graphWidth }
+    // The merge view and settings cover every panel but the sidebar, so the bar is laid out as if they were closed.
+    private var covered: Bool { state.showingMerge || state.showingSettings }
+    private var filesVisible: Bool { state.filesVisible && !covered }
+    private var reviewWidth: CGFloat { covered ? 0 : state.reviewWidth }
+    private var graphWidth: CGFloat { covered ? 0 : state.graphWidth }
 
     /// Every panel runs up into the bar in its own color, like Mac apps with a sidebar, and the terminal's part matches the terminal.
     @ViewBuilder private func columns(_ p: Palette) -> some View {
