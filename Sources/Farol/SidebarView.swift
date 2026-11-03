@@ -28,8 +28,7 @@ struct SidebarView: View {
                             ProjectHeader(name: name, sessions: group.items, folded: shut, palette: p,
                                           onToggle: { toggleFold(key) }, onNew: { commands.newSessionIn(key) })
                         }
-                        // The session on screen stays in its folded project, so ⌘1 to ⌘9 never select a hidden row.
-                        ForEach(shut ? group.items.filter { $0.id == store.selectedID } : group.items) { session in
+                        ForEach(shut ? [] : group.items) { session in
                             SessionRow(
                                 session: session,
                                 selected: session.id == store.selectedID && !state.showingSettings,
@@ -53,6 +52,11 @@ struct SidebarView: View {
             // Pinned below the list, so it stays in the same place however many sessions there are.
             NewTaskRow(palette: p, action: commands.newTask)
                 .padding(8)
+        }
+        // Reaching a session in a folded project, with ⌘1 to ⌘9 or a notification, opens the project so the row is there.
+        .onChange(of: store.selectedID) { _, id in
+            guard let key = store.sessions.first(where: { $0.id == id })?.repoRoot, isFolded(key) else { return }
+            toggleFold(key)
         }
         // Fixed width, so collapsing the sidebar clips it instead of reflowing every row.
         .frame(width: state.sidebarWidth)
