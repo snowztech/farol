@@ -7,3 +7,4 @@ Follow [CONTRIBUTING.md](CONTRIBUTING.md). In short:
 - Commit messages are one line, Conventional Commits style. No body, no co-author trailer.
 - PR descriptions follow `.github/pull_request_template.md`: two or three sentences for what and why, then short bullets. No paragraphs, no summaries of the diff, no lists of every file changed, no AI attribution footer.
 - Comments explain why, not what. No em dashes.
+- UI changes (views, color, icons, motion) follow [DESIGN.md](DESIGN.md).
