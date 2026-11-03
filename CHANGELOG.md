@@ -12,6 +12,8 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - Settings groups its rows into cards, with an icon for each section.
 - The sidebar has larger rows, quieter project headers and a selection that slides to the row you pick. Panels open on a softer curve, buttons give a little when pressed, and tooltips fade in, with the next one showing at once as you move along.
+- Agents, integrations and each Settings section have a colored icon, and states like Connected share one badge. Pi shows its own mark.
+- Empty panels show a quiet symbol with their message, and the review panel's header reads like the sidebar.
 - Boxed with color is gone. If you used it, Farol switches you to Boxed.
 
 - Settings → Appearance → Animations turns the motion off. Reduce Motion in macOS does too.
