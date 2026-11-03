@@ -4,6 +4,20 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Settings → Appearance → Style → Glass puts the sidebar, files and graph panels on Liquid Glass, with the desktop blurred through them. Older macOS gets a plain blur.
+
+### Changed
+
+- Settings groups its rows into cards, with an icon for each section.
+- The sidebar has larger rows, quieter project headers and a selection that slides to the row you pick. Panels open on a softer curve, buttons give a little when pressed, and tooltips fade in, with the next one showing at once as you move along.
+- Boxed with color is gone. If you used it, Farol switches you to Boxed.
+
+### Fixed
+
+- A narrow Settings page no longer squeezes a row's words to one letter per line or draws over the panels beside it.
+
 ## [0.57.0] - 2026-11-03
 
 Each session keeps its own panels, and switching back shows them at once.
