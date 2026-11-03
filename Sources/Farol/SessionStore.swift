@@ -569,8 +569,6 @@ final class SessionStore: ObservableObject {
 
     private func create(_ panes: PaneContainer, directory: String, select: Bool = true) -> Session {
         let session = Session(panes: panes, directory: directory)
-        // A sidebar you hid stays hidden for keyboard users, so a new session doesn't bring it back.
-        session.panels.sidebar = selected?.panels.sidebar ?? true
         panes.terminals.forEach { wire($0, to: session) }
         panes.onFocusChange = { [weak self, weak session] in
             session?.show($0)
@@ -782,9 +780,9 @@ final class SessionStore: ObservableObject {
     }
 }
 
-/// The panels a session had open when you left it. A new session starts with the files, graph and review closed, and the sidebar as you have it.
+/// The panels a session had open when you left it. A new session starts with them closed.
+/// The sidebar isn't one of them: it's how you move between sessions, so it stays as you set it.
 struct Panels: Codable, Equatable {
-    var sidebar = true
     var files = false
     var graph = false
     var review = false

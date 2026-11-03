@@ -398,11 +398,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func toggleSidebar() {
-        setSidebar(visible: sidebarWidth.constant == 0)
-    }
-
-    private func setSidebar(visible open: Bool) {
-        remember { $0.sidebar = open }
+        let open = sidebarWidth.constant == 0
         withAnimation(.easeOut(duration: 0.18)) { state.sidebarVisible = open }
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.18
@@ -891,7 +887,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// Brings back the panels the session had open. The review closes before the switch and opens after it, so it never reads the other session's diff.
     private func arrange(_ session: Session?) {
         let panels = session?.panels ?? Panels()
-        if state.sidebarVisible != panels.sidebar { setSidebar(visible: panels.sidebar) }
         if state.filesVisible != panels.files { setFiles(visible: panels.files) }
         if state.graphVisible != panels.graph { setGraph(visible: panels.graph) }
         if !panels.review, review.isOpen { toggleReview(closing: true) }
