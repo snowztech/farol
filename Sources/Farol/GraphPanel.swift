@@ -299,9 +299,13 @@ struct GraphPanel: View {
                 historyHeader(p)
             }
             if let error = graph.error {
-                message(error, p)
+                EmptyState(symbol: "exclamationmark.triangle", text: error, palette: p)
             } else if graph.rows.isEmpty {
-                message(graph.root == nil ? state.noRepoMessage : "No commits.", p)
+                if graph.root == nil {
+                    EmptyState(symbol: state.noRepoSymbol, text: state.noRepoMessage, palette: p)
+                } else {
+                    EmptyState(symbol: "clock", text: "No commits.", palette: p)
+                }
             } else {
                 let lanes = min(graph.rows.map(\.width).max() ?? 1, CommitRow.maxLanes)
                 let rows = matchingRows
@@ -484,13 +488,6 @@ struct GraphPanel: View {
                     resize(start - drag.translation.width)
                 }
                 .onEnded { _ in dragStart = nil })
-    }
-
-    private func message(_ text: String, _ p: Palette) -> some View {
-        Text(text)
-            .font(.system(size: 12))
-            .foregroundStyle(p.muted)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

@@ -172,7 +172,7 @@ struct MergePanel: View {
                 Rectangle().fill(p.line).frame(height: 1)
             }
             if merge.operation == nil {
-                message("Git isn't stopped on a merge or a rebase here.", p)
+                EmptyState(symbol: "arrow.triangle.merge", text: "Git isn't stopped on a merge or a rebase here.", palette: p)
             } else {
                 HStack(spacing: 0) {
                     if listsFiles {

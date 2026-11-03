@@ -925,9 +925,13 @@ struct ReviewPanel: View {
             Rectangle().fill(p.line).frame(height: 1)
             if review.findOpen { findBar(p) }
             if let error = review.error {
-                message(error, p)
+                EmptyState(symbol: "exclamationmark.triangle", text: error, palette: p)
             } else if review.rows.isEmpty {
-                message(review.root == nil ? state.noRepoMessage : "No changes.", p)
+                if review.root == nil {
+                    EmptyState(symbol: state.noRepoSymbol, text: state.noRepoMessage, palette: p)
+                } else {
+                    EmptyState(symbol: "checkmark.circle", text: "No changes.", palette: p)
+                }
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -1090,13 +1094,6 @@ struct ReviewPanel: View {
         let total = "\(review.matches.count)\(review.matches.count >= ReviewModel.matchLimit ? "+" : "")"
         guard let current = review.current else { return "\(total) \(review.matches.count == 1 ? "match" : "matches")" }
         return "\(current + 1) of \(total)"
-    }
-
-    private func message(_ text: String, _ p: Palette) -> some View {
-        Text(text)
-            .font(.system(size: 12))
-            .foregroundStyle(p.muted)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     /// The line between the terminal and the panel, wide enough to grab and drag.

@@ -8,6 +8,7 @@ final class WindowState: ObservableObject {
     /// The selected session is over ssh, so the panels have nothing local to show.
     @Published var remote = false
     var noRepoMessage: String { remote ? "Not available over ssh." : "Not a git repository." }
+    var noRepoSymbol: String { remote ? "network" : "folder.badge.questionmark" }
     /// Kept here so the About menu item can open settings on its page.
     @Published var settingsSection = SettingsPage.Section.terminal
     /// The three column merge view replaces the terminal while git is stopped on conflicts.
@@ -605,6 +606,29 @@ extension View {
     /// Hover for anything clickable: runs `action` and shows the pointing hand while the mouse is over it.
     func onClickableHover(_ action: @escaping (Bool) -> Void) -> some View {
         modifier(ClickableHover { inside in withAnimation(.easeOut(duration: 0.1)) { action(inside) } })
+    }
+}
+
+/// What a panel shows when it has nothing to show: a quiet symbol and a line, in the middle of the panel.
+struct EmptyState: View {
+    let symbol: String
+    let text: String
+    let palette: Palette
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: symbol)
+                .font(.system(size: 20))
+                .foregroundStyle(palette.muted)
+                .frame(width: 48, height: 48)
+                .background(palette.raised.opacity(0.7), in: Circle())
+            Text(text)
+                .font(.system(size: 12))
+                .foregroundStyle(palette.muted)
+                .multilineTextAlignment(.center)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
