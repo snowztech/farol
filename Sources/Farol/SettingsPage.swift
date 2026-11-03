@@ -63,6 +63,32 @@ struct SettingsPage: View {
         case remote = "Remote"
         case shortcuts = "Shortcuts"
         case about = "About"
+
+        var symbol: String {
+            switch self {
+            case .terminal: "apple.terminal"
+            case .appearance: "paintpalette"
+            case .agents: "sparkles"
+            case .worktrees: "arrow.triangle.branch"
+            case .integrations: "puzzlepiece.extension"
+            case .remote: "iphone"
+            case .shortcuts: "command"
+            case .about: "info"
+            }
+        }
+
+        /// The theme's own hues, so the tiles change with it like everything else.
+        func tint(_ p: Palette) -> Color {
+            switch self {
+            case .terminal: p.done
+            case .appearance: Color(nsColor: p.code.keyword)
+            case .agents: p.waiting
+            case .worktrees: p.working
+            case .integrations: p.pull
+            case .remote: p.removed
+            case .shortcuts, .about: p.muted
+            }
+        }
     }
 
     var body: some View {
@@ -70,7 +96,7 @@ struct SettingsPage: View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(Section.allCases, id: \.self) { s in
-                    NavItem(title: s.rawValue, selected: s == section, palette: p) { section = s }
+                    NavItem(title: s.rawValue, symbol: s.symbol, tint: s.tint(p), selected: s == section, palette: p) { section = s }
                 }
                 Spacer()
                 OpenConfigRow(palette: p, action: settings.openFile)
@@ -123,44 +149,48 @@ struct SettingsPage: View {
 
     @ViewBuilder private func appearance(_ p: Palette) -> some View {
         Heading(title: "Appearance", detail: nil, palette: p)
-        Row(title: "App icon", detail: "Shown in the Dock while Farol runs.", palette: p) {
-            Picker("", selection: $appIcon) {
-                ForEach(AppIcon.allCases, id: \.self) { icon in
-                    Label {
-                        Text(icon == .default ? "\(icon.title) (default)" : icon.title)
-                    } icon: {
-                        if let image = icon.menuImage { Image(nsImage: image) }
+        Card(palette: p) {
+            Row(title: "App icon", detail: "Shown in the Dock while Farol runs.", palette: p) {
+                Picker("", selection: $appIcon) {
+                    ForEach(AppIcon.allCases, id: \.self) { icon in
+                        Label {
+                            Text(icon == .default ? "\(icon.title) (default)" : icon.title)
+                        } icon: {
+                            if let image = icon.menuImage { Image(nsImage: image) }
+                        }
+                        .tag(icon.rawValue)
                     }
-                    .tag(icon.rawValue)
                 }
+                .labelsHidden()
+                .fixedSize()
             }
-            .labelsHidden()
-            .fixedSize()
         }
-        .padding(.bottom, 8)
 
         GroupTitle(title: "Sidebar", palette: p)
-        Row(title: "Group sessions by project",
-            detail: "Sessions in the same git repository, worktrees included, go under one header once you work in more than one.",
-            palette: p) {
-            toggle($groupByRepo)
+        Card(palette: p) {
+            Row(title: "Group sessions by project",
+                detail: "Sessions in the same git repository, worktrees included, go under one header once you work in more than one.",
+                palette: p) {
+                toggle($groupByRepo)
+            }
         }
-        .padding(.bottom, 8)
 
         GroupTitle(title: "Window", palette: p)
-        Row(title: "Style",
-            detail: "Boxed puts each panel in a rounded card. Glass puts the side panels on Liquid Glass, with the desktop blurred through them.",
-            palette: p) {
-            Picker("", selection: $state.style) {
-                ForEach(UIStyle.allCases, id: \.self) { Text($0.title).tag($0) }
+        Card(palette: p) {
+            Row(title: "Style",
+                detail: "Boxed puts each panel in a rounded card. Glass puts the side panels on Liquid Glass, with the desktop blurred through them.",
+                palette: p) {
+                Picker("", selection: $state.style) {
+                    ForEach(UIStyle.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                .labelsHidden()
+                .fixedSize()
             }
-            .labelsHidden()
-            .fixedSize()
-        }
-        Row(title: "Run button on panes",
-            detail: "▶ in a pane's corner, under the mouse, runs one of the project's commands, and ■ stops it with the port it listens on. ⌘P and the right-click menu run them too.",
-            palette: p) {
-            toggle($runButton)
+            Row(title: "Run button on panes",
+                detail: "▶ in a pane's corner, under the mouse, runs one of the project's commands, and ■ stops it with the port it listens on. ⌘P and the right-click menu run them too.",
+                palette: p) {
+                toggle($runButton)
+            }
         }
         .padding(.bottom, 32)
 
@@ -198,56 +228,64 @@ struct SettingsPage: View {
         Heading(title: "Terminal", detail: "Applies to every session.", palette: p)
 
         GroupTitle(title: "Font", palette: p)
-        Row(title: "Family", palette: p) {
-            Picker("", selection: $settings.fontFamily) {
-                Text("Default").tag("")
-                ForEach(Settings.monospacedFamilies, id: \.self) { Text($0).tag($0) }
+        Card(palette: p) {
+            Row(title: "Family", palette: p) {
+                Picker("", selection: $settings.fontFamily) {
+                    Text("Default").tag("")
+                    ForEach(Settings.monospacedFamilies, id: \.self) { Text($0).tag($0) }
+                }
+                .labelsHidden()
+                .fixedSize()
             }
-            .labelsHidden()
-            .fixedSize()
-        }
-        Row(title: "Size", palette: p) {
-            Stepper("\(settings.fontSize) pt", value: $settings.fontSize, in: 8...32)
+            Row(title: "Size", palette: p) {
+                Stepper("\(settings.fontSize) pt", value: $settings.fontSize, in: 8...32)
+            }
         }
 
         GroupTitle(title: "Cursor", palette: p)
-        Row(title: "Style", palette: p) {
-            Picker("", selection: $settings.cursorStyle) {
-                Text("Block").tag("block")
-                Text("Bar").tag("bar")
-                Text("Underline").tag("underline")
+        Card(palette: p) {
+            Row(title: "Style", palette: p) {
+                Picker("", selection: $settings.cursorStyle) {
+                    Text("Block").tag("block")
+                    Text("Bar").tag("bar")
+                    Text("Underline").tag("underline")
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .fixedSize()
             }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-            .fixedSize()
-        }
-        Row(title: "Blink", palette: p) {
-            toggle($settings.cursorBlink)
+            Row(title: "Blink", palette: p) {
+                toggle($settings.cursorBlink)
+            }
         }
 
         GroupTitle(title: "Keyboard and mouse", palette: p)
-        Row(title: "Option key as Alt",
-            detail: "For shortcuts in programs like vim or emacs. Leave it off to type accents with Option.",
-            palette: p) {
-            Picker("", selection: $settings.optionAsAlt) {
-                Text("Off").tag("false")
-                Text("Left").tag("left")
-                Text("Right").tag("right")
-                Text("Both").tag("true")
+        Card(palette: p) {
+            Row(title: "Option key as Alt",
+                detail: "For shortcuts in programs like vim or emacs. Leave it off to type accents with Option.",
+                palette: p) {
+                Picker("", selection: $settings.optionAsAlt) {
+                    Text("Off").tag("false")
+                    Text("Left").tag("left")
+                    Text("Right").tag("right")
+                    Text("Both").tag("true")
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .fixedSize()
             }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-            .fixedSize()
-        }
-        Row(title: "Copy on select", detail: "Selecting text copies it to the clipboard.", palette: p) {
-            toggle($settings.copyOnSelect)
+            Row(title: "Copy on select", detail: "Selecting text copies it to the clipboard.", palette: p) {
+                toggle($settings.copyOnSelect)
+            }
         }
 
         GroupTitle(title: "Config file", palette: p)
-        Row(title: "~/.config/farol/config",
-            detail: "Everything on this page is saved here. Add any other option and save, and it applies right away. If you also use Ghostty, its config loads first and Farol's wins.",
-            palette: p) {
-            ShipButton(title: "Open", busy: false, palette: p, action: settings.openFile)
+        Card(palette: p) {
+            Row(title: "~/.config/farol/config",
+                detail: "Everything on this page is saved here. Add any other option and save, and it applies right away. If you also use Ghostty, its config loads first and Farol's wins.",
+                palette: p) {
+                ShipButton(title: "Open", busy: false, palette: p, action: settings.openFile)
+            }
         }
         ForEach(settings.configErrors, id: \.self) { error in
             Text(error)
@@ -262,69 +300,81 @@ struct SettingsPage: View {
         Heading(title: "Agents", detail: "Set up your coding agents so Farol can tell you when they need you.", palette: p)
 
         GroupTitle(title: "Status", palette: p)
-        ForEach(Array(agentSetups.enumerated()), id: \.element.id) { agentRow($0.element, in: agentFolders[$0.offset], p) }
+        Card(palette: p) {
+            ForEach(Array(agentSetups.enumerated()), id: \.element.id) { agentRow($0.element, in: agentFolders[$0.offset], p) }
+        }
 
         GroupTitle(title: "Agents working together", palette: p)
-        Row(title: "Let agents start tasks and message sessions",
-            detail: "Any agent in Farol can list the sessions with farol sessions, wait for one and read what it said. With this on, it can also start a task in a new worktree with farol task, and type to another agent with farol send.",
-            palette: p) {
-            toggle($agents.agentControl)
-        }
-        Row(title: "Let Farol Voice control sessions",
-            detail: "Farol Voice can go to a session, type to its agent and start tasks when you tell it to. Farol checks that it's really Farol Voice asking.",
-            palette: p) {
-            toggle($agents.voiceControl)
+        Card(palette: p) {
+            Row(title: "Let agents start tasks and message sessions",
+                detail: "Any agent in Farol can list the sessions with farol sessions, wait for one and read what it said. With this on, it can also start a task in a new worktree with farol task, and type to another agent with farol send.",
+                palette: p) {
+                toggle($agents.agentControl)
+            }
+            Row(title: "Let Farol Voice control sessions",
+                detail: "Farol Voice can go to a session, type to its agent and start tasks when you tell it to. Farol checks that it's really Farol Voice asking.",
+                palette: p) {
+                toggle($agents.voiceControl)
+            }
         }
 
         GroupTitle(title: "When Farol opens", palette: p)
-        Row(title: "Resume agent conversations",
-            detail: "Agents that were running when Farol quit pick up where they left off, in the same panes. Needs the agent connected above.",
-            palette: p) {
-            toggle($agents.resume)
+        Card(palette: p) {
+            Row(title: "Resume agent conversations",
+                detail: "Agents that were running when Farol quit pick up where they left off, in the same panes. Needs the agent connected above.",
+                palette: p) {
+                toggle($agents.resume)
+            }
         }
 
         GroupTitle(title: "Notifications", palette: p)
-        if notificationsBlocked {
-            Row(title: "macOS is blocking Farol's notifications",
-                detail: "Turn them on for Farol in System Settings, under Notifications.", palette: p) {
-                ShipButton(title: "Open System Settings", busy: false, palette: p) {
-                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")!)
+        Card(palette: p) {
+            if notificationsBlocked {
+                Row(title: "macOS is blocking Farol's notifications",
+                    detail: "Turn them on for Farol in System Settings, under Notifications.", palette: p) {
+                    ShipButton(title: "Open System Settings", busy: false, palette: p) {
+                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")!)
+                    }
                 }
             }
+            Row(title: "When an agent is waiting for you", palette: p) { toggle($agents.notifyWaiting) }
+            Row(title: "When an agent finishes", palette: p) { toggle($agents.notifyDone) }
+            Row(title: "Waiting count on the Dock icon", palette: p) { toggle($agents.dockBadge) }
         }
-        Row(title: "When an agent is waiting for you", palette: p) { toggle($agents.notifyWaiting) }
-        Row(title: "When an agent finishes", palette: p) { toggle($agents.notifyDone) }
-        Row(title: "Waiting count on the Dock icon", palette: p) { toggle($agents.dockBadge) }
 
         GroupTitle(title: "Outside Farol", palette: p)
-        Row(title: "In the menu bar", detail: "See agents working, waiting or done from any app, and jump to a session.", palette: p) {
-            toggle($agents.menuBarStatus)
-        }
-        Row(title: "Status panel", detail: "A small black panel while agents are active. Hover it to see the sessions.", palette: p) {
-            Picker("", selection: statusPanel) {
-                Text("Off").tag("off")
-                if NotchStatus.isAvailable { Text("At the notch").tag(NotchStatus.Place.notch.rawValue) }
-                Text("On the screen edge").tag(NotchStatus.Place.edge.rawValue)
+        Card(palette: p) {
+            Row(title: "In the menu bar", detail: "See agents working, waiting or done from any app, and jump to a session.", palette: p) {
+                toggle($agents.menuBarStatus)
             }
-            .labelsHidden()
-            .fixedSize()
+            Row(title: "Status panel", detail: "A small black panel while agents are active. Hover it to see the sessions.", palette: p) {
+                Picker("", selection: statusPanel) {
+                    Text("Off").tag("off")
+                    if NotchStatus.isAvailable { Text("At the notch").tag(NotchStatus.Place.notch.rawValue) }
+                    Text("On the screen edge").tag(NotchStatus.Place.edge.rawValue)
+                }
+                .labelsHidden()
+                .fixedSize()
+            }
         }
 
         GroupTitle(title: "New sessions", palette: p)
-        Row(title: "Start with", detail: "Typed into the shell of every new session, so you are back in the shell when it exits.", palette: p) {
-            Picker("", selection: startPreset) {
-                Text("Shell").tag("")
-                ForEach(agentFolders, id: \.id) { Text($0.label).tag($0.command()) }
-                Text("Custom").tag(Self.custom)
+        Card(palette: p) {
+            Row(title: "Start with", detail: "Typed into the shell of every new session, so you are back in the shell when it exits.", palette: p) {
+                Picker("", selection: startPreset) {
+                    Text("Shell").tag("")
+                    ForEach(agentFolders, id: \.id) { Text($0.label).tag($0.command()) }
+                    Text("Custom").tag(Self.custom)
+                }
+                .labelsHidden()
+                .fixedSize()
             }
-            .labelsHidden()
-            .fixedSize()
-        }
-        if isCustomStart {
-            Row(title: "Command", palette: p) {
-                TextField("For example aider", text: $agents.startCommand)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 220)
+            if isCustomStart {
+                Row(title: "Command", palette: p) {
+                    TextField("For example aider", text: $agents.startCommand)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 220)
+                }
             }
         }
         if let agentError {
@@ -339,10 +389,12 @@ struct SettingsPage: View {
         Heading(title: "Worktrees", detail: "Applies to new tasks and worktree sessions.", palette: p)
 
         GroupTitle(title: "Local environment", palette: p)
-        Row(title: "Copy local environment files",
-            detail: "Copies ignored .env files into each new worktree so projects can run immediately. Agents in the worktree can read their values.",
-            palette: p) {
-            toggle($worktrees.copyEnvironmentFiles)
+        Card(palette: p) {
+            Row(title: "Copy local environment files",
+                detail: "Copies ignored .env files into each new worktree so projects can run immediately. Agents in the worktree can read their values.",
+                palette: p) {
+                toggle($worktrees.copyEnvironmentFiles)
+            }
         }
     }
 
@@ -354,32 +406,36 @@ struct SettingsPage: View {
             .font(.system(size: 11.5))
             .foregroundStyle(p.muted)
             .padding(.bottom, 4)
-        ForEach(Forge.Kind.allCases, id: \.self) { toolRow($0, p) }
+        Card(palette: p) {
+            ForEach(Forge.Kind.allCases, id: \.self) { toolRow($0, p) }
+        }
 
         GroupTitle(title: "Tickets", palette: p)
         Text("New Task lists your open Jira tickets, next to the open issues of a repo on GitHub. Picking one names the branch after it and hands the agent the ticket in full.")
             .font(.system(size: 11.5))
             .foregroundStyle(p.muted)
             .padding(.bottom, 4)
-        Row(title: "Jira", detail: jiraDetail, icon: ForgeIcon(source: .jira, size: 13), link: ("Jira CLI (jira)", Jira.docs), palette: p) {
-            toolControl(jira, avatar: jiraAvatar, setup: Jira.setupCommand(from:), p)
-        }
-        if listsBoards {
-            Row(title: "Tickets to list",
-                detail: "Your own open tickets, or everything open on a team's board. A scrum board lists its current sprint.",
-                palette: p) {
-                Picker("", selection: $jiraBoard) {
-                    Text("Assigned to me").tag("")
-                    Divider()
-                    // The chosen board is listed before the others load, so the picker never shows a blank.
-                    ForEach(jiraBoards.isEmpty ? [Jira.Board(line: jiraBoard)].compactMap { $0 } : jiraBoards, id: \.id) { board in
-                        Text(board.name).tag(board.line)
+        Card(palette: p) {
+            Row(title: "Jira", detail: jiraDetail, icon: ForgeIcon(source: .jira, size: 13), link: ("Jira CLI (jira)", Jira.docs), palette: p) {
+                toolControl(jira, avatar: jiraAvatar, setup: Jira.setupCommand(from:), p)
+            }
+            if listsBoards {
+                Row(title: "Tickets to list",
+                    detail: "Your own open tickets, or everything open on a team's board. A scrum board lists its current sprint.",
+                    palette: p) {
+                    Picker("", selection: $jiraBoard) {
+                        Text("Assigned to me").tag("")
+                        Divider()
+                        // The chosen board is listed before the others load, so the picker never shows a blank.
+                        ForEach(jiraBoards.isEmpty ? [Jira.Board(line: jiraBoard)].compactMap { $0 } : jiraBoards, id: \.id) { board in
+                            Text(board.name).tag(board.line)
+                        }
                     }
+                    .labelsHidden()
+                    // The menu would grow as wide as the longest board's name and squeeze the words beside it.
+                    .frame(width: 220)
+                    .disabled(jira == nil)
                 }
-                .labelsHidden()
-                // The menu would grow as wide as the longest board's name and squeeze the words beside it.
-                .frame(width: 220)
-                .disabled(jira == nil)
             }
         }
     }
@@ -564,43 +620,49 @@ struct SettingsPage: View {
 
     @ViewBuilder private func remoteSection(_ p: Palette) -> some View {
         Heading(title: "Remote", detail: "Answer your agents from your phone when you are away from the Mac.", palette: p, beta: true)
-        Row(title: "Let a paired phone in",
-            detail: "It sees your sessions and types into them, and shows the agents connected in Settings → Agents. The Mac has to stay on, since the agents run on it.",
-            palette: p) {
-            toggle($agents.remote)
+        Card(palette: p) {
+            Row(title: "Let a paired phone in",
+                detail: "It sees your sessions and types into them, and shows the agents connected in Settings → Agents. The Mac has to stay on, since the agents run on it.",
+                palette: p) {
+                toggle($agents.remote)
+            }
+            if agents.remote {
+                Row(title: "Keep the Mac awake for agents",
+                    detail: "While an agent works or waits for you, the Mac does not go to sleep by itself. Closing the lid still puts it to sleep.",
+                    palette: p) {
+                    toggle($agents.remoteKeepAwake)
+                }
+            }
         }
         if let problem = remote.problem {
             Text(problem).font(.system(size: 12)).foregroundStyle(p.waiting).padding(.top, 6)
         }
         if agents.remote {
-            Row(title: "Keep the Mac awake for agents",
-                detail: "While an agent works or waits for you, the Mac does not go to sleep by itself. Closing the lid still puts it to sleep.",
-                palette: p) {
-                toggle($agents.remoteKeepAwake)
-            }
             GroupTitle(title: "Phones", palette: p)
-            ForEach(remote.devices, id: \.key) { device in
-                Row(title: device.name,
-                    detail: remote.connected.contains(device.key) ? "Connected now" : "Not connected",
-                    palette: p) {
-                    ShipButton(title: "Remove", help: "It is cut off at once, and has to scan a new code to come back.", busy: false, palette: p) {
-                        remote.remove(device)
+            Card(palette: p) {
+                ForEach(remote.devices, id: \.key) { device in
+                    Row(title: device.name,
+                        detail: remote.connected.contains(device.key) ? "Connected now" : "Not connected",
+                        palette: p) {
+                        ShipButton(title: "Remove", help: "It is cut off at once, and has to scan a new code to come back.", busy: false, palette: p) {
+                            remote.remove(device)
+                        }
                     }
                 }
-            }
-            // The app comes before the code, since the code is only read from inside it.
-            Row(title: "Farol for iPhone", detail: "The app that scans the code and shows your sessions. Remote needs an iPhone for now.", palette: p) {
-                ShipButton(title: "Get the app", busy: false, palette: p) {
-                    if let page = URL(string: RemoteBridge.iPhoneApp) { NSWorkspace.shared.open(page) }
+                // The app comes before the code, since the code is only read from inside it.
+                Row(title: "Farol for iPhone", detail: "The app that scans the code and shows your sessions. Remote needs an iPhone for now.", palette: p) {
+                    ShipButton(title: "Get the app", busy: false, palette: p) {
+                        if let page = URL(string: RemoteBridge.iPhoneApp) { NSWorkspace.shared.open(page) }
+                    }
                 }
-            }
-            Row(title: remote.devices.isEmpty ? "Pair your phone" : "Pair another phone",
-                detail: remote.offer == nil
-                    ? "Shows a code to scan from the app. It works once, for two minutes."
-                    : "Scan this from the app. Whoever scans it can type into your sessions, so show it to nobody else.",
-                palette: p) {
-                ShipButton(title: remote.offer == nil ? "Show code" : "Hide", busy: false, palette: p) {
-                    remote.offer == nil ? remote.showOffer() : remote.hideOffer()
+                Row(title: remote.devices.isEmpty ? "Pair your phone" : "Pair another phone",
+                    detail: remote.offer == nil
+                        ? "Shows a code to scan from the app. It works once, for two minutes."
+                        : "Scan this from the app. Whoever scans it can type into your sessions, so show it to nobody else.",
+                    palette: p) {
+                    ShipButton(title: remote.offer == nil ? "Show code" : "Hide", busy: false, palette: p) {
+                        remote.offer == nil ? remote.showOffer() : remote.hideOffer()
+                    }
                 }
             }
             if let link = remote.link, let code = Self.qrCode(link.absoluteString) {
@@ -615,29 +677,31 @@ struct SettingsPage: View {
             }
 
             GroupTitle(title: "Connection", palette: p)
-            let whose = remote.ownRelay == nil ? "Farol's relay" : remote.relayHost
-            Row(title: remote.online ? "Connected through \(whose)" : "Not connected to \(whose)",
-                detail: relayDraft == nil
-                    ? "The relay joins this Mac with your phone. Everything is encrypted between the two, so the relay cannot read it."
-                    : "The address of a relay you run, like relay.example.com. Phones you already paired have to scan a new code after a change.",
-                palette: p) {
-                if let draft = relayDraft {
-                    HStack(spacing: 8) {
-                        TextField("relay.example.com", text: Binding(get: { draft }, set: { relayDraft = $0 }))
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 200)
-                            .onSubmit(saveRelay)
-                            // Escape leaves the relay as it was.
-                            .onExitCommand { relayDraft = nil }
-                        ShipButton(title: "Cancel", busy: false, palette: p) { relayDraft = nil }
-                        ShipButton(title: "Use it", busy: false, palette: p, action: saveRelay)
+            Card(palette: p) {
+                let whose = remote.ownRelay == nil ? "Farol's relay" : remote.relayHost
+                Row(title: remote.online ? "Connected through \(whose)" : "Not connected to \(whose)",
+                    detail: relayDraft == nil
+                        ? "The relay joins this Mac with your phone. Everything is encrypted between the two, so the relay cannot read it."
+                        : "The address of a relay you run, like relay.example.com. Phones you already paired have to scan a new code after a change.",
+                    palette: p) {
+                    if let draft = relayDraft {
+                        HStack(spacing: 8) {
+                            TextField("relay.example.com", text: Binding(get: { draft }, set: { relayDraft = $0 }))
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 200)
+                                .onSubmit(saveRelay)
+                                // Escape leaves the relay as it was.
+                                .onExitCommand { relayDraft = nil }
+                            ShipButton(title: "Cancel", busy: false, palette: p) { relayDraft = nil }
+                            ShipButton(title: "Use it", busy: false, palette: p, action: saveRelay)
+                        }
+                        // Without this the row squeezes the buttons until their titles are cut to dots.
+                        .fixedSize()
+                    } else if remote.ownRelay == nil {
+                        ShipButton(title: "Use your own", help: "For a relay you run yourself.", busy: false, palette: p) { relayDraft = "" }
+                    } else {
+                        ShipButton(title: "Use Farol's", busy: false, palette: p) { remote.useRelay("") }
                     }
-                    // Without this the row squeezes the buttons until their titles are cut to dots.
-                    .fixedSize()
-                } else if remote.ownRelay == nil {
-                    ShipButton(title: "Use your own", help: "For a relay you run yourself.", busy: false, palette: p) { relayDraft = "" }
-                } else {
-                    ShipButton(title: "Use Farol's", busy: false, palette: p) { remote.useRelay("") }
                 }
             }
         }
@@ -662,10 +726,12 @@ struct SettingsPage: View {
         Heading(title: "Shortcuts", detail: "Standard terminal shortcuts, plus Farol's own for sessions.", palette: p)
         ForEach(Self.shortcutGroups, id: \.title) { group in
             GroupTitle(title: group.title, palette: p)
-            ForEach(group.items, id: \.action) { item in
-                Row(title: item.action, palette: p) {
-                    HStack(spacing: 4) {
-                        ForEach(item.keys, id: \.self) { Keycap(keys: $0, palette: p) }
+            Card(palette: p) {
+                ForEach(group.items, id: \.action) { item in
+                    Row(title: item.action, palette: p) {
+                        HStack(spacing: 4) {
+                            ForEach(item.keys, id: \.self) { Keycap(keys: $0, palette: p) }
+                        }
                     }
                 }
             }
@@ -915,6 +981,23 @@ private struct QuietLink: View {
     }
 }
 
+/// Rows that belong together, on one rounded card like System Settings. Each row's rule parts it from the next.
+private struct Card<Content: View>: View {
+    let palette: Palette
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+        VStack(alignment: .leading, spacing: 0) { content }
+            .padding(.horizontal, 14)
+            // The last row's rule would sit on the card's own edge, so it is cut off.
+            .padding(.bottom, -1)
+            .background(palette.surface)
+            .clipShape(shape)
+            .overlay(shape.strokeBorder(palette.line.opacity(0.7)))
+    }
+}
+
 /// A small heading between rows. Sentence case, a step above the rows, no rule of its own.
 private struct GroupTitle: View {
     let title: String
@@ -925,7 +1008,7 @@ private struct GroupTitle: View {
             .font(.system(size: 12, weight: .semibold))
             .foregroundStyle(palette.muted)
             .padding(.top, 22)
-            .padding(.bottom, 2)
+            .padding(.bottom, 8)
     }
 }
 
@@ -1094,6 +1177,8 @@ private struct Keycap: View {
 
 private struct NavItem: View {
     let title: String
+    let symbol: String
+    let tint: Color
     let selected: Bool
     let palette: Palette
     let action: () -> Void
@@ -1102,14 +1187,19 @@ private struct NavItem: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            HStack(spacing: 9) {
+                Image(systemName: symbol)
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 20, height: 20)
+                    .background(tint.gradient, in: RoundedRectangle(cornerRadius: 5.5, style: .continuous))
                 Text(title)
                     .font(.system(size: 13, weight: selected ? .medium : .regular))
-                    .foregroundStyle(selected ? palette.text : palette.muted)
+                    .foregroundStyle(selected ? palette.text : palette.text.opacity(0.85))
                 Spacer()
             }
-            .padding(.vertical, 6)
-            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .padding(.horizontal, 8)
             .background(RoundedRectangle(cornerRadius: 6).fill(selected ? palette.selection : hovering ? palette.hover : .clear))
             .contentShape(Rectangle())
         }
