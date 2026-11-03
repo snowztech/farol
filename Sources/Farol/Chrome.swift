@@ -643,6 +643,8 @@ private struct ClickableHover: ViewModifier {
 
 /// The one close button, for panels, panes and rows. QuietButton draws the same in AppKit.
 struct CloseButton: View {
+    /// A plus for the same small button that adds instead.
+    var symbol = "xmark"
     let help: String
     let palette: Palette
     let action: () -> Void
@@ -651,7 +653,7 @@ struct CloseButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "xmark")
+            Image(systemName: symbol)
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(hovering ? palette.text : palette.muted)
                 .frame(width: 20, height: 20)
