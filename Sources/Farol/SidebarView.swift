@@ -61,7 +61,7 @@ struct SidebarView: View {
         // Fixed width, so collapsing the sidebar clips it instead of reflowing every row.
         .frame(width: state.sidebarWidth)
         .frame(maxHeight: .infinity)
-        .background(p.surface)
+        .background(p.panel)
         .overlay(alignment: .trailing) {
             Rectangle().fill(p.boxed ? .clear : p.line).frame(width: 1)
                 .frame(width: 7, alignment: .trailing)

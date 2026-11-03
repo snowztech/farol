@@ -11,6 +11,10 @@ enum UIStyle: String, CaseIterable {
     case boxed
     /// Boxed, with the theme's blue tinting the panels and lighting what is selected.
     case vivid
+    /// Classic, with the side panels on Liquid Glass and the desktop blurred through them.
+    case glass
+    /// Boxed, with the cards on Liquid Glass and the desktop blurred around them.
+    case boxedGlass
 
     static let key = "appearance.style"
     static var saved: UIStyle { UserDefaults.standard.string(forKey: key).flatMap(UIStyle.init) ?? .classic }
@@ -20,13 +24,18 @@ enum UIStyle: String, CaseIterable {
         case .classic: "Classic"
         case .boxed: "Boxed"
         case .vivid: "Boxed with color"
+        case .glass: "Glass"
+        case .boxedGlass: "Boxed glass"
         }
     }
 
+    /// Every panel is a card with a gap around it.
+    var boxed: Bool { self != .classic && self != .glass }
+    var glass: Bool { self == .glass || self == .boxedGlass }
     /// The space around each panel.
-    var gap: CGFloat { self == .classic ? 0 : 8 }
+    var gap: CGFloat { boxed ? 8 : 0 }
     /// How round a panel's corners are. With the gap around it, they follow the window's own corners.
-    var radius: CGFloat { self == .classic ? 0 : 10 }
+    var radius: CGFloat { boxed ? 10 : 0 }
 }
 
 /// Every color comes from the terminal theme, so Farol looks right with any of them.
@@ -64,8 +73,16 @@ struct Palette: Equatable {
     /// A row under the mouse. Fainter than `raised`, so it never reads as selected.
     var hover: Color { raised.opacity(0.35) }
 
-    var boxed: Bool { style != .classic }
+    var boxed: Bool { style.boxed }
     var vivid: Bool { style == .vivid }
+    var glass: Bool { style.glass }
+    /// The side panels' fill. Glass lets the blur through, the terminal and code stay solid to be read.
+    /// On macOS 26 the panels sit on Liquid Glass, which brings its own fill.
+    var panel: Color {
+        guard glass else { return surface }
+        if #available(macOS 26, *) { return .clear }
+        return surface.opacity(0.25)
+    }
 
     init(_ runtime: TerminalRuntime, style: UIStyle = .classic) {
         self.init(background: runtime.backgroundColor, foreground: runtime.foregroundColor, ansi: runtime.ansiColors,
@@ -86,7 +103,12 @@ struct Palette: Equatable {
         selection = vivid ? Color(nsColor: bg.mixed(with: blue, 0.3)) : raised
         // Darker than the terminal in a dark theme, so the cards stand out from it. A light theme has no room above white.
         let black = NSColor(srgbRed: 0, green: 0, blue: 0, alpha: 1)
-        backdrop = Color(nsColor: style == .classic ? bg : bg.isDark ? bg.mixed(with: black, 0.35) : bg.mixed(with: fg, 0.07))
+        backdrop = switch style {
+        case .classic: Color(nsColor: bg)
+        // The window's blur shows here, tinted toward the theme so it never looks like a stray system gray.
+        case .glass, .boxedGlass: Color(nsColor: bg).opacity(0.12)
+        default: Color(nsColor: bg.isDark ? bg.mixed(with: black, 0.35) : bg.mixed(with: fg, 0.07))
+        }
         text = Color(nsColor: fg)
         muted = Color(nsColor: bg.mixed(with: fg, 0.55))
         accent = Color(nsColor: fg)

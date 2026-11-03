@@ -128,7 +128,8 @@ struct TopBar: View {
     @ViewBuilder private func columns(_ p: Palette) -> some View {
         // Boxed, the panels are cards below the bar, and the bar is part of what is around them.
         if p.boxed {
-            p.backdrop
+            // Glass already has its tint under the whole window.
+            p.glass ? .clear : p.backdrop
         } else {
             touchingColumns(p)
         }
@@ -136,15 +137,15 @@ struct TopBar: View {
 
     private func touchingColumns(_ p: Palette) -> some View {
         HStack(spacing: 0) {
-            Rectangle().fill(p.surface).frame(width: state.sidebarVisible ? state.sidebarWidth - 1 : 0)
+            Rectangle().fill(p.panel).frame(width: state.sidebarVisible ? state.sidebarWidth - 1 : 0)
             Rectangle().fill(p.line).frame(width: state.sidebarVisible ? 1 : 0)
-            Rectangle().fill(p.surface).frame(width: filesVisible ? state.filesWidth - 1 : 0)
+            Rectangle().fill(p.panel).frame(width: filesVisible ? state.filesWidth - 1 : 0)
             Rectangle().fill(p.line).frame(width: filesVisible ? 1 : 0)
             Rectangle().fill(p.background)
             Rectangle().fill(p.line).frame(width: reviewWidth > 0 ? 1 : 0)
             Rectangle().fill(p.background).frame(width: max(reviewWidth - 1, 0))
             Rectangle().fill(p.line).frame(width: graphWidth > 0 ? 1 : 0)
-            Rectangle().fill(p.surface).frame(width: max(graphWidth - 1, 0))
+            Rectangle().fill(p.panel).frame(width: max(graphWidth - 1, 0))
         }
     }
 

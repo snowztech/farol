@@ -118,7 +118,7 @@ struct FilesPanel: View {
         // Fixed width, so closing the panel clips it instead of reflowing every row.
         .frame(width: state.filesWidth, alignment: .leading)
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(p.surface)
+        .background(p.panel)
         .overlay(alignment: .trailing) { edge(p) }
     }
 

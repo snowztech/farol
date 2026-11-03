@@ -375,7 +375,7 @@ struct GraphPanel: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(p.surface)
+        .background(p.panel)
         .overlay(alignment: .leading) { edge(p) }
     }
 
