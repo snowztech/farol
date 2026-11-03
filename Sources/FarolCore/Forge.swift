@@ -441,8 +441,9 @@ public struct Forge: Equatable {
             }
             try Git.run(tool, ["pr", "review", "\(number)", flag] + (text.isEmpty ? [] : ["--body", text]), in: directory)
         case .gitlab:
-            if !text.isEmpty { try Git.run(tool, ["mr", "note", "\(number)", "--message", text], in: directory) }
+            // Approving first, as it's what fails on your own merge request, so a retry never posts the note twice.
             if verdict == .approve { try Git.run(tool, ["mr", "approve", "\(number)"], in: directory) }
+            if !text.isEmpty { try Git.run(tool, ["mr", "note", "\(number)", "--message", text], in: directory) }
         }
     }
 
