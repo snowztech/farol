@@ -234,6 +234,27 @@ public struct Forge: Equatable {
         return Diff.parse(try Git.run(path, arguments, in: directory, trimming: false))
     }
 
+    /// Every line of `file` at `commit`, a request's head, for the unmodified lines its diff leaves out.
+    /// Nil when the forge can't give it, like a binary file. Talks to the forge, so call it off the main thread.
+    public func lines(of file: String, at commit: String, in directory: String) -> [String]? {
+        guard let path = kind.toolPath else { return nil }
+        var allowed = CharacterSet.urlPathAllowed
+        allowed.remove(charactersIn: "?#")
+        let text: String?
+        switch kind {
+        case .github:
+            guard let encoded = file.addingPercentEncoding(withAllowedCharacters: allowed) else { return nil }
+            text = try? Git.run(path, ["api", "-H", "Accept: application/vnd.github.raw",
+                                       "repos/{owner}/{repo}/contents/\(encoded)?ref=\(commit)"], in: directory, trimming: false)
+        case .gitlab:
+            // GitLab wants the slashes of the path encoded too.
+            allowed.remove("/")
+            guard let encoded = file.addingPercentEncoding(withAllowedCharacters: allowed) else { return nil }
+            text = try? Git.run(path, ["api", "projects/:id/repository/files/\(encoded)/raw?ref=\(commit)"], in: directory, trimming: false)
+        }
+        return text.map(Diff.lines(of:))
+    }
+
     /// What was said on a request: its description, then every comment, oldest first.
     public struct Discussion: Equatable {
         public struct Comment: Equatable {
@@ -394,6 +415,35 @@ public struct Forge: Equatable {
             defer { try? FileManager.default.removeItem(at: file) }
             try Git.run(tool, ["api", "--method", "POST", "--header", "Content-Type: application/json", "--input", file.path,
                                "projects/:id/merge_requests/\(number)/discussions"], in: directory)
+        }
+    }
+
+    /// How a review ends.
+    public enum Verdict: CaseIterable {
+        case comment, approve, requestChanges
+
+        /// GitLab's tool has no way to ask for changes.
+        public func isOffered(by kind: Kind) -> Bool { self != .requestChanges || kind == .github }
+        /// Only a comment or a request for changes means nothing without words.
+        public var needsText: Bool { self != .approve }
+    }
+
+    /// Finishes your review of request `number`, with `text` as its summary.
+    /// Talks to the forge, so call it off the main thread.
+    public func submitReview(_ text: String, as verdict: Verdict, onRequest number: Int, in directory: String) throws {
+        guard let tool = kind.toolPath else { throw GitError(description: "\(self.tool) isn't installed.") }
+        switch kind {
+        case .github:
+            let flag = switch verdict {
+            case .comment: "--comment"
+            case .approve: "--approve"
+            case .requestChanges: "--request-changes"
+            }
+            try Git.run(tool, ["pr", "review", "\(number)", flag] + (text.isEmpty ? [] : ["--body", text]), in: directory)
+        case .gitlab:
+            // Approving first, as it's what fails on your own merge request, so a retry never posts the note twice.
+            if verdict == .approve { try Git.run(tool, ["mr", "approve", "\(number)"], in: directory) }
+            if !text.isEmpty { try Git.run(tool, ["mr", "note", "\(number)", "--message", text], in: directory) }
         }
     }
 

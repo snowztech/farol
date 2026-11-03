@@ -131,6 +131,10 @@ final class ReviewModel: ObservableObject {
     /// Files with unmodified lines opened, as the diff gave them and as shown. Kept while the diff of the file stays the same.
     private var expanded: [String: (base: Diff.File, shown: Diff.File)] = [:]
     private var expandedScope: Diff.Scope?
+    /// Files of the request on screen, as the forge gave them, so each is asked for once.
+    private var requestLines: [String: [String]] = [:]
+    /// Files whose unmodified lines are being read, for the spinner in the gap that was clicked.
+    @Published private(set) var expanding: Set<String> = []
 
     // MARK: Find
 
@@ -419,6 +423,7 @@ final class ReviewModel: ObservableObject {
         shownRequest = request
         // Another click reads it again, for commits pushed since.
         fetchedRequest = nil
+        requestLines = [:]
         browse(.request(request.number), in: root)
         loadDiscussion()
     }
@@ -480,6 +485,20 @@ final class ReviewModel: ObservableObject {
                 guard let updated else { return self.sendError = "Sent, but couldn't read it back. View on \(forge.name) shows it." }
                 self.composing = nil
                 self.discussion = updated
+            }
+        }
+    }
+
+    /// Ends your review of the request on screen, then reads the conversation again so a summary shows in it.
+    func submitReview(_ text: String, as verdict: Forge.Verdict, done: @escaping (String?) -> Void) {
+        guard let root, let forge, let request = shownRequest else { return done("No request to review.") }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let sent = Result { try forge.submitReview(text, as: verdict, onRequest: request.number, in: root) }
+            let updated = (try? sent.get()) == nil ? nil : forge.discussion(ofRequest: request.number, in: root)
+            DispatchQueue.main.async { [weak self] in
+                if case .failure(let error) = sent { return done(String(describing: error)) }
+                if let self, self.root == root, self.shownRequest?.number == request.number, let updated { self.discussion = updated }
+                done(nil)
             }
         }
     }
@@ -645,24 +664,34 @@ final class ReviewModel: ObservableObject {
     /// Lines shown by one click on a gap's button. A smaller gap opens whole.
     private static let expandStep = 20
 
-    var canExpand: Bool { !scope.isRequest }
-
     /// Shows more of the unmodified lines in `gap`, from its top, next to the change above, or from its bottom.
     func expand(_ path: String, gap: Range<Int>, fromTop: Bool) {
-        guard canExpand, let root, let file = files.first(where: { $0.path == path }) else { return }
+        guard let root, let file = files.first(where: { $0.path == path }), !expanding.contains(path) else { return }
         let scope = scope
         let part = gap.count <= Self.expandStep * 2 ? gap
             : fromTop ? gap.lowerBound..<(gap.lowerBound + Self.expandStep) : (gap.upperBound - Self.expandStep)..<gap.upperBound
+        func show(_ text: [String]) {
+            guard let at = files.firstIndex(where: { $0.path == file.path }) else { return }
+            let shown = files[at].expanding(part, from: text)
+            expanded[path] = (expanded[path]?.base ?? file, shown)
+            files[at] = shown
+            rebuild()
+            search()
+        }
+        // A request's file comes from the forge, which takes a while, so it is asked for once.
+        if let text = requestLines[path] { return show(text) }
+        // The commit loaded with the request, so the lines match the diff on screen even after a push.
+        let forge = forge, head = discussion?.head
+        expanding.insert(path)
         DispatchQueue.global(qos: .userInitiated).async {
-            let text = Diff.newLines(of: path, in: root, scope)
+            let text = scope.isRequest ? head.flatMap { forge?.lines(of: path, at: $0, in: root) } : Diff.newLines(of: path, in: root, scope)
             DispatchQueue.main.async { [weak self] in
-                guard let self, self.root == root, self.scope == scope, let text,
-                      let at = self.files.firstIndex(where: { $0.path == file.path }) else { return }
-                let shown = self.files[at].expanding(part, from: text)
-                self.expanded[path] = (self.expanded[path]?.base ?? file, shown)
-                self.files[at] = shown
-                self.rebuild()
-                self.search()
+                guard let self else { return }
+                self.expanding.remove(path)
+                guard self.root == root, self.scope == scope else { return }
+                guard let text else { return NSSound.beep() }
+                if scope.isRequest { self.requestLines[path] = text }
+                show(text)
             }
         }
     }
@@ -694,7 +723,7 @@ final class ReviewModel: ObservableObject {
                     for file in files where !known.contains(file.path) && file.added + file.removed > Self.foldedAbove {
                         self.collapsed.insert(file.path)
                     }
-                    if self.expandedScope != scope { self.expanded = [:] }
+                    if self.expandedScope != scope { self.expanded = [:]; self.requestLines = [:] }
                     self.expandedScope = scope
                     self.files = files.map { file in
                         if let kept = self.expanded[file.path], kept.base == file { return kept.shown }
@@ -845,6 +874,7 @@ struct ReviewPanel: View {
                 if let forge = review.forge, let request = review.shownRequest, review.scope == .request(request.number) {
                     ShipButton(title: "View on \(forge.name)", help: "Open \(forge.request) #\(request.number) in the browser",
                                busy: false, icon: forge.kind, palette: p) { NSWorkspace.shared.open(request.url) }
+                    if forge.takesLineComments { SubmitReviewButton(review: review, forge: forge, palette: p) }
                 }
                 if !isCommit {
                     RequestBadge(review: review, palette: p)
@@ -964,7 +994,8 @@ struct ReviewPanel: View {
         case .body(let file, let rows):
             DiffText(file: file, rows: rows, colors: p.diff, syntax: p.code,
                      comment: review.canComment ? { review.startComment(on: .init(path: file.path, line: $0, old: $1)) } : nil,
-                     expand: review.canExpand ? { review.expand(file.path, gap: $0, fromTop: $1) } : nil,
+                     expand: { review.expand(file.path, gap: $0, fromTop: $1) },
+                     loading: review.expanding.contains(file.path),
                      marks: review.marks[file.path])
                 .padding(.horizontal, 8)
         case .thread(_, let comments):
@@ -1485,6 +1516,113 @@ private struct MarkdownBlocks: View {
     static func inline(_ text: String) -> Text {
         let markdown = Markdown.inlineHTML(text)
         return Text((try? AttributedString(markdown: markdown, options: Self.options)) ?? AttributedString(markdown))
+    }
+}
+
+/// "Submit review" on a request: opens a small popover to say how it went, then sends it. ⌘↩ sends, Escape puts it away.
+private struct SubmitReviewButton: View {
+    @ObservedObject var review: ReviewModel
+    let forge: Forge
+    let palette: Palette
+
+    @State private var open = false
+    @State private var text = ""
+    @State private var verdict = Forge.Verdict.comment
+    @State private var sending = false
+    @State private var failure: String?
+    @FocusState private var focused: Bool
+
+    private var ready: Bool {
+        !sending && (!verdict.needsText || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
+
+    var body: some View {
+        ShipButton(title: "Submit review", help: "Finish your review of this \(forge.request)", busy: false, palette: palette) { open.toggle() }
+            .popover(isPresented: $open, arrowEdge: .bottom) { form }
+    }
+
+    private var form: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Finish your review").font(.system(size: 13, weight: .semibold))
+            TextEditor(text: $text)
+                .font(.system(size: 12))
+                .scrollContentBackground(.hidden)
+                .focused($focused)
+                .frame(height: 96)
+                .padding(6)
+                .background(RoundedRectangle(cornerRadius: 6).fill(palette.background))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(focused ? palette.muted : palette.line))
+            VStack(spacing: 2) {
+                ForEach(Forge.Verdict.allCases.filter { $0.isOffered(by: forge.kind) }, id: \.self) { choice in
+                    VerdictRow(title: Self.title(choice), selected: verdict == choice, palette: palette) { verdict = choice }
+                }
+            }
+            if let failure {
+                Text(failure).font(.system(size: 11)).foregroundStyle(palette.removed).fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
+                ShipButton(title: "Cancel", busy: false, palette: palette) { open = false }
+                ShipButton(title: sending ? "Submitting…" : "Submit", busy: !ready, keys: "⌘↩", palette: palette, action: submit)
+                    .keyboardShortcut(.return, modifiers: .command)
+            }
+        }
+        .font(.system(size: 12))
+        .foregroundStyle(palette.text)
+        .padding(12)
+        .frame(width: 340)
+        .background(palette.background)
+        .onAppear { focused = true }
+        .onExitCommand { open = false }
+    }
+
+    private func submit() {
+        guard ready else { return NSSound.beep() }
+        sending = true
+        failure = nil
+        review.submitReview(text.trimmingCharacters(in: .whitespacesAndNewlines), as: verdict) { error in
+            sending = false
+            failure = error
+            guard error == nil else { return }
+            text = ""
+            verdict = .comment
+            open = false
+        }
+    }
+
+    private static func title(_ verdict: Forge.Verdict) -> String {
+        switch verdict {
+        case .comment: "Comment"
+        case .approve: "Approve"
+        case .requestChanges: "Request changes"
+        }
+    }
+}
+
+/// A choice with a radio mark and no frame, lit only under the mouse.
+private struct VerdictRow: View {
+    let title: String
+    let selected: Bool
+    let palette: Palette
+    let choose: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: choose) {
+            HStack(spacing: 8) {
+                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                    .foregroundStyle(selected ? palette.text : palette.muted)
+                Text(title)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 6)
+            .frame(height: 26)
+            .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised : .clear))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onClickableHover { hovering = $0 }
     }
 }
 

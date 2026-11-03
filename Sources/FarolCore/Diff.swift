@@ -167,7 +167,7 @@ public enum Diff {
     }
 
     /// Every line of a file as the scope's new side has it, to show the lines a diff leaves out.
-    /// Nil when it can't be read as text, and for a request, whose files aren't in the checkout.
+    /// Nil when it can't be read as text, and for a request, whose files aren't in the checkout. `Forge.lines(of:at:in:)` reads those.
     public static func newLines(of path: String, in directory: String, _ scope: Scope) -> [String]? {
         let text: String?
         switch scope {
@@ -178,10 +178,7 @@ public enum Diff {
         case .request:
             text = nil
         }
-        guard var lines = text?.components(separatedBy: "\n") else { return nil }
-        // The newline that ends the last line isn't a line of its own.
-        if lines.last == "" { lines.removeLast() }
-        return lines
+        return text.map(lines(of:))
     }
 
     public static func files(in directory: String, _ scope: Scope) throws -> [File] {
@@ -265,7 +262,8 @@ public enum Diff {
         return file
     }
 
-    private static func lines(of text: String) -> [String] {
+    /// The lines of a file's text. The newline that ends the last line isn't a line of its own.
+    static func lines(of text: String) -> [String] {
         var lines = text.components(separatedBy: "\n")
         if lines.last == "" { lines.removeLast() }
         return lines

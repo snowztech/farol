@@ -6,6 +6,8 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
+- The unmodified lines around a change can be expanded in a pull request or merge request too.
+- A pull request or merge request can be reviewed from its page: comment, approve or ask for changes.
 - Click a project's header in the sidebar to fold its sessions. A folded project shows how many it holds and lights up when one needs you. Hover the header for a button that opens a new session there.
 
 ### Fixed
