@@ -286,9 +286,8 @@ struct RepoHeader: View {
     let palette: Palette
 
     var body: some View {
-        Text(name.uppercased())
-            .font(.system(size: 10.5, weight: .semibold))
-            .tracking(0.6)
+        Text(name)
+            .font(.system(size: 11.5, weight: .medium))
             .foregroundStyle(palette.muted)
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -319,9 +318,8 @@ private struct ProjectHeader: View {
                 if folded { FoldedLamp(sessions: sessions, palette: palette) }
             }
             .frame(width: 7)
-            Text(name.uppercased())
-                .font(.system(size: 10.5, weight: .semibold))
-                .tracking(0.6)
+            Text(name)
+                .font(.system(size: 11.5, weight: .medium))
                 .foregroundStyle(hovering ? palette.text : palette.muted)
             if folded {
                 Text(verbatim: "\(sessions.count)")
@@ -332,11 +330,13 @@ private struct ProjectHeader: View {
             if hovering {
                 CloseButton(symbol: "plus", help: "New session in \(name)", palette: palette, action: onNew)
             }
+            // Only while hovered, or folded so a shut project still says it holds more. The name alone is quieter.
             Image(systemName: "chevron.right")
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(hovering ? palette.text : palette.muted)
                 .rotationEffect(.degrees(folded ? 0 : 90))
                 .frame(width: 20, height: 20)
+                .opacity(hovering || folded ? 1 : 0)
         }
         .lineLimit(1)
         .padding(.leading, 10)
