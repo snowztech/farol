@@ -128,8 +128,7 @@ struct TopBar: View {
     @ViewBuilder private func columns(_ p: Palette) -> some View {
         // Boxed, the panels are cards below the bar, and the bar is part of what is around them.
         if p.boxed {
-            // Glass already has its tint under the whole window.
-            p.glass ? .clear : p.backdrop
+            p.backdrop
         } else {
             touchingColumns(p)
         }
@@ -296,12 +295,10 @@ private struct SessionMenu: View {
                 Text(session.displayName)
                 Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
             }
-            .foregroundStyle(hovering || open || p.vivid ? p.text : p.muted)
+            .foregroundStyle(hovering || open ? p.text : p.muted)
             .padding(.horizontal, 8)
             .frame(height: 20)
-            // With color, the title is a pill all the time, and lights up like a selected row.
-            .background(RoundedRectangle(cornerRadius: 6)
-                .fill(hovering || open ? p.selection : p.vivid ? p.raised : .clear))
+            .background(RoundedRectangle(cornerRadius: 6).fill(hovering || open ? p.selection : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(QuietPress())
@@ -574,7 +571,7 @@ private struct SessionChoice: View {
             HStack(spacing: 9) {
                 // Always takes its room, so every name starts at the same place.
                 Image(systemName: "checkmark").font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(palette.vivid ? palette.pull : palette.text)
+                    .foregroundStyle(palette.text)
                     .opacity(current ? 1 : 0)
                 Lamp(activity: session.activity, selected: true, palette: palette)
                 Text(session.displayName).lineLimit(1).truncationMode(.tail).layoutPriority(1)

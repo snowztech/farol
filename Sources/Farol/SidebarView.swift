@@ -260,12 +260,10 @@ private struct NewTaskRow: View {
                     .foregroundStyle(palette.muted)
             }
         }
-        .foregroundStyle(hovering || palette.vivid ? palette.text : palette.muted)
+        .foregroundStyle(hovering ? palette.text : palette.muted)
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
-        // With color, starting a task is the one filled button in the sidebar.
-        .background(RoundedRectangle(cornerRadius: 6)
-            .fill(palette.vivid ? palette.selection.opacity(hovering ? 1 : 0.6) : hovering ? palette.hover : .clear))
+        .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
     }
 }
@@ -279,7 +277,7 @@ struct RepoHeader: View {
         Text(name.uppercased())
             .font(.system(size: 10.5, weight: .semibold))
             .tracking(0.6)
-            .foregroundStyle(palette.vivid ? palette.pull : palette.muted)
+            .foregroundStyle(palette.muted)
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 10)
@@ -312,7 +310,7 @@ private struct ProjectHeader: View {
             Text(name.uppercased())
                 .font(.system(size: 10.5, weight: .semibold))
                 .tracking(0.6)
-                .foregroundStyle(hovering ? palette.text : palette.vivid ? palette.pull : palette.muted)
+                .foregroundStyle(hovering ? palette.text : palette.muted)
             if folded {
                 Text(verbatim: "\(sessions.count)")
                     .font(.system(size: 10.5, design: .monospaced))

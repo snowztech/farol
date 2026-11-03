@@ -149,7 +149,7 @@ struct SettingsPage: View {
 
         GroupTitle(title: "Window", palette: p)
         Row(title: "Style",
-            detail: "Boxed puts each panel in a rounded card. With color, the panels take a tint of your theme's blue, which also lights what is selected. Glass puts the side panels on Liquid Glass, and Boxed glass the cards.",
+            detail: "Boxed puts each panel in a rounded card. Glass puts the side panels on Liquid Glass, with the desktop blurred through them.",
             palette: p) {
             Picker("", selection: $state.style) {
                 ForEach(UIStyle.allCases, id: \.self) { Text($0.title).tag($0) }
@@ -513,7 +513,7 @@ struct SettingsPage: View {
     private func toggle(_ value: Binding<Bool>) -> some View {
         let p = state.palette
         return Toggle("", isOn: value).labelsHidden().toggleStyle(.switch).controlSize(.small)
-            .tint(p.vivid ? p.pull : p.muted)
+            .tint(p.muted)
     }
 
     private func refreshAgents() {

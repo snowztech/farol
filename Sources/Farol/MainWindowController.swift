@@ -17,13 +17,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     private lazy var notifier = AgentNotifier(settings: agents)
     private let content = NSView()
-    /// What the glass style shows around the cards: the desktop blurred, under a tint of the theme.
+    /// What the glass style shows through its side panels: the desktop blurred, under a tint of the theme.
     private let blur = NSVisualEffectView()
     private let blurTint = NSView()
     /// Liquid Glass behind each side panel, on macOS 26 and later.
     private var glassPanels: [NSView] = []
-    /// Boxed, the glass starts under the top bar like its card. Otherwise it runs up into the bar, as the panels' color does.
-    private var glassTops: [(boxed: NSLayoutConstraint, touching: NSLayoutConstraint)] = []
     private let terminalContainer = NSView()
     private var sidebarWidth: NSLayoutConstraint!
     private static let sidebarWidthKey = "sidebar.width"
@@ -206,9 +204,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
                 let glass = NSGlassEffectView()
                 glass.translatesAutoresizingMaskIntoConstraints = false
                 root.addSubview(glass, positioned: .above, relativeTo: blur)
-                glassTops.append((glass.topAnchor.constraint(equalTo: panel.topAnchor), glass.topAnchor.constraint(equalTo: root.topAnchor)))
+                // Up into the top bar, as the panels' color does in the classic style.
                 NSLayoutConstraint.activate([
-                    glass.bottomAnchor.constraint(equalTo: panel.bottomAnchor),
+                    glass.topAnchor.constraint(equalTo: root.topAnchor), glass.bottomAnchor.constraint(equalTo: panel.bottomAnchor),
                     glass.leadingAnchor.constraint(equalTo: panel.leadingAnchor), glass.trailingAnchor.constraint(equalTo: panel.trailingAnchor),
                 ])
                 glassPanels.append(glass)
@@ -772,23 +770,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         window?.backgroundColor = palette.glass ? .clear : NSColor(palette.backdrop)
         blur.isHidden = !palette.glass
         blurTint.layer?.backgroundColor = NSColor(palette.backdrop).cgColor
-        if #available(macOS 26, *) {
-            for case let glass as NSGlassEffectView in glassPanels {
-                glass.isHidden = !palette.glass
-                glass.cornerRadius = palette.style.radius
-            }
-            for top in glassTops {
-                top.boxed.isActive = palette.boxed
-                top.touching.isActive = !palette.boxed
-            }
-        }
+        glassPanels.forEach { $0.isHidden = !palette.glass }
         // The side panels already clip, which a closed one relies on to hide what is in it, so their corners come for free.
         // The terminal stays clear of its card's corners by its own margin, which spares it a mask.
         for panel in panels {
             panel.layer?.cornerRadius = palette.style.radius
-            // Liquid Glass draws its own edge.
-            let onGlass = palette.glass && !glassPanels.isEmpty && panel !== content && panel !== reviewHost
-            panel.layer?.borderWidth = palette.boxed && !onGlass ? 1 : 0
+            panel.layer?.borderWidth = palette.boxed ? 1 : 0
             panel.layer?.borderColor = NSColor(palette.line).cgColor
         }
         // Settings fills the terminal's card to its edges, so it is cut to the same corners.
