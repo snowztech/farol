@@ -4,11 +4,16 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.56.0] - 2026-11-03
+
+Fold projects in the sidebar, review a pull request without leaving Farol and see what's new before you update.
+
 ### Added
 
 - The unmodified lines around a change can be expanded in a pull request or merge request too.
 - A pull request or merge request can be reviewed from its page: comment, approve or ask for changes.
 - Click a project's header in the sidebar to fold its sessions. A folded project shows how many it holds and lights up when one needs you. Hover the header for a button that opens a new session there.
+- The update dialog shows what's new in the version before you install it.
 
 ### Fixed
 
@@ -1110,7 +1115,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.55.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.56.0...HEAD
+[0.56.0]: https://github.com/snowztech/farol/releases/tag/v0.56.0
 [0.55.0]: https://github.com/snowztech/farol/releases/tag/v0.55.0
 [0.54.1]: https://github.com/snowztech/farol/releases/tag/v0.54.1
 [0.54.0]: https://github.com/snowztech/farol/releases/tag/v0.54.0
