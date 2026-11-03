@@ -1,0 +1,124 @@
+diff --git a/include/ghostty.h b/include/ghostty.h
+index eec6550..17b4611 100644
+--- a/include/ghostty.h
++++ b/include/ghostty.h
+@@ -1239,6 +1239,8 @@ GHOSTTY_API bool ghostty_surface_read_text(ghostty_surface_t,
+                                               ghostty_selection_s,
+                                               ghostty_text_s*);
+ GHOSTTY_API void ghostty_surface_free_text(ghostty_surface_t, ghostty_text_s*);
++GHOSTTY_API bool ghostty_surface_read_vt_screen(ghostty_surface_t, ghostty_text_s*);
++GHOSTTY_API bool ghostty_surface_read_vt_history(ghostty_surface_t, uint32_t, ghostty_text_s*);
+ 
+ #ifdef __APPLE__
+ GHOSTTY_API void ghostty_surface_set_display_id(ghostty_surface_t, uint32_t);
+diff --git a/src/apprt/embedded.zig b/src/apprt/embedded.zig
+index b90366a..3e884ad 100644
+--- a/src/apprt/embedded.zig
++++ b/src/apprt/embedded.zig
+@@ -1940,6 +1940,106 @@ pub const CAPI = struct {
+         ptr.deinit();
+     }
+ 
++    /// Farol: the screen as VT sequences, to draw it again in another
++    /// terminal of the same size: the colors, the modes, the rows from the
++    /// top left, then the cursor. Free it with ghostty_surface_free_text.
++    export fn ghostty_surface_read_vt_screen(
++        surface: *Surface,
++        result: *Text,
++    ) bool {
++        return readVt(surface, null, result) catch |err| {
++            log.warn("error reading vt err={}", .{err});
++            return false;
++        };
++    }
++
++    /// Farol: up to `rows` rows above the screen as VT sequences with their
++    /// colors, oldest first. False when nothing is above it.
++    export fn ghostty_surface_read_vt_history(
++        surface: *Surface,
++        rows: u32,
++        result: *Text,
++    ) bool {
++        if (rows == 0) return false;
++        return readVt(surface, rows, result) catch |err| {
++            log.warn("error reading vt history err={}", .{err});
++            return false;
++        };
++    }
++
++    fn readVt(surface: *Surface, history: ?u32, result: *Text) !bool {
++        const core_surface = &surface.core_surface;
++        core_surface.renderer_state.mutex.lockUncancelable(global.io());
++        defer core_surface.renderer_state.mutex.unlock(global.io());
++
++        const t = core_surface.renderer_state.terminal;
++        const screen = t.screens.active;
++        const pages = &screen.pages;
++        const sel: terminal.Selection = if (history) |rows| sel: {
++            const end = pages.getBottomRight(.history) orelse return false;
++            var start = end.up(rows - 1) orelse pages.getTopLeft(.history);
++            start.x = 0;
++            break :sel .init(start, end, false);
++        } else .init(
++            pages.getTopLeft(.screen),
++            pages.getBottomRight(.screen) orelse return false,
++            false,
++        );
++
++        const alloc = global.alloc();
++        var out: std.Io.Writer.Allocating = .init(alloc);
++        defer out.deinit();
++
++        var formatter: terminal.formatter.TerminalFormatter = .init(t, .{
++            .emit = .vt,
++            .unwrap = false,
++            .trim = true,
++        });
++        formatter.content = .{ .selection = sel.ordered(screen, .forward) };
++        if (history == null) {
++            // The default colors, which the palette does not carry.
++            const osc = [_]struct { u8, ?terminal.color.RGB }{
++                .{ 10, t.colors.foreground.get() },
++                .{ 11, t.colors.background.get() },
++                .{ 12, t.colors.cursor.get() },
++            };
++            for (osc) |entry| if (entry[1]) |rgb| {
++                try out.writer.print(
++                    "\x1b]{d};rgb:{x:0>2}/{x:0>2}/{x:0>2}\x1b\\",
++                    .{ entry[0], rgb.r, rgb.g, rgb.b },
++                );
++            };
++            formatter.extra = .{
++                .palette = true,
++                .modes = true,
++                .scrolling_region = false,
++                .tabstops = false,
++                .pwd = false,
++                .keyboard = true,
++                .screen = .{
++                    .cursor = true,
++                    .style = true,
++                    .hyperlink = false,
++                    .protection = false,
++                    .kitty_keyboard = true,
++                    .charsets = false,
++                },
++            };
++        } else formatter.extra = .none;
++        try formatter.format(&out.writer);
++
++        const text = try alloc.dupeZ(u8, out.written());
++        result.* = .{
++            .tl_px_x = -1,
++            .tl_px_y = -1,
++            .offset_start = 0,
++            .offset_len = 0,
++            .text = text.ptr,
++            .text_len = text.len,
++        };
++        return true;
++    }
++
+     /// Tell the surface that it needs to schedule a render
+     export fn ghostty_surface_refresh(surface: *Surface) void {
+         surface.refresh();
