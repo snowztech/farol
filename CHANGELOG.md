@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.57.0] - 2026-11-03
+
+Each session keeps its own panels, and switching back shows them at once.
+
 ### Changed
 
 - Each session remembers which of the files, git graph and review panels are open and brings them back when you return to it. A new session starts with them closed.
@@ -1123,7 +1127,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.56.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.57.0...HEAD
+[0.57.0]: https://github.com/snowztech/farol/releases/tag/v0.57.0
 [0.56.0]: https://github.com/snowztech/farol/releases/tag/v0.56.0
 [0.55.0]: https://github.com/snowztech/farol/releases/tag/v0.55.0
 [0.54.1]: https://github.com/snowztech/farol/releases/tag/v0.54.1
