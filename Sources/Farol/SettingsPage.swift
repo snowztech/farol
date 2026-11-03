@@ -221,8 +221,8 @@ struct SettingsPage: View {
             .font(.system(size: 13))
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
-            .background(p.surface, in: RoundedRectangle(cornerRadius: 7))
-            .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(p.line))
+            .background(p.surface, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(p.line))
 
             ShipButton(title: "Themes folder", busy: false, palette: p, action: openThemesFolder)
         }
@@ -418,7 +418,7 @@ struct SettingsPage: View {
 
         GroupTitle(title: "Pull requests", palette: p)
         Text("Farol creates pull requests and shows their state through these tools. Without them it opens the new request page in your browser.")
-            .font(.system(size: 11.5))
+            .font(.system(size: 12))
             .foregroundStyle(p.muted)
             .padding(.bottom, 4)
         Card(palette: p) {
@@ -427,7 +427,7 @@ struct SettingsPage: View {
 
         GroupTitle(title: "Tickets", palette: p)
         Text("New Task lists your open Jira tickets, next to the open issues of a repo on GitHub. Picking one names the branch after it and hands the agent the ticket in full.")
-            .font(.system(size: 11.5))
+            .font(.system(size: 12))
             .foregroundStyle(p.muted)
             .padding(.bottom, 4)
         Card(palette: p) {
@@ -778,7 +778,7 @@ struct SettingsPage: View {
             } label: {
                 HStack(spacing: 6) {
                     Text("Version \(Self.version)").font(.system(size: 12, design: .monospaced))
-                    Image(systemName: versionCopied ? "checkmark" : "doc.on.doc").font(.system(size: 10.5))
+                    Image(systemName: versionCopied ? "checkmark" : "doc.on.doc").font(.system(size: 11))
                 }
                 .foregroundStyle(p.muted)
                 .padding(.horizontal, 10)
@@ -804,7 +804,7 @@ struct SettingsPage: View {
                 link("Changelog", Self.repo + "/blob/main/CHANGELOG.md")
                 link("Report an issue", Self.repo + "/issues/new")
             }
-            .font(.system(size: 12.5))
+            .font(.system(size: 13))
             .padding(.top, 24)
 
             // The string literal is read as Markdown, so snowztech becomes a quiet link in the same line.
@@ -910,7 +910,7 @@ private struct Heading: View {
                 Text(title).font(.system(size: 20, weight: .semibold))
                 if beta {
                     Text("Beta")
-                        .font(.system(size: 10.5, weight: .medium))
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(palette.muted)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 1)
@@ -918,7 +918,7 @@ private struct Heading: View {
                 }
             }
             if let detail {
-                Text(detail).font(.system(size: 12.5)).foregroundStyle(palette.muted)
+                Text(detail).font(.system(size: 13)).foregroundStyle(palette.muted)
             }
         }
         .padding(.bottom, 20)
@@ -959,7 +959,7 @@ private struct Row<Control: View>: View {
             HStack(spacing: 6) {
                 if let icon { icon }
                 Text(title).font(.system(size: 13))
-                if let subtitle { Text(subtitle).font(.system(size: 11.5)).foregroundStyle(palette.muted) }
+                if let subtitle { Text(subtitle).font(.system(size: 12)).foregroundStyle(palette.muted) }
             }
             if let detail {
                 // The link is a view of its own between the words around it. Inside one text it couldn't tell when it is hovered.
@@ -972,7 +972,7 @@ private struct Row<Control: View>: View {
                         Text(detail)
                     }
                 }
-                .font(.system(size: 11.5, design: mono ? .monospaced : .default))
+                .font(.system(size: 12, design: mono ? .monospaced : .default))
                 .foregroundStyle(palette.muted)
             }
         }
@@ -1113,7 +1113,7 @@ private struct Avatar: View {
         ZStack {
             Circle().fill(palette.line)
             Text(name.prefix(1).uppercased())
-                .font(.system(size: 9.5, weight: .semibold))
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(palette.muted)
             if let image {
                 Image(nsImage: image).resizable().interpolation(.high).clipShape(Circle())
@@ -1165,8 +1165,8 @@ private struct OpenConfigRow: View {
 
     private var label: some View {
         HStack(spacing: 8) {
-            Image(systemName: "doc.text").font(.system(size: 11.5))
-            Text("Open config file").font(.system(size: 12.5))
+            Image(systemName: "doc.text").font(.system(size: 12))
+            Text("Open config file").font(.system(size: 13))
             Spacer(minLength: 0)
         }
         .foregroundStyle(hovering ? palette.text : palette.muted)
@@ -1183,10 +1183,10 @@ private struct Keycap: View {
 
     var body: some View {
         Text(keys)
-            .font(.system(size: 11.5, weight: .medium, design: .monospaced))
+            .font(.system(size: 12, weight: .medium, design: .monospaced))
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
-            .background(palette.raised, in: RoundedRectangle(cornerRadius: 5))
+            .background(palette.raised, in: RoundedRectangle(cornerRadius: 6))
     }
 }
 
@@ -1208,7 +1208,7 @@ private struct NavItem: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 20, height: 20)
-                    .background(tint.gradient, in: RoundedRectangle(cornerRadius: 5.5, style: .continuous))
+                    .background(tint.gradient, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                 Text(title)
                     .font(.system(size: 13, weight: selected ? .medium : .regular))
                     .foregroundStyle(selected ? palette.text : palette.text.opacity(0.85))
@@ -1217,7 +1217,7 @@ private struct NavItem: View {
             .padding(.vertical, 5)
             .padding(.horizontal, 8)
             .background {
-                let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
+                let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
                 if selected {
                     shape.fill(palette.selection).matchedGeometryEffect(id: "selection", in: highlight)
                 } else {

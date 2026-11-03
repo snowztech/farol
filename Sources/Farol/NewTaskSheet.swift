@@ -535,7 +535,7 @@ private struct AttachmentChip: View {
     var body: some View {
         HStack(spacing: 6) {
             if let thumbnail {
-                Image(nsImage: thumbnail).resizable().scaledToFill().frame(width: 18, height: 18).clipShape(RoundedRectangle(cornerRadius: 3))
+                Image(nsImage: thumbnail).resizable().scaledToFill().frame(width: 18, height: 18).clipShape(RoundedRectangle(cornerRadius: 4))
             } else {
                 Image(systemName: "doc").foregroundStyle(palette.muted)
             }

@@ -16,13 +16,13 @@ final class SearchBar: NSView, NSTextFieldDelegate {
         self.terminal = terminal
         super.init(frame: NSRect(origin: .zero, size: Self.size))
         wantsLayer = true
-        layer?.cornerRadius = 7
+        layer?.cornerRadius = 8
         layer?.borderWidth = 1
 
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
-        field.font = .systemFont(ofSize: 12.5)
+        field.font = .systemFont(ofSize: 13)
         field.placeholderString = "Find"
         field.delegate = self
         count.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)

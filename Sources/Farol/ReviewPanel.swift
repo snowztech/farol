@@ -1054,7 +1054,7 @@ struct ReviewPanel: View {
             Image(systemName: "magnifyingglass").font(.system(size: 11)).foregroundStyle(p.muted)
             TextField("Find in the changes", text: $review.query)
                 .textFieldStyle(.plain)
-                .font(.system(size: 12.5))
+                .font(.system(size: 13))
                 .focused($findFocused)
                 .onSubmit { review.step(1) }
                 .onKeyPress(.return, phases: .down) { press in
@@ -1128,7 +1128,7 @@ private struct ScopeMenu: View {
         Button(action: showMenu) {
             HStack(spacing: 6) {
                 Image(systemName: "arrow.left.arrow.right")
-                    .font(.system(size: 9.5, weight: .semibold))
+                    .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(palette.muted)
                 Text(title).font(.system(size: 12, weight: .medium))
                 Image(systemName: "chevron.up.chevron.down")
@@ -1248,7 +1248,7 @@ private struct FileHeader: View {
                 .foregroundStyle(palette.muted)
                 .frame(width: 15)
             (Text(folder).foregroundColor(palette.muted) + Text(name).foregroundColor(ticked == false ? palette.muted : palette.text))
-                .font(.system(size: 12.5))
+                .font(.system(size: 13))
                 .lineLimit(1)
                 .truncationMode(.head)
             if let status { Text(status).font(.system(size: 11)).foregroundStyle(palette.muted) }
@@ -1368,7 +1368,7 @@ private struct Conversation: View {
                     .rotationEffect(.degrees(folded ? 0 : 90))
                     .foregroundStyle(palette.muted)
                     .frame(width: 12)
-                Text("Conversation").font(.system(size: 12.5)).foregroundStyle(palette.text)
+                Text("Conversation").font(.system(size: 13)).foregroundStyle(palette.text)
                 Text(comments.count == 1 ? "1 comment" : "\(comments.count) comments")
                     .font(.system(size: 11))
                     .foregroundStyle(palette.muted)
@@ -1516,11 +1516,11 @@ private struct MarkdownBlocks: View {
             Self.inline(text).fixedSize(horizontal: false, vertical: true)
         case .code(_, let text):
             Text(text)
-                .font(.system(size: 11.5, design: .monospaced))
+                .font(.system(size: 12, design: .monospaced))
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(8)
-                .background(RoundedRectangle(cornerRadius: 5).fill(palette.surface))
+                .background(RoundedRectangle(cornerRadius: 6).fill(palette.surface))
         case .quote(let blocks):
             MarkdownBlocks(blocks: blocks, palette: palette)
                 .foregroundStyle(palette.muted)

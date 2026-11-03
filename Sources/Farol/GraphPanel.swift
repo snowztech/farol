@@ -440,7 +440,7 @@ struct GraphPanel: View {
             if !searchText.isEmpty {
                 let count = matchingRows.count
                 Text("\(count) \(count == 1 ? "match" : "matches")")
-                    .font(.system(size: 10.5))
+                    .font(.system(size: 11))
                     .foregroundStyle(p.muted)
                     .padding(.leading, 6)
             }
@@ -455,7 +455,7 @@ struct GraphPanel: View {
             ForEach([("All", true), ("Current", false)], id: \.0) { title, all in
                 Button { graph.show(all: all) } label: {
                     Text(title)
-                        .font(.system(size: 10.5, weight: .medium))
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(graph.showsAll == all ? p.text : p.muted)
                         .padding(.horizontal, 6)
                         .frame(height: 18)
@@ -500,7 +500,7 @@ private struct SectionTitle: View {
 
     var body: some View {
         Text(text.prefix(1).uppercased() + text.dropFirst().lowercased())
-            .font(.system(size: 11.5, weight: .medium))
+            .font(.system(size: 12, weight: .medium))
             .foregroundStyle(palette.muted)
     }
 }
@@ -728,7 +728,7 @@ private struct BranchRow: View {
         }
         .padding(.horizontal, 10)
         .frame(height: Self.height)
-        .background(RoundedRectangle(cornerRadius: 5).fill(current ? palette.raised : hovering ? palette.hover : .clear))
+        .background(RoundedRectangle(cornerRadius: 6).fill(current ? palette.raised : hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
         .onClickableHover {
             hovering = $0
@@ -761,7 +761,7 @@ private struct PullRequestButton: View {
                 PullRequestGlyph()
                     .stroke(style: StrokeStyle(lineWidth: 1.15, lineCap: .round, lineJoin: .round))
                     .frame(width: 10, height: 10)
-                Text("#\(request.number)").font(.system(size: 10.5, weight: .semibold).monospacedDigit())
+                Text("#\(request.number)").font(.system(size: 11, weight: .semibold).monospacedDigit())
             }
             .foregroundStyle(hovering ? palette.text : palette.muted)
             .padding(.horizontal, 5)
@@ -817,8 +817,8 @@ private struct DriftButton: View {
         Button(action: action) {
             HStack(spacing: 2) {
                 Image(systemName: symbol).font(.system(size: 9, weight: .bold))
-                Text("\(count)").font(.system(size: 10.5, weight: .semibold).monospacedDigit())
-                if showsLabel { Text(label).font(.system(size: 10.5, weight: .medium)) }
+                Text("\(count)").font(.system(size: 11, weight: .semibold).monospacedDigit())
+                if showsLabel { Text(label).font(.system(size: 11, weight: .medium)) }
             }
             .foregroundStyle(color)
             .padding(.horizontal, 5)
@@ -906,7 +906,7 @@ private struct CommitRow: View {
             }
             if room >= Self.hashWidth + Self.spacing {
                 Text(copied ? "Copied" : row.commit.shortHash)
-                    .font(.system(size: 10.5, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(copied ? palette.text : hoveringHash ? palette.text : palette.muted.opacity(0.8))
                     .underline(hoveringHash && !copied)
                     .lineLimit(1)
@@ -924,7 +924,7 @@ private struct CommitRow: View {
         }
         .padding(.trailing, 6)
         .frame(maxWidth: .infinity, minHeight: Self.height, maxHeight: Self.height, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 5).fill(selected || highlighted ? palette.raised : hovering ? palette.hover : .clear))
+        .background(RoundedRectangle(cornerRadius: 6).fill(selected || highlighted ? palette.raised : hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture(count: 2, perform: review)
@@ -1084,7 +1084,7 @@ private struct CommitPane: View {
             // The title sits in the bar, so the files get the room a second line would take.
             HStack(spacing: 6) {
                 Text(commit.subject)
-                    .font(.system(size: 11.5, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(palette.text)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -1111,8 +1111,8 @@ private struct CommitPane: View {
                         ForEach(folders(files), id: \.folder) { group in
                             if !group.folder.isEmpty {
                                 HStack(spacing: 6) {
-                                    Image(systemName: "folder").font(.system(size: 10.5))
-                                    Text(group.folder.replacingOccurrences(of: "/", with: " / ")).font(.system(size: 11.5)).lineLimit(1)
+                                    Image(systemName: "folder").font(.system(size: 11))
+                                    Text(group.folder.replacingOccurrences(of: "/", with: " / ")).font(.system(size: 12)).lineLimit(1)
                                 }
                                 .foregroundStyle(palette.muted)
                                 .frame(height: 22)
@@ -1166,7 +1166,7 @@ private struct ChangedFile: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            FileIcon(path: file.path).font(.system(size: 10.5)).foregroundStyle(palette.muted)
+            FileIcon(path: file.path).font(.system(size: 11)).foregroundStyle(palette.muted)
             Text((file.path as NSString).lastPathComponent)
                 .font(.system(size: 12))
                 .foregroundStyle(file.status == .added ? palette.added : file.status == .deleted ? palette.muted : palette.text)
@@ -1174,7 +1174,7 @@ private struct ChangedFile: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
             if let note {
-                Text(note).font(.system(size: 10.5)).foregroundStyle(palette.muted).lineLimit(1)
+                Text(note).font(.system(size: 11)).foregroundStyle(palette.muted).lineLimit(1)
             }
             if !file.isBinary {
                 Counts(added: file.added, removed: file.removed, palette: palette)

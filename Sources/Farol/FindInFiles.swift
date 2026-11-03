@@ -158,7 +158,7 @@ struct FindInFiles: View {
                 Image(systemName: "magnifyingglass").font(.system(size: 11)).foregroundStyle(p.muted)
                 TextField("Find in \(((model.folder() ?? "") as NSString).lastPathComponent)", text: $model.query)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 12.5))
+                    .font(.system(size: 13))
                     .focused($focused)
                     .onSubmit { model.highlighted.map(choose) }
                     .onKeyPress(.downArrow) {
@@ -313,9 +313,9 @@ private struct FileHeader: View {
             FileIcon(path: path).font(.system(size: 10)).foregroundStyle(palette.muted).frame(width: 14)
             Text((path as NSString).lastPathComponent).font(.system(size: 12, weight: .semibold)).lineLimit(1).layoutPriority(1)
             Text((path as NSString).deletingLastPathComponent)
-                .font(.system(size: 10.5)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.head)
+                .font(.system(size: 11)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.head)
             Spacer(minLength: 4)
-            Text(verbatim: String(count)).font(.system(size: 10.5, design: .monospaced)).foregroundStyle(palette.muted)
+            Text(verbatim: String(count)).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted)
         }
         .padding(.horizontal, 6)
         .padding(.top, 8)
@@ -343,16 +343,16 @@ private struct MatchRow: View {
         Button(action: choose) {
             HStack(spacing: 6) {
                 Text(verbatim: String(match.line))
-                    .font(.system(size: 10.5, design: .monospaced)).foregroundStyle(palette.muted)
+                    .font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted)
                     .lineLimit(1)
                     .fixedSize()
                     .frame(width: CGFloat(max(digits, 3)) * 6.5 + 2, alignment: .trailing)
-                Text(marked).font(.system(size: 11.5, design: .monospaced)).lineLimit(1).truncationMode(.tail)
+                Text(marked).font(.system(size: 12, design: .monospaced)).lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 4)
             .frame(height: 22)
-            .background(RoundedRectangle(cornerRadius: 5).fill(lit ? palette.raised : .clear))
+            .background(RoundedRectangle(cornerRadius: 6).fill(lit ? palette.raised : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(QuietPress())
@@ -371,7 +371,7 @@ private struct MatchRow: View {
         for found in FileSearch.ranges(of: query, in: line, options: options) {
             guard let range = Range(found, in: text) else { continue }
             text[range].foregroundColor = palette.text
-            text[range].font = .system(size: 11.5, weight: .bold, design: .monospaced)
+            text[range].font = .system(size: 12, weight: .bold, design: .monospaced)
         }
         return text
     }
@@ -389,7 +389,7 @@ struct OptionToggle<Label: View>: View {
     var body: some View {
         Button { on.toggle() } label: {
             label
-                .font(.system(size: 10.5, weight: .semibold))
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(on ? palette.text : hovering ? palette.text : palette.muted)
                 .frame(width: 20, height: 16)
                 .background(RoundedRectangle(cornerRadius: 4).fill(on ? palette.selection : .clear))
@@ -419,7 +419,7 @@ private struct ScopeButton: View {
                 .lineLimit(1)
                 .padding(.horizontal, 8)
                 .frame(height: 20)
-                .background(RoundedRectangle(cornerRadius: 5).fill(on ? palette.selection : hovering ? palette.hover : .clear))
+                .background(RoundedRectangle(cornerRadius: 6).fill(on ? palette.selection : hovering ? palette.hover : .clear))
                 .contentShape(Rectangle())
         }
         .buttonStyle(QuietPress())

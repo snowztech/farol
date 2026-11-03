@@ -134,7 +134,7 @@ struct ManageCommandsSheet: View {
     private func section(_ title: String, commands: [ProjectCommand]) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(title)
-                .font(.system(size: 11.5, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(palette.muted)
                 .padding(.horizontal, 20)
                 .padding(.top, 14)

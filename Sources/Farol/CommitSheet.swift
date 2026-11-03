@@ -244,9 +244,9 @@ private struct GenerateButton: View {
                     if running {
                         ProgressView().controlSize(.mini).scaleEffect(0.8).frame(width: 11, height: 11)
                     } else {
-                        Image(systemName: "wand.and.rays").font(.system(size: 10.5, weight: .medium))
+                        Image(systemName: "wand.and.rays").font(.system(size: 11, weight: .medium))
                     }
-                    Text(running ? "Stop" : "Generate").font(.system(size: 11.5, weight: .medium))
+                    Text(running ? "Stop" : "Generate").font(.system(size: 12, weight: .medium))
                 }
                 .padding(.horizontal, 6)
                 .frame(height: 20)
@@ -266,7 +266,7 @@ private struct GenerateButton: View {
                     }
                 } label: {
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 7, weight: .semibold))
+                        .font(.system(size: 8, weight: .semibold))
                         .frame(width: 14, height: 20)
                         .foregroundStyle(hoveringPicker ? palette.text : palette.muted)
                         .background(RoundedRectangle(cornerRadius: 6).fill(hoveringPicker ? palette.raised : .clear))
@@ -292,11 +292,11 @@ struct Tick: View {
 
     /// Drawn like the rest of the chrome: a soft box with a thin edge, and only the check mark in the text color.
     var body: some View {
-        RoundedRectangle(cornerRadius: 3.5)
+        RoundedRectangle(cornerRadius: 4)
             .fill(on ? palette.raised : .clear)
-            .overlay(RoundedRectangle(cornerRadius: 3.5).strokeBorder(palette.muted.opacity(on ? 0.35 : 0.6)))
+            .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(palette.muted.opacity(on ? 0.35 : 0.6)))
             .overlay {
-                if on { Image(systemName: "checkmark").font(.system(size: 7.5, weight: .bold)).foregroundStyle(palette.text) }
+                if on { Image(systemName: "checkmark").font(.system(size: 8, weight: .bold)).foregroundStyle(palette.text) }
             }
             .frame(width: 13, height: 13)
     }

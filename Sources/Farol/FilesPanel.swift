@@ -190,16 +190,16 @@ private struct FileRow: View {
     var body: some View {
         HStack(spacing: 5) {
             Image(systemName: "chevron.right")
-                .font(.system(size: 8.5, weight: .bold))
+                .font(.system(size: 9, weight: .bold))
                 .rotationEffect(.degrees(row.expanded ? 90 : 0))
                 .frame(width: 10)
                 .opacity(row.entry.isDirectory ? 1 : 0)
             FileIcon(path: row.entry.name, folder: row.entry.isDirectory)
-                .font(.system(size: 10.5))
+                .font(.system(size: 11))
                 .foregroundStyle(palette.muted)
                 .frame(width: 15)
             Text(row.entry.name)
-                .font(.system(size: 12.5))
+                .font(.system(size: 13))
                 .lineLimit(1)
                 .truncationMode(.middle)
             Spacer(minLength: 0)
@@ -207,7 +207,7 @@ private struct FileRow: View {
         .foregroundStyle(row.dimmed ? palette.muted : palette.text)
         .padding(.leading, CGFloat(row.depth) * 14 + 4)
         .frame(height: 24)
-        .background(RoundedRectangle(cornerRadius: 5).fill(selected ? palette.raised : hovering ? palette.hover : .clear))
+        .background(RoundedRectangle(cornerRadius: 6).fill(selected ? palette.raised : hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
         .onClickableHover { hovering = $0 }
         .onTapGesture(perform: action)

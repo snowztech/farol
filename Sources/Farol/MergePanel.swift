@@ -207,7 +207,7 @@ struct MergePanel: View {
 
     private func header(_ p: Palette) -> some View {
         HStack(spacing: 8) {
-            Text(title).font(.system(size: 12.5, weight: .medium)).lineLimit(1)
+            Text(title).font(.system(size: 13, weight: .medium)).lineLimit(1)
             if let detail { Text(detail).font(.system(size: 12)).foregroundStyle(p.muted).lineLimit(1).truncationMode(.tail) }
             Spacer(minLength: 12)
             if let operation = merge.operation {
@@ -327,7 +327,7 @@ struct MergePanel: View {
                         .foregroundStyle(step.state == .todo ? p.muted : p.text)
                         .padding(.horizontal, 7)
                         .frame(height: 20)
-                        .background(RoundedRectangle(cornerRadius: 5).fill(step.state == .current ? p.raised : .clear))
+                        .background(RoundedRectangle(cornerRadius: 6).fill(step.state == .current ? p.raised : .clear))
                         .hoverTip(step.subject)
                         .id(index)
                     }
@@ -808,7 +808,7 @@ private struct OptionCard: View {
                 Image(systemName: selected ? "largecircle.fill.circle" : "circle")
                     .font(.system(size: 12)).foregroundStyle(selected ? palette.text : palette.muted)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.system(size: 12.5, weight: .medium))
+                    Text(title).font(.system(size: 13, weight: .medium))
                     Text(detail).font(.system(size: 11)).foregroundStyle(palette.muted)
                 }
             }
@@ -851,7 +851,7 @@ private struct FileRow: View {
                     Circle().fill(palette.waiting).frame(width: 7, height: 7).frame(width: 8)
                 }
                 VStack(alignment: .leading, spacing: 1) {
-                    Text((path as NSString).lastPathComponent).font(.system(size: 12.5))
+                    Text((path as NSString).lastPathComponent).font(.system(size: 13))
                         .foregroundStyle(resolved ? palette.muted : palette.text)
                     let folder = (path as NSString).deletingLastPathComponent
                     if !folder.isEmpty { Text(folder).font(.system(size: 11)).foregroundStyle(palette.muted) }

@@ -163,7 +163,7 @@ private struct SessionRow: View {
                         HStack(spacing: 6) {
                             name
                             Text("worktree")
-                                .font(.system(size: 10.5, design: .monospaced))
+                                .font(.system(size: 11, design: .monospaced))
                                 .foregroundStyle(palette.muted.opacity(0.65))
                                 .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
                         }
@@ -232,7 +232,7 @@ private struct SessionRow: View {
 
     /// Selection stays neutral, so color only ever means agent status. A faint edge lifts it off the panel.
     @ViewBuilder private var background: some View {
-        let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
         if selected {
             shape.fill(palette.selection)
                 .overlay(shape.strokeBorder(palette.line))
@@ -267,14 +267,14 @@ private struct NewTaskRow: View {
             Spacer(minLength: 0)
             if hovering {
                 Text("⇧⌘N")
-                    .font(.system(size: 10.5, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(palette.muted)
             }
         }
         .foregroundStyle(hovering ? palette.text : palette.muted)
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(hovering ? palette.hover : .clear))
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
     }
 }
@@ -286,7 +286,7 @@ struct RepoHeader: View {
 
     var body: some View {
         Text(name)
-            .font(.system(size: 11.5, weight: .medium))
+            .font(.system(size: 12, weight: .medium))
             .foregroundStyle(palette.muted)
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -318,11 +318,11 @@ private struct ProjectHeader: View {
             }
             .frame(width: 7)
             Text(name)
-                .font(.system(size: 11.5, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(hovering ? palette.text : palette.muted)
             if folded {
                 Text(verbatim: "\(sessions.count)")
-                    .font(.system(size: 10.5, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(palette.muted.opacity(0.7))
             }
             Spacer(minLength: 0)
@@ -341,7 +341,7 @@ private struct ProjectHeader: View {
         .padding(.leading, 10)
         .padding(.trailing, 6)
         .padding(.vertical, 4)
-        .background(RoundedRectangle(cornerRadius: 9, style: .continuous)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
             .fill(folded && holdsSelection ? palette.selection : hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
         .onTapGesture(perform: onToggle)

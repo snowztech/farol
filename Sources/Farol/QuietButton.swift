@@ -20,7 +20,7 @@ final class QuietButton: NSButton {
         target = self
         self.action = #selector(fire)
         wantsLayer = true
-        layer?.cornerRadius = 5
+        layer?.cornerRadius = 6
         refresh()
     }
 

@@ -212,7 +212,7 @@ private struct GitButton: View {
                 Half(active: state.graphVisible, help: "Git graph (⌥⌘G)", palette: p, action: graph) { color in
                     // The size of the gear next to it.
                     Image(systemName: "point.3.filled.connected.trianglepath.dotted")
-                        .font(.system(size: 12.5, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(color)
                 }
                 if counts {
@@ -510,7 +510,7 @@ private struct CommandChoice: View {
             }
             .padding(.horizontal, 9)
             .frame(height: 30)
-            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(lit ? palette.selection : .clear))
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(lit ? palette.selection : .clear))
             .contentShape(Rectangle())
             .hoverTip(command.global ? "Available in all projects" : "\(command.source) in \((command.folder as NSString).abbreviatingWithTildeInPath)")
         }
@@ -547,7 +547,7 @@ private struct FileChoice: View {
             }
             .padding(.horizontal, 9)
             .frame(height: 30)
-            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(lit ? palette.selection : .clear))
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(lit ? palette.selection : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(QuietPress())
@@ -596,7 +596,7 @@ private struct SessionChoice: View {
             }
             .padding(.horizontal, 9)
             .frame(height: 30)
-            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(lit ? palette.selection : .clear))
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(lit ? palette.selection : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(QuietPress())
@@ -668,7 +668,7 @@ struct CloseButton: View {
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(hovering ? palette.text : palette.muted)
                 .frame(width: 20, height: 20)
-                .background(RoundedRectangle(cornerRadius: 5).fill(hovering ? palette.raised : .clear))
+                .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised : .clear))
                 .contentShape(Rectangle())
         }
         .buttonStyle(QuietPress())
@@ -689,7 +689,7 @@ struct IconButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 12.5, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .frame(width: 26, height: 20)
                 .foregroundStyle(active ? palette.accent : hovering ? palette.text : palette.muted)
                 .background(RoundedRectangle(cornerRadius: 6).fill(hovering || active ? palette.raised : .clear))
