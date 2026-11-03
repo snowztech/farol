@@ -68,11 +68,11 @@ struct SettingsPage: View {
 
         var symbol: String {
             switch self {
-            case .terminal: "apple.terminal"
-            case .appearance: "paintpalette"
+            case .terminal: "apple.terminal.fill"
+            case .appearance: "paintpalette.fill"
             case .agents: "sparkles"
             case .worktrees: "arrow.triangle.branch"
-            case .integrations: "puzzlepiece.extension"
+            case .integrations: "link"
             case .remote: "iphone"
             case .shortcuts: "command"
             case .about: "info"
@@ -915,7 +915,7 @@ private struct Heading: View {
                 // The section's tile from the list on the left, so the page carries its color.
                 if let section = SettingsPage.Section(rawValue: title) {
                     Tile(color: section.tint(palette), size: 28) {
-                        Image(systemName: section.symbol).font(.system(size: 15, weight: .semibold))
+                        Image(systemName: section.symbol).font(.system(size: 15, weight: .bold))
                     }
                 }
                 Text(title).font(.system(size: 20, weight: .semibold))
@@ -1024,6 +1024,7 @@ private struct Card<Content: View>: View {
 }
 
 /// Brighter than the pickers' tint, so a switch that is on can't be taken for one that is off. Brighter still under the mouse.
+/// A light theme's mid gray reads as switched off, so there the switch takes the text's color instead.
 private struct SettingsSwitch: View {
     @Binding var isOn: Bool
     let palette: Palette
@@ -1032,7 +1033,8 @@ private struct SettingsSwitch: View {
 
     var body: some View {
         Toggle("", isOn: $isOn).labelsHidden().toggleStyle(.switch).controlSize(.small)
-            .tint(hovering ? palette.text.opacity(0.75) : palette.muted)
+            .tint(palette.isDark ? (hovering ? palette.text.opacity(0.75) : palette.muted)
+                                 : palette.text.opacity(hovering ? 0.85 : 0.7))
             .onClickableHover { hovering = $0 }
     }
 }
@@ -1229,7 +1231,7 @@ private struct NavItem: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 9) {
-                Tile(color: tint) { Image(systemName: symbol).font(.system(size: 11, weight: .semibold)) }
+                Tile(color: tint) { Image(systemName: symbol).font(.system(size: 11, weight: .bold)) }
                 Text(title)
                     .font(.system(size: 13, weight: selected ? .medium : .regular))
                     .foregroundStyle(selected ? palette.text : palette.text.opacity(0.85))
