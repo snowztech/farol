@@ -14,7 +14,8 @@ struct RequestSheet: View {
     let palette: Palette
     /// The names the forge offers as labels. Slow, so it is asked for off the main thread.
     let loadLabels: () -> [String]
-    let create: (_ base: String, _ title: String, _ body: String, _ labels: [String]) -> Void
+    /// Gets nil once the request is made, or what went wrong.
+    let create: (_ base: String, _ title: String, _ body: String, _ labels: [String], _ draft: Bool, _ done: @escaping (String?) -> Void) -> Void
     let close: () -> Void
 
     private enum Field: Hashable { case title, body }
@@ -40,9 +41,12 @@ struct RequestSheet: View {
     @State private var generated: (title: String, body: String)?
     /// What the commits gave for the base now chosen. A field still holding it is replaced when the base changes, one you edited isn't.
     @State private var started: (title: String, body: String) = ("", "")
+    @State private var creating = false
+    @AppStorage("request.draft") private var draft = false
+    @State private var createError: String?
 
     init(request: String, forge: String, head: String, bases: [String], preferred: String?, root: String, palette: Palette,
-         loadLabels: @escaping () -> [String], create: @escaping (String, String, String, [String]) -> Void,
+         loadLabels: @escaping () -> [String], create: @escaping (String, String, String, [String], Bool, @escaping (String?) -> Void) -> Void,
          close: @escaping () -> Void) {
         self.request = request
         self.forge = forge
@@ -58,7 +62,7 @@ struct RequestSheet: View {
 
     static func present(in window: NSWindow, request: String, forge: String, head: String, bases: [String], preferred: String?,
                         root: String, palette: Palette, loadLabels: @escaping () -> [String],
-                        create: @escaping (String, String, String, [String]) -> Void) {
+                        create: @escaping (String, String, String, [String], Bool, @escaping (String?) -> Void) -> Void) {
         guard window.attachedSheet == nil else { return }
         let sheet = NSWindow(contentRect: .zero, styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: true)
         let view = RequestSheet(request: request, forge: forge, head: head, bases: bases, preferred: preferred, root: root,
@@ -76,36 +80,18 @@ struct RequestSheet: View {
         let p = palette
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 16) {
-                SheetHeader(title: "Create a \(request)", palette: p) {
-                    Text("Opened on \(forge). The title and description start from the branch's commits.")
+                // Laid out like the commit sheet: the branch under the title, then plain fields with no captions over them.
+                SheetHeader(title: "New \(request)", palette: p) {
+                    Label(head, systemImage: "arrow.triangle.branch")
                 }
-                HStack(spacing: 10) {
-                    // Read with "from" as one line, so it is clear which branch receives and which one is merged.
-                    Text("Into").foregroundStyle(p.muted)
-                    select(p)
-                    Text("from").foregroundStyle(p.muted)
-                    // The blue the theme gives a branch to pull, as the forge tints the branch the request comes from.
-                    Text(head)
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundStyle(p.pull)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .padding(.horizontal, 8)
-                        .frame(height: 26)
-                        .background(RoundedRectangle(cornerRadius: 6).fill(p.pull.opacity(0.14)))
-                        .layoutPriority(1)
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Title").foregroundStyle(p.muted)
+                select(p)
+                VStack(alignment: .leading, spacing: 10) {
                     TextField(generating == nil ? "Title" : "\(chosenAgent?.label ?? "The agent") is writing…", text: $title)
                         .textFieldStyle(.plain)
                         .focused($focus, equals: .title)
                         .opacity(generating == nil || title.isEmpty ? 1 : 0.45)
                         .disabled(generating != nil)
                         .sheetField(p, focused: focus == .title)
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Description").foregroundStyle(p.muted)
                     TextField("Description", text: $body_, axis: .vertical)
                         .textFieldStyle(.plain)
                         .lineLimit(5...12)
@@ -132,30 +118,35 @@ struct RequestSheet: View {
             .padding(20)
             Rectangle().fill(p.line).frame(height: 1)
             HStack {
+                Toggle("Draft", isOn: $draft)
+                    .toggleStyle(.checkbox)
+                    .foregroundStyle(p.muted)
+                    .hoverTip("Open it as a draft, not ready for review yet")
                 Spacer()
                 Button("Cancel", action: close)
                     .buttonStyle(SheetButton(palette: p, primary: false))
                     .keyboardShortcut(.cancelAction)
-                Button("Create") {
-                    let (chosen, heading, text) = (base, title.trimmingCharacters(in: .whitespacesAndNewlines),
-                                                   body_.trimmingCharacters(in: .whitespacesAndNewlines))
-                    let picked = labels.filter(chosenLabels.contains)
-                    close()
-                    // The request is made in the background and may fail with a message of its own, which needs this sheet gone first.
-                    DispatchQueue.main.async { create(chosen, heading, text, picked) }
+                Button(creating ? "Creating…" : "Create \(request.capitalized)") {
+                    creating = true
+                    createError = nil
+                    // Open until the forge answers, so a failure leaves the title and description here to try again.
+                    create(base, heading, body_.trimmingCharacters(in: .whitespacesAndNewlines), labels.filter(chosenLabels.contains), draft) { error in
+                        creating = false
+                        if let error { createError = error } else { close() }
+                    }
                 }
                 .buttonStyle(SheetButton(palette: p, primary: true))
                 .keyboardShortcut(.defaultAction)
-                .disabled(base.isEmpty || generating != nil)
+                // Without a title the tool fills one from the commits and drops the description.
+                .disabled(base.isEmpty || heading.isEmpty || generating != nil || creating)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
         }
         .font(.system(size: 13))
         .foregroundStyle(p.text)
-        .frame(width: 520)
+        .frame(width: 460)
         .sheetBackground(p)
-        .ignoresSafeArea()
         .onAppear {
             focus = .title
             fillFromCommits()
@@ -167,6 +158,11 @@ struct RequestSheet: View {
         .onChange(of: base) { _, _ in fillFromCommits() }
         .onDisappear { stop() }
     }
+
+    /// The width of the select it opens from, so the list reads as that field opened up.
+    private static let listWidth: CGFloat = 420
+
+    private var heading: String { title.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     /// Restore after the agent wrote over something you typed, and what went wrong if it failed.
     private func hints(_ p: Palette) -> some View {
@@ -181,12 +177,12 @@ struct RequestSheet: View {
                 .foregroundStyle(p.muted)
                 .hoverTip("Put back what you had typed")
             }
-            if let generationError {
-                Text(generationError)
+            if let error = createError ?? generationError {
+                Text(error)
                     .font(.system(size: 11))
                     .foregroundStyle(p.removed)
                     .lineLimit(2)
-                    .hoverTip(generationError)
+                    .hoverTip(error)
             }
         }
     }
@@ -196,39 +192,36 @@ struct RequestSheet: View {
         let query = labelFilter.trimmingCharacters(in: .whitespaces)
         let shown = query.isEmpty ? labels : labels.filter { $0.localizedCaseInsensitiveContains(query) }
         let picked = labels.filter(chosenLabels.contains)
-        return VStack(alignment: .leading, spacing: 6) {
-            Text("Labels").foregroundStyle(p.muted)
-            SheetSelect(palette: p, open: $pickingLabels) {
-                Image(systemName: "tag").font(.system(size: 12)).foregroundStyle(p.muted)
-                Text(picked.isEmpty ? "None" : picked.joined(separator: ", "))
-                    .foregroundStyle(picked.isEmpty ? p.muted : p.text)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            } choices: {
-                VStack(spacing: 6) {
-                    TextField("Filter labels", text: $labelFilter)
-                        .textFieldStyle(.plain)
-                        .sheetField(p, focused: false)
-                    ScrollView {
-                        VStack(spacing: 1) {
-                            ForEach(shown, id: \.self) { name in
-                                SheetChoice(palette: p) {
-                                    if chosenLabels.contains(name) { chosenLabels.remove(name) } else { chosenLabels.insert(name) }
-                                } label: {
-                                    Text(name).lineLimit(1).truncationMode(.middle)
-                                    Spacer()
-                                    if chosenLabels.contains(name) { Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)) }
-                                }
+        return SheetSelect(palette: p, open: $pickingLabels) {
+            Image(systemName: "tag").font(.system(size: 12)).foregroundStyle(p.muted)
+            Text(picked.isEmpty ? "No labels" : picked.joined(separator: ", "))
+                .foregroundStyle(picked.isEmpty ? p.muted : p.text)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        } choices: {
+            VStack(spacing: 6) {
+                TextField("Filter labels", text: $labelFilter)
+                    .textFieldStyle(.plain)
+                    .sheetField(p, focused: false)
+                ScrollView {
+                    VStack(spacing: 1) {
+                        ForEach(shown, id: \.self) { name in
+                            SheetChoice(palette: p) {
+                                if chosenLabels.contains(name) { chosenLabels.remove(name) } else { chosenLabels.insert(name) }
+                            } label: {
+                                Text(name).lineLimit(1).truncationMode(.middle)
+                                    .frame(maxWidth: .infinity, alignment: .leading).layoutPriority(1)
+                                if chosenLabels.contains(name) { Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)) }
                             }
                         }
                     }
-                    .frame(maxHeight: 220)
                 }
-                .padding(6)
-                .frame(width: 280)
+                .frame(maxHeight: 220)
             }
-            .onChange(of: pickingLabels) { _, _ in labelFilter = "" }
+            .padding(6)
+            .frame(width: Self.listWidth)
         }
+        .onChange(of: pickingLabels) { _, _ in labelFilter = "" }
     }
 
     private func fillFromCommits() {
@@ -289,9 +282,7 @@ struct RequestSheet: View {
 
     private func select(_ p: Palette) -> some View {
         SheetSelect(palette: p, open: $picking) {
-            Image(systemName: "arrow.triangle.branch").font(.system(size: 12)).foregroundStyle(p.muted)
-            // Only as wide as the name, up to a limit, so a short one doesn't leave a gap before the chevron.
-            Text(base).lineLimit(1).truncationMode(.middle).frame(maxWidth: 190, alignment: .leading)
+            Text("Into \(Text(base).foregroundStyle(p.text))").foregroundStyle(p.muted).lineLimit(1).truncationMode(.middle)
         } choices: {
             VStack(spacing: 6) {
                 TextField("Filter branches", text: $filter)
@@ -304,8 +295,9 @@ struct RequestSheet: View {
                                 base = name
                                 picking = false
                             } label: {
+                                // The name takes the row's room, so the check sits at its right edge.
                                 Text(name).lineLimit(1).truncationMode(.middle)
-                                Spacer()
+                                    .frame(maxWidth: .infinity, alignment: .leading).layoutPriority(1)
                                 if name == base { Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)) }
                             }
                         }
@@ -314,9 +306,8 @@ struct RequestSheet: View {
                 .frame(maxHeight: 220)
             }
             .padding(6)
-            .frame(width: 280)
+            .frame(width: Self.listWidth)
         }
-        .fixedSize(horizontal: true, vertical: false)
         .onChange(of: picking) { _, _ in filter = "" }
     }
 }
