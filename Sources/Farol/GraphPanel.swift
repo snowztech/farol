@@ -234,9 +234,11 @@ final class GraphModel: ObservableObject {
     func isBase(_ branch: String) -> Bool { base == branch || base == "origin/\(branch)" }
 
     /// The branch has to be pushed already. The request is titled from its commits, and its number shows on the row once made.
-    func createRequest(_ branch: String, into base: String, failed: @escaping (String) -> Void) {
+    func createRequest(_ branch: String, into base: String, title: String, body: String, failed: @escaping (String) -> Void) {
         guard let forge else { return }
-        run(failed, then: { [weak self] in self?.loadRequests() }) { try forge.createRequest(for: branch, base: base, in: $0) }
+        run(failed, then: { [weak self] in self?.loadRequests() }) {
+            try forge.createRequest(for: branch, base: base, title: title, body: body, in: $0)
+        }
     }
 
     /// The branches on the server a request can go into, without the remote's name as the forge wants them.
@@ -683,11 +685,12 @@ private struct BranchList: View {
             Divider()
             Button("Create \(forge.request.capitalized)\u{2026}") {
                 let bases = graph.requestBases
-                guard let window = NSApp.keyWindow else { return }
+                guard let window = NSApp.keyWindow, let root = graph.root else { return }
                 RequestSheet.present(in: window, request: forge.request, forge: forge.name, head: branch,
-                                     bases: bases.all.filter { $0 != branch }, preferred: bases.preferred,
-                                     palette: palette) { base in
-                    graph.createRequest(branch, into: base, failed: gitError("Couldn't create the \(forge.request)"))
+                                     bases: bases.all.filter { $0 != branch }, preferred: bases.preferred, root: root,
+                                     palette: palette) { base, title, body in
+                    graph.createRequest(branch, into: base, title: title, body: body,
+                                        failed: gitError("Couldn't create the \(forge.request)"))
                 }
             }
             .disabled(upstream.ahead > 0)

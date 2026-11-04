@@ -549,14 +549,21 @@ public struct Forge: Equatable {
         }
     }
 
-    /// Creates the request for `branch`, titled and described from its commits. The branch has to be pushed first.
+    /// Creates the request for `branch`. The branch has to be pushed first.
     /// It goes into `base`, or the repo's default branch without one, which is wrong for a branch built on another.
-    public func createRequest(for branch: String, base: String? = nil, in directory: String) throws {
+    /// With a `title` it is the request's, and `body` its description. Without one both come from the commits.
+    public func createRequest(for branch: String, base: String? = nil, title: String? = nil, body: String? = nil,
+                              in directory: String) throws {
         guard let path = kind.toolPath else { throw GitError(description: "\(tool) isn't installed.") }
+        let titled = title.flatMap { $0.isEmpty ? nil : $0 }
         // Both flags keep the tools from stopping to ask, which they can't here.
         let arguments = switch kind {
-        case .github: ["pr", "create", "--fill", "--head", branch] + (base.map { ["--base", $0] } ?? [])
-        case .gitlab: ["mr", "create", "--fill", "--yes", "--source-branch", branch] + (base.map { ["--target-branch", $0] } ?? [])
+        case .github:
+            ["pr", "create", "--head", branch] + (base.map { ["--base", $0] } ?? [])
+                + (titled.map { ["--title", $0, "--body", body ?? ""] } ?? ["--fill"])
+        case .gitlab:
+            ["mr", "create", "--yes", "--source-branch", branch] + (base.map { ["--target-branch", $0] } ?? [])
+                + (titled.map { ["--title", $0, "--description", body ?? ""] } ?? ["--fill"])
         }
         try Git.run(path, arguments, in: directory)
     }

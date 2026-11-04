@@ -212,7 +212,7 @@ struct ShipButton: View {
 }
 
 /// One run of the agent, kept from the click so it can be stopped before its process has started.
-private final class Generation {
+final class Generation {
     var process: Process? { didSet { if stopped { process?.terminate() } } }
     private(set) var stopped = false
 
@@ -224,7 +224,7 @@ private final class Generation {
 
 /// "Generate" with a wand in the message field's corner, and an arrow to pick the agent or account.
 /// Quiet like the toolbar's icon buttons, since most people pick an agent once: its name is in the tooltip and the menu.
-private struct GenerateButton: View {
+struct GenerateButton: View {
     let agent: AgentFolder
     let agents: [AgentFolder]
     /// While the agent writes, the wand turns into a spinner and a click stops it.
