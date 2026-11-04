@@ -266,7 +266,7 @@ public final class TerminalView: NSView {
         resize()
     }
 
-    /// The size in cells a phone gave the pane while it shows it and nobody uses the Mac, so programs draw for the phone.
+    /// The size in cells a phone gave the pane while it shows it and acted after the Mac did, so programs draw for the phone.
     /// Ghostty draws the smaller grid in the pane's top left. Nil when the pane fills its view.
     public private(set) var phoneGrid: (cols: Int, rows: Int)?
 

@@ -102,8 +102,10 @@ final class RemoteBridge: ObservableObject {
         /// It draws that terminal itself, from VT sequences, and was last sent this of it.
         var vt = false
         var vtScreen: Data?
-        /// The size its terminal fits in, which the pane takes while it shows it and nobody uses the Mac.
+        /// The size its terminal fits in, which the pane takes while it shows it, unless the Mac was used since.
         var fit: (session: UUID, cols: Int, rows: Int)?
+        /// When it last opened, sized or typed into its terminal, against the Mac's last keyboard or mouse event.
+        var acted = Date.distantPast
         /// The session it was told is an empty conversation, an agent started there with no log yet, so it is told once.
         var toldEmpty: UUID?
         /// What it was told the watched session waits on. Nil until told, so the first tick always says, even that it waits on nothing.
@@ -366,7 +368,10 @@ final class RemoteBridge: ObservableObject {
             respondAsk(command, by: device, session: session, ask: ask, decision: decision, from: id)
         case .terminal(let session, let open, let vt):
             phones[id]?.saysTerminal = true
-            if open { phones[id]?.terminal = session } else if phones[id]?.terminal == session { phones[id]?.terminal = nil }
+            if open {
+                phones[id]?.terminal = session
+                phones[id]?.acted = .now
+            } else if phones[id]?.terminal == session { phones[id]?.terminal = nil }
             phones[id]?.screen = nil
             phones[id]?.vt = open && vt == true
             phones[id]?.vtScreen = nil
@@ -397,9 +402,13 @@ final class RemoteBridge: ObservableObject {
             if vt == true { return tell(.vtHistory(session: session, data: terminal.historyVT(bytes: 90_000)), id) }
             tell(.history(session: session, text: terminal.historyText()), id)
         case .input(let session, let data):
+            phones[id]?.acted = .now
             act(command, by: device, on: session, from: id) { $0.input(data) }
+            // The program echoes within a few milliseconds, so the screen goes now rather than on the next tick.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) { [weak self] in self?.tick() }
         case .fit(let session, let cols, let rows):
             phones[id]?.fit = (session, cols, rows)
+            phones[id]?.acted = .now
         case .send(let session, let text):
             act(command, by: device, on: session, from: id) { pane in
                 // While Farol holds a question, the agent shows nothing to type into, so a typed reply is the answer, as Other is on the Mac.
@@ -936,14 +945,16 @@ final class RemoteBridge: ObservableObject {
     /// The panes sized for a phone.
     private var fitted: Set<UUID> = []
 
-    /// Gives a pane a phone shows the phone's size, so Claude Code and the shell draw for the phone, but only while nobody uses the Mac:
-    /// taken after a while without keyboard or mouse, and given back the moment either is touched, or when no phone shows it.
+    /// Gives a pane a phone shows the phone's size, so Claude Code and the shell draw for the phone, as tmux's `window-size latest`.
+    /// Whoever acted last has it: the phone opening or typing into the terminal takes it, and the Mac's keyboard or mouse gives it back.
+    /// The phone closing the terminal gives it back too.
     private func refit() {
         let idle = CGEventSource.secondsSinceLastEventType(.hidSystemState, eventType: CGEventType(rawValue: ~0)!)
+        let macActed = Date.now.addingTimeInterval(-idle)
         var wanted: [UUID: (cols: Int, rows: Int)] = [:]
         for phone in phones.values where phone.device != nil {
             guard let fit = phone.fit, phone.terminal == fit.session, fit.cols > 0, fit.rows > 0 else { continue }
-            if idle >= (fitted.contains(fit.session) ? 2 : 30) { wanted[fit.session] = (fit.cols, fit.rows) }
+            if phone.acted > macActed { wanted[fit.session] = (fit.cols, fit.rows) }
         }
         for id in fitted where wanted[id] == nil { pane(id)?.terminal.unfit() }
         for (id, size) in wanted { pane(id)?.terminal.fit(cols: size.cols, rows: size.rows) }
