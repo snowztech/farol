@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.60.0] - 2026-11-04
+
+Create pull requests from Farol, in one click or written first.
+
 ### Added
 
 - Create a pull request or merge request without leaving Farol. Create PR in the review panel makes it in one click from the commits. Its arrow has Create Draft PR and Edit and Create PR…, which opens a sheet to pick the base, write the title and description or have an agent write them, add labels and open it as a draft. A local branch's menu in the git graph has Create Pull Request and Edit and Create Pull Request…, and both push the branch first.
@@ -1212,7 +1216,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.59.1...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.60.0...HEAD
+[0.60.0]: https://github.com/snowztech/farol/releases/tag/v0.60.0
 [0.59.1]: https://github.com/snowztech/farol/releases/tag/v0.59.1
 [0.59.0]: https://github.com/snowztech/farol/releases/tag/v0.59.0
 [0.58.3]: https://github.com/snowztech/farol/releases/tag/v0.58.3
