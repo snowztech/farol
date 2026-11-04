@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.59.1] - 2026-11-04
+
+Glass is one surface, and sheets and tips are on it too.
+
 ### Changed
 
 - Glass joins the sidebar and files panel into one surface, and sheets and tips are on glass too.
@@ -1200,7 +1204,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.59.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.59.1...HEAD
+[0.59.1]: https://github.com/snowztech/farol/releases/tag/v0.59.1
 [0.59.0]: https://github.com/snowztech/farol/releases/tag/v0.59.0
 [0.58.3]: https://github.com/snowztech/farol/releases/tag/v0.58.3
 [0.58.2]: https://github.com/snowztech/farol/releases/tag/v0.58.2
