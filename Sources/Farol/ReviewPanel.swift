@@ -592,7 +592,8 @@ final class ReviewModel: ObservableObject {
 
     /// Commits when there is a message, every uncommitted file or only `paths`, then goes as far as `next` says.
     /// `failed` gets a title and git's own message.
-    func ship(message: String?, only paths: [String]? = nil, then next: AfterCommit, failed: @escaping (String, String) -> Void) {
+    func ship(message: String?, only paths: [String]? = nil, then next: AfterCommit, draft: Bool = false,
+              failed: @escaping (String, String) -> Void) {
         guard let root, !isShipping else { return }
         // With the forge's tool the request is created right here. Without it, its form opens in the browser.
         let create = next == .openRequest && canCreateRequest ? forge : nil
@@ -613,7 +614,7 @@ final class ReviewModel: ObservableObject {
                     return (message == nil ? "Couldn't push" : "Committed, but couldn't push", String(describing: error))
                 }
                 guard let create, let branch else { return nil }
-                do { try create.createRequest(for: branch, in: root) } catch {
+                do { try create.createRequest(for: branch, draft: draft, in: root) } catch {
                     return ("Pushed, but couldn't create the \(create.request)", String(describing: error))
                 }
                 return nil
@@ -634,6 +635,39 @@ final class ReviewModel: ObservableObject {
                 self.checkRequest(force: true)
             }
         }
+    }
+
+    /// Pushes the branch, then creates its request with what the sheet wrote. `done` gets nil once it is made, or what went wrong.
+    func createRequest(into base: String, title: String, body: String, labels: [String], draft: Bool,
+                       done: @escaping (String?) -> Void) {
+        guard let root, let branch, let forge, !isShipping else { return done("Nothing to create a \(forge?.request ?? "request") from.") }
+        isShipping = true
+        DispatchQueue.global(qos: .userInitiated).async {
+            let failure: String? = {
+                do { try History.push(in: root) } catch { return "Couldn't push: \(error)" }
+                do { try forge.createRequest(for: branch, base: base, title: title, body: body, labels: labels, draft: draft, in: root) } catch {
+                    return String(describing: error)
+                }
+                return nil
+            }()
+            let created = failure == nil ? forge.request(for: branch, in: root) : nil
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.isShipping = false
+                done(failure)
+                self.refresh()
+                if let created, self.root == root, self.branch == branch { self.request = created }
+                if failure == nil { self.checksDue = Date() + 60 }
+                self.checkRequest(force: true)
+            }
+        }
+    }
+
+    /// What the request sheet offers to merge into, by the names the forge uses: the base first, never the branch itself.
+    var requestBases: [String] {
+        let names = branches.map { $0.hasPrefix("origin/") ? String($0.dropFirst(7)) : $0 }.filter { $0 != branch && $0 != "HEAD" }
+        var seen: Set<String> = []
+        return names.filter { seen.insert($0).inserted }
     }
 
     /// The files a commit would take, for the commit sheet. Read on demand, since the panel may be showing another scope.

@@ -47,22 +47,38 @@ private struct CommitSheetHost: ViewModifier {
     }
 }
 
-/// Shown once there is nothing left to commit.
-/// "Create PR" when the forge's tool says there is none yet: pushes the branch and creates it, titled from the commits.
-/// Without the tool Farol can't tell or create, so it says "Pull Request" and opens the forge's page after the push.
+/// "Create PR" pushes the branch and creates it from the commits, in one click. Its arrow has the other ways: as a draft, or a sheet to write it first.
+/// Without the forge's tool Farol can't tell or create, so it says "Pull Request" and opens the forge's page after the push.
 struct RequestButton: View {
     @ObservedObject var review: ReviewModel
     let palette: Palette
 
     var body: some View {
         if let forge = review.forge, let branch = review.branch {
-            let create = review.canCreateRequest
-            ShipButton(title: review.isShipping ? "Pushing…" : create ? "Create \(forge.requestShort)" : forge.request.capitalized,
-                       help: create ? "Push \(branch) and create a \(forge.request) on \(forge.name), titled from its commits"
-                           : "Push \(branch) and open its \(forge.request) page on \(forge.name). Install \(forge.tool) to create it from here.",
-                       busy: review.isShipping, icon: forge.kind, palette: palette) {
-                review.ship(message: nil, then: .openRequest, failed: gitFailure)
+            if review.canCreateRequest {
+                SplitShipButton(title: review.isShipping ? "Pushing…" : "Create \(forge.requestShort)",
+                                help: "Push \(branch) and create a \(forge.request) on \(forge.name), titled from its commits",
+                                busy: review.isShipping, icon: forge.kind, palette: palette, action: { create() }) {
+                    Button("Create Draft \(forge.requestShort)") { create(draft: true) }
+                    Button("Edit and Create \(forge.requestShort)\u{2026}") { write(forge) }
+                }
+            } else {
+                ShipButton(title: review.isShipping ? "Pushing…" : forge.request.capitalized,
+                           help: "Push \(branch) and open its \(forge.request) page on \(forge.name). Install \(forge.tool) to create it from here.",
+                           busy: review.isShipping, icon: forge.kind, palette: palette) { create() }
             }
+        }
+    }
+
+    private func create(draft: Bool = false) { review.ship(message: nil, then: .openRequest, draft: draft, failed: gitFailure) }
+
+    private func write(_ forge: Forge) {
+        guard let window = NSApp.keyWindow, let root = review.root, let branch = review.branch else { return }
+        let bases = review.requestBases
+        RequestSheet.present(in: window, request: forge.request, forge: forge.name, head: branch, bases: bases,
+                             preferred: bases.first, root: root, palette: palette,
+                             loadLabels: { forge.labels(in: root) }) { base, title, body, labels, draft, done in
+            review.createRequest(into: base, title: title, body: body, labels: labels, draft: draft, done: done)
         }
     }
 }
@@ -211,8 +227,58 @@ struct ShipButton: View {
     }
 }
 
+/// A ShipButton with an arrow beside it for the other ways to do the same, like Warp's commit button.
+struct SplitShipButton<Choices: View>: View {
+    let title: String
+    let help: String
+    let busy: Bool
+    var icon: Forge.Kind? = nil
+    let palette: Palette
+    let action: () -> Void
+    @ViewBuilder let choices: Choices
+
+    @State private var hovering = false
+    @State private var hoveringArrow = false
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Button(action: action) {
+                HStack(spacing: 6) {
+                    if let icon { ForgeIcon(kind: icon) }
+                    Text(title).font(.system(size: 12, weight: .medium))
+                }
+                .padding(.horizontal, 10)
+                .frame(height: 24)
+                .background(hovering ? palette.raised : .clear)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .onClickableHover { hovering = $0 }
+            .hoverTip(help)
+            Rectangle().fill(palette.line).frame(width: 1, height: 24)
+            // A plain button style, so the chevron keeps the small size of the one by Generate instead of the menu's own.
+            Menu { choices } label: {
+                Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
+                    .frame(width: 20, height: 24)
+                    .background(hoveringArrow ? palette.raised : .clear)
+                    .contentShape(Rectangle())
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .onClickableHover { hoveringArrow = $0 }
+        }
+        .foregroundStyle(busy ? palette.muted : palette.text)
+        .background(palette.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(palette.line))
+        .fixedSize()
+        .disabled(busy)
+    }
+}
+
 /// One run of the agent, kept from the click so it can be stopped before its process has started.
-private final class Generation {
+final class Generation {
     var process: Process? { didSet { if stopped { process?.terminate() } } }
     private(set) var stopped = false
 
@@ -224,7 +290,7 @@ private final class Generation {
 
 /// "Generate" with a wand in the message field's corner, and an arrow to pick the agent or account.
 /// Quiet like the toolbar's icon buttons, since most people pick an agent once: its name is in the tooltip and the menu.
-private struct GenerateButton: View {
+struct GenerateButton: View {
     let agent: AgentFolder
     let agents: [AgentFolder]
     /// While the agent writes, the wand turns into a spinner and a click stops it.

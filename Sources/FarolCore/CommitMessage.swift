@@ -84,7 +84,7 @@ public enum CommitMessage {
         }
     }
 
-    private static func environment(for agent: AgentFolder) -> [String: String] {
+    static func environment(for agent: AgentFolder) -> [String: String] {
         var environment = ProcessInfo.processInfo.environment
         environment["PATH"] = (AgentFolder.Kind.installFolders + [environment["PATH"] ?? "/usr/bin:/bin"]).joined(separator: ":")
         if !agent.isDefault { environment[agent.kind.environmentVariable] = agent.directory.path }
