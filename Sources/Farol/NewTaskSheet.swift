@@ -220,7 +220,7 @@ struct NewTaskSheet: View {
         .font(.system(size: 13))
         .foregroundStyle(p.text)
         .frame(width: 460)
-        .background(p.background)
+        .sheetBackground(p)
         .ignoresSafeArea()
         .fileImporter(isPresented: $choosingRepos, allowedContentTypes: [.folder], allowsMultipleSelection: true) { result in
             switch result {

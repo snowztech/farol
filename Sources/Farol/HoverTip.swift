@@ -9,6 +9,8 @@ final class HoverTip {
 
     /// Set from the terminal theme, like the rest of the window.
     var colors = (background: NSColor.black, foreground: NSColor.white) { didSet { restyle() } }
+    /// The Glass style puts the tip on Liquid Glass, on macOS 26.
+    var glass = false { didSet { if glass != oldValue { restyle() } } }
 
     private static let delay: TimeInterval = 0.5
     /// Moving from one control to the next within this long shows the next tip at once, as macOS does.
@@ -116,8 +118,25 @@ final class HoverTip {
     }
 
     private func restyle() {
-        bubble.fill = colors.background.mixed(with: colors.foreground, 0.12)
-        bubble.edge = colors.background.mixed(with: colors.foreground, 0.16)
+        let fill = colors.background.mixed(with: colors.foreground, 0.12)
+        var onGlass = false
+        if #available(macOS 26, *), glass {
+            onGlass = true
+            let view = panel.contentView as? NSGlassEffectView ?? NSGlassEffectView()
+            view.cornerRadius = 8
+            view.tintColor = fill.withAlphaComponent(0.6)
+            if view.contentView !== bubble {
+                bubble.removeFromSuperview()
+                view.contentView = bubble
+            }
+            panel.contentView = view
+        } else if panel.contentView !== bubble {
+            bubble.removeFromSuperview()
+            panel.contentView = bubble
+        }
+        // On glass, the glass is the fill and the edge.
+        bubble.fill = onGlass ? .clear : fill
+        bubble.edge = onGlass ? .clear : colors.background.mixed(with: colors.foreground, 0.16)
         bubble.needsDisplay = true
     }
 }

@@ -5,6 +5,8 @@ import SwiftUI
 final class WindowState: ObservableObject {
     @Published var palette: Palette
     @Published var showingSettings = false
+    /// Full screen has no traffic lights, so the title bar buttons take their place.
+    @Published var fullScreen = false
     /// The selected session is over ssh, so the panels have nothing local to show.
     @Published var remote = false
     var noRepoMessage: String { remote ? "Not available over ssh." : "Not a git repository." }
@@ -89,7 +91,7 @@ struct TopBar: View {
 
             HStack(spacing: 2) {
                 // Room for the traffic lights.
-                Spacer().frame(width: 72)
+                Spacer().frame(width: state.fullScreen ? 8 : 72)
                 IconButton(symbol: "sidebar.left", help: "Sidebar (⌘B)", active: state.sidebarVisible,
                            palette: p, action: commands.toggleSidebar)
                 IconButton(symbol: "folder", help: "Files (⇧⌘E)", active: state.filesVisible,

@@ -74,6 +74,11 @@ struct Palette: Equatable {
 
     var boxed: Bool { style == .boxed }
     var glass: Bool { style == .glass }
+    /// Glass where Liquid Glass exists, so sheets can let theirs through.
+    var liquid: Bool {
+        if #available(macOS 26, *) { return glass }
+        return false
+    }
     /// The side panels' fill. Glass lets the blur through, the terminal and code stay solid to be read.
     /// On macOS 26 the panels sit on Liquid Glass, which brings its own fill.
     var panel: Color {
@@ -176,5 +181,12 @@ extension NSColor {
 
     func mixed(with other: NSColor, _ amount: CGFloat) -> NSColor {
         blended(withFraction: amount, of: other) ?? self
+    }
+}
+
+extension View {
+    /// A sheet's background. Glass on macOS 26 lets the sheet's own Liquid Glass through, tinted toward the theme.
+    func sheetBackground(_ palette: Palette) -> some View {
+        background(palette.liquid ? palette.background.opacity(0.55) : palette.background)
     }
 }
