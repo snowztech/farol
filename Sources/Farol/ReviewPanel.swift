@@ -603,10 +603,7 @@ final class ReviewModel: ObservableObject {
         let compared: String? = if case .branch(let base) = scope { base } else { nil }
         isShipping = true
         DispatchQueue.global(qos: .userInitiated).async {
-            // A remote branch like origin/main is on the forge as main. A local one has to be pushed, and is named as it is.
-            let base = compared.map { ref in
-                History.branches(in: root).remote.contains(ref) ? String(ref.drop { $0 != "/" }.dropFirst()) : ref
-            }
+            let base = compared.flatMap { History.requestBase($0, in: root) }
             var committed = false
             let failure: (String, String)? = {
                 if let message {
