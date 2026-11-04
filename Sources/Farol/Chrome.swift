@@ -180,7 +180,7 @@ private struct UpdateBadge: View {
     }
 }
 
-/// "⛬ +821 −61": the graph icon opens the graph, the counts open the review.
+/// "+821 −61 ⛬": the counts open the review, the graph icon opens the graph.
 /// Only in a git repo, or while a panel is open so it can still be closed. The counts, and the pill around both, only when there are changes.
 /// While git is stopped on a merge or a rebase, "3 conflicts" comes first and opens the three column view.
 private struct GitButton: View {
@@ -211,17 +211,18 @@ private struct GitButton: View {
                         }
                     }
                 }
-                Half(active: state.graphVisible, help: "Git graph (⌥⌘G)", palette: p, action: graph) { color in
-                    // The size of the gear next to it.
-                    Image(systemName: "point.3.filled.connected.trianglepath.dotted")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(color)
-                }
+                // In the order the panels open below, review then graph, so the graph icon also keeps its place by the gear.
                 if counts {
                     // Over a commit or a request it isn't lit: a click there brings your changes back.
                     Half(active: review.isOpen && review.showsYours, help: "Review changes (⌥⌘R)", palette: p, action: changes) { _ in
                         Counts(added: review.total.added, removed: review.total.removed, palette: p)
                     }
+                }
+                Half(active: state.graphVisible, help: "Git graph (⌥⌘G)", palette: p, action: graph) { color in
+                    // The size of the gear next to it.
+                    Image(systemName: "point.3.filled.connected.trianglepath.dotted")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(color)
                 }
             }
             .font(.system(size: 11, weight: .medium))
