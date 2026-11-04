@@ -72,6 +72,11 @@ public struct Forge: Equatable {
     /// The repo's page, like https://github.com/snowztech/farol.
     public let web: String
 
+    /// Who the repo belongs to, like snowztech in https://github.com/snowztech/farol.
+    var owner: String? {
+        URL(string: web).flatMap { $0.pathComponents.dropFirst().first }
+    }
+
     public var name: String { kind.name }
     public var request: String { kind.request }
     public var requestShort: String { kind.requestShort }
@@ -556,10 +561,12 @@ public struct Forge: Equatable {
                               in directory: String) throws {
         guard let path = kind.toolPath else { throw GitError(description: "\(tool) isn't installed.") }
         let titled = title.flatMap { $0.isEmpty ? nil : $0 }
+        // A bare name is a branch of the repo the request goes into. In a fork the branch is in the fork, so GitHub is told whose.
+        let head = owner.map { "\($0):\(branch)" } ?? branch
         // Both flags keep the tools from stopping to ask, which they can't here.
         let arguments = switch kind {
         case .github:
-            ["pr", "create", "--head", branch] + (base.map { ["--base", $0] } ?? [])
+            ["pr", "create", "--head", head] + (base.map { ["--base", $0] } ?? [])
                 + (titled.map { ["--title", $0, "--body", body ?? ""] } ?? ["--fill"])
         case .gitlab:
             ["mr", "create", "--yes", "--source-branch", branch] + (base.map { ["--target-branch", $0] } ?? [])
