@@ -33,6 +33,24 @@ public enum RequestMessage {
         return text
     }
 
+    /// What the sheet starts with before any agent is asked. The first commit gives the title and the description, the others are listed under it.
+    /// Nil when `base` isn't known here or the branch adds nothing to it.
+    public static func fromCommits(head: String, base: String, in directory: String) -> Text? {
+        guard let start = try? reference(of: base, in: directory),
+              let log = try? Git.run(["log", "--reverse", "--format=%s%x1f%b%x1e", "\(start)..\(head)"], in: directory, trimming: false)
+        else { return nil }
+        let commits = log.split(separator: "\u{1e}").compactMap { entry -> (subject: String, body: String)? in
+            let fields = entry.split(separator: "\u{1f}", maxSplits: 1, omittingEmptySubsequences: false)
+            let subject = fields[0].trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !subject.isEmpty else { return nil }
+            return (subject, fields.count > 1 ? fields[1].trimmingCharacters(in: .whitespacesAndNewlines) : "")
+        }
+        guard let first = commits.first else { return nil }
+        let others = commits.dropFirst().map { "- " + $0.subject }
+        let body = ([first.body].filter { !$0.isEmpty } + (others.isEmpty ? [] : [others.joined(separator: "\n")])).joined(separator: "\n\n")
+        return Text(title: first.subject, body: body)
+    }
+
     /// `base` as git can read it: the server's copy when there is one, as the request is made against that.
     static func reference(of base: String, in directory: String) throws -> String {
         let remote = History.pushRemote(in: directory)

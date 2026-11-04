@@ -32,6 +32,8 @@ struct RequestSheet: View {
     /// What you had typed before the agent wrote over it, until you type again.
     @State private var replaced: (title: String, body: String)?
     @State private var generated: (title: String, body: String)?
+    /// What the commits gave for the base now chosen. A field still holding it is replaced when the base changes, one you edited isn't.
+    @State private var started: (title: String, body: String) = ("", "")
 
     init(request: String, forge: String, head: String, bases: [String], preferred: String?, root: String, palette: Palette,
          create: @escaping (String, String, String) -> Void, close: @escaping () -> Void) {
@@ -66,7 +68,7 @@ struct RequestSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 16) {
                 SheetHeader(title: "Create a \(request)", palette: p) {
-                    Text("Opened on \(forge). Leave the title empty to take it from the commits.")
+                    Text("Opened on \(forge). The title and description start from the branch's commits.")
                 }
                 HStack(spacing: 10) {
                     // Read with "from" as one line, so it is clear which branch receives and which one is merged.
@@ -142,7 +144,11 @@ struct RequestSheet: View {
         .frame(width: 520)
         .sheetBackground(p)
         .ignoresSafeArea()
-        .onAppear { focus = .title }
+        .onAppear {
+            focus = .title
+            fillFromCommits()
+        }
+        .onChange(of: base) { _, _ in fillFromCommits() }
         .onDisappear { stop() }
     }
 
@@ -165,6 +171,23 @@ struct RequestSheet: View {
                     .foregroundStyle(p.removed)
                     .lineLimit(2)
                     .hoverTip(generationError)
+            }
+        }
+    }
+
+    private func fillFromCommits() {
+        let (base, head, root) = (base, head, root)
+        DispatchQueue.global(qos: .userInitiated).async {
+            let text = RequestMessage.fromCommits(head: head, base: base, in: root)
+            DispatchQueue.main.async {
+                // The base moved on while git answered, or the agent is writing: that answer isn't for these fields anymore.
+                guard self.base == base, generating == nil else { return }
+                let untouched = title == started.title && body_ == started.body
+                started = (text?.title ?? "", text?.body ?? "")
+                if untouched, let text {
+                    title = text.title
+                    body_ = text.body
+                }
             }
         }
     }
