@@ -8,6 +8,7 @@ Farol is a quiet Mac app that gets loud only when an agent needs you. Every rule
 
 - **In the work area, color means agent status.** The sidebar, top bar and panels are the theme's grays. The lamps are the only color there.
 - **Outside it, color means identity, and only on a tile.** Settings sections and tools (agents, forges, Jira) sit on a `Tile` or `ToolTile`. A tool takes its maker's color, a section takes a theme hue at full saturation.
+- **Color carries information**: an agent's status, which tool something is, or a place to go. A tile that repeats its title is decoration, so sheets and dialogs have none.
 - **Every color comes from the Ghostty theme**, through `Palette`. A view has to read well in any of the 600+ themes, light and dark.
 
 ## The lamps
@@ -43,5 +44,6 @@ Motion is short and says what changed: a selection slides, a panel opens, a tip 
 Tried and settled, so they stay settled unless a person asks:
 
 - Sidebar rows show the lamp, without an agent icon beside it. An icon competed with the lamp.
+- Settings opens over the side panels at full width, as a page of its own. A sheet would be too small for it.
 - Styles are Classic, Boxed and Glass. A tinted style broke the color rule.
 - The terminal background is solid by default.

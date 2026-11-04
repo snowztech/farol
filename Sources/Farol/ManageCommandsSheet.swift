@@ -87,7 +87,7 @@ struct ManageCommandsSheet: View {
 
     private var list: some View {
         VStack(alignment: .leading, spacing: 0) {
-            SheetHeader(title: "Saved commands", section: .terminal, palette: palette) {
+            SheetHeader(title: "Saved commands", palette: palette) {
                 Text("Edit or remove a command saved for this project or all projects.")
             }
             .padding(20)
@@ -164,7 +164,7 @@ struct ManageCommandsSheet: View {
 
     private func editor(_ command: ProjectCommand) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            SheetHeader(title: "Edit command", section: .terminal, palette: palette) {
+            SheetHeader(title: "Edit command", palette: palette) {
                 Text(scope(for: command)).font(.system(size: 12))
             }
             .padding(20)

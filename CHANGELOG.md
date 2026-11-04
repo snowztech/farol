@@ -4,6 +4,12 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- Settings opens at the window's full width over the files, review and graph panels, which come back as they were when you close it. The files, review and graph buttons leave Settings and show their panel.
+- The change counts in the title bar come before the git graph icon, in the order their panels open, so the icon keeps its place.
+- Sheet titles drop their colored icon, so the only color left in a sheet is the agent or tool you pick.
+
 ## [0.58.1] - 2026-11-04
 
 The sheets match Settings, and commit subjects get more room in the git graph.

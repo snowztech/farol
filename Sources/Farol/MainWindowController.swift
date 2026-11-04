@@ -175,9 +175,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             ])
         }
         for v in [topBar, sidebar, filesPanel, graphPanel, content, reviewPanel] { root.addSubview(v) }
-        for v in [terminalContainer, settingsView!] { content.addSubview(v) }
-        // Over the side panels too: three columns of code need the whole width.
+        content.addSubview(terminalContainer)
+        // Over the side panels too: three columns of code need the whole width, and settings is a page of its own.
+        // The panels stay open underneath, so closing either brings them back as they were.
         root.addSubview(mergeView)
+        root.addSubview(settingsView)
         for v in [topBar, sidebar, filesPanel, graphPanel, content, reviewPanel, terminalContainer, settingsView!, mergeView!] {
             v.translatesAutoresizingMaskIntoConstraints = false
         }
@@ -245,8 +247,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             terminalContainer.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -8),
 
             settingsView.topAnchor.constraint(equalTo: content.topAnchor),
-            settingsView.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-            settingsView.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            settingsView.leadingAnchor.constraint(equalTo: filesPanel.leadingAnchor),
+            settingsView.trailingAnchor.constraint(equalTo: graphPanel.trailingAnchor),
             settingsView.bottomAnchor.constraint(equalTo: content.bottomAnchor),
 
             mergeView.topAnchor.constraint(equalTo: content.topAnchor),
@@ -451,7 +453,16 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// Opens or closes the files panel. The session remembers the choice, and the disk is only watched while open.
     func toggleFiles() {
+        if leaveSettings(), state.filesVisible { return }
         setFiles(visible: !state.filesVisible)
+    }
+
+    /// Settings covers the side panels, so a panel's button leaves it first.
+    /// A panel already open underneath is then just shown, since the click asked to see it. True when settings was showing.
+    private func leaveSettings() -> Bool {
+        guard state.showingSettings else { return false }
+        toggleSettings()
+        return true
     }
 
     private func setFiles(visible open: Bool) {
@@ -464,6 +475,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// Opens or closes the git graph. The session remembers the choice, and git is only asked while open.
     func toggleGraph() {
+        if leaveSettings(), state.graphVisible { return }
         setGraph(visible: !state.graphVisible)
     }
 
@@ -513,6 +525,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// Opens or closes the review panel at the width you last gave it.
     func toggleReview(closing: Bool = false) {
+        if !closing, leaveSettings(), review.isOpen { return }
         // Over a commit or a request, "Review changes" brings your changes back. Closing the panel there would hide what you asked for.
         if !closing, review.showYours() { return graph.select(nil) }
         review.isOpen.toggle()
@@ -773,7 +786,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             panel.layer?.borderWidth = palette.boxed ? 1 : 0
             panel.layer?.borderColor = NSColor(palette.line).cgColor
         }
-        // Settings fills the terminal's card to its edges, so it is cut to the same corners.
+        // Settings is one card over the panels, so it is cut to the same corners.
         // Cut in every style, so a page wider than the room never draws over the panels beside it.
         settingsView.layer?.cornerRadius = palette.style.radius
         settingsView.layer?.masksToBounds = true
