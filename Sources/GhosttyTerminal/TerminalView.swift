@@ -391,6 +391,52 @@ public final class TerminalView: NSView {
         return Data()
     }
 
+    /// Starts the pane's tap, or starts it over, with the screen and up to `historyRows` rows above it as VT.
+    /// What `tapRead` gives next follows that screen exactly, so a phone that draws both has the pane as it is, and keeps it so.
+    public func tapStart(historyRows: Int) -> (cols: Int, rows: Int, history: Data, screen: Data)? {
+        guard let surface else { return nil }
+        var history = ghostty_text_s(), screen = ghostty_text_s()
+        guard ghostty_surface_tap_start(surface, UInt32(historyRows), &history, &screen) else { return nil }
+        defer {
+            ghostty_surface_free_text(surface, &history)
+            ghostty_surface_free_text(surface, &screen)
+        }
+        let size = ghostty_surface_size(surface)
+        func data(_ text: ghostty_text_s) -> Data { text.text.map { Data(bytes: $0, count: Int(text.text_len)) } ?? Data() }
+        return (Int(size.columns), Int(size.rows), data(history), data(screen))
+    }
+
+    public enum Tapped {
+        case bytes(Data)
+        case nothing
+        /// The tap is closed or fell too far behind, and needs `tapStart` again.
+        case lost
+    }
+
+    /// What the program wrote since the tap started or was last read.
+    public func tapRead() -> Tapped {
+        guard let surface else { return .lost }
+        var text = ghostty_text_s()
+        switch ghostty_surface_tap_read(surface, &text) {
+        case 1:
+            defer { ghostty_surface_free_text(surface, &text) }
+            return text.text.map { .bytes(Data(bytes: $0, count: Int(text.text_len))) } ?? .nothing
+        case 0: return .nothing
+        default: return .lost
+        }
+    }
+
+    public func tapStop() {
+        if let surface { ghostty_surface_tap_stop(surface) }
+    }
+
+    /// The size in cells, which a tap's phone needs a new start for when it changes.
+    public var cells: (cols: Int, rows: Int)? {
+        guard let surface else { return nil }
+        let size = ghostty_surface_size(surface)
+        return (Int(size.columns), Int(size.rows))
+    }
+
     /// Bytes straight to the program, as a keyboard sends them, already encoded for it. Not a paste, so nothing is bracketed.
     public func input(_ data: Data) {
         // Ghostty's `text` action writes them as they are, given in Zig's string syntax.

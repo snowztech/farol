@@ -102,6 +102,8 @@ final class RemoteBridge: ObservableObject {
         /// It draws that terminal itself, from VT sequences, and was last sent this of it.
         var vt = false
         var vtScreen: Data?
+        /// It takes that terminal as one stream, `vtSnapshot` then `vtData`, instead of `vt` screens.
+        var stream = false
         /// The size its terminal fits in, which the pane takes while it shows it, unless the Mac was used since.
         var fit: (session: UUID, cols: Int, rows: Int)?
         /// When it last opened, sized or typed into its terminal, against the Mac's last keyboard or mouse event.
@@ -230,6 +232,107 @@ final class RemoteBridge: ObservableObject {
         connected = []
         timer?.invalidate()
         timer = nil
+        pumpStreams()
+    }
+
+    // MARK: Streams
+
+    /// A pane streamed to phones, shared by every phone that streams it.
+    private struct Stream {
+        var epoch: Int
+        var seq = 0
+        var cols: Int
+        var rows: Int
+        /// What went out in the second that started at `since`, against what the relay lets through.
+        var since = Date.now
+        var sent = 0
+        /// Output came faster than the budget, so the bytes since were dropped and a snapshot goes once it calms.
+        var behind = false
+    }
+
+    private var streams: [UUID: Stream] = [:]
+    private var epochs = 0
+    private var pump: Timer?
+
+    /// The relay passes 512 KB a second per connection, and a stream's bytes about double on the wire, so a pane gets this much.
+    private static let streamBudget = 150_000
+
+    private func pumpIfStreaming() {
+        guard pump == nil, phones.values.contains(where: { $0.stream && $0.terminal != nil }) else { return }
+        let pump = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in self?.pumpStreams() }
+        RunLoop.main.add(pump, forMode: .common)
+        self.pump = pump
+    }
+
+    /// Sends each streaming phone what its pane's program wrote since the last frame, and a new snapshot when the stream breaks:
+    /// the tap fell behind, the pane changed size, or output came faster than the relay passes.
+    private func pumpStreams() {
+        let wanted = Set(phones.values.compactMap { $0.device != nil && $0.stream ? $0.terminal : nil })
+        for id in streams.keys where !wanted.contains(id) {
+            pane(id)?.terminal.tapStop()
+            streams[id] = nil
+        }
+        guard !wanted.isEmpty else {
+            pump?.invalidate()
+            pump = nil
+            return
+        }
+        for id in wanted {
+            guard let terminal = pane(id)?.terminal else { continue }
+            guard var stream = streams[id], let cells = terminal.cells, cells.cols == stream.cols, cells.rows == stream.rows else {
+                restartStream(of: id)
+                continue
+            }
+            if Date.now.timeIntervalSince(stream.since) >= 1 {
+                stream.since = .now
+                stream.sent = 0
+            }
+            if stream.behind, Date.now.timeIntervalSince(stream.since) >= 0.25 {
+                restartStream(of: id)
+                continue
+            }
+            switch terminal.tapRead() {
+            case .nothing:
+                break
+            case .lost:
+                restartStream(of: id)
+                continue
+            case .bytes(let data):
+                if stream.behind { break }
+                guard stream.sent + data.count <= Self.streamBudget else {
+                    stream.behind = true
+                    break
+                }
+                for (phone, state) in phones where state.stream && state.terminal == id {
+                    tell(.vtData(session: id, epoch: stream.epoch, seq: stream.seq, data: data), phone)
+                }
+                stream.seq += 1
+                stream.sent += data.count
+            }
+            streams[id] = stream
+        }
+    }
+
+    /// Starts a pane's stream over: every phone streaming it gets the screen and the history above it, and the bytes after.
+    private func restartStream(of id: UUID) {
+        guard let terminal = pane(id)?.terminal, let start = terminal.tapStart(historyRows: 2000) else {
+            streams[id] = nil
+            return
+        }
+        epochs += 1
+        let history = Self.trim(start.history, to: 90_000)
+        streams[id] = Stream(epoch: epochs, cols: start.cols, rows: start.rows, sent: history.count + start.screen.count)
+        for (phone, state) in phones where state.stream && state.terminal == id {
+            tell(.vtSnapshot(session: id, epoch: epochs, cols: start.cols, rows: start.rows, history: history, screen: start.screen), phone)
+        }
+    }
+
+    /// The last rows of VT history that fit in `bytes`, cut where a row starts so no row is half there.
+    static func trim(_ history: Data, to bytes: Int) -> Data {
+        guard history.count > bytes else { return history }
+        let tail = history.suffix(bytes)
+        guard let row = tail.firstRange(of: Data("\r\n".utf8)) else { return Data() }
+        return Data("\u{1B}[0m".utf8) + tail[row.upperBound...]
     }
 
     /// How often phones are sent what changed: often while one shows a terminal, so typing there feels live, and less the rest of the time.
@@ -366,7 +469,7 @@ final class RemoteBridge: ObservableObject {
             answer(command, by: device, session: session, request: request, choice: choice, from: id)
         case .respondAsk(let session, let ask, let decision):
             respondAsk(command, by: device, session: session, ask: ask, decision: decision, from: id)
-        case .terminal(let session, let open, let vt):
+        case .terminal(let session, let open, let vt, let stream):
             phones[id]?.saysTerminal = true
             if open {
                 phones[id]?.terminal = session
@@ -375,8 +478,11 @@ final class RemoteBridge: ObservableObject {
             phones[id]?.screen = nil
             phones[id]?.vt = open && vt == true
             phones[id]?.vtScreen = nil
+            phones[id]?.stream = open && vt == true && stream == true
+            if open, stream == true { restartStream(of: session) }
             retime()
             tick()
+            pumpIfStreaming()
         case .commands(let session):
             commands(command, of: session, from: id)
         case .attach(let session, let attachment, let part, let parts, let data):
@@ -406,6 +512,8 @@ final class RemoteBridge: ObservableObject {
             act(command, by: device, on: session, from: id) { $0.input(data) }
             // The program echoes within a few milliseconds, so the screen goes now rather than on the next tick.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) { [weak self] in self?.tick() }
+        case .resync(let session):
+            restartStream(of: session)
         case .fit(let session, let cols, let rows):
             phones[id]?.fit = (session, cols, rows)
             phones[id]?.acted = .now
@@ -1016,7 +1124,7 @@ final class RemoteBridge: ObservableObject {
                     }
                 }
             }
-            if let watching = phone.watching, phone.vt, phone.terminal == watching, let (_, terminal) = pane(watching),
+            if let watching = phone.watching, phone.vt, !phone.stream, phone.terminal == watching, let (_, terminal) = pane(watching),
                let screen = terminal.screenVT, screen.data != phone.vtScreen {
                 phones[id]?.vtScreen = screen.data
                 tell(.vt(session: watching, cols: screen.cols, rows: screen.rows, data: screen.data), id)
