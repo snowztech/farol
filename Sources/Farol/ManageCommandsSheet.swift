@@ -70,7 +70,7 @@ struct ManageCommandsSheet: View {
         .font(.system(size: 13))
         .foregroundStyle(palette.text)
         .frame(width: 460)
-        .background(palette.background)
+        .sheetBackground(palette)
         .confirmationDialog(deleteTitle, isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete Command", role: .destructive) { delete() }
             Button("Cancel", role: .cancel) {}

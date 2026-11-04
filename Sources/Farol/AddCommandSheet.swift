@@ -103,7 +103,7 @@ struct AddCommandSheet: View {
         .font(.system(size: 13))
         .foregroundStyle(p.text)
         .frame(width: 460)
-        .background(p.background)
+        .sheetBackground(p)
         .ignoresSafeArea()
         .onAppear { focus = .name }
     }

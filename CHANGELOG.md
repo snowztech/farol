@@ -4,6 +4,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- Glass joins the sidebar and files panel into one surface, and the selected session, file and Settings section sit on a piece of glass.
+- In Glass, the title bar buttons sit on glass pills, and sheets and tips are on glass too.
+
 ## [0.59.0] - 2026-11-04
 
 Branches show when they are updating or pushing, and Glass holds its color everywhere.

@@ -206,12 +206,22 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             edge = panel.trailingAnchor
         }
         if #available(macOS 26, *) {
+            // One container, so the sidebar and files glass that touch merge into one surface, with no seam where they meet.
+            let container = NSGlassEffectContainerView()
+            let surface = NSView()
+            container.contentView = surface
+            container.translatesAutoresizingMaskIntoConstraints = false
+            root.addSubview(container, positioned: .above, relativeTo: blur)
+            NSLayoutConstraint.activate([
+                container.topAnchor.constraint(equalTo: root.topAnchor), container.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+                container.leadingAnchor.constraint(equalTo: root.leadingAnchor), container.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            ])
             for panel in [sidebar, filesPanel, graphPanel] {
                 let glass = NSGlassEffectView()
                 // Square like the panels it sits under, so full screen, with no round window corners to hide it, shows no curved slabs.
                 glass.cornerRadius = UIStyle.glass.radius
                 glass.translatesAutoresizingMaskIntoConstraints = false
-                root.addSubview(glass, positioned: .above, relativeTo: blur)
+                surface.addSubview(glass)
                 // Up into the top bar, as the panels' color does in the classic style.
                 NSLayoutConstraint.activate([
                     glass.topAnchor.constraint(equalTo: root.topAnchor), glass.bottomAnchor.constraint(equalTo: panel.bottomAnchor),
@@ -789,6 +799,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         menuBar.apply(state.palette)
         notch.apply(state.palette)
         HoverTip.shared.colors = (bg, runtime.foregroundColor)
+        HoverTip.shared.glass = state.palette.glass
         applyStyle()
         window?.appearance = NSAppearance(named: bg.isDark ? .darkAqua : .aqua)
         content.layer?.backgroundColor = bg.cgColor

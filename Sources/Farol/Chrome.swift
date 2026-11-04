@@ -90,11 +90,14 @@ struct TopBar: View {
             HStack(spacing: 2) {
                 // Room for the traffic lights.
                 Spacer().frame(width: 72)
-                IconButton(symbol: "sidebar.left", help: "Sidebar (⌘B)", active: state.sidebarVisible,
-                           palette: p, action: commands.toggleSidebar)
-                IconButton(symbol: "folder", help: "Files (⇧⌘E)", active: state.filesVisible,
-                           palette: p, action: commands.toggleFiles)
-                newSessionButton(p)
+                HStack(spacing: 2) {
+                    IconButton(symbol: "sidebar.left", help: "Sidebar (⌘B)", active: state.sidebarVisible,
+                               palette: p, action: commands.toggleSidebar)
+                    IconButton(symbol: "folder", help: "Files (⇧⌘E)", active: state.filesVisible,
+                               palette: p, action: commands.toggleFiles)
+                    newSessionButton(p)
+                }
+                .glassCapsule(p)
                 Spacer()
                 if let session = store.selected {
                     GitButton(session: session, state: state, review: review, merge: merge,
@@ -106,6 +109,7 @@ struct TopBar: View {
                 }
                 IconButton(symbol: "gearshape", help: "Settings (⌘,)", active: state.showingSettings,
                            palette: p, action: commands.toggleSettings)
+                    .glassCapsule(p)
             }
             .padding(.trailing, 8)
         }
@@ -227,7 +231,9 @@ private struct GitButton: View {
             }
             .font(.system(size: 11, weight: .medium))
             .clipShape(Capsule())
-            .overlay(Capsule().strokeBorder(p.line))
+            // On glass, the glass is the pill's edge.
+            .overlay(Capsule().strokeBorder(p.line.opacity(p.liquid ? 0 : 1)))
+            .glassCapsule(p)
             .padding(.trailing, 6)
         }
     }
@@ -252,7 +258,7 @@ private struct GitButton: View {
                 label(active ? palette.accent : hovering ? palette.text : palette.muted)
                     .padding(.horizontal, 8)
                     .frame(height: 20)
-                    .background(active ? palette.muted.opacity(0.3) : palette.raised.opacity(hovering ? 1 : 0.6))
+                    .background(active ? palette.muted.opacity(0.3) : palette.raised.opacity(hovering ? 1 : palette.liquid ? 0 : 0.6))
                     .contentShape(Rectangle())
             }
             .buttonStyle(QuietPress())

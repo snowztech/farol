@@ -207,7 +207,13 @@ private struct FileRow: View {
         .foregroundStyle(row.dimmed ? palette.muted : palette.text)
         .padding(.leading, CGFloat(row.depth) * 14 + 4)
         .frame(height: 24)
-        .background(RoundedRectangle(cornerRadius: 6).fill(selected ? palette.raised : hovering ? palette.hover : .clear))
+        .background {
+            if selected {
+                GlassFill(palette: palette, color: palette.raised, shape: RoundedRectangle(cornerRadius: 6))
+            } else {
+                RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.hover : .clear)
+            }
+        }
         .contentShape(Rectangle())
         .onClickableHover { hovering = $0 }
         .onTapGesture(perform: action)
