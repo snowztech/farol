@@ -1,0 +1,145 @@
+diff --git a/include/ghostty.h b/include/ghostty.h
+index 17b4611..e861903 100644
+--- a/include/ghostty.h
++++ b/include/ghostty.h
+@@ -1241,6 +1241,9 @@ GHOSTTY_API bool ghostty_surface_read_text(ghostty_surface_t,
+ GHOSTTY_API void ghostty_surface_free_text(ghostty_surface_t, ghostty_text_s*);
+ GHOSTTY_API bool ghostty_surface_read_vt_screen(ghostty_surface_t, ghostty_text_s*);
+ GHOSTTY_API bool ghostty_surface_read_vt_history(ghostty_surface_t, uint32_t, ghostty_text_s*);
++GHOSTTY_API bool ghostty_surface_tap_start(ghostty_surface_t, uint32_t, ghostty_text_s*, ghostty_text_s*);
++GHOSTTY_API int32_t ghostty_surface_tap_read(ghostty_surface_t, ghostty_text_s*);
++GHOSTTY_API void ghostty_surface_tap_stop(ghostty_surface_t);
+ 
+ #ifdef __APPLE__
+ GHOSTTY_API void ghostty_surface_set_display_id(ghostty_surface_t, uint32_t);
+diff --git a/src/apprt/embedded.zig b/src/apprt/embedded.zig
+index efac2b8..2192e4f 100644
+--- a/src/apprt/embedded.zig
++++ b/src/apprt/embedded.zig
+@@ -1967,11 +1967,78 @@ pub const CAPI = struct {
+         };
+     }
+ 
++    /// Farol: opens the pane's tap, or starts it over: the screen as
++    /// ghostty_surface_read_vt_screen gives it and up to `history_rows` rows
++    /// above it, read under the lock that empties the tap. What
++    /// ghostty_surface_tap_read gives next is what the program wrote after
++    /// that screen, so the two make one stream with no gap.
++    export fn ghostty_surface_tap_start(
++        surface: *Surface,
++        history_rows: u32,
++        history: *Text,
++        screen: *Text,
++    ) bool {
++        const core_surface = &surface.core_surface;
++        core_surface.renderer_state.mutex.lockUncancelable(global.io());
++        defer core_surface.renderer_state.mutex.unlock(global.io());
++
++        history.* = .{ .tl_px_x = -1, .tl_px_y = -1, .offset_start = 0, .offset_len = 0, .text = null, .text_len = 0 };
++        if (history_rows > 0) _ = readVtLocked(surface, history_rows, history) catch false;
++        const read = readVtLocked(surface, null, screen) catch |err| {
++            log.warn("error reading vt for the tap err={}", .{err});
++            history.deinit();
++            return false;
++        };
++        if (!read) {
++            history.deinit();
++            return false;
++        }
++
++        const io = &core_surface.io;
++        if (io.farol_tap) |*tap| tap.clearRetainingCapacity() else io.farol_tap = .empty;
++        io.farol_tap_overflow = false;
++        return true;
++    }
++
++    /// Farol: what the program wrote since the tap started or was last
++    /// read. 1 with bytes in `result`, 0 when nothing came, and -1 when the
++    /// tap is closed or went over its limit, so it needs starting again.
++    export fn ghostty_surface_tap_read(surface: *Surface, result: *Text) i32 {
++        const core_surface = &surface.core_surface;
++        core_surface.renderer_state.mutex.lockUncancelable(global.io());
++        defer core_surface.renderer_state.mutex.unlock(global.io());
++
++        const io = &core_surface.io;
++        const tap = if (io.farol_tap) |*tap| tap else return -1;
++        if (io.farol_tap_overflow) return -1;
++        if (tap.items.len == 0) return 0;
++        const text = global.alloc().dupeZ(u8, tap.items) catch return -1;
++        tap.clearRetainingCapacity();
++        result.* = .{ .tl_px_x = -1, .tl_px_y = -1, .offset_start = 0, .offset_len = 0, .text = text.ptr, .text_len = text.len };
++        return 1;
++    }
++
++    /// Farol: closes the tap, so the program's output is kept no more.
++    export fn ghostty_surface_tap_stop(surface: *Surface) void {
++        const core_surface = &surface.core_surface;
++        core_surface.renderer_state.mutex.lockUncancelable(global.io());
++        defer core_surface.renderer_state.mutex.unlock(global.io());
++
++        const io = &core_surface.io;
++        if (io.farol_tap) |*tap| tap.deinit(io.alloc);
++        io.farol_tap = null;
++        io.farol_tap_overflow = false;
++    }
++
+     fn readVt(surface: *Surface, history: ?u32, result: *Text) !bool {
+         const core_surface = &surface.core_surface;
+         core_surface.renderer_state.mutex.lockUncancelable(global.io());
+         defer core_surface.renderer_state.mutex.unlock(global.io());
++        return readVtLocked(surface, history, result);
++    }
+ 
++    fn readVtLocked(surface: *Surface, history: ?u32, result: *Text) !bool {
++        const core_surface = &surface.core_surface;
+         const t = core_surface.renderer_state.terminal;
+         const screen = t.screens.active;
+         const pages = &screen.pages;
+diff --git a/src/termio/Termio.zig b/src/termio/Termio.zig
+index d08f2e5..9a42be2 100644
+--- a/src/termio/Termio.zig
++++ b/src/termio/Termio.zig
+@@ -69,6 +69,14 @@ terminal_stream: StreamHandler.Stream,
+ /// flooding with cursor resets.
+ last_cursor_reset: ?std.Io.Timestamp = null,
+ 
++/// Farol: what the child wrote since the tap was last read, while one is
++/// open. Guarded by renderer_state.mutex, like the terminal it follows.
++farol_tap: ?std.ArrayList(u8) = null,
++
++/// Farol: the tap went past its limit unread and stopped, so what it
++/// holds no longer follows the screen it started from.
++farol_tap_overflow: bool = false,
++
+ /// State we have for thread enter. This may be null if we don't need
+ /// to keep track of any state or if its already been freed.
+ thread_enter_state: ?*ThreadEnterState = null,
+@@ -342,6 +350,8 @@ pub fn deinit(self: *Termio) void {
+ 
+     // Clear any initial state if we have it
+     if (self.thread_enter_state) |v| v.destroy();
++
++    if (self.farol_tap) |*tap| tap.deinit(self.alloc);
+ }
+ 
+ pub fn threadEnter(
+@@ -682,6 +692,19 @@ pub fn processOutput(self: *Termio, buf: []const u8) void {
+ 
+ /// Process output from readdata but the lock is already held.
+ fn processOutputLocked(self: *Termio, buf: []const u8) void {
++    if (self.farol_tap) |*tap| farol: {
++        if (self.farol_tap_overflow) break :farol;
++        // A megabyte nobody read means the host stopped reading, and starts over.
++        if (tap.items.len + buf.len > 1024 * 1024) {
++            self.farol_tap_overflow = true;
++            tap.clearRetainingCapacity();
++            break :farol;
++        }
++        tap.appendSlice(self.alloc, buf) catch {
++            self.farol_tap_overflow = true;
++        };
++    }
++
+     // Schedule a render. We can call this first because we have the lock.
+     self.terminal_stream.handler.queueRender() catch unreachable;
+ 
