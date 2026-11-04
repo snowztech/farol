@@ -25,6 +25,8 @@ final class GraphModel: ObservableObject {
     @Published private(set) var forge: Forge?
     /// The branch work is merged into, like origin/main, which has no request to make.
     private var base: String?
+    /// Local branches with commits the base doesn't have. Nil until read, which offers a request on every branch.
+    private var unmerged: Set<String>?
     /// The branch under the mouse in the list, so the history can light up the commit it points to.
     @Published var hoveredBranch: String?
     @Published private(set) var rows: [History.Row] = []
@@ -221,24 +223,35 @@ final class GraphModel: ObservableObject {
         DispatchQueue.global(qos: .utility).async {
             let forge = Forge.detect(in: root)
             let requests = forge?.openRequests(in: root) ?? [:]
-            let base = Diff.baseBranch(in: root)
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root else { return }
                 self.requests = requests
                 self.forge = forge
-                self.base = base
             }
         }
     }
 
     func isBase(_ branch: String) -> Bool { base == branch || base == "origin/\(branch)" }
 
-    /// The branch has to be pushed already. The request is titled from its commits, and its number shows on the row once made.
-    func createRequest(_ branch: String, into base: String, title: String, body: String, labels: [String],
-                       failed: @escaping (String) -> Void) {
-        guard let forge else { return }
-        run(failed, then: { [weak self] in self?.loadRequests() }) {
-            try forge.createRequest(for: branch, base: base, title: title, body: body, labels: labels, in: $0)
+    /// Whether `branch` has commits the base doesn't, so the forge has something to put in a request.
+    func hasNewWork(_ branch: String) -> Bool { unmerged?.contains(branch) ?? true }
+
+    /// Pushes the branch first, as the review panel's button does. An empty title has the forge title it from its commits. Its number shows on the row once made.
+    /// `done` gets nil once it is made, or what went wrong.
+    func createRequest(_ branch: String, into base: String?, title: String = "", body: String = "", labels: [String] = [],
+                       draft: Bool = false, done: @escaping (String?) -> Void) {
+        guard let forge, let root else { return done("Not in a repository.") }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let error: String?
+            do {
+                try History.publish(branch, in: root)
+                try forge.createRequest(for: branch, base: base, title: title, body: body, labels: labels, draft: draft, in: root)
+                error = nil
+            } catch let failure { error = String(describing: failure) }
+            DispatchQueue.main.async { [weak self] in
+                done(error)
+                self?.loadRequests()
+            }
         }
     }
 
@@ -296,8 +309,13 @@ final class GraphModel: ObservableObject {
             let commits = Result { try History.commits(in: root, branch: all ? nil : "HEAD") }
             let oneSided = all ? History.oneSided(upstreams, in: root) : History.oneSided(upstreams.filter { $0.key == current }, in: root)
             let rows = (try? commits.get()).map { History.graph($0, oneSided: oneSided) }
+            // Read with each reload, so a branch's first commit offers it a request straight away.
+            let base = Diff.baseBranch(in: root)
+            let unmerged = base.map { History.branches(notMergedInto: $0, in: root) }
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root else { return }
+                self.base = base
+                self.unmerged = unmerged
                 // Only what changed is assigned, so a reload that finds the same history redraws nothing.
                 if self.local != branches.local { self.local = branches.local }
                 if self.remote != branches.remote { self.remote = branches.remote }
@@ -681,20 +699,23 @@ private struct BranchList: View {
             graph.rebase(onto: branch, interactive: true, failed: gitError("Couldn't rebase"))
         }
         .disabled(current)
-        // Pushed and with no request yet. Not pushed is greyed out rather than hidden, so the reason isn't a mystery.
-        if !remote, let forge = graph.forge, let upstream = graph.upstreams[branch], graph.requests[branch] == nil, !graph.isBase(branch) {
+        // A local branch with commits main doesn't have and no request yet, since the forge refuses one with nothing in it.
+        // Each pushes it first, so one that was never pushed gets them too. A draft is a tick in the sheet, which keeps this menu short.
+        if !remote, let forge = graph.forge, graph.requests[branch] == nil, !graph.isBase(branch), graph.hasNewWork(branch) {
             Divider()
-            Button("Create \(forge.request.capitalized)\u{2026}") {
+            Button("Create \(forge.request.capitalized)") {
+                let failed = gitError("Couldn't create the \(forge.request)")
+                graph.createRequest(branch, into: graph.requestBases.preferred) { $0.map(failed) }
+            }
+            Button("Edit and Create \(forge.request.capitalized)\u{2026}") {
                 let bases = graph.requestBases
                 guard let window = NSApp.keyWindow, let root = graph.root else { return }
                 RequestSheet.present(in: window, request: forge.request, forge: forge.name, head: branch,
                                      bases: bases.all.filter { $0 != branch }, preferred: bases.preferred, root: root,
-                                     palette: palette, loadLabels: { forge.labels(in: root) }) { base, title, body, labels in
-                    graph.createRequest(branch, into: base, title: title, body: body, labels: labels,
-                                        failed: gitError("Couldn't create the \(forge.request)"))
+                                     palette: palette, loadLabels: { forge.labels(in: root) }) { base, title, body, labels, draft, done in
+                    graph.createRequest(branch, into: base, title: title, body: body, labels: labels, draft: draft, done: done)
                 }
             }
-            .disabled(upstream.ahead > 0)
         }
         Divider()
         // A local branch and its twin on the server can go separately, since deleting either doesn't touch the other.

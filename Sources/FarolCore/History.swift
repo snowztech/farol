@@ -243,6 +243,18 @@ public enum History {
         try Git.run(["push", "--set-upstream", pushRemote(in: directory), "HEAD"], in: directory)
     }
 
+    /// Local branches with commits `base` doesn't have, the only ones a request can be made from. One git call for all of them.
+    public static func branches(notMergedInto base: String, in directory: String) -> Set<String> {
+        let output = (try? Git.run(["for-each-ref", "--format=%(refname:short)", "--no-merged=\(base)", "refs/heads"], in: directory)) ?? ""
+        return Set(output.split(separator: "\n").map(String.init))
+    }
+
+    /// Pushes `branch` under its own name and has it follow that, like `push(in:)` for one that may not be checked out.
+    /// A branch made from origin/main follows main until then, which is no place to open a request from.
+    public static func publish(_ branch: String, in directory: String) throws {
+        try Git.run(["push", "--set-upstream", pushRemote(in: directory), "refs/heads/\(branch):refs/heads/\(branch)"], in: directory)
+    }
+
     /// How many commits the checked out branch has that `base` doesn't. Zero means there is nothing to request a merge of.
     public static func commitsAhead(of base: String, in directory: String) -> Int {
         (try? Git.run(["rev-list", "--count", "\(base)..HEAD"], in: directory)).flatMap(Int.init) ?? 0
