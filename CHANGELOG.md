@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.58.3] - 2026-11-04
+
+Line numbers stay inside the file editor.
+
 ### Fixed
 
 - An open file's line numbers and blame no longer spill into the pane below it when the window is split.
@@ -1177,7 +1181,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.58.2...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.58.3...HEAD
+[0.58.3]: https://github.com/snowztech/farol/releases/tag/v0.58.3
 [0.58.2]: https://github.com/snowztech/farol/releases/tag/v0.58.2
 [0.58.1]: https://github.com/snowztech/farol/releases/tag/v0.58.1
 [0.58.0]: https://github.com/snowztech/farol/releases/tag/v0.58.0
