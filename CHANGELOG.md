@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- The update dialog shows what's new in the last five versions, not only the newest, so skipping a few no longer hides what changed.
+
 ## [0.58.2] - 2026-11-04
 
 Settings gets the whole window, and sheets keep color for what you pick.
