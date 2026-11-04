@@ -21,6 +21,10 @@ final class GraphModel: ObservableObject {
     @Published private(set) var syncing: [String: BranchSync] = [:]
     /// The open pull requests, by branch, for the button next to each. Empty without gh or glab.
     @Published private(set) var requests: [String: Forge.Request] = [:]
+    /// Where the checkout pushes to, for the menu item that creates a request.
+    @Published private(set) var forge: Forge?
+    /// The branch work is merged into, like origin/main, which has no request to make.
+    private var base: String?
     /// The branch under the mouse in the list, so the history can light up the commit it points to.
     @Published var hoveredBranch: String?
     @Published private(set) var rows: [History.Row] = []
@@ -215,12 +219,36 @@ final class GraphModel: ObservableObject {
     private func loadRequests() {
         guard let root else { return }
         DispatchQueue.global(qos: .utility).async {
-            let requests = Forge.detect(in: root)?.openRequests(in: root) ?? [:]
+            let forge = Forge.detect(in: root)
+            let requests = forge?.openRequests(in: root) ?? [:]
+            let base = Diff.baseBranch(in: root)
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.root == root else { return }
                 self.requests = requests
+                self.forge = forge
+                self.base = base
             }
         }
+    }
+
+    func isBase(_ branch: String) -> Bool { base == branch || base == "origin/\(branch)" }
+
+    /// The branch has to be pushed already. The request is titled from its commits, and its number shows on the row once made.
+    func createRequest(_ branch: String, into base: String, failed: @escaping (String) -> Void) {
+        guard let forge else { return }
+        run(failed, then: { [weak self] in self?.loadRequests() }) { try forge.createRequest(for: branch, base: base, in: $0) }
+    }
+
+    /// The branches on the server a request can go into, without the remote's name as the forge wants them.
+    /// The default branch comes first and then the ones with a request open, since a branch built on another is usually into one of those.
+    var requestBases: (all: [String], preferred: String?) {
+        func name(_ ref: String) -> String { ref.firstIndex(of: "/").map { String(ref[ref.index(after: $0)...]) } ?? ref }
+        let preferred = base.map(name)
+        let named = remote.map(name).filter { $0 != "HEAD" }
+        let open = named.filter { requests[$0] != nil }
+        var seen: Set<String> = []
+        let all = ([preferred].compactMap { $0 } + open + named).filter { seen.insert($0).inserted }
+        return (all, preferred)
     }
 
     func rebase(onto base: String, interactive: Bool, failed: @escaping (String) -> Void) {
@@ -650,6 +678,20 @@ private struct BranchList: View {
             graph.rebase(onto: branch, interactive: true, failed: gitError("Couldn't rebase"))
         }
         .disabled(current)
+        // Pushed and with no request yet. Not pushed is greyed out rather than hidden, so the reason isn't a mystery.
+        if !remote, let forge = graph.forge, let upstream = graph.upstreams[branch], graph.requests[branch] == nil, !graph.isBase(branch) {
+            Divider()
+            Button("Create \(forge.request.capitalized)\u{2026}") {
+                let bases = graph.requestBases
+                guard let window = NSApp.keyWindow else { return }
+                RequestSheet.present(in: window, request: forge.request, forge: forge.name, head: branch,
+                                     bases: bases.all.filter { $0 != branch }, preferred: bases.preferred,
+                                     palette: palette) { base in
+                    graph.createRequest(branch, into: base, failed: gitError("Couldn't create the \(forge.request)"))
+                }
+            }
+            .disabled(upstream.ahead > 0)
+        }
         Divider()
         // A local branch and its twin on the server can go separately, since deleting either doesn't touch the other.
         let twin = remote ? branch : graph.remote.first { $0.drop { $0 != "/" }.dropFirst() == branch }

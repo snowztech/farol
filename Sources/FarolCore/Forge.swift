@@ -550,12 +550,13 @@ public struct Forge: Equatable {
     }
 
     /// Creates the request for `branch`, titled and described from its commits. The branch has to be pushed first.
-    public func createRequest(for branch: String, in directory: String) throws {
+    /// It goes into `base`, or the repo's default branch without one, which is wrong for a branch built on another.
+    public func createRequest(for branch: String, base: String? = nil, in directory: String) throws {
         guard let path = kind.toolPath else { throw GitError(description: "\(tool) isn't installed.") }
         // Both flags keep the tools from stopping to ask, which they can't here.
         let arguments = switch kind {
-        case .github: ["pr", "create", "--fill", "--head", branch]
-        case .gitlab: ["mr", "create", "--fill", "--yes", "--source-branch", branch]
+        case .github: ["pr", "create", "--fill", "--head", branch] + (base.map { ["--base", $0] } ?? [])
+        case .gitlab: ["mr", "create", "--fill", "--yes", "--source-branch", branch] + (base.map { ["--target-branch", $0] } ?? [])
         }
         try Git.run(path, arguments, in: directory)
     }
