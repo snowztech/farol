@@ -2,6 +2,9 @@ import AppKit
 import FarolCore
 import SwiftUI
 
+/// What a branch is waiting on, so its row shows a loader in the color of that action.
+enum BranchSync { case pull, push }
+
 /// The selected session's commit graph. Git is only asked while the panel is open.
 final class GraphModel: ObservableObject {
     @Published private(set) var root: String?
@@ -14,6 +17,8 @@ final class GraphModel: ObservableObject {
     /// Each local branch's upstream, for the Update item.
     @Published private(set) var upstreams: [String: History.Upstream] = [:]
     @Published private(set) var fetching = false
+    /// The branches being updated or pushed. A second click on one is ignored until the first finishes.
+    @Published private(set) var syncing: [String: BranchSync] = [:]
     /// The open pull requests, by branch, for the button next to each. Empty without gh or glab.
     @Published private(set) var requests: [String: Forge.Request] = [:]
     /// The branch under the mouse in the list, so the history can light up the commit it points to.
@@ -191,12 +196,19 @@ final class GraphModel: ObservableObject {
     }
 
     func update(_ branch: String, failed: @escaping (String) -> Void) {
+        guard syncing[branch] == nil else { return }
         let current = branch == current
-        run(failed) { try History.update(branch, current: current, in: $0) }
+        syncing[branch] = .pull
+        run(failed, then: { [weak self] in self?.syncing[branch] = nil }) { try History.update(branch, current: current, in: $0) }
     }
 
     func push(_ branch: String, failed: @escaping (String) -> Void) {
-        run(failed, then: { [weak self] in self?.loadRequests() }) { try History.push(branch, in: $0) }
+        guard syncing[branch] == nil else { return }
+        syncing[branch] = .push
+        run(failed, then: { [weak self] in
+            self?.syncing[branch] = nil
+            self?.loadRequests()
+        }) { try History.push(branch, in: $0) }
     }
 
     /// Asks the forge, so only when a request may have changed: another checkout, the panel reopened, a fetch or a push.
@@ -557,6 +569,7 @@ private struct BranchList: View {
                         let current = !entry.remote && entry.name == graph.current
                         BranchRow(name: entry.name, remote: entry.remote, current: current,
                                   upstream: entry.remote ? nil : graph.upstreams[entry.name],
+                                  syncing: graph.syncing[entry.name],
                                   request: graph.requests[entry.remote ? String(entry.name.drop { $0 != "/" }.dropFirst()) : entry.name],
                                   color: colors[entry.name].map { palette.lanes[$0 % palette.lanes.count] } ?? palette.muted,
                                   palette: palette,
@@ -683,6 +696,7 @@ private struct BranchRow: View {
     let remote: Bool
     let current: Bool
     var upstream: History.Upstream?
+    var syncing: BranchSync?
     var request: Forge.Request?
     let color: Color
     let palette: Palette
@@ -707,7 +721,11 @@ private struct BranchRow: View {
                 Text("remote").font(.system(size: 10)).foregroundStyle(palette.muted).fixedSize()
             }
             Spacer(minLength: 4)
-            if let upstream, upstream.ahead + upstream.behind > 0 {
+            // The counts stay out while it runs, since they are about to change.
+            if let syncing {
+                SyncSpinner(color: syncing == .pull ? palette.pull : palette.added)
+                    .hoverTip(syncing == .pull ? "Updating\u{2026}" : "Pushing\u{2026}")
+            } else if let upstream, upstream.ahead + upstream.behind > 0 {
                 HStack(spacing: 2) {
                     if upstream.behind > 0 {
                         DriftButton(symbol: "arrow.down", count: upstream.behind, label: "Update", showsLabel: hovering, color: palette.pull,
@@ -797,6 +815,25 @@ private struct PullRequestGlyph: Shape {
         path.addLine(to: point(7.5, 4.5))
         path.addLine(to: point(9, 6))
         return path
+    }
+}
+
+/// A ring that turns in one color. ProgressView ignores tint on macOS, and the color is what says pull from push.
+private struct SyncSpinner: View {
+    let color: Color
+
+    var body: some View {
+        // Without motion the arc stays still, which still says something is running.
+        TimelineView(.animation(paused: !Motion.enabled)) { context in
+            let turn = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 0.9) / 0.9 * 360
+            Circle()
+                .trim(from: 0, to: 0.75)
+                .stroke(color, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                .rotationEffect(.degrees(Motion.enabled ? turn : 0))
+        }
+        .frame(width: 11, height: 11)
+        .padding(.horizontal, 5)
+        .frame(height: 18)
     }
 }
 
