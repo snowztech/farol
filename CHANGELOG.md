@@ -6,7 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Changed
 
-- The update dialog shows what's new in the last five versions, not only the newest, so skipping a few no longer hides what changed.
+- The update dialog shows what's new in every version from the last 30 days, up to 15, not only the newest, so skipping a few no longer hides what changed.
 
 ## [0.58.2] - 2026-11-04
 

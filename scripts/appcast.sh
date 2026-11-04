@@ -23,8 +23,8 @@ signature=$("$tools/bin/sign_update" --ed-key-file "$SPARKLE_KEY_FILE" "$zip")
 build=$(defaults read "$root/build/Farol.app/Contents/Info.plist" CFBundleVersion)
 date=$(LC_ALL=C date -u "+%a, %d %b %Y %H:%M:%S +0000")
 # Shown in the update dialog before installing. A "]]>" in the notes would end the CDATA early, so it is split across two.
-# The versions before it too, since most people skip a few and would only hear about the last one.
-notes=$("$root/scripts/release-notes.sh" "$version" 5 | sed 's/]]>/]]]]><![CDATA[>/g')
+# The recent versions before it too, since most people skip a few and would only hear about the last one.
+notes=$("$root/scripts/release-notes.sh" "$version" recent | sed 's/]]>/]]]]><![CDATA[>/g')
 
 cat <<XML
 <?xml version="1.0" encoding="utf-8"?>
