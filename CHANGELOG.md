@@ -4,6 +4,12 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- Glass keeps the theme's color in full screen and when Farol is in the background, and full screen shows no rounded panel corners.
+- Leaving full screen no longer leaves a bar over the top bar's buttons. The bar macOS slides in at the top in full screen takes the theme's color.
+- A switch that is on in Settings is clearly brighter than one that is off.
+
 ## [0.58.3] - 2026-11-04
 
 Line numbers stay inside the file editor.

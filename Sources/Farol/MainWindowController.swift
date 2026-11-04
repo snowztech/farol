@@ -208,6 +208,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         if #available(macOS 26, *) {
             for panel in [sidebar, filesPanel, graphPanel] {
                 let glass = NSGlassEffectView()
+                // Square like the panels it sits under, so full screen, with no round window corners to hide it, shows no curved slabs.
+                glass.cornerRadius = UIStyle.glass.radius
                 glass.translatesAutoresizingMaskIntoConstraints = false
                 root.addSubview(glass, positioned: .above, relativeTo: blur)
                 // Up into the top bar, as the panels' color does in the classic style.
@@ -405,6 +407,32 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             store.selected?.panes.toggleZoom()
             store.selected?.panes.setVisible(true)
         }
+    }
+
+    func windowDidEnterFullScreen(_ notification: Notification) { styleTitleBar() }
+    func windowDidExitFullScreen(_ notification: Notification) { styleTitleBar() }
+    func windowDidBecomeMain(_ notification: Notification) { applyStyle() }
+    func windowDidResignMain(_ notification: Notification) { applyStyle() }
+
+    /// The top bar is Farol's own, so macOS's title bar behind it must stay see-through.
+    /// Its gray background comes back on its own after full screen, over the top bar's buttons, so it is hidden each time.
+    /// Full screen, the bar macOS slides in over the top lives in a private window, found by class name as Ghostty does, and takes the terminal's color.
+    private func styleTitleBar() {
+        guard let window else { return }
+        let full = window.styleMask.contains(.fullScreen)
+        let host = full ? NSApp.windows.first { $0.className == "NSToolbarFullScreenWindow" && $0.parent == window } : window
+        guard let root = host?.contentView?.superview else { return }
+        func first(_ name: String, in view: NSView) -> NSView? {
+            for sub in view.subviews {
+                if String(describing: type(of: sub)) == name { return sub }
+                if let found = first(name, in: sub) { return found }
+            }
+            return nil
+        }
+        first("NSTitlebarBackgroundView", in: root)?.isHidden = true
+        let titlebar = first("NSTitlebarView", in: root)
+        titlebar?.wantsLayer = true
+        titlebar?.layer?.backgroundColor = full ? runtime.backgroundColor.cgColor : nil
     }
 
     /// Farol is one window, so closing it quits, which asks first when programs are running.
@@ -777,8 +805,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         window?.isOpaque = !palette.glass
         window?.backgroundColor = palette.glass ? .clear : NSColor(palette.backdrop)
         blur.isHidden = !palette.glass
-        blurTint.layer?.backgroundColor = NSColor(palette.backdrop).cgColor
-        glassPanels.forEach { $0.isHidden = !palette.glass }
+        // In the background, Liquid Glass turns a flat gray whatever its tint, so the panels drop it for the theme's color over the blur.
+        let front = window?.isMainWindow ?? true
+        blurTint.layer?.backgroundColor = (front ? NSColor(palette.backdrop) : runtime.backgroundColor.withAlphaComponent(0.85)).cgColor
+        glassPanels.forEach { $0.isHidden = !palette.glass || !front }
+        if #available(macOS 26, *) {
+            // Untinted, the glass takes the color of whatever is behind it, like the wallpaper or a full screen space's gray.
+            let tint = runtime.backgroundColor.withAlphaComponent(0.6)
+            glassPanels.forEach { ($0 as? NSGlassEffectView)?.tintColor = tint }
+        }
         // The side panels already clip, which a closed one relies on to hide what is in it, so their corners come for free.
         // The terminal stays clear of its card's corners by its own margin, which spares it a mask.
         for panel in panels {
@@ -793,6 +828,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         mergeView.layer?.cornerRadius = palette.style.radius
         mergeView.layer?.masksToBounds = palette.boxed
         layoutGaps()
+        styleTitleBar()
     }
 
     /// A closed panel takes no gap, or two gaps would sit side by side where it was.
