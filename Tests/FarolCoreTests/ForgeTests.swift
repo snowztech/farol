@@ -47,6 +47,15 @@ import Testing
     #expect(Forge(remote: "https://gitlab.com/group/sub/app.git")?.owner == "group")
 }
 
+@Test func linksToARequestIntoABase() {
+    let github = Forge(remote: "git@github.com:snowztech/farol.git")
+    #expect(github?.newRequest(from: "feat/b", base: "feat/a")?.absoluteString
+        == "https://github.com/snowztech/farol/compare/feat/a...feat/b?expand=1")
+    let gitlab = Forge(remote: "git@gitlab.com:group/app.git")
+    #expect(gitlab?.newRequest(from: "feat/b", base: "feat/a")?.absoluteString
+        == "https://gitlab.com/group/app/-/merge_requests/new?merge_request%5Bsource_branch%5D=feat/b&merge_request%5Btarget_branch%5D=feat/a")
+}
+
 @Test func detectsTheForgeOfACheckout() throws {
     let box = try Sandbox()
     #expect(Forge.detect(in: box.repo) == nil)
@@ -241,4 +250,21 @@ import Testing
     #expect(Forge.request(from: json) == .open(number: 7, url: URL(string: "https://github.com/o/r/pull/7")!))
     #expect(Forge.checks(from: json).map(\.name) == ["test"])
     #expect(Forge.checks(from: json).first?.state == .passed)
+}
+
+/// A request goes into the compared branch only where the server has it, so one never pushed falls back to the default.
+@Test func namesTheBaseAsTheServerHasIt() throws {
+    let box = try Sandbox()
+    let server = box.repo + "-server.git"
+    try Git.run(["init", "--quiet", "--bare", server], in: box.repo)
+    try Git.run(["remote", "add", "origin", server], in: box.repo)
+    try Git.run(["remote", "add", "upstream", server], in: box.repo)
+    try Git.run(["branch", "shared"], in: box.repo)
+    try Git.run(["branch", "local-only"], in: box.repo)
+    try Git.run(["push", "--quiet", "origin", "main", "shared"], in: box.repo)
+    try Git.run(["fetch", "--quiet", "upstream"], in: box.repo)
+    #expect(History.requestBase("origin/main", in: box.repo) == "main")
+    #expect(History.requestBase("upstream/main", in: box.repo) == "main")
+    #expect(History.requestBase("shared", in: box.repo) == "shared")
+    #expect(History.requestBase("local-only", in: box.repo) == nil)
 }

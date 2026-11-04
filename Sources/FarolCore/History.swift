@@ -243,6 +243,14 @@ public enum History {
         try Git.run(["push", "--set-upstream", pushRemote(in: directory), "HEAD"], in: directory)
     }
 
+    /// The name the forge knows `ref` by, as the branch a request goes into: origin/main and upstream/main are both main.
+    /// Nil when the push remote doesn't have it, like a local branch never pushed, so the forge takes its default instead of refusing.
+    public static func requestBase(_ ref: String, in directory: String) -> String? {
+        let remotes = Set(branches(in: directory).remote)
+        let name = remotes.contains(ref) ? String(ref.drop { $0 != "/" }.dropFirst()) : ref
+        return remotes.contains("\(pushRemote(in: directory))/\(name)") ? name : nil
+    }
+
     /// Local branches with commits `base` doesn't have, the only ones a request can be made from. One git call for all of them.
     public static func branches(notMergedInto base: String, in directory: String) -> Set<String> {
         let output = (try? Git.run(["for-each-ref", "--format=%(refname:short)", "--no-merged=\(base)", "refs/heads"], in: directory)) ?? ""

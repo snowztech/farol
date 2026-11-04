@@ -597,10 +597,13 @@ final class ReviewModel: ObservableObject {
         guard let root, !isShipping else { return }
         // With the forge's tool the request is created right here. Without it, its form opens in the browser.
         let create = next == .openRequest && canCreateRequest ? forge : nil
-        let link = next == .openRequest && create == nil ? branch.flatMap { forge?.newRequest(from: $0) } : nil
+        let page = next == .openRequest && create == nil ? forge : nil
         let branch = branch
+        // The branch you are comparing with is the one the request goes into, not whatever the forge calls its default.
+        let compared: String? = if case .branch(let base) = scope { base } else { nil }
         isShipping = true
         DispatchQueue.global(qos: .userInitiated).async {
+            let base = compared.flatMap { History.requestBase($0, in: root) }
             var committed = false
             let failure: (String, String)? = {
                 if let message {
@@ -614,11 +617,12 @@ final class ReviewModel: ObservableObject {
                     return (message == nil ? "Couldn't push" : "Committed, but couldn't push", String(describing: error))
                 }
                 guard let create, let branch else { return nil }
-                do { try create.createRequest(for: branch, draft: draft, in: root) } catch {
+                do { try create.createRequest(for: branch, base: base, draft: draft, in: root) } catch {
                     return ("Pushed, but couldn't create the \(create.request)", String(describing: error))
                 }
                 return nil
             }()
+            let link = branch.flatMap { page?.newRequest(from: $0, base: base) }
             // Read here, while the button is still busy, so it turns straight into "PR #5".
             let created = create.flatMap { forge in branch.map { forge.request(for: $0, in: root) } }
             DispatchQueue.main.async { [weak self] in
@@ -663,9 +667,11 @@ final class ReviewModel: ObservableObject {
         }
     }
 
-    /// What the request sheet offers to merge into, by the names the forge uses: the base first, never the branch itself.
+    /// What the request sheet offers to merge into, by the names the forge uses, never the branch itself.
+    /// The branch you are comparing with comes first, as the one-click button sends the request there too.
     var requestBases: [String] {
-        let names = branches.map { $0.hasPrefix("origin/") ? String($0.dropFirst(7)) : $0 }.filter { $0 != branch && $0 != "HEAD" }
+        let compared: [String] = if case .branch(let base) = scope { [base] } else { [] }
+        let names = (compared + branches).map { $0.hasPrefix("origin/") ? String($0.dropFirst(7)) : $0 }.filter { $0 != branch && $0 != "HEAD" }
         var seen: Set<String> = []
         return names.filter { seen.insert($0).inserted }
     }
