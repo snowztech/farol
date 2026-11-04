@@ -609,13 +609,17 @@ public struct Forge: Equatable {
 
     /// The page that opens a pull request, or merge request, from `branch` into the default branch.
     /// If one is already open, both forges point to it from there.
-    public func newRequest(from branch: String) -> URL? {
+    /// With `base` it goes into that branch, where the forge would pick its default one.
+    public func newRequest(from branch: String, base: String? = nil) -> URL? {
         // Slashes stay, as in feat/x. Anything else that means something in a URL is escaped.
         let safe = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~/"))
         guard let name = branch.addingPercentEncoding(withAllowedCharacters: safe) else { return nil }
+        let target = base?.addingPercentEncoding(withAllowedCharacters: safe)
         switch kind {
-        case .github: return URL(string: "\(web)/compare/\(name)?expand=1")
-        case .gitlab: return URL(string: "\(web)/-/merge_requests/new?merge_request%5Bsource_branch%5D=\(name)")
+        case .github: return URL(string: "\(web)/compare/" + (target.map { "\($0)..." } ?? "") + "\(name)?expand=1")
+        case .gitlab:
+            return URL(string: "\(web)/-/merge_requests/new?merge_request%5Bsource_branch%5D=\(name)"
+                       + (target.map { "&merge_request%5Btarget_branch%5D=\($0)" } ?? ""))
         }
     }
 }

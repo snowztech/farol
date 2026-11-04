@@ -47,6 +47,15 @@ import Testing
     #expect(Forge(remote: "https://gitlab.com/group/sub/app.git")?.owner == "group")
 }
 
+@Test func linksToARequestIntoABase() {
+    let github = Forge(remote: "git@github.com:snowztech/farol.git")
+    #expect(github?.newRequest(from: "feat/b", base: "feat/a")?.absoluteString
+        == "https://github.com/snowztech/farol/compare/feat/a...feat/b?expand=1")
+    let gitlab = Forge(remote: "git@gitlab.com:group/app.git")
+    #expect(gitlab?.newRequest(from: "feat/b", base: "feat/a")?.absoluteString
+        == "https://gitlab.com/group/app/-/merge_requests/new?merge_request%5Bsource_branch%5D=feat/b&merge_request%5Btarget_branch%5D=feat/a")
+}
+
 @Test func detectsTheForgeOfACheckout() throws {
     let box = try Sandbox()
     #expect(Forge.detect(in: box.repo) == nil)

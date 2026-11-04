@@ -596,10 +596,16 @@ final class ReviewModel: ObservableObject {
         guard let root, !isShipping else { return }
         // With the forge's tool the request is created right here. Without it, its form opens in the browser.
         let create = next == .openRequest && canCreateRequest ? forge : nil
-        let link = next == .openRequest && create == nil ? branch.flatMap { forge?.newRequest(from: $0) } : nil
+        let page = next == .openRequest && create == nil ? forge : nil
         let branch = branch
+        // The branch you are comparing with is the one the request goes into, not whatever the forge calls its default.
+        let compared: String? = if case .branch(let base) = scope { base } else { nil }
         isShipping = true
         DispatchQueue.global(qos: .userInitiated).async {
+            // A remote branch like origin/main is on the forge as main. A local one has to be pushed, and is named as it is.
+            let base = compared.map { ref in
+                History.branches(in: root).remote.contains(ref) ? String(ref.drop { $0 != "/" }.dropFirst()) : ref
+            }
             var committed = false
             let failure: (String, String)? = {
                 if let message {
@@ -613,11 +619,12 @@ final class ReviewModel: ObservableObject {
                     return (message == nil ? "Couldn't push" : "Committed, but couldn't push", String(describing: error))
                 }
                 guard let create, let branch else { return nil }
-                do { try create.createRequest(for: branch, in: root) } catch {
+                do { try create.createRequest(for: branch, base: base, in: root) } catch {
                     return ("Pushed, but couldn't create the \(create.request)", String(describing: error))
                 }
                 return nil
             }()
+            let link = branch.flatMap { page?.newRequest(from: $0, base: base) }
             // Read here, while the button is still busy, so it turns straight into "PR #5".
             let created = create.flatMap { forge in branch.map { forge.request(for: $0, in: root) } }
             DispatchQueue.main.async { [weak self] in
