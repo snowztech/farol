@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.58.2] - 2026-11-04
+
+Settings gets the whole window, and sheets keep color for what you pick.
+
 ### Changed
 
 - Settings opens at the window's full width over the files, review and graph panels, which come back as they were when you close it. The files, review and graph buttons leave Settings and show their panel.
@@ -1169,7 +1173,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.58.1...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.58.2...HEAD
+[0.58.2]: https://github.com/snowztech/farol/releases/tag/v0.58.2
 [0.58.1]: https://github.com/snowztech/farol/releases/tag/v0.58.1
 [0.58.0]: https://github.com/snowztech/farol/releases/tag/v0.58.0
 [0.57.0]: https://github.com/snowztech/farol/releases/tag/v0.57.0
