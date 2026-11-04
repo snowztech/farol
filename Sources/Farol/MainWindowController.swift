@@ -457,8 +457,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         setFiles(visible: !state.filesVisible)
     }
 
-    /// Settings covers the side panels, so a panel's button leaves it first. A panel already open underneath is then
-    /// just shown, since the click asked to see it. True when settings was showing.
+    /// Settings covers the side panels, so a panel's button leaves it first.
+    /// A panel already open underneath is then just shown, since the click asked to see it. True when settings was showing.
     private func leaveSettings() -> Bool {
         guard state.showingSettings else { return false }
         toggleSettings()
