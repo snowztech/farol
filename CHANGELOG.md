@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- An open file's line numbers and blame no longer spill into the pane below it when the window is split.
+
 ## [0.58.2] - 2026-11-04
 
 Settings gets the whole window, and sheets keep color for what you pick.

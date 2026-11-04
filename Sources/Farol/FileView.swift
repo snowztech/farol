@@ -635,6 +635,7 @@ private final class LineNumbers: NSView {
     init(textView: NSTextView) {
         self.textView = textView
         super.init(frame: .zero)
+        clipsToBounds = true
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -746,6 +747,7 @@ private final class BlameColumn: NSView {
     init(gutter: LineNumbers) {
         self.gutter = gutter
         super.init(frame: .zero)
+        clipsToBounds = true
         isHidden = true
     }
 
