@@ -558,7 +558,7 @@ public struct Forge: Equatable {
     /// It goes into `base`, or the repo's default branch without one, which is wrong for a branch built on another.
     /// With a `title` it is the request's, and `body` its description. Without one both come from the commits.
     public func createRequest(for branch: String, base: String? = nil, title: String? = nil, body: String? = nil,
-                              in directory: String) throws {
+                              labels: [String] = [], in directory: String) throws {
         guard let path = kind.toolPath else { throw GitError(description: "\(tool) isn't installed.") }
         let titled = title.flatMap { $0.isEmpty ? nil : $0 }
         // A bare name is a branch of the repo the request goes into. In a fork the branch is in the fork, so GitHub is told whose.
@@ -567,12 +567,30 @@ public struct Forge: Equatable {
         let arguments = switch kind {
         case .github:
             ["pr", "create", "--head", head] + (base.map { ["--base", $0] } ?? [])
-                + (titled.map { ["--title", $0, "--body", body ?? ""] } ?? ["--fill"])
+                + (titled.map { ["--title", $0, "--body", body ?? ""] } ?? ["--fill"]) + labels.flatMap { ["--label", $0] }
         case .gitlab:
             ["mr", "create", "--yes", "--source-branch", branch] + (base.map { ["--target-branch", $0] } ?? [])
-                + (titled.map { ["--title", $0, "--description", body ?? ""] } ?? ["--fill"])
+                + (titled.map { ["--title", $0, "--description", body ?? ""] } ?? ["--fill"]) + labels.flatMap { ["--label", $0] }
         }
         try Git.run(path, arguments, in: directory)
+    }
+
+    /// The labels a request can carry, by name. Empty when the tool is missing or can't answer, so the sheet just leaves them out.
+    /// Talks to the forge, so call it off the main thread.
+    public func labels(in directory: String) -> [String] {
+        guard let path = kind.toolPath else { return [] }
+        let arguments = switch kind {
+        case .github: ["label", "list", "--json", "name", "--limit", "200"]
+        case .gitlab: ["label", "list", "--output", "json"]
+        }
+        guard let output = try? Git.run(path, arguments, in: directory) else { return [] }
+        return Self.labels(from: output)
+    }
+
+    /// Reads either tool's JSON list: gh says name, glab may write it with a capital.
+    static func labels(from json: String) -> [String] {
+        guard let list = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]] else { return [] }
+        return list.compactMap { ($0["name"] ?? $0["Name"]) as? String }.filter { !$0.isEmpty }
     }
 
     /// Reads either tool's JSON list: gh says number and url, glab says iid and web_url.

@@ -12,7 +12,9 @@ struct RequestSheet: View {
     /// The checkout the agent reads the commits in.
     let root: String
     let palette: Palette
-    let create: (_ base: String, _ title: String, _ body: String) -> Void
+    /// The names the forge offers as labels. Slow, so it is asked for off the main thread.
+    let loadLabels: () -> [String]
+    let create: (_ base: String, _ title: String, _ body: String, _ labels: [String]) -> Void
     let close: () -> Void
 
     private enum Field: Hashable { case title, body }
@@ -20,6 +22,10 @@ struct RequestSheet: View {
     @State private var base: String
     @State private var picking = false
     @State private var filter = ""
+    @State private var labels: [String] = []
+    @State private var chosenLabels: Set<String> = []
+    @State private var pickingLabels = false
+    @State private var labelFilter = ""
     @State private var title = ""
     @State private var body_ = ""
     @FocusState private var focus: Field?
@@ -36,24 +42,27 @@ struct RequestSheet: View {
     @State private var started: (title: String, body: String) = ("", "")
 
     init(request: String, forge: String, head: String, bases: [String], preferred: String?, root: String, palette: Palette,
-         create: @escaping (String, String, String) -> Void, close: @escaping () -> Void) {
+         loadLabels: @escaping () -> [String], create: @escaping (String, String, String, [String]) -> Void,
+         close: @escaping () -> Void) {
         self.request = request
         self.forge = forge
         self.head = head
         self.bases = bases
         self.root = root
         self.palette = palette
+        self.loadLabels = loadLabels
         self.create = create
         self.close = close
         _base = State(initialValue: preferred.flatMap { bases.contains($0) ? $0 : nil } ?? bases.first ?? "")
     }
 
     static func present(in window: NSWindow, request: String, forge: String, head: String, bases: [String], preferred: String?,
-                        root: String, palette: Palette, create: @escaping (String, String, String) -> Void) {
+                        root: String, palette: Palette, loadLabels: @escaping () -> [String],
+                        create: @escaping (String, String, String, [String]) -> Void) {
         guard window.attachedSheet == nil else { return }
         let sheet = NSWindow(contentRect: .zero, styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: true)
         let view = RequestSheet(request: request, forge: forge, head: head, bases: bases, preferred: preferred, root: root,
-                                palette: palette, create: create,
+                                palette: palette, loadLabels: loadLabels, create: create,
                                 close: { [weak window, weak sheet] in sheet.map { window?.endSheet($0) } })
         let host = NSHostingController(rootView: view)
         host.sizingOptions = [.preferredContentSize]
@@ -117,6 +126,8 @@ struct RequestSheet: View {
                         }
                     hints(p)
                 }
+                // Only where the forge has labels to offer, so a repo without any shows no empty choice.
+                if !labels.isEmpty { labelsRow(p) }
             }
             .padding(20)
             Rectangle().fill(p.line).frame(height: 1)
@@ -128,9 +139,10 @@ struct RequestSheet: View {
                 Button("Create") {
                     let (chosen, heading, text) = (base, title.trimmingCharacters(in: .whitespacesAndNewlines),
                                                    body_.trimmingCharacters(in: .whitespacesAndNewlines))
+                    let picked = labels.filter(chosenLabels.contains)
                     close()
                     // The request is made in the background and may fail with a message of its own, which needs this sheet gone first.
-                    DispatchQueue.main.async { create(chosen, heading, text) }
+                    DispatchQueue.main.async { create(chosen, heading, text, picked) }
                 }
                 .buttonStyle(SheetButton(palette: p, primary: true))
                 .keyboardShortcut(.defaultAction)
@@ -147,6 +159,10 @@ struct RequestSheet: View {
         .onAppear {
             focus = .title
             fillFromCommits()
+            DispatchQueue.global(qos: .userInitiated).async {
+                let names = loadLabels()
+                DispatchQueue.main.async { labels = names }
+            }
         }
         .onChange(of: base) { _, _ in fillFromCommits() }
         .onDisappear { stop() }
@@ -172,6 +188,46 @@ struct RequestSheet: View {
                     .lineLimit(2)
                     .hoverTip(generationError)
             }
+        }
+    }
+
+    /// One select for the labels, with a check on each one taken. It stays open so several can be ticked in a row.
+    private func labelsRow(_ p: Palette) -> some View {
+        let query = labelFilter.trimmingCharacters(in: .whitespaces)
+        let shown = query.isEmpty ? labels : labels.filter { $0.localizedCaseInsensitiveContains(query) }
+        let picked = labels.filter(chosenLabels.contains)
+        return VStack(alignment: .leading, spacing: 6) {
+            Text("Labels").foregroundStyle(p.muted)
+            SheetSelect(palette: p, open: $pickingLabels) {
+                Image(systemName: "tag").font(.system(size: 12)).foregroundStyle(p.muted)
+                Text(picked.isEmpty ? "None" : picked.joined(separator: ", "))
+                    .foregroundStyle(picked.isEmpty ? p.muted : p.text)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            } choices: {
+                VStack(spacing: 6) {
+                    TextField("Filter labels", text: $labelFilter)
+                        .textFieldStyle(.plain)
+                        .sheetField(p, focused: false)
+                    ScrollView {
+                        VStack(spacing: 1) {
+                            ForEach(shown, id: \.self) { name in
+                                SheetChoice(palette: p) {
+                                    if chosenLabels.contains(name) { chosenLabels.remove(name) } else { chosenLabels.insert(name) }
+                                } label: {
+                                    Text(name).lineLimit(1).truncationMode(.middle)
+                                    Spacer()
+                                    if chosenLabels.contains(name) { Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)) }
+                                }
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 220)
+                }
+                .padding(6)
+                .frame(width: 280)
+            }
+            .onChange(of: pickingLabels) { _, _ in labelFilter = "" }
         }
     }
 

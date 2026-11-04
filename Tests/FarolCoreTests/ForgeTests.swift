@@ -36,6 +36,12 @@ import Testing
         == "https://gitlab.com/group/app/-/merge_requests/new?merge_request%5Bsource_branch%5D=feat/a%26b")
 }
 
+@Test func readsTheLabelNamesFromBothTools() {
+    #expect(Forge.labels(from: #"[{"name":"bug","color":"d73a4a"},{"name":"ui"}]"#) == ["bug", "ui"])
+    #expect(Forge.labels(from: #"[{"Name":"backend","ID":3}]"#) == ["backend"])
+    #expect(Forge.labels(from: "not json") == [])
+}
+
 @Test func knowsWhoTheRepoBelongsTo() {
     #expect(Forge(remote: "git@github.com:stmartins/farol.git")?.owner == "stmartins")
     #expect(Forge(remote: "https://gitlab.com/group/sub/app.git")?.owner == "group")

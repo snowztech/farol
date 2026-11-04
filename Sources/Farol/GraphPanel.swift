@@ -234,10 +234,11 @@ final class GraphModel: ObservableObject {
     func isBase(_ branch: String) -> Bool { base == branch || base == "origin/\(branch)" }
 
     /// The branch has to be pushed already. The request is titled from its commits, and its number shows on the row once made.
-    func createRequest(_ branch: String, into base: String, title: String, body: String, failed: @escaping (String) -> Void) {
+    func createRequest(_ branch: String, into base: String, title: String, body: String, labels: [String],
+                       failed: @escaping (String) -> Void) {
         guard let forge else { return }
         run(failed, then: { [weak self] in self?.loadRequests() }) {
-            try forge.createRequest(for: branch, base: base, title: title, body: body, in: $0)
+            try forge.createRequest(for: branch, base: base, title: title, body: body, labels: labels, in: $0)
         }
     }
 
@@ -688,8 +689,8 @@ private struct BranchList: View {
                 guard let window = NSApp.keyWindow, let root = graph.root else { return }
                 RequestSheet.present(in: window, request: forge.request, forge: forge.name, head: branch,
                                      bases: bases.all.filter { $0 != branch }, preferred: bases.preferred, root: root,
-                                     palette: palette) { base, title, body in
-                    graph.createRequest(branch, into: base, title: title, body: body,
+                                     palette: palette, loadLabels: { forge.labels(in: root) }) { base, title, body, labels in
+                    graph.createRequest(branch, into: base, title: title, body: body, labels: labels,
                                         failed: gitError("Couldn't create the \(forge.request)"))
                 }
             }
