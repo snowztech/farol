@@ -1023,8 +1023,7 @@ struct Card<Content: View>: View {
     }
 }
 
-/// Brighter than the pickers' tint, so a switch that is on can't be taken for one that is off. Brighter still under the mouse.
-/// A light theme's mid gray reads as switched off, so there the switch takes the text's color instead.
+/// In the text's color, well clear of the gray track a switch has when off, so on and off can't be mixed up. Brighter under the mouse.
 private struct SettingsSwitch: View {
     @Binding var isOn: Bool
     let palette: Palette
@@ -1033,8 +1032,7 @@ private struct SettingsSwitch: View {
 
     var body: some View {
         Toggle("", isOn: $isOn).labelsHidden().toggleStyle(.switch).controlSize(.small)
-            .tint(palette.isDark ? (hovering ? palette.text.opacity(0.75) : palette.muted)
-                                 : palette.text.opacity(hovering ? 0.85 : 0.7))
+            .tint(palette.text.opacity(hovering ? 0.85 : 0.7))
             .onClickableHover { hovering = $0 }
     }
 }
