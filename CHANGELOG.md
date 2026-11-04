@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Create a pull request or merge request without leaving Farol. Create PR in the review panel makes it in one click from the commits. Its arrow has Create Draft PR and Edit and Create PR…, which opens a sheet to pick the base, write the title and description or have an agent write them, add labels and open it as a draft. A local branch's menu in the git graph has Create Pull Request and Edit and Create Pull Request…, and both push the branch first.
+
 ## [0.59.1] - 2026-11-04
 
 Glass is one surface, and sheets and tips are on it too.

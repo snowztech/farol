@@ -558,20 +558,18 @@ public struct Forge: Equatable {
     /// It goes into `base`, or the repo's default branch without one, which is wrong for a branch built on another.
     /// With a `title` it is the request's, and `body` its description. Without one both come from the commits.
     public func createRequest(for branch: String, base: String? = nil, title: String? = nil, body: String? = nil,
-                              labels: [String] = [], in directory: String) throws {
+                              labels: [String] = [], draft: Bool = false, in directory: String) throws {
         guard let path = kind.toolPath else { throw GitError(description: "\(tool) isn't installed.") }
         let titled = title.flatMap { $0.isEmpty ? nil : $0 }
         // A bare name is a branch of the repo the request goes into. In a fork the branch is in the fork, so GitHub is told whose.
         let head = owner.map { "\($0):\(branch)" } ?? branch
+        let github = kind == .github
         // Both flags keep the tools from stopping to ask, which they can't here.
-        let arguments = switch kind {
-        case .github:
-            ["pr", "create", "--head", head] + (base.map { ["--base", $0] } ?? [])
-                + (titled.map { ["--title", $0, "--body", body ?? ""] } ?? ["--fill"]) + labels.flatMap { ["--label", $0] }
-        case .gitlab:
-            ["mr", "create", "--yes", "--source-branch", branch] + (base.map { ["--target-branch", $0] } ?? [])
-                + (titled.map { ["--title", $0, "--description", body ?? ""] } ?? ["--fill"]) + labels.flatMap { ["--label", $0] }
-        }
+        var arguments: [String] = github ? ["pr", "create", "--head", head] : ["mr", "create", "--yes", "--source-branch", branch]
+        if let base { arguments += [github ? "--base" : "--target-branch", base] }
+        if let titled { arguments += ["--title", titled, github ? "--body" : "--description", body ?? ""] } else { arguments.append("--fill") }
+        for label in labels { arguments += ["--label", label] }
+        if draft { arguments.append("--draft") }
         try Git.run(path, arguments, in: directory)
     }
 
