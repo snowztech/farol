@@ -74,7 +74,7 @@ struct Palette: Equatable {
 
     var boxed: Bool { style == .boxed }
     var glass: Bool { style == .glass }
-    /// Glass where Liquid Glass exists, so selections, title bar buttons and sheets can sit on it too.
+    /// Glass where Liquid Glass exists, so sheets can let theirs through.
     var liquid: Bool {
         if #available(macOS 26, *) { return glass }
         return false
@@ -184,31 +184,7 @@ extension NSColor {
     }
 }
 
-/// A fill in `color`. In the Glass style on macOS 26 it is a piece of Liquid Glass tinted with it, as selections are in Tahoe's own sidebars.
-struct GlassFill<S: Shape>: View {
-    let palette: Palette
-    let color: Color
-    let shape: S
-
-    var body: some View {
-        if #available(macOS 26, *), palette.glass {
-            Color.clear.glassEffect(.regular.tint(color), in: shape)
-        } else {
-            shape.fill(color)
-        }
-    }
-}
-
 extension View {
-    /// Liquid Glass behind a group of title bar buttons, like a Tahoe toolbar. Only in the Glass style on macOS 26.
-    @ViewBuilder func glassCapsule(_ palette: Palette) -> some View {
-        if #available(macOS 26, *), palette.glass {
-            padding(.horizontal, 2).frame(height: 24).glassEffect(.regular.tint(palette.background.opacity(0.35)), in: Capsule())
-        } else {
-            self
-        }
-    }
-
     /// A sheet's background. Glass on macOS 26 lets the sheet's own Liquid Glass through, tinted toward the theme.
     func sheetBackground(_ palette: Palette) -> some View {
         background(palette.liquid ? palette.background.opacity(0.55) : palette.background)

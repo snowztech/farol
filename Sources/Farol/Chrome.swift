@@ -5,6 +5,8 @@ import SwiftUI
 final class WindowState: ObservableObject {
     @Published var palette: Palette
     @Published var showingSettings = false
+    /// Full screen has no traffic lights, so the title bar buttons take their place.
+    @Published var fullScreen = false
     /// The selected session is over ssh, so the panels have nothing local to show.
     @Published var remote = false
     var noRepoMessage: String { remote ? "Not available over ssh." : "Not a git repository." }
@@ -89,15 +91,12 @@ struct TopBar: View {
 
             HStack(spacing: 2) {
                 // Room for the traffic lights.
-                Spacer().frame(width: 72)
-                HStack(spacing: 2) {
-                    IconButton(symbol: "sidebar.left", help: "Sidebar (⌘B)", active: state.sidebarVisible,
-                               palette: p, action: commands.toggleSidebar)
-                    IconButton(symbol: "folder", help: "Files (⇧⌘E)", active: state.filesVisible,
-                               palette: p, action: commands.toggleFiles)
-                    newSessionButton(p)
-                }
-                .glassCapsule(p)
+                Spacer().frame(width: state.fullScreen ? 8 : 72)
+                IconButton(symbol: "sidebar.left", help: "Sidebar (⌘B)", active: state.sidebarVisible,
+                           palette: p, action: commands.toggleSidebar)
+                IconButton(symbol: "folder", help: "Files (⇧⌘E)", active: state.filesVisible,
+                           palette: p, action: commands.toggleFiles)
+                newSessionButton(p)
                 Spacer()
                 if let session = store.selected {
                     GitButton(session: session, state: state, review: review, merge: merge,
@@ -109,7 +108,6 @@ struct TopBar: View {
                 }
                 IconButton(symbol: "gearshape", help: "Settings (⌘,)", active: state.showingSettings,
                            palette: p, action: commands.toggleSettings)
-                    .glassCapsule(p)
             }
             .padding(.trailing, 8)
         }
@@ -231,9 +229,7 @@ private struct GitButton: View {
             }
             .font(.system(size: 11, weight: .medium))
             .clipShape(Capsule())
-            // On glass, the glass is the pill's edge.
-            .overlay(Capsule().strokeBorder(p.line.opacity(p.liquid ? 0 : 1)))
-            .glassCapsule(p)
+            .overlay(Capsule().strokeBorder(p.line))
             .padding(.trailing, 6)
         }
     }
@@ -258,7 +254,7 @@ private struct GitButton: View {
                 label(active ? palette.accent : hovering ? palette.text : palette.muted)
                     .padding(.horizontal, 8)
                     .frame(height: 20)
-                    .background(active ? palette.muted.opacity(0.3) : palette.raised.opacity(hovering ? 1 : palette.liquid ? 0 : 0.6))
+                    .background(active ? palette.muted.opacity(0.3) : palette.raised.opacity(hovering ? 1 : 0.6))
                     .contentShape(Rectangle())
             }
             .buttonStyle(QuietPress())

@@ -1240,7 +1240,7 @@ private struct NavItem: View {
             .background {
                 let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
                 if selected {
-                    GlassFill(palette: palette, color: palette.selection, shape: shape).matchedGeometryEffect(id: "selection", in: highlight)
+                    shape.fill(palette.selection).matchedGeometryEffect(id: "selection", in: highlight)
                 } else {
                     shape.fill(hovering ? palette.hover : .clear)
                 }

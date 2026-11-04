@@ -230,8 +230,8 @@ private struct SessionRow: View {
     @ViewBuilder private var background: some View {
         let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
         if selected {
-            GlassFill(palette: palette, color: palette.selection, shape: shape)
-                .overlay(shape.strokeBorder(palette.line.opacity(palette.liquid ? 0 : 1)))
+            shape.fill(palette.selection)
+                .overlay(shape.strokeBorder(palette.line))
                 .matchedGeometryEffect(id: "selection", in: highlight)
         } else {
             shape.fill(hovering ? palette.hover : .clear)
@@ -337,14 +337,8 @@ private struct ProjectHeader: View {
         .padding(.leading, 10)
         .padding(.trailing, 6)
         .padding(.vertical, 4)
-        .background {
-            let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
-            if folded && holdsSelection {
-                GlassFill(palette: palette, color: palette.selection, shape: shape)
-            } else {
-                shape.fill(hovering ? palette.hover : .clear)
-            }
-        }
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .fill(folded && holdsSelection ? palette.selection : hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
         .onTapGesture(perform: onToggle)
         .onClickableHover { hovering = $0 }

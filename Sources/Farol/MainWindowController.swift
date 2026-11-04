@@ -419,7 +419,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    func windowWillEnterFullScreen(_ notification: Notification) { state.fullScreen = true }
     func windowDidEnterFullScreen(_ notification: Notification) { styleTitleBar() }
+    func windowWillExitFullScreen(_ notification: Notification) { state.fullScreen = false }
     func windowDidExitFullScreen(_ notification: Notification) { styleTitleBar() }
     func windowDidBecomeMain(_ notification: Notification) { applyStyle() }
     func windowDidResignMain(_ notification: Notification) { applyStyle() }
