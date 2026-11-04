@@ -6,7 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Changed
 
-- Settings opens at the window's full width over the files, review and graph panels, which come back as they were when you close it.
+- Settings opens at the window's full width over the files, review and graph panels, which come back as they were when you close it. The files, review and graph buttons leave Settings and show their panel.
 - Sheet titles drop their colored icon, so the only color left in a sheet is the agent or tool you pick.
 
 ## [0.58.1] - 2026-11-04
