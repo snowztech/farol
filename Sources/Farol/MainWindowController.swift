@@ -124,7 +124,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let filesPanel = hosting(FilesPanel(
             tree: files, state: state,
             search: fileSearch,
-            open: { [weak self] in self?.open($0, line: $1) },
+            // Picked in the tree on purpose, so it gets a tab of its own. Search results and review click through in the preview tab.
+            open: { [weak self] in self?.open($0, line: $1, keep: true) },
             openMatch: { [weak self] in self?.openMatch($0, line: $1) },
             resize: { [weak self] in self?.setFilesWidth($0) },
             startSearch: { [weak self] in self?.findInFiles() }))
@@ -551,11 +552,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// Text opens in the file pane. Images, PDFs and media open in their Mac app.
     /// Anything else is shown in Finder rather than opened, since opening an unknown binary could run it.
-    private func open(_ path: String, line: Int? = nil) {
+    private func open(_ path: String, line: Int? = nil, keep: Bool = false) {
         let url = URL(fileURLWithPath: path)
         // The contents decide before the extension does, since macOS calls a TypeScript .ts a video and an SVG an image.
         if case .text? = try? Files.read(path) {
-            store.selected?.panes.open(path, line: line)
+            store.selected?.panes.open(path, line: line, keep: keep)
         } else if let type = UTType(filenameExtension: url.pathExtension),
                   [UTType.image, .pdf, .audiovisualContent].contains(where: type.conforms) {
             NSWorkspace.shared.open(url)

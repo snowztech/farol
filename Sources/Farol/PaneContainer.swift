@@ -169,13 +169,13 @@ final class PaneContainer: NSView {
     }
 
     /// Shows the file in the file pane, opening one right of the focused terminal if there is none yet.
-    /// `line` scrolls to it, for opening a file at a change. It takes the preview tab, see FileTabs.
-    func open(_ path: String, line: Int? = nil) {
+    /// `line` scrolls to it, for opening a file at a change. Unless `keep`, it takes the preview tab, see FileTabs.
+    func open(_ path: String, line: Int? = nil, keep: Bool = false) {
         if tabs == nil {
             let tabs = makeTabs()
             insert(Node(tabs: tabs), beside: focused, .right)
         }
-        tabs?.open(path, line: line, keep: false)
+        tabs?.open(path, line: line, keep: keep)
         focusFile()
     }
 

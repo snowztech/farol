@@ -6,7 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
-- Files open in tabs above the file pane, so you can keep several open and switch with a click or ⌃Tab. A file opened from a search, the review or a definition takes a preview tab, in italics, which the next one replaces until you edit it or double-click its tab.
+- Files open in tabs above the file pane, so you can keep several open and switch with a click or ⌃Tab. A file picked in the files panel gets a tab of its own. One opened from a search or the review takes a preview tab, in italics, which the next one replaces until you edit it or double-click its tab.
 - Code in the file pane colors types and functions too, like `Engine`, `string` and `NewEngine(`, from your theme's cyan and blue, so a line reads at a glance.
 
 ## [0.60.0] - 2026-11-04

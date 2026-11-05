@@ -3,7 +3,7 @@ import FarolCore
 import SwiftUI
 
 /// The file pane: a tab per open file over the one in front. Each file keeps its own view, so its scroll, undo and unsaved edits stay.
-/// A file opened by clicking through, from search, review or a definition, takes the preview tab, which the next one replaces.
+/// A file opened by clicking through, from search or review, takes the preview tab, which the next one replaces.
 /// So tabs don't pile up. Editing it or double-clicking its tab keeps it.
 final class FileTabs: NSView {
     private(set) var files: [FileView] = []
