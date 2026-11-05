@@ -63,6 +63,13 @@ private func tokens(_ text: String, _ path: String) -> [String] {
     // In Swift a capitalized call makes a value of that type, and a method call is still a function.
     let swift = "let token = Token(range: r)\nview.layout()"
     #expect(tokens(swift, "a.swift") == ["let:keyword", "Token:type", "layout:function"])
+    // Lower-case built-in types, and a Go conversion to one.
+    #expect(tokens("func f(name string) error { return errors.New(string(b)) }", "a.go") == [
+        "func:keyword", "f:function", "string:type", "error:type", "return:keyword", "New:function", "string:type",
+    ])
+    #expect(tokens("const total: number = count(ids as string[])", "a.ts") == [
+        "const:keyword", "number:type", "count:function", "as:keyword", "string:type",
+    ])
     // Neither convention holds in a shell script or JSON, so their names stay plain.
     #expect(tokens("Run() {\n  echo Hi\n}", "a.sh") == [])
     #expect(tokens("{\"Name\": true}", "a.json") == ["\"Name\":string", "true:keyword"])

@@ -27,6 +27,8 @@ public enum Syntax {
         var names = false
         /// A capitalized call is a type being made, like Swift's `Token(range:)`. In Go or JavaScript, `NewEngine(` is a function.
         var capitalCallsAreTypes = false
+        /// Types written in lower case, like Go's `string` or TypeScript's `number`, which no capital gives away.
+        var builtinTypes: Set<String> = []
     }
 
     /// The language for a file name, or nil when Farol doesn't color it.
@@ -132,6 +134,8 @@ public enum Syntax {
         /// A call is a function, or a type being made where capitalized calls are. A capital elsewhere is a type.
         /// Not after a dot, where Go's `prompt.System` is a field, nor in ALL_CAPS, which is a constant.
         func name(_ word: String, at start: Int, end: Int, afterDot: Bool) -> Kind? {
+            // Before calls, since Go's `string(b)` converts to the type.
+            if !afterDot, language.builtinTypes.contains(word) { return .type }
             var next = end
             while next < chars.count, chars[next] == code(" ") { next += 1 }
             let capital = chars[start] >= 65 && chars[start] <= 90
@@ -208,19 +212,21 @@ public enum Syntax {
 
     static let go = Language(lineComments: ["//"], blockComments: [("/*", "*/")], quotes: ["\"", "'", "`"], multilineQuotes: ["`"], keywords: words(
         "package import func var const type struct interface map chan if else for range return go defer select switch case default break continue fallthrough goto nil true false iota"),
-        names: true)
+        names: true, builtinTypes: words(
+            "string bool byte rune error any comparable int int8 int16 int32 int64 uint uint8 uint16 uint32 uint64 uintptr float32 float64 complex64 complex128"))
 
     static let javascript = Language(lineComments: ["//"], blockComments: [("/*", "*/")], quotes: ["\"", "'", "`"], multilineQuotes: ["`"], keywords: words(
         "const let var function return if else for while do switch case default break continue new this class extends super import export from as async await try catch finally throw typeof instanceof in of null undefined true false void delete yield static get set interface type enum implements private public protected readonly declare namespace abstract keyof"),
-        names: true)
+        names: true, builtinTypes: words("string number boolean bigint symbol object unknown never any"))
 
     static let python = Language(lineComments: ["#"], blockComments: [], quotes: ["\"", "'"], keywords: words(
         "def class return if elif else for while in not and or is import from as with try except finally raise pass break continue lambda yield None True False self async await global nonlocal assert del match case"),
-        names: true, capitalCallsAreTypes: true)
+        names: true, capitalCallsAreTypes: true, builtinTypes: words("int float str bool bytes list dict set tuple object"))
 
     static let rust = Language(lineComments: ["//"], blockComments: [("/*", "*/")], quotes: ["\""], keywords: words(
         "fn let mut const static struct enum impl trait pub use mod crate self Self super match if else loop while for in return break continue as ref move where type unsafe async await dyn true false Some None Ok Err"),
-        names: true, capitalCallsAreTypes: true)
+        names: true, capitalCallsAreTypes: true, builtinTypes: words(
+            "bool char str i8 i16 i32 i64 i128 isize u8 u16 u32 u64 u128 usize f32 f64"))
 
     static let ruby = Language(lineComments: ["#"], blockComments: [], quotes: ["\"", "'"], keywords: words(
         "def end class module if elsif else unless while until for in do return yield begin rescue ensure raise self nil true false and or not then case when require require_relative attr_reader attr_accessor private"),
