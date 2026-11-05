@@ -814,7 +814,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         store.sessions.forEach {
             $0.panes.theme = theme
             $0.panes.palette = state.palette
-            $0.panes.syntax = state.palette.code
+            $0.panes.syntax = state.palette.editorCode
         }
     }
 
@@ -937,7 +937,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         session.panes.autoresizingMask = [.width, .height]
         session.panes.theme = theme
         session.panes.palette = state.palette
-        session.panes.syntax = state.palette.code
+        session.panes.syntax = state.palette.editorCode
         terminalContainer.addSubview(session.panes)
     }
 

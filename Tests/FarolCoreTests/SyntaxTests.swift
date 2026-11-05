@@ -25,7 +25,7 @@ private func tokens(_ text: String, _ path: String) -> [String] {
 }
 
 @Test func namesAfterADotAreNotKeywords() {
-    #expect(tokens("case .default: obj.type", "a.swift") == ["case:keyword"])
+    #expect(tokens("case .default: obj.type", "a.swift") == ["case:keyword", "default:property", "type:property"])
 }
 
 @Test func unknownFilesAreNotColored() {
@@ -43,7 +43,7 @@ private func tokens(_ text: String, _ path: String) -> [String] {
 
 @Test func htmlColorsTagsAttributesAndComments() {
     let code = "<!-- hi --><p class=\"a\">Farol's</p>"
-    #expect(tokens(code, "index.html") == ["<!-- hi -->:comment", "p:keyword", "\"a\":string", "p:keyword"])
+    #expect(tokens(code, "index.html") == ["<!-- hi -->:comment", "p:tag", "\"a\":string", "p:tag"])
 }
 
 @Test func markdownColorsHeadingsListsCodeAndLinks() {
@@ -58,7 +58,7 @@ private func tokens(_ text: String, _ path: String) -> [String] {
     let go = "func (e *Engine) Run(req QueryRequest) {\n\tvar b strings.Builder\n\treturn NewOpenAI(prompt.System, MAX_TOKENS)\n}"
     #expect(tokens(go, "a.go") == [
         "func:keyword", "Engine:type", "Run:function", "QueryRequest:type",
-        "var:keyword", "return:keyword", "NewOpenAI:function",
+        "var:keyword", "Builder:property", "return:keyword", "NewOpenAI:function", "System:property",
     ])
     // In Swift a capitalized call makes a value of that type, and a method call is still a function.
     let swift = "let token = Token(range: r)\nview.layout()"
@@ -73,4 +73,19 @@ private func tokens(_ text: String, _ path: String) -> [String] {
     // Neither convention holds in a shell script or JSON, so their names stay plain.
     #expect(tokens("Run() {\n  echo Hi\n}", "a.sh") == [])
     #expect(tokens("{\"Name\": true}", "a.json") == ["\"Name\":string", "true:keyword"])
+}
+
+@Test func colorsKeysAndMembersAsPropertiesButNotTypedVariables() {
+    let go = "return &Engine{\n\tprovider: NewOpenAI(apiKey),\n}, req.DatabaseType"
+    #expect(tokens(go, "a.go") == [
+        "return:keyword", "Engine:type", "provider:property", "NewOpenAI:function", "DatabaseType:property",
+    ])
+    let ts = "interface User {\n  id: string\n}\nconst where = { id: userId }\nfunction find(id: string) {}"
+    #expect(tokens(ts, "a.ts") == [
+        "interface:keyword", "User:type", "id:property", "string:type",
+        "const:keyword", "id:property", "function:keyword", "find:function", "string:type",
+    ])
+    // A type after the colon, a path and Go's := aren't keys.
+    #expect(tokens("let map: [String: Int]", "a.swift") == ["let:keyword", "String:type", "Int:type"])
+    #expect(tokens("x := 1", "a.go") == ["1:number"])
 }
