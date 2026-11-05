@@ -253,13 +253,18 @@ final class RemoteBridge: ObservableObject {
     private var streams: [UUID: Stream] = [:]
     private var epochs = 0
     private var pump: Timer?
+    /// When a stream last carried bytes or the phone last typed. A quiet pump slows down so an idle terminal barely wakes the Mac.
+    private var pumpBusy = Date.now
 
     /// The relay passes 512 KB a second per connection, and a stream's bytes about double on the wire, so a pane gets this much.
     private static let streamBudget = 150_000
 
-    private func pumpIfStreaming() {
-        guard pump == nil, phones.values.contains(where: { $0.stream && $0.terminal != nil }) else { return }
-        let pump = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in self?.pumpStreams() }
+    private func pumpIfStreaming(fast: Bool = true) {
+        guard phones.values.contains(where: { $0.stream && $0.terminal != nil }) else { return }
+        let interval = fast ? 1.0 / 60 : 0.1
+        if let pump, pump.timeInterval == interval { return }
+        pump?.invalidate()
+        let pump = Timer(timeInterval: interval, repeats: true) { [weak self] _ in self?.pumpStreams() }
         RunLoop.main.add(pump, forMode: .common)
         self.pump = pump
     }
@@ -298,6 +303,7 @@ final class RemoteBridge: ObservableObject {
                 restartStream(of: id)
                 continue
             case .bytes(let data):
+                pumpBusy = .now
                 if stream.behind { break }
                 guard stream.sent + data.count <= Self.streamBudget else {
                     stream.behind = true
@@ -311,6 +317,8 @@ final class RemoteBridge: ObservableObject {
             }
             streams[id] = stream
         }
+        let fast = Date.now.timeIntervalSince(pumpBusy) < 0.5
+        if fast != (pump?.timeInterval == 1.0 / 60) { pumpIfStreaming(fast: fast) }
     }
 
     /// Starts a pane's stream over: every phone streaming it gets the screen and the history above it, and the bytes after.
@@ -509,6 +517,8 @@ final class RemoteBridge: ObservableObject {
             tell(.history(session: session, text: terminal.historyText()), id)
         case .input(let session, let data):
             phones[id]?.acted = .now
+            pumpBusy = .now
+            pumpIfStreaming()
             act(command, by: device, on: session, from: id) { $0.input(data) }
             // The program echoes within a few milliseconds, so the screen goes now rather than on the next tick.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) { [weak self] in self?.tick() }
