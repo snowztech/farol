@@ -11,7 +11,7 @@ private func tokens(_ text: String, _ path: String) -> [String] {
 
 @Test func colorsGoKeywordsStringsNumbersAndComments() {
     let code = "func main() { // start\n\tx := \"hi\" + 42\n}"
-    #expect(tokens(code, "main.go") == ["func:keyword", "// start:comment", "\"hi\":string", "42:number"])
+    #expect(tokens(code, "main.go") == ["func:keyword", "main:function", "// start:comment", "\"hi\":string", "42:number"])
 }
 
 @Test func blockCommentsAndEscapedQuotes() {
@@ -52,4 +52,18 @@ private func tokens(_ text: String, _ path: String) -> [String] {
         "# Title:keyword", "-:keyword", "`make lint`:string", "(https://x.dev):comment",
         "```:string", "let a = 1:string", "```:string",
     ])
+}
+
+@Test func colorsTypesByTheirCapitalAndFunctionsByTheirCall() {
+    let go = "func (e *Engine) Run(req QueryRequest) {\n\tvar b strings.Builder\n\treturn NewOpenAI(prompt.System, MAX_TOKENS)\n}"
+    #expect(tokens(go, "a.go") == [
+        "func:keyword", "Engine:type", "Run:function", "QueryRequest:type",
+        "var:keyword", "return:keyword", "NewOpenAI:function",
+    ])
+    // In Swift a capitalized call makes a value of that type, and a method call is still a function.
+    let swift = "let token = Token(range: r)\nview.layout()"
+    #expect(tokens(swift, "a.swift") == ["let:keyword", "Token:type", "layout:function"])
+    // Neither convention holds in a shell script or JSON, so their names stay plain.
+    #expect(tokens("Run() {\n  echo Hi\n}", "a.sh") == [])
+    #expect(tokens("{\"Name\": true}", "a.json") == ["\"Name\":string", "true:keyword"])
 }

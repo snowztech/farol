@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Code in the file pane colors types and functions too, like `Engine` and `NewEngine(`, from your theme's cyan and blue, so a line reads at a glance.
+
 ## [0.60.0] - 2026-11-04
 
 Create pull requests from Farol, in one click or written first.
