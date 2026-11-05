@@ -85,6 +85,8 @@ final class PaneContainer: NSView {
     var onLayoutChange: (() -> Void)?
     /// A file's blame asked for a commit, by its hash.
     var onShowCommit: ((String) -> Void)?
+    /// The file pane shows another file, or closes, so the files panel can highlight the one in view.
+    var onFileChange: ((String?) -> Void)?
 
     var terminals: [TerminalView] { root.leaves }
 
@@ -182,7 +184,11 @@ final class PaneContainer: NSView {
     private func makeTabs() -> FileTabs {
         let tabs = FileTabs(palette: palette) { [weak self] in self?.adopt($0) }
         tabs.autoresizingMask = []
-        tabs.onChange = { [weak self] in self?.onLayoutChange?() }
+        // Another tab in front, or one opened or closed: the files panel lights the file now in front.
+        tabs.onChange = { [weak self] in
+            self?.onFileChange?(self?.file?.path)
+            self?.onLayoutChange?()
+        }
         tabs.runCommand = { [weak self] in _ = self?.runInNewPane?($0) }
         tabs.onEmpty = { [weak self] in self?.removeTabs() }
         self.tabs = tabs
@@ -213,6 +219,7 @@ final class PaneContainer: NSView {
     private func removeTabs() {
         guard let tabs, let leaf = node(of: tabs) else { return }
         self.tabs = nil
+        onFileChange?(nil)
         detach(leaf)
         tabs.removeFromSuperview()
         if fileFocused { focus(focused) }
@@ -836,6 +843,10 @@ final class PaneContainer: NSView {
         file.onShowCommit = { [weak self] in self?.onShowCommit?($0) }
         file.onOpenAt = { [weak self] in self?.open($0, line: $1) }
         file.palette = { [weak self] in self?.palette }
+        // A preview tab shows another file in the same view, which the files panel follows when it's the one in front.
+        file.onPathChange = { [weak self, weak file] in
+            if let file, file === self?.file { self?.onFileChange?(file.path) }
+        }
     }
 
     private func applyFocus() {

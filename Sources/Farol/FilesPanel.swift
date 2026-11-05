@@ -14,8 +14,11 @@ final class FileTree: ObservableObject {
 
     @Published private(set) var root: String?
     @Published private(set) var rows: [Row] = []
-    /// The file last opened from the panel, highlighted until another session is shown.
+    /// The file in view in the file pane, highlighted. A click on a row sets it too, before the pane catches up.
     @Published var selected: String?
+    /// Set once the row of the file in view is in the list, so the panel can scroll to it.
+    @Published private(set) var revealed: (path: String, token: UUID)?
+    private var pendingReveal: String?
 
     /// Open folders per root, so going back to a session finds its tree as you left it.
     private var expanded: [String: Set<String>] = [:]
@@ -36,6 +39,37 @@ final class FileTree: ObservableObject {
         guard let root else { return }
         watcher = FolderWatcher(root) { [weak self] in self?.changed($0) }
         reload()
+    }
+
+    /// Highlights the file in view, opening the folders on the way to it so its row is there, and scrolling to it.
+    /// A file outside the folder shown, or none, leaves nothing highlighted.
+    func follow(_ path: String?) {
+        guard let root, let path else {
+            selected = nil
+            pendingReveal = nil
+            return
+        }
+        // Compared as the tree's rows spell them, which follow every link, since the folder may be reached through one.
+        let file = Files.realPath(path)
+        guard let folders = Files.folders(from: Files.realPath(root), to: file).map(Set.init) else {
+            selected = nil
+            pendingReveal = nil
+            return
+        }
+        selected = file
+        pendingReveal = file
+        if folders.isSubset(of: expanded[root, default: []]) {
+            revealIfListed()
+        } else {
+            expanded[root, default: []].formUnion(folders)
+            rebuild()
+        }
+    }
+
+    private func revealIfListed() {
+        guard let path = pendingReveal, rows.contains(where: { $0.id == path }) else { return }
+        pendingReveal = nil
+        revealed = (path, UUID())
     }
 
     func toggle(_ folder: String) {
@@ -77,6 +111,7 @@ final class FileTree: ObservableObject {
         }
         add(root, depth: 0, dimmed: false)
         self.rows = rows
+        revealIfListed()
     }
 
     /// Git touches .git at every shell prompt, so only a .gitignore edit asks git again.
@@ -159,21 +194,27 @@ struct FilesPanel: View {
 
     private func tree(_ p: Palette) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(tree.rows) { row in
-                        FileRow(row: row, selected: row.id == tree.selected, palette: p) {
-                            if row.entry.isDirectory {
-                                tree.toggle(row.entry.path)
-                            } else {
-                                tree.selected = row.entry.path
-                                open(row.entry.path, nil)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(tree.rows) { row in
+                            FileRow(row: row, selected: row.id == tree.selected, palette: p) {
+                                if row.entry.isDirectory {
+                                    tree.toggle(row.entry.path)
+                                } else {
+                                    tree.selected = row.entry.path
+                                    open(row.entry.path, nil)
+                                }
                             }
                         }
                     }
+                    .padding(.horizontal, 6)
+                    .padding(.bottom, 8)
                 }
-                .padding(.horizontal, 6)
-                .padding(.bottom, 8)
+                // No anchor, so a row already in view stays where it is and only one out of view is brought in.
+                .onChange(of: tree.revealed?.token) { _, _ in
+                    if let path = tree.revealed?.path { proxy.scrollTo(path) }
+                }
             }
         }
     }

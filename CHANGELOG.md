@@ -20,6 +20,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - The tab in front stays fully in view when tabs fill the bar, and language marks no longer run into the file name.
 
+### Fixed
+
+- The files panel highlights the file you are looking at. It followed only the last file you clicked in the panel, so a file opened from a search result or the blame was never lit. It now follows the file pane, opens the folders on the way to the file and scrolls to it.
+
 ## [0.60.0] - 2026-11-04
 
 Create pull requests from Farol, in one click or written first.
