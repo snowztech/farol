@@ -92,6 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func toggleFiles(_ sender: Any?) { windowController.toggleFiles() }
     @objc func toggleGraph(_ sender: Any?) { windowController.toggleGraph() }
     @objc func toggleBlame(_ sender: Any?) { windowController.toggleBlame() }
+    @objc func goToLine(_ sender: Any?) { windowController.goToLine() }
     @objc func toggleReview(_ sender: Any?) { windowController.toggleReview() }
     @objc func toggleMerge(_ sender: Any?) { windowController.toggleMerge() }
     @objc func commit(_ sender: Any?) { windowController.commit() }
@@ -131,6 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
         return switch item.action {
         case #selector(saveFile): windowController.canSaveFile
+        case #selector(goToLine): windowController.canGoToLine
         case #selector(checkForUpdates): windowController.canCheckForUpdates
         case #selector(nextResult), #selector(previousResult): windowController.canStepResult
         case #selector(nextTab), #selector(previousTab): windowController.canStepTab
@@ -194,6 +196,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         sessions.addItem(withTitle: "New Worktree Session…", action: #selector(newWorktreeSession), keyEquivalent: "T")
         sessions.addItem(withTitle: "Close Session", action: #selector(closeSession), keyEquivalent: "w")
         sessions.addItem(withTitle: "Save File", action: #selector(saveFile), keyEquivalent: "s")
+        sessions.addItem(withTitle: "Go to Line…", action: #selector(goToLine), keyEquivalent: "l")
         sessions.addItem(withTitle: "Next File Tab", action: #selector(nextTab), keyEquivalent: "\t").keyEquivalentModifierMask = [.control]
         sessions.addItem(withTitle: "Previous File Tab", action: #selector(previousTab), keyEquivalent: "\t")
             .keyEquivalentModifierMask = [.control, .shift]

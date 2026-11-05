@@ -876,6 +876,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         return panes.file
     }
 
+    /// ⌘L in the file pane: the status bar's Go to Line field.
+    var canGoToLine: Bool { focusedFile != nil }
+    func goToLine() { store.selected?.panes.tabs?.askLine() }
+
     /// View → Show Git Blame, for the file in front. Also in the right-click menu of its code and line numbers.
     var canToggleBlame: Bool { focusedFile?.canBlame == true }
     var isBlaming: Bool { focusedFile?.isBlaming == true }

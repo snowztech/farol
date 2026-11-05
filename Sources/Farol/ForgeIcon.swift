@@ -88,7 +88,9 @@ struct Tile<Glyph: View>: View {
 
 /// A tool's mark on its tile, in the tool's own color.
 struct ToolTile: View {
-    private let icon: ForgeIcon
+    private let icon: ForgeIcon?
+    /// A language's mark instead, from the file icons, for a language server's row.
+    private var file: String?
     private let color: Color
     private let size: CGFloat
 
@@ -104,7 +106,20 @@ struct ToolTile: View {
         (icon, color, self.size) = (ForgeIcon(source: .jira, size: size * 0.55), ForgeIcon.jiraBlue, size)
     }
 
-    var body: some View { Tile(color: color, size: size) { icon } }
+    /// A language on its own color, like Go's cyan, with the mark its files carry in the files panel.
+    init(file path: String, color: Color, size: CGFloat = 20) {
+        (icon, file, self.color, self.size) = (nil, path, color, size)
+    }
+
+    var body: some View {
+        Tile(color: color, size: size) {
+            if let file {
+                FileIcon(path: file, size: size * 1.05, fit: size * 0.72).font(.system(size: size * 0.5, weight: .semibold))
+            } else {
+                icon
+            }
+        }
+    }
 }
 
 extension ToolTile {
