@@ -16,6 +16,27 @@ public enum Files {
     /// Installed dependencies, which a search outside git would otherwise fill up with. Names a source folder never has.
     static let dependencies: Set<String> = ["node_modules", "Pods", "DerivedData", "__pycache__"]
 
+    /// The folders to open in a tree rooted at `root` to see `file`, from the first one down to the one that holds it.
+    /// Nil when the file isn't under `root`, and none for a file directly in it.
+    public static func folders(from root: String, to file: String) -> [String]? {
+        guard file.hasPrefix(root + "/") else { return nil }
+        var folders: [String] = []
+        var folder = (file as NSString).deletingLastPathComponent
+        while folder.count > root.count, folder.hasPrefix(root + "/") {
+            folders.insert(folder, at: 0)
+            folder = (folder as NSString).deletingLastPathComponent
+        }
+        return folders
+    }
+
+    /// The path with every link followed, the way a listing of a folder spells its entries.
+    /// Foundation's own version drops the /private of /private/tmp and /private/var, which then never matches those.
+    public static func realPath(_ path: String) -> String {
+        guard let resolved = realpath(path, nil) else { return path }
+        defer { free(resolved) }
+        return String(cString: resolved)
+    }
+
     /// A folder's entries, folders first, then by name the way Finder sorts them.
     public static func list(_ directory: String) -> [Entry] {
         let url = URL(fileURLWithPath: directory)

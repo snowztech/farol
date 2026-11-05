@@ -83,6 +83,8 @@ final class PaneContainer: NSView {
     var onLayoutChange: (() -> Void)?
     /// A file's blame asked for a commit, by its hash.
     var onShowCommit: ((String) -> Void)?
+    /// The file pane shows another file, or closes, so the files panel can highlight the one in view.
+    var onFileChange: ((String?) -> Void)?
 
     var terminals: [TerminalView] { root.leaves }
 
@@ -194,6 +196,7 @@ final class PaneContainer: NSView {
     private func removeFile() {
         guard let file, let leaf = node(of: file) else { return }
         self.file = nil
+        onFileChange?(nil)
         detach(leaf)
         file.removeFromSuperview()
         if fileFocused { focus(focused) }
@@ -817,6 +820,8 @@ final class PaneContainer: NSView {
         file.onOpenFile = { [weak self] in self?.open($0) }
         file.onOpenAt = { [weak self] in self?.open($0, line: $1) }
         file.onShowCommit = { [weak self] in self?.onShowCommit?($0) }
+        file.onPathChange = { [weak self] in self?.onFileChange?(self?.file?.path) }
+        onFileChange?(file.path)
         addSubview(file)
         needsLayout = true
     }

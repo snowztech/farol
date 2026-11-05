@@ -32,6 +32,8 @@ final class FileView: NSView {
     var onShowCommit: ((String) -> Void)?
     /// Opens a file at a line, from a ⌘-click on a name that is defined there.
     var onOpenAt: ((String, Int) -> Void)?
+    /// The pane now shows another file, which the files panel follows.
+    var onPathChange: (() -> Void)?
 
     /// The file as last read or saved, to tell our own save from someone else's change.
     private var onDisk: String?
@@ -234,6 +236,7 @@ final class FileView: NSView {
         load(keepingPosition: false)
         watch()
         findFolder()
+        onPathChange?()
     }
 
     /// Asks git where the checkout starts, off the main thread. Outside a checkout the header shows only the name.

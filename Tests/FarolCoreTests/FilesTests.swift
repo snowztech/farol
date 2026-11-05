@@ -74,3 +74,21 @@ private func folder(_ files: [String: String]) throws -> String {
     let root = try folder(["index.js": "", "node_modules/left-pad/index.js": "", "src/__pycache__/a.pyc": "", "src/a.py": ""])
     #expect(Files.walk(root) == ["src/", "index.js", "src/a.py"])
 }
+
+@Test func spellsAPathAsAListingOfItsFolderDoes() throws {
+    let root = try folder(["src/a.swift": ""])
+    let link = root + "-link"
+    try FileManager.default.createSymbolicLink(atPath: link, withDestinationPath: root)
+    // Through a link the rows still come out as the real folder's, and so does the path.
+    let listed = Files.list(link + "/src").map(\.path)
+    #expect(listed == [Files.realPath(link + "/src/a.swift")])
+    #expect(Files.realPath("/does/not/exist") == "/does/not/exist")
+}
+
+@Test func listsTheFoldersToOpenToReachAFile() {
+    #expect(Files.folders(from: "/p", to: "/p/a.swift") == [])
+    #expect(Files.folders(from: "/p", to: "/p/Sources/App/main.swift") == ["/p/Sources", "/p/Sources/App"])
+    // Not under the folder, even when the names start alike.
+    #expect(Files.folders(from: "/p", to: "/other/a.swift") == nil)
+    #expect(Files.folders(from: "/p", to: "/project/a.swift") == nil)
+}
