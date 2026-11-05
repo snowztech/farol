@@ -456,7 +456,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// Asks before quitting kills running programs.
     func confirmQuit(_ reply: @escaping (Bool) -> Void) {
         // Unsaved files first, one at a time, each shown in its session.
-        if let session = store.sessions.first(where: { $0.panes.file?.isDirty == true }), let file = session.panes.file {
+        if let session = store.sessions.first(where: { $0.panes.tabs?.files.contains(where: \.isDirty) == true }),
+           let file = session.panes.unsavedFile() {
             store.select(session)
             return file.confirmClose({ [weak self] in self?.confirmQuit(reply) }, cancelled: { reply(false) })
         }
@@ -733,6 +734,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let (query, options) = (fileSearch.query, fileSearch.options)
         store.selected?.panes.file?.mark { FileSearch.ranges(of: query, in: $0, options: options) }
     }
+
+    /// Only in the file pane with more than one tab, so ⌃Tab reaches programs in the terminal the rest of the time.
+    var canStepTab: Bool { store.selected?.panes.canStepTab == true }
+    func stepTab(_ by: Int) { store.selected?.panes.stepTab(by) }
 
     /// Only with results and a file in front, so F4 stays a key for programs in the terminal, like htop's filter, the rest of the time.
     var canStepResult: Bool { !fileSearch.matches.isEmpty && focusedFile != nil }

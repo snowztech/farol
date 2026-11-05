@@ -234,6 +234,7 @@ Each tmux window there shows up on the phone next to your Mac's sessions. `farol
 | Toggle sidebar | ⌘B |
 | Toggle files | ⇧⌘E |
 | Save the open file | ⌘S |
+| Next and previous file tab | ⌃Tab and ⌃⇧Tab |
 | Review changes | ⌥⌘R |
 | Commit | ⌥⌘C |
 | Push | ⌥⌘P |
