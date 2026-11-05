@@ -734,6 +734,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         store.selected?.panes.file?.mark { FileSearch.ranges(of: query, in: $0, options: options) }
     }
 
+    var canGoBack: Bool { store.selected?.panes.canGoBack == true }
+    var canGoForward: Bool { store.selected?.panes.canGoForward == true }
+
+    /// ⇧⌘←: the file and line you were at before the last jump, as after following a definition into another file.
+    func goBack() { store.selected?.panes.goBack() }
+
+    /// ⇧⌘→: back to where you were when you went back.
+    func goForward() { store.selected?.panes.goForward() }
+
     /// Only with results and a file in front, so F4 stays a key for programs in the terminal, like htop's filter, the rest of the time.
     var canStepResult: Bool { !fileSearch.matches.isEmpty && focusedFile != nil }
 

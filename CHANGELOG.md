@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Back and forward through the files and lines you jumped between, with ⇧⌘← and ⇧⌘→ or the Go menu. Following a search result or a definition into another file no longer means searching again to return to where you were.
+
 ## [0.60.0] - 2026-11-04
 
 Create pull requests from Farol, in one click or written first.

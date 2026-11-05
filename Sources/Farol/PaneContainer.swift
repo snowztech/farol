@@ -158,14 +158,32 @@ final class PaneContainer: NSView {
     }
 
     /// Shows the file in the file pane, opening one right of the focused terminal if there is none yet.
-    /// `line` scrolls to it, for opening a file at a change.
+    /// `line` scrolls to it, for opening a file at a change. Where you were is kept, so ⇧⌘← comes back to it.
     func open(_ path: String, line: Int? = nil) {
+        show(path, line: line)
+    }
+
+    /// Where the open file's cursor is, or nil without a file.
+    private var place: NavigationHistory.Place? {
+        file.map { NavigationHistory.Place(path: $0.path, line: $0.currentLine) }
+    }
+
+    /// `moved` runs once the file really changes, which an unsaved file can refuse. Without it the jump is recorded.
+    private func show(_ path: String, line: Int?, moved: (() -> Void)? = nil) {
         if let file {
+            // Read before the file changes, and only once an unsaved file has agreed to go.
+            let left = place
+            let jumps = file.path != path || line.map { $0 != left?.line } == true
+            let record = { [weak self] in
+                if let moved { moved() } else if jumps, let left { self?.history.record(leaving: left) }
+            }
             guard file.path != path else {
+                record()
                 if let line { file.reveal(line: line) }
                 return focusFile()
             }
             return file.confirmClose { [weak self, weak file] in
+                record()
                 file?.show(path)
                 if let line { file?.reveal(line: line) }
                 self?.focusFile()
@@ -180,6 +198,29 @@ final class PaneContainer: NSView {
         }
         focusFile()
         onLayoutChange?()
+    }
+
+    /// Every jump in the file pane, so a chain of definitions can be walked back and forth.
+    private var history = NavigationHistory()
+
+    var canGoBack: Bool { file != nil && history.canGoBack }
+    var canGoForward: Bool { file != nil && history.canGoForward }
+
+    /// To the file and line you were at before the last jump. A file that is gone is passed over.
+    func goBack() {
+        var next = history
+        guard let here = place, let there = next.goBack(from: here, where: Self.exists) else { return }
+        show(there.path, line: there.line) { [weak self] in self?.history = next }
+    }
+
+    func goForward() {
+        var next = history
+        guard let here = place, let there = next.goForward(from: here, where: Self.exists) else { return }
+        show(there.path, line: there.line) { [weak self] in self?.history = next }
+    }
+
+    private static func exists(_ place: NavigationHistory.Place) -> Bool {
+        FileManager.default.fileExists(atPath: place.path)
     }
 
     private func focusFile() {

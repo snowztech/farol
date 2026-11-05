@@ -298,6 +298,21 @@ final class FileView: NSView {
         }
     }
 
+    /// The line the cursor is on, counting from 1.
+    var currentLine: Int {
+        let string = text.string as NSString
+        let end = min(text.selectedRange().location, string.length)
+        var line = 1
+        var index = 0
+        while index < end {
+            let found = string.range(of: "\n", range: NSRange(location: index, length: end - index))
+            guard found.location != NSNotFound else { break }
+            line += 1
+            index = NSMaxRange(found)
+        }
+        return line
+    }
+
     /// Puts the cursor on a line and scrolls it near the top, for opening a file at its first change.
     func reveal(line: Int) {
         // A line is a place in the source. The preview has no lines to go to.

@@ -82,6 +82,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func findInFiles(_ sender: Any?) { windowController.findInFiles() }
     @objc func nextResult(_ sender: Any?) { windowController.stepResult(1) }
     @objc func previousResult(_ sender: Any?) { windowController.stepResult(-1) }
+    @objc func goBack(_ sender: Any?) { windowController.goBack() }
+    @objc func goForward(_ sender: Any?) { windowController.goForward() }
 
     @objc func toggleSettings(_ sender: Any?) { windowController.toggleSettings() }
     @objc func showAbout(_ sender: Any?) { windowController.showAbout() }
@@ -126,6 +128,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         case #selector(saveFile): windowController.canSaveFile
         case #selector(checkForUpdates): windowController.canCheckForUpdates
         case #selector(nextResult), #selector(previousResult): windowController.canStepResult
+        case #selector(goBack): windowController.canGoBack
+        case #selector(goForward): windowController.canGoForward
         default: true
         }
     }
@@ -202,6 +206,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             item.tag = i
         }
         main.addItem(submenu: sessions, title: "Session")
+
+        // Back and forward through the files you jumped between, like a browser's.
+        let go = NSMenu()
+        let left = String(Character(UnicodeScalar(NSLeftArrowFunctionKey)!))
+        let right = String(Character(UnicodeScalar(NSRightArrowFunctionKey)!))
+        go.addItem(withTitle: "Back", action: #selector(goBack), keyEquivalent: left)
+            .keyEquivalentModifierMask = [.command, .shift]
+        go.addItem(withTitle: "Forward", action: #selector(goForward), keyEquivalent: right)
+            .keyEquivalentModifierMask = [.command, .shift]
+        main.addItem(submenu: go, title: "Go")
 
         let view = NSMenu(title: "View")
         view.addItem(withTitle: "Toggle Sidebar", action: #selector(toggleSidebar), keyEquivalent: "b")
