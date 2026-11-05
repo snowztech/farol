@@ -151,6 +151,8 @@ struct SyntaxColors: Equatable {
     let string: NSColor
     let number: NSColor
     let comment: NSColor
+    let type: NSColor
+    let function: NSColor
     /// The theme's hues, for telling commits apart at a glance. Not its red, which reads as removed next to a diff.
     let hues: [NSColor]
 
@@ -161,6 +163,8 @@ struct SyntaxColors: Equatable {
         string = color(2)
         number = color(3)
         comment = background.mixed(with: foreground, 0.45)
+        type = color(6)
+        function = color(4)
     }
 
     func color(_ kind: Syntax.Kind) -> NSColor {
@@ -169,6 +173,8 @@ struct SyntaxColors: Equatable {
         case .string: string
         case .number: number
         case .comment: comment
+        case .type: type
+        case .function: function
         }
     }
 }
