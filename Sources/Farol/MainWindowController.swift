@@ -124,7 +124,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let filesPanel = hosting(FilesPanel(
             tree: files, state: state,
             search: fileSearch,
-            open: { [weak self] in self?.open($0, line: $1) },
+            // Picked in the tree on purpose, so it gets a tab of its own. Search results and review click through in the preview tab.
+            open: { [weak self] in self?.open($0, line: $1, keep: true) },
             openMatch: { [weak self] in self?.openMatch($0, line: $1) },
             resize: { [weak self] in self?.setFilesWidth($0) },
             startSearch: { [weak self] in self?.findInFiles() }))
@@ -456,7 +457,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// Asks before quitting kills running programs.
     func confirmQuit(_ reply: @escaping (Bool) -> Void) {
         // Unsaved files first, one at a time, each shown in its session.
-        if let session = store.sessions.first(where: { $0.panes.file?.isDirty == true }), let file = session.panes.file {
+        if let session = store.sessions.first(where: { $0.panes.tabs?.files.contains(where: \.isDirty) == true }),
+           let file = session.panes.unsavedFile() {
             store.select(session)
             return file.confirmClose({ [weak self] in self?.confirmQuit(reply) }, cancelled: { reply(false) })
         }
@@ -550,11 +552,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// Text opens in the file pane. Images, PDFs and media open in their Mac app.
     /// Anything else is shown in Finder rather than opened, since opening an unknown binary could run it.
-    private func open(_ path: String, line: Int? = nil) {
+    private func open(_ path: String, line: Int? = nil, keep: Bool = false) {
         let url = URL(fileURLWithPath: path)
         // The contents decide before the extension does, since macOS calls a TypeScript .ts a video and an SVG an image.
         if case .text? = try? Files.read(path) {
-            store.selected?.panes.open(path, line: line)
+            store.selected?.panes.open(path, line: line, keep: keep)
         } else if let type = UTType(filenameExtension: url.pathExtension),
                   [UTType.image, .pdf, .audiovisualContent].contains(where: type.conforms) {
             NSWorkspace.shared.open(url)
@@ -733,6 +735,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let (query, options) = (fileSearch.query, fileSearch.options)
         store.selected?.panes.file?.mark { FileSearch.ranges(of: query, in: $0, options: options) }
     }
+
+    /// Only in the file pane with more than one tab, so ⌃Tab reaches programs in the terminal the rest of the time.
+    var canStepTab: Bool { store.selected?.panes.canStepTab == true }
+    func stepTab(_ by: Int) { store.selected?.panes.stepTab(by) }
 
     /// Only with results and a file in front, so F4 stays a key for programs in the terminal, like htop's filter, the rest of the time.
     var canStepResult: Bool { !fileSearch.matches.isEmpty && focusedFile != nil }

@@ -75,6 +75,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func newSession(_ sender: Any?) { windowController.newSession() }
     @objc func newWorktreeSession(_ sender: Any?) { windowController.newWorktreeSession() }
     @objc func closeSession(_ sender: Any?) { store.selected.map(windowController.requestClosePane) }
+    @objc func nextTab(_ sender: Any?) { windowController.stepTab(1) }
+    @objc func previousTab(_ sender: Any?) { windowController.stepTab(-1) }
     @objc func nextSession(_ sender: Any?) { store.selectNext(offset: 1) }
     @objc func previousSession(_ sender: Any?) { store.selectNext(offset: -1) }
     @objc func selectSession(_ sender: NSMenuItem) { store.select(index: sender.tag) }
@@ -126,6 +128,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         case #selector(saveFile): windowController.canSaveFile
         case #selector(checkForUpdates): windowController.canCheckForUpdates
         case #selector(nextResult), #selector(previousResult): windowController.canStepResult
+        case #selector(nextTab), #selector(previousTab): windowController.canStepTab
         default: true
         }
     }
@@ -186,6 +189,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         sessions.addItem(withTitle: "New Worktree Session…", action: #selector(newWorktreeSession), keyEquivalent: "T")
         sessions.addItem(withTitle: "Close Session", action: #selector(closeSession), keyEquivalent: "w")
         sessions.addItem(withTitle: "Save File", action: #selector(saveFile), keyEquivalent: "s")
+        sessions.addItem(withTitle: "Next File Tab", action: #selector(nextTab), keyEquivalent: "\t").keyEquivalentModifierMask = [.control]
+        sessions.addItem(withTitle: "Previous File Tab", action: #selector(previousTab), keyEquivalent: "\t")
+            .keyEquivalentModifierMask = [.control, .shift]
         sessions.addItem(withTitle: "Name Pane…", action: #selector(namePane), keyEquivalent: "R")
         sessions.addItem(withTitle: "Open in Editor", action: #selector(openInEditor), keyEquivalent: "o")
         sessions.addItem(withTitle: "Run Project Command…", action: #selector(showRunMenu), keyEquivalent: "k")

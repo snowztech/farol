@@ -150,7 +150,7 @@ extension MainWindowController {
 
     /// Offers to remove the session's worktree, but only when that is possible and safe.
     private func closeAskingAboutWorktree(_ session: Session) {
-        if let file = session.panes.file, file.isDirty {
+        if let file = session.panes.unsavedFile() {
             return file.confirmClose { [weak self] in self?.closeAskingAboutWorktree(session) }
         }
         let task = session.taskFolder
