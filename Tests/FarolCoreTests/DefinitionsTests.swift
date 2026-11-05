@@ -230,3 +230,54 @@ private func lines(_ matches: [FileSearch.Match]) -> [String] { matches.map { "\
     #expect(index.find("user", from: file, text: text, member: true).isEmpty)
     #expect(lines(index.find("user", from: file, text: text)) == ["auth.ts:2"])
 }
+
+@Test func tellsPropertiesFromLocalsByWhatTheySitInWhateverTheIndent() throws {
+    let box = try Sandbox()
+    // Two spaces: the property is one level in, the local two.
+    try write("struct Cart {\n  let items: [String]\n  func total() -> Int {\n    let count = items.count\n    return count\n  }\n}\n",
+              to: "Cart.swift", in: box.repo)
+    let other = box.repo + "/main.swift"
+    #expect(lines(Definitions.find("items", from: other, in: box.repo)) == ["Cart.swift:2"])
+    #expect(Definitions.find("count", from: other, in: box.repo).isEmpty)
+    // A computed property's own variable, and one in an extension's method, are locals too.
+    try write("extension Cart {\n  var label: String {\n    let name = \"cart\"\n    return name\n  }\n}\n", to: "Label.swift", in: box.repo)
+    #expect(lines(Definitions.find("label", from: other, in: box.repo)) == ["Label.swift:2"])
+    #expect(Definitions.find("name", from: other, in: box.repo).isEmpty)
+}
+
+@Test func findsParametersInTheClickedFile() throws {
+    let box = try Sandbox()
+    let swift = "func load(from path: String, _ order: Int) {\n    print(path, order)\n    run { item, index in print(item) }\n}\n"
+    try write(swift, to: "Load.swift", in: box.repo)
+    let go = "package a\n\nfunc (e *Engine) Run(a, b int, name string) {\n\tuse(e, a, b, name)\n}\n"
+    try write(go, to: "a.go", in: box.repo)
+    let ts = """
+    function save(user, options) {}
+    const remove = async (userId: string, force?: boolean) => {}
+    const twice = n => n * 2
+    class Store {
+      update(id: number, data) {
+        if (data) {}
+      }
+    }
+    """
+    try write(ts, to: "store.ts", in: box.repo)
+
+    let load = box.repo + "/Load.swift"
+    #expect(lines(Definitions.find("path", from: load, in: box.repo)) == ["Load.swift:1"])
+    #expect(lines(Definitions.find("order", from: load, in: box.repo)) == ["Load.swift:1"])
+    #expect(lines(Definitions.find("item", from: load, in: box.repo)) == ["Load.swift:3"])
+    let goFile = box.repo + "/a.go"
+    for name in ["e", "a", "b", "name"] {
+        #expect(lines(Definitions.find(name, from: goFile, in: box.repo)) == ["a.go:3"])
+    }
+    let store = box.repo + "/store.ts"
+    #expect(lines(Definitions.find("user", from: store, in: box.repo)) == ["store.ts:1"])
+    #expect(lines(Definitions.find("options", from: store, in: box.repo)) == ["store.ts:1"])
+    #expect(lines(Definitions.find("userId", from: store, in: box.repo)) == ["store.ts:2"])
+    #expect(lines(Definitions.find("force", from: store, in: box.repo)) == ["store.ts:2"])
+    #expect(lines(Definitions.find("n", from: store, in: box.repo)) == ["store.ts:3"])
+    #expect(lines(Definitions.find("id", from: store, in: box.repo)) == ["store.ts:5"])
+    // data is the method's parameter, and the if that tests it isn't a method.
+    #expect(lines(Definitions.find("data", from: store, in: box.repo)) == ["store.ts:5"])
+}

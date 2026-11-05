@@ -38,6 +38,8 @@ public enum Definitions {
             }
         }
 
+        static let swiftModifiers = #"(?:@\w+(?:\([^)]*\))?\s+|(?:public|private|fileprivate|internal|open|package|static|final|override|lazy|weak|unowned|mutating|nonmutating|required|convenience|nonisolated|indirect)\s+)*"#
+
         /// Words a declaration pattern can catch that only start a statement, like Go's `\treturn err` read as a field.
         var keywords: Set<String> {
             switch self {
@@ -57,12 +59,12 @@ public enum Definitions {
             case .swift:
                 let initializer = #"^\s*(?:\w+\s+)*"# + (name == "init" ? "init" : "(?<n>init)") + #"\s*[?!]?\s*\("#
                 if name == "init" { return ([initializer], []) }
-                let modifiers = #"(?:@\w+(?:\([^)]*\))?\s+|(?:public|private|fileprivate|internal|open|package|static|final|override|lazy|weak|unowned|mutating|nonmutating|required|convenience|nonisolated|indirect)\s+)*"#
+                let modifiers = Self.swiftModifiers
                 return ([
                     initializer,
                     #"\b(?:func|class|struct|enum|protocol|actor|typealias|associatedtype|macro)\s+\#(name)\b"#,
-                    // A property: at the top of the file or one level into a type. Deeper, it is a function's own.
-                    #"^(?: {0,4}|\t?)"# + modifiers + #"(?:var|let)\s+\#(name)\b"#,
+                    // A property, or a function's own variable, which `Properties` tells apart by what the line sits in.
+                    #"^[ \t]*"# + modifiers + #"(?:var|let)\s+\#(name)\b"#,
                     // An enum case, alone or among others on the same line.
                     #"\bcase\s+(?:[A-Za-z_]\w*(?:\([^)]*\))?\s*,\s*)*\#(name)\b"#,
                 ], [
@@ -70,6 +72,10 @@ public enum Definitions {
                     // Bound by if, guard or while, among other conditions on the line.
                     #"\b(?:if|guard|while)\b.*\b(?:let|var)\s+\#(name)\b"#,
                     #"\bfor\s+(?:case\s+)?(?:let\s+|var\s+)?\(?(?:\w+\s*,\s*)*\#(name)\s*(?:,\s*\w+\s*)*\)?\s+in\b"#,
+                    // A parameter, after its label or alone: func load(from path: String, _ order: Order).
+                    #"\b(?:func|init|subscript)\b[^(\n]*\((?:[^)\n]*,)?\s*(?:\w+\s+)?\#(name)\s*:"#,
+                    // A closure's: { a, b in or { (a: Int) in.
+                    #"\{\s*(?:\[[^\]\n]*\]\s*)?\(?[\w ,:]*?\b\#(name)\b[\w ,:?\[\]]*\)?\s+in\b"#,
                 ])
             case .go:
                 var shared = [
@@ -92,6 +98,8 @@ public enum Definitions {
                     #"^\s+(?:var|const)\s+\#(name)\b"#,
                     // From :=, alone or among others, as in a range loop.
                     #"\b(?:\w+\s*,\s*)*\#(name)\s*(?:,\s*\w+\s*)*:="#,
+                    // A receiver or a parameter, with its type, or before others that share it: func (e *Engine) Run(a, b int).
+                    #"\bfunc\b[^{\n]*?[(,]\s*(?:\w+\s*,\s*)*\#(name)(?:\s*,\s*\w+)*\s+[*\[\]\w.]"#,
                 ])
             case .script, .vue:
                 return ([
@@ -104,6 +112,11 @@ public enum Definitions {
                     #"^\s*\#(name)\s*:\s*(?:async\s*)?(?:function\b|\()"#,
                 ], [
                     #"\b(?:const|let|var)\s+\#(name)\b"#,
+                    // A parameter of a function, an arrow or a method, as in (a, b: T) => or save(user) {.
+                    #"\bfunction\b[^(\n]*\((?:[^)\n]*,)?\s*(?:\.\.\.)?\#(name)\s*[?:,)=]"#,
+                    #"\((?:[^()\n]*,)?\s*(?:\.\.\.)?\#(name)\s*\??\s*(?::[^,()\n]*)?(?:,[^()\n]*)?\)\s*(?::\s*[^=\n]+?)?\s*=>"#,
+                    #"(?:^|[=(,:]\s*|\basync\s+)\#(name)\s*=>"#,
+                    #"^\s*(?:(?:async|static|get|set|public|private|protected|readonly|override)\s+)*(?!(?:if|for|while|switch|catch|with|function)\b)[A-Za-z_$][\w$]*\s*(?:<[^>\n]*>)?\((?:[^)\n]*,)?\s*(?:(?:public|private|protected|readonly)\s+)?\#(name)\s*\??\s*(?=[:,)=])[^)\n]*\)\s*(?::\s*[^{\n]+)?\{"#,
                 ])
             }
         }
@@ -161,10 +174,13 @@ public enum Definitions {
             guard let language = Language(path: path) else { return Index(folder: folder, names: [:], vueFiles: []) }
             let shared = language.declarations(of: #"(?<n>[A-Za-z_$][\w$]*)"#, exported: #"(?<n>[A-Z]\w*)"#).shared
             let extractors = shared.compactMap { try? NSRegularExpression(pattern: $0) }
-            let patterns = shared.map { $0.replacingOccurrences(of: "(?<n>", with: "(?:") }
+            // Extensions declare no name, but say what the lines inside them sit in.
+            let patterns = shared.map { $0.replacingOccurrences(of: "(?<n>", with: "(?:") } + (language == .swift ? [Properties.type] : [])
             let keywords = language.keywords
             var names: [String: [FileSearch.Match]] = [:]
-            for hit in lines(matching: patterns, in: folder, files: language.globs) {
+            var properties = Properties()
+            for hit in lines(matching: patterns, in: folder, files: language.globs)
+            where !(language == .swift && properties.isLocal(hit)) {
                 let line = hit.text as NSString
                 var found: Set<String> = []
                 for extractor in extractors {
@@ -209,31 +225,59 @@ public enum Definitions {
         return Index.build(for: path, in: folder).find(word, from: path, text: text, limit: limit)
     }
 
+    /// Tells a Swift property from a function's own variable by what it sits in, the nearest declaration above with less indent.
+    /// Inside a type or an extension it is a property. Inside a function, an initializer or another property it is local.
+    /// Fed one file's declaration lines in order, as git lists them, so the indent width doesn't matter.
+    struct Properties {
+        static let type = #"^\s*"# + Language.swiftModifiers + #"(?:class|struct|enum|actor|extension|protocol)\s+(?!(?:func|var|let)\b)\w"#
+        // Compiled once: the index runs these on every declaration line of the project.
+        private static let types = try! NSRegularExpression(pattern: type)
+        private static let variables = try! NSRegularExpression(pattern: #"^\s*"# + Language.swiftModifiers + #"(?:var|let)\s"#)
+        private var path = ""
+        /// The lines still open around the next one: their indent, and whether each is a type.
+        private var around: [(indent: Int, type: Bool)] = []
+
+        mutating func isLocal(_ hit: (path: String, line: Int, text: String)) -> Bool {
+            if hit.path != path { (path, around) = (hit.path, []) }
+            // A tab as four columns, so a file that mixes them still nests the way it reads.
+            let indent = hit.text.prefix { $0 == " " || $0 == "\t" }.reduce(0) { $0 + ($1 == "\t" ? 4 : 1) }
+            while let last = around.last, last.indent >= indent { around.removeLast() }
+            let inside = around.last
+            around.append((indent, Self.matches(Self.types, hit.text)))
+            return inside.map { !$0.type } == true && Self.matches(Self.variables, hit.text)
+        }
+
+        private static func matches(_ expression: NSRegularExpression, _ line: String) -> Bool {
+            expression.firstMatch(in: line, range: NSRange(location: 0, length: (line as NSString).length)) != nil
+        }
+    }
+
     /// Variables bound inside a function, read from the text open in the pane, so unsaved edits count too.
+    /// Only the lines that hold the word are tried, found by a plain search, so a long file costs what its mentions of the name do.
     static func locals(_ word: String, in text: String, language: Language, path: String) -> [FileSearch.Match] {
         let escaped = NSRegularExpression.escapedPattern(for: word)
         let local = language.declarations(of: escaped, exported: word.first?.isUppercase == true ? escaped : nil).local
-        guard !local.isEmpty,
-              let expression = try? NSRegularExpression(pattern: local.map { "(?:\($0))" }.joined(separator: "|"), options: .anchorsMatchLines)
+        guard !local.isEmpty, let expression = try? NSRegularExpression(pattern: local.map { "(?:\($0))" }.joined(separator: "|"))
         else { return [] }
         let string = text as NSString
         var matches: [FileSearch.Match] = []
-        var line = 1
-        var counted = 0
-        var lastLine = -1
-        for match in expression.matches(in: text, range: NSRange(location: 0, length: string.length)) {
-            // Counted on from the last match, so a long file is read once.
-            while counted < match.range.location {
-                let next = string.range(of: "\n", range: NSRange(location: counted, length: match.range.location - counted))
+        var (line, counted, searched) = (1, 0, 0)
+        while searched < string.length {
+            let found = string.range(of: word, options: .literal, range: NSRange(location: searched, length: string.length - searched))
+            guard found.location != NSNotFound else { break }
+            let lineRange = string.lineRange(for: found)
+            searched = NSMaxRange(lineRange)
+            // Counted on from the last line tried, so the file is read once.
+            while counted < lineRange.location {
+                let next = string.range(of: "\n", range: NSRange(location: counted, length: lineRange.location - counted))
                 guard next.location != NSNotFound else { break }
                 line += 1
                 counted = NSMaxRange(next)
             }
-            counted = max(counted, match.range.location)
-            guard line != lastLine else { continue }
-            lastLine = line
-            let text = string.substring(with: string.lineRange(for: match.range))
-            matches.append(FileSearch.Match(path: path, line: line, text: shown(text)))
+            let content = string.substring(with: lineRange).trimmingCharacters(in: .newlines)
+            if expression.firstMatch(in: content, range: NSRange(location: 0, length: (content as NSString).length)) != nil {
+                matches.append(FileSearch.Match(path: path, line: line, text: shown(content)))
+            }
         }
         return matches
     }
