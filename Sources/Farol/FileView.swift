@@ -30,6 +30,8 @@ final class FileView: NSView {
     var onOpenFile: ((String) -> Void)?
     /// Shows a commit, by its hash, in the git graph, from a click on a line's hash in the blame.
     var onShowCommit: ((String) -> Void)?
+    /// Opens a file at a line, from a ⌘-click on a name that is defined there.
+    var onOpenAt: ((String, Int) -> Void)?
 
     /// The file as last read or saved, to tell our own save from someone else's change.
     private var onDisk: String?
@@ -125,6 +127,8 @@ final class FileView: NSView {
         container.widthTracksTextView = false
         text.textContainerInset = NSSize(width: 8, height: 6)
         text.onFocus = { [weak self] in self?.onFocus?() }
+        text.onCommandClick = { [weak self] in self?.goToDefinition(at: $0) }
+        text.onCommandHover = { [weak self] in self?.lightName(at: $0) }
         NotificationCenter.default.addObserver(forName: NSText.didChangeNotification, object: text, queue: .main) { [weak self] _ in
             guard let self else { return }
             // Typing a line and deleting it again leaves nothing to save.
@@ -296,6 +300,79 @@ final class FileView: NSView {
                 updateMode()
             }
         }
+    }
+
+    // MARK: Go to definition
+
+    /// The name ⌘ would open, colored and underlined as a link is, so it is clear what a click lands on.
+    private var lit: NSRange?
+
+    private func lightName(at index: Int?) {
+        let range = index.flatMap { Definitions.wordRange(in: text.string, at: $0, hyphens: path.hasSuffix(".vue")) }
+        guard range != lit, let layout = text.layoutManager, let container = text.textContainer else { return }
+        let length = (text.string as NSString).length
+        if let old = lit {
+            let clipped = NSIntersectionRange(old, NSRange(location: 0, length: length))
+            layout.removeTemporaryAttribute(.foregroundColor, forCharacterRange: clipped)
+            layout.removeTemporaryAttribute(.underlineStyle, forCharacterRange: clipped)
+        }
+        lit = range
+        guard let range, NSMaxRange(range) <= length else { return text.linkRect = nil }
+        // The theme's blue, which Farol uses for what leads somewhere, with the text color where a theme has no hues.
+        let color = syntax?.hues.dropFirst(2).first ?? themeColors?.foreground ?? .linkColor
+        layout.addTemporaryAttribute(.foregroundColor, value: color, forCharacterRange: range)
+        layout.addTemporaryAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, forCharacterRange: range)
+        let glyphs = layout.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+        text.linkRect = layout.boundingRect(forGlyphRange: glyphs, in: container).offsetBy(dx: text.textContainerOrigin.x, dy: text.textContainerOrigin.y)
+    }
+
+    /// ⌘-click on a name: to where the project declares it, or a choice when it is declared in several places.
+    private func goToDefinition(at index: Int) {
+        guard let word = Definitions.word(in: text.string, at: index, hyphens: path.hasSuffix(".vue")) else { return NSSound.beep() }
+        // The cursor goes where you clicked, so going back lands on this spot and not on wherever it was.
+        text.setSelectedRange(NSRange(location: index, length: 0))
+        let (file, line) = (path, lineNumber(of: index))
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let directory = (file as NSString).deletingLastPathComponent
+            let folder = Git.repoRoot(of: directory) ?? directory
+            // The line that was clicked is a declaration too when you click on one, and it is no answer.
+            let found = Definitions.find(word, from: file, in: folder).filter { folder + "/" + $0.path != file || $0.line != line }
+            DispatchQueue.main.async { self?.showDefinitions(found, in: folder) }
+        }
+    }
+
+    /// The line a character is on, counting from 1.
+    private func lineNumber(of index: Int) -> Int {
+        let string = text.string as NSString
+        var line = 1
+        var position = 0
+        while position < min(index, string.length) {
+            let found = string.range(of: "\n", range: NSRange(location: position, length: min(index, string.length) - position))
+            guard found.location != NSNotFound else { break }
+            line += 1
+            position = NSMaxRange(found)
+        }
+        return line
+    }
+
+    private func showDefinitions(_ found: [FileSearch.Match], in folder: String) {
+        guard let first = found.first else { return NSSound.beep() }
+        guard found.count > 1, let window else { return onOpenAt?(folder + "/" + first.path, first.line) ?? () }
+        let menu = NSMenu()
+        for match in found {
+            let item = NSMenuItem(title: "\((match.path as NSString).lastPathComponent):\(match.line)   \(match.text)",
+                                  action: #selector(openDefinition(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = [folder + "/" + match.path, match.line] as [Any]
+            item.toolTip = match.path
+            menu.addItem(item)
+        }
+        menu.popUp(positioning: nil, at: text.convert(window.mouseLocationOutsideOfEventStream, from: nil), in: text)
+    }
+
+    @objc private func openDefinition(_ item: NSMenuItem) {
+        guard let place = item.representedObject as? [Any], let path = place.first as? String, let line = place.last as? Int else { return }
+        onOpenAt?(path, line)
     }
 
     /// Puts the cursor on a line and scrolls it near the top, for opening a file at its first change.
@@ -603,6 +680,66 @@ final class FileView: NSView {
 
 private final class CodeTextView: NSTextView {
     var onFocus: (() -> Void)?
+    /// A ⌘-click, with the character it landed on, which a click would otherwise only select.
+    var onCommandClick: ((Int) -> Void)?
+    /// The character under the mouse while ⌘ is held, or nil when it isn't or the mouse is elsewhere.
+    var onCommandHover: ((Int?) -> Void)?
+    /// Where the name that would open is, so the pointer can be a hand over it.
+    var linkRect: NSRect? {
+        didSet { window?.invalidateCursorRects(for: self) }
+    }
+    private var tracking: NSTrackingArea?
+
+    private func character(at point: NSPoint) -> Int? {
+        guard let layout = layoutManager, let container = textContainer, bounds.contains(point) else { return nil }
+        let inside = NSPoint(x: point.x - textContainerOrigin.x, y: point.y - textContainerOrigin.y)
+        return layout.characterIndex(for: inside, in: container, fractionOfDistanceBetweenInsertionPoints: nil)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard event.modifierFlags.contains(.command), event.clickCount == 1,
+              let index = character(at: convert(event.locationInWindow, from: nil)) else {
+            return super.mouseDown(with: event)
+        }
+        onCommandHover?(nil)
+        onCommandClick?(index)
+    }
+
+    // MARK: Command hover
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let tracking { removeTrackingArea(tracking) }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self)
+        addTrackingArea(area)
+        tracking = area
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        hover(holding: event.modifierFlags)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        onCommandHover?(nil)
+    }
+
+    /// Pressing or letting go of ⌘ with the mouse still is a change too.
+    override func flagsChanged(with event: NSEvent) {
+        super.flagsChanged(with: event)
+        hover(holding: event.modifierFlags)
+    }
+
+    private func hover(holding flags: NSEvent.ModifierFlags) {
+        guard flags.contains(.command), let window else { return onCommandHover?(nil) ?? () }
+        onCommandHover?(character(at: convert(window.mouseLocationOutsideOfEventStream, from: nil)))
+    }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        if let linkRect { addCursorRect(linkRect, cursor: .pointingHand) }
+    }
 
     override func becomeFirstResponder() -> Bool {
         let accepted = super.becomeFirstResponder()

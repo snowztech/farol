@@ -815,6 +815,7 @@ final class PaneContainer: NSView {
         }
         file.onClose = { [weak self] in self?.closeFile() }
         file.onOpenFile = { [weak self] in self?.open($0) }
+        file.onOpenAt = { [weak self] in self?.open($0, line: $1) }
         file.onShowCommit = { [weak self] in self?.onShowCommit?($0) }
         addSubview(file)
         needsLayout = true

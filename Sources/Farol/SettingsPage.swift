@@ -864,6 +864,7 @@ struct SettingsPage: View {
             ("Next and previous match", ["⌘G", "⇧⌘G"]),
             ("Find the selected text", ["⌘E"]),
             ("Find in the files under the pane's folder", ["⇧⌘F"]),
+            ("Go to the definition of a name in the open file", ["⌘ click"]),
             ("Next and previous search result", ["F4", "⇧F4"]),
             ("Close find", ["esc"]),
         ]),
