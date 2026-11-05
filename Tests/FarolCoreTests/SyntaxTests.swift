@@ -76,9 +76,10 @@ private func tokens(_ text: String, _ path: String) -> [String] {
 }
 
 @Test func colorsKeysAndMembersAsPropertiesButNotTypedVariables() {
-    let go = "return &Engine{\n\tprovider: NewOpenAI(apiKey),\n}, req.DatabaseType"
+    let go = "return &Engine{\n\tprovider: NewOpenAI(apiKey),\n}, req.DatabaseType, &http.Client{Timeout: 30}"
     #expect(tokens(go, "a.go") == [
         "return:keyword", "Engine:type", "provider:property", "NewOpenAI:function", "DatabaseType:property",
+        "Client:property", "Timeout:property", "30:number",
     ])
     let ts = "interface User {\n  id: string\n}\nconst where = { id: userId }\nfunction find(id: string) {}"
     #expect(tokens(ts, "a.ts") == [

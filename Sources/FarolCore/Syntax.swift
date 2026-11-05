@@ -145,7 +145,7 @@ public enum Syntax {
                 return capital && language.capitalCallsAreTypes ? .type : .function
             }
             if afterDot { return .property }
-            if !capital, isKey(start: start, colon: next) { return .property }
+            if isKey(start: start, colon: next) { return .property }
             return capital && word.contains(where: \.isLowercase) ? .type : nil
         }
 

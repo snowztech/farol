@@ -161,7 +161,7 @@ struct SyntaxColors: Equatable {
     /// The theme's hues, for telling commits apart at a glance. Not its red, which reads as removed next to a diff.
     let hues: [NSColor]
 
-    /// `editor` is the file pane, where types, properties and comments get colors of their own. Elsewhere, diffs above all, red stays for what was removed.
+    /// `editor` is the file pane, where types and properties get colors of their own. Elsewhere, diffs above all, red stays for what was removed.
     /// Properties stay plain there too, so a diff stays calm.
     init(background: NSColor, foreground: NSColor, ansi: [NSColor], editor: Bool = false) {
         let color = { (i: Int) in ansi.count > i ? ansi[i] : foreground }
@@ -169,15 +169,15 @@ struct SyntaxColors: Equatable {
         keyword = color(5)
         string = color(2)
         function = color(4)
+        // Comments stay muted in both, since they are what you read last.
+        comment = background.mixed(with: foreground, 0.45)
         if editor {
             number = color(2)
-            comment = color(3)
             type = color(1)
             property = color(6)
             tag = color(1)
         } else {
             number = color(3)
-            comment = background.mixed(with: foreground, 0.45)
             type = color(6)
             property = foreground
             tag = keyword
