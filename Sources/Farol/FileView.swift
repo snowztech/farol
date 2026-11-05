@@ -22,8 +22,18 @@ final class FileView: NSView {
             unsavedDot.isHidden = !isDirty
             needsLayout = true
             blame.lines = isDirty ? [] : blameLines
+            if isDirty != oldValue { onStateChange?() }
         }
     }
+    /// Off inside tabs, whose bar shows the name and these actions instead.
+    var showsHeader = true {
+        didSet {
+            header.isHidden = !showsHeader
+            needsLayout = true
+        }
+    }
+    /// The file, its unsaved state or its mode changed, for the tab bar to follow.
+    var onStateChange: (() -> Void)?
     var onFocus: (() -> Void)?
     var onClose: (() -> Void)?
     /// Opens another file in this pane, from a link in the Markdown preview.
@@ -187,7 +197,14 @@ final class FileView: NSView {
 
     private var showsPreview: Bool { Markdown.handles(path) && previewing && message.isHidden }
 
-    private func togglePreview() {
+    /// Markdown reads as source or rendered.
+    var canPreview: Bool { Markdown.handles(path) && message.isHidden }
+    var isPreviewing: Bool { previewing }
+    /// A checkout's file shown as source has someone to blame for each line.
+    var canBlame: Bool { inCheckout && !scroll.isHidden }
+    var isBlaming: Bool { blaming }
+
+    func togglePreview() {
         let focused = window?.firstResponder === textView
         previewing.toggle()
         UserDefaults.standard.set(previewing, forKey: Self.previewKey)
@@ -210,6 +227,7 @@ final class FileView: NSView {
         blameButton.show(symbol: "person.text.rectangle", help: blaming ? "Hide git blame" : "Show git blame")
         if showsPreview { preview.show(text.string, path: path) }
         needsLayout = true
+        onStateChange?()
     }
 
     /// Loads another file into the same pane. Callers check `isDirty` first, see confirmClose.
@@ -254,7 +272,7 @@ final class FileView: NSView {
     /// Keeps its width while there are unsaved edits, so the code doesn't jump. It is blank then, since git numbers the saved file.
     private var showsBlame: Bool { blaming && inCheckout && !blameMissing && !scroll.isHidden }
 
-    private func toggleBlame() {
+    func toggleBlame() {
         blaming.toggle()
         UserDefaults.standard.set(blaming, forKey: Self.blameKey)
         loadBlame()
@@ -570,7 +588,7 @@ final class FileView: NSView {
 
     override func layout() {
         super.layout()
-        let h = Self.headerHeight
+        let h = showsHeader ? Self.headerHeight : 0
         header.frame = NSRect(x: 0, y: 0, width: bounds.width, height: h)
         closeButton.frame = NSRect(x: bounds.width - 28, y: 3, width: 20, height: 20)
         previewButton.frame = NSRect(x: bounds.width - 52, y: 3, width: 20, height: 20)

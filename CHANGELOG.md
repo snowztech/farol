@@ -4,6 +4,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Files open in tabs above the file pane, so you can keep several open and switch with a click or ⌃Tab. A file picked in the files panel gets a tab of its own. One opened from a search or the review takes a preview tab, in italics, which the next one replaces until you edit it or double-click its tab.
+- Code in the file pane is easier to read at a glance. Types, functions and properties each get their own color from your theme, beside keywords, strings and numbers. Diffs keep their calmer colors, so red still means removed there.
+
 ## [0.60.0] - 2026-11-04
 
 Create pull requests from Farol, in one click or written first.
