@@ -1,7 +1,7 @@
 import FarolCore
 import Foundation
 
-/// The declaration indexes, one per checkout and family of languages, kept so ⌘ over a name answers at once.
+/// The declaration indexes, one per checkout and family of languages, built on the first ⌘ over a name and kept so the next ones answer at once.
 /// A changed file marks its index stale, and the next lookup rebuilds it behind the old answers.
 /// So nothing runs while you aren't looking things up.
 @MainActor

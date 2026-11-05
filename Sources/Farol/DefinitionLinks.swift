@@ -6,12 +6,9 @@ import FarolCore
 @MainActor
 final class DefinitionLinks {
     /// The file the text is, which says what a name is and where to look for it.
+    /// Nothing is indexed until ⌘ is first held over a name, so reading files costs nothing for people who never jump.
     var path = "" {
-        didSet {
-            reset()
-            // Ready before ⌘ is first held, so the first name under the mouse lights at once.
-            DefinitionIndexes.index(for: path) { _ in }
-        }
+        didSet { reset() }
     }
     var open: ((String, Int) -> Void)?
     var palette: () -> Palette? = { nil }
