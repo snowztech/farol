@@ -819,6 +819,7 @@ final class PaneContainer: NSView {
         file.onClose = { [weak self] in self?.closeFile() }
         file.onOpenFile = { [weak self] in self?.open($0) }
         file.onOpenAt = { [weak self] in self?.open($0, line: $1) }
+        file.palette = { [weak self] in self?.palette }
         file.onShowCommit = { [weak self] in self?.onShowCommit?($0) }
         file.onPathChange = { [weak self] in self?.onFileChange?(self?.file?.path) }
         onFileChange?(file.path)

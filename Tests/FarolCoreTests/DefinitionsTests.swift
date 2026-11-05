@@ -113,3 +113,109 @@ private func lines(_ matches: [FileSearch.Match]) -> [String] { matches.map { "\
     try write("func run() {}\n", to: "notes.txt", in: box.repo)
     #expect(Definitions.find("run", from: box.repo + "/notes.txt", in: box.repo).isEmpty)
 }
+
+@Test func findsLocalsAndGoFields() throws {
+    let box = try Sandbox()
+    try write("""
+    func load(paths: [String]) {
+        guard let first = paths.first, let last = paths.last else { return }
+        for (index, path) in paths.enumerated() {}
+    }
+    """, to: "Sources/Load.swift", in: box.repo)
+    try write("""
+    package server
+
+    type Order struct {
+    \tID    string `json:"id"`
+    \tItems []Item // what was bought
+    }
+
+    func handle() {
+    \tfor i, item := range items {}
+    \tresult, err := run()
+    \tID(result)
+    }
+    """, to: "server/order.go", in: box.repo)
+    let swift = box.repo + "/Sources/Load.swift"
+    let go = box.repo + "/server/order.go"
+
+    #expect(lines(Definitions.find("first", from: swift, in: box.repo)) == ["Sources/Load.swift:2"])
+    #expect(lines(Definitions.find("last", from: swift, in: box.repo)) == ["Sources/Load.swift:2"])
+    #expect(lines(Definitions.find("path", from: swift, in: box.repo)) == ["Sources/Load.swift:3"])
+    #expect(lines(Definitions.find("ID", from: go, in: box.repo)) == ["server/order.go:4"])
+    #expect(lines(Definitions.find("Items", from: go, in: box.repo)) == ["server/order.go:5"])
+    #expect(lines(Definitions.find("item", from: go, in: box.repo)) == ["server/order.go:9"])
+    #expect(lines(Definitions.find("err", from: go, in: box.repo)) == ["server/order.go:10"])
+}
+
+@Test func opensWithoutAskingWhenTheClickedFileSettlesIt() {
+    let match = { (path: String, line: Int) in FileSearch.Match(path: path, line: line, text: "") }
+    let here = "/repo/a.swift"
+    // One answer, or one in the clicked file, opens straight away.
+    #expect(Definitions.best([match("b.swift", 3)], from: here, in: "/repo", line: 1) == match("b.swift", 3))
+    #expect(Definitions.best([match("a.swift", 9), match("b.swift", 3)], from: here, in: "/repo", line: 1) == match("a.swift", 9))
+    // Several in the clicked file: the nearest above the click, as a local in scope.
+    let locals = [match("a.swift", 2), match("a.swift", 10), match("a.swift", 20)]
+    #expect(Definitions.best(locals, from: here, in: "/repo", line: 15) == match("a.swift", 10))
+    #expect(Definitions.best(locals, from: here, in: "/repo", line: 1) == nil)
+    // Only elsewhere, in several files: the menu asks.
+    #expect(Definitions.best([match("b.swift", 3), match("c.swift", 4)], from: here, in: "/repo", line: 1) == nil)
+}
+
+@Test func aLocalInAnotherFileIsNoAnswer() throws {
+    let box = try Sandbox()
+    try write("final class Pipe {\n    let handle: Int\n}\n", to: "Sources/Pipe.swift", in: box.repo)
+    try write("func read() {\n        let handle = 1\n        guard let handle = open() else { return }\n}\n", to: "Sources/Read.swift", in: box.repo)
+    try write("pipe.handle\n", to: "Sources/main.swift", in: box.repo)
+    #expect(lines(Definitions.find("handle", from: box.repo + "/Sources/main.swift", in: box.repo)) == ["Sources/Pipe.swift:2"])
+}
+
+@Test func indexesEveryCaseOnALineAndNoKeywords() throws {
+    let box = try Sandbox()
+    try write("enum Mode {\n    case light, dark(Int), auto = 3\n}\nswitch mode {\ncase .light: break\n}\n", to: "Mode.swift", in: box.repo)
+    try write("package a\n\nfunc f() error {\n\treturn err\n}\n", to: "a.go", in: box.repo)
+    let swift = Definitions.Index.build(for: box.repo + "/Mode.swift", in: box.repo)
+    for name in ["light", "dark", "auto"] {
+        #expect(lines(swift.find(name, from: box.repo + "/x.swift", text: "")) == ["Mode.swift:2"])
+    }
+    let go = Definitions.Index.build(for: box.repo + "/a.go", in: box.repo)
+    #expect(go.find("return", from: box.repo + "/a.go", text: "").isEmpty)
+    #expect(lines(go.find("f", from: box.repo + "/b.go", text: "")) == ["a.go:3"])
+}
+
+@Test func readsLocalsFromTheTextInThePaneNotTheDisk() throws {
+    let box = try Sandbox()
+    try write("func run() {}\n", to: "main.swift", in: box.repo)
+    let index = Definitions.Index.build(for: box.repo + "/main.swift", in: box.repo)
+    // An unsaved edit adds a local the file on disk doesn't have yet.
+    let edited = "func run() {\n    let total = 1\n    print(total)\n}\n"
+    #expect(lines(index.find("total", from: box.repo + "/main.swift", text: edited)) == ["main.swift:2"])
+}
+
+@Test func aCallThroughAnotherValueAsksAndFindsTheInterface() throws {
+    let box = try Sandbox()
+    let engine = """
+    package ai
+
+    type Provider interface {
+    \tGenerateQuery(req QueryRequest) (*QueryResponse, error)
+    }
+
+    func (e *Engine) GenerateQuery(req QueryRequest) (*QueryResponse, error) {
+    \treturn e.provider.GenerateQuery(req)
+    }
+    """
+    try write(engine, to: "ai/engine.go", in: box.repo)
+    try write("package ai\n\nfunc (o *OpenAI) GenerateQuery(req QueryRequest) (*QueryResponse, error) {\n\treturn nil, nil\n}\n",
+              to: "ai/openai.go", in: box.repo)
+    let file = box.repo + "/ai/engine.go"
+    let found = Definitions.find("GenerateQuery", from: file, in: box.repo)
+    #expect(lines(found) == ["ai/engine.go:4", "ai/engine.go:7", "ai/openai.go:3"])
+    // e.provider.GenerateQuery is the provider's, so the method beside it is no hint and the list asks.
+    let call = (engine as NSString).range(of: "GenerateQuery(req)")
+    let range = NSRange(location: call.location, length: "GenerateQuery".count)
+    #expect(Definitions.isMember(in: engine, at: range))
+    #expect(Definitions.best(found, from: file, in: box.repo, line: 8, member: true) == nil)
+    #expect(!Definitions.isMember(in: "self.run()", at: NSRange(location: 5, length: 3)))
+    #expect(!Definitions.isMember(in: "run()", at: NSRange(location: 0, length: 3)))
+}

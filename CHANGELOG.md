@@ -6,7 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
-- ⌘-click a name in the open file to go to where it is defined, in Swift, Go, Vue, TypeScript and JavaScript files. It looks for the declaring line in the project, so there is no language server to set up. With several answers a menu lists them, and a Vue component used as a tag opens its file.
+- ⌘-click a name in the open file to go to where it is defined, in Swift, Go, Vue, TypeScript and JavaScript files. It looks for the declaring line in the project, so there is no language server to set up. With several answers a list opens under the name, and a Vue component used as a tag opens its file.
 
 ### Fixed
 
