@@ -831,7 +831,6 @@ final class PaneContainer: NSView {
             self?.fileFocused = true
             self?.applyFocus()
         }
-        file.onClose = { [weak self] in self?.closeFile() }
         file.onOpenFile = { [weak self] in self?.open($0) }
         file.onShowCommit = { [weak self] in self?.onShowCommit?($0) }
     }

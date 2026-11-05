@@ -35,7 +35,6 @@ final class FileTabs: NSView {
         model.keep = { [weak self] id in self?.file(id).map { self?.keep($0) } }
         model.closeOthers = { [weak self] id in self?.file(id).map { self?.close(except: $0) } }
         model.togglePreview = { [weak self] in self?.current?.togglePreview() }
-        model.toggleBlame = { [weak self] in self?.current?.toggleBlame() }
         model.closeAll = { [weak self] in self?.close(except: nil) }
         addSubview(bar)
     }
@@ -64,7 +63,6 @@ final class FileTabs: NSView {
             return select(preview)
         }
         let file = FileView(path: path)
-        file.showsHeader = false
         file.onStateChange = { [weak self, weak file] in
             // An edit keeps the file, so the next click through doesn't replace work in progress.
             if let file, file.isDirty, self?.preview === file { self?.preview = nil }
@@ -153,8 +151,6 @@ final class FileTabs: NSView {
         model.active = current.map(ObjectIdentifier.init)
         model.canPreview = current?.canPreview == true
         model.previewing = current?.isPreviewing == true
-        model.canBlame = current?.canBlame == true
-        model.blaming = current?.isBlaming == true
     }
 
     override func layout() {
@@ -184,14 +180,11 @@ final class FileTabsModel: ObservableObject {
     @Published var palette: Palette?
     @Published var canPreview = false
     @Published var previewing = false
-    @Published var canBlame = false
-    @Published var blaming = false
     var select: (ObjectIdentifier) -> Void = { _ in }
     var close: (ObjectIdentifier) -> Void = { _ in }
     var keep: (ObjectIdentifier) -> Void = { _ in }
     var closeOthers: (ObjectIdentifier) -> Void = { _ in }
     var togglePreview: () -> Void = {}
-    var toggleBlame: () -> Void = {}
     var closeAll: () -> Void = {}
 }
 
@@ -210,16 +203,13 @@ struct FileTabBar: View {
                         }
                         .padding(.horizontal, 6)
                     }
-                    // A tab opened past the edge comes into view.
-                    .onChange(of: model.active) { _, active in
-                        if let active { withAnimation(Motion.enabled ? .easeOut(duration: 0.15) : nil) { scroll.scrollTo(active) } }
-                    }
+                    // The tab in front stays in full view, also when a tab opens past the edge or the bar narrows.
+                    // After layout, since a tab added in the same change has no width yet to scroll to.
+                    .onChange(of: model.active) { _, _ in reveal(scroll) }
+                    .onChange(of: model.tabs) { _, _ in reveal(scroll) }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { _ in reveal(scroll) }
                 }
                 HStack(spacing: 2) {
-                    if model.canBlame {
-                        IconButton(symbol: "person.text.rectangle", help: model.blaming ? "Hide git blame" : "Show git blame",
-                                   active: model.blaming, palette: p, action: model.toggleBlame)
-                    }
                     if model.canPreview {
                         IconButton(symbol: model.previewing ? "chevron.left.forwardslash.chevron.right" : "eye",
                                    help: model.previewing ? "Show the source" : "Preview", palette: p, action: model.togglePreview)
@@ -230,6 +220,13 @@ struct FileTabBar: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .overlay(alignment: .bottom) { Rectangle().fill(p.line).frame(height: 1) }
+        }
+    }
+
+    private func reveal(_ scroll: ScrollViewProxy) {
+        guard let active = model.active else { return }
+        DispatchQueue.main.async {
+            withAnimation(Motion.enabled ? .easeOut(duration: 0.15) : nil) { scroll.scrollTo(active) }
         }
     }
 }
@@ -246,7 +243,8 @@ private struct FileTabItem: View {
     var body: some View {
         let p = palette
         HStack(spacing: 6) {
-            FileIcon(path: tab.path).font(.system(size: 11)).foregroundStyle(p.muted).frame(width: 14)
+            // As wide as the widest mark, Go's, so none spills over the name.
+            FileIcon(path: tab.path).font(.system(size: 11)).foregroundStyle(p.muted).frame(width: 20)
             Text(tab.name)
                 .font(.system(size: 12))
                 .italic(tab.preview)
