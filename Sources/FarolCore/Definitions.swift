@@ -183,12 +183,13 @@ public enum Definitions {
 
         /// Where `word`, clicked in the file at `path` whose text is `text`, is declared. Paths are relative to the folder.
         /// The clicked file comes first, then its folder, so the nearest answer is the first.
-        public func find(_ word: String, from path: String, text: String, limit: Int = 30) -> [FileSearch.Match] {
+        /// A `member`, as in `db.user`, belongs to another value, so a variable of the same name is no answer.
+        public func find(_ word: String, from path: String, text: String, member: Bool = false, limit: Int = 30) -> [FileSearch.Match] {
             guard let language = Language(path: path) else { return [] }
             let here = path.hasPrefix(folder + "/") ? String(path.dropFirst(folder.count + 1)) : path
             var found: [FileSearch.Match] = []
             if language == .vue { found += Definitions.components(named: word, among: vueFiles) }
-            found += Definitions.locals(word, in: text, language: language, path: here)
+            if !member { found += Definitions.locals(word, in: text, language: language, path: here) }
             found += names[word] ?? []
             let nearby = (here as NSString).deletingLastPathComponent
             func rank(_ match: FileSearch.Match) -> Int {

@@ -219,3 +219,14 @@ private func lines(_ matches: [FileSearch.Match]) -> [String] { matches.map { "\
     #expect(!Definitions.isMember(in: "self.run()", at: NSRange(location: 5, length: 3)))
     #expect(!Definitions.isMember(in: "run()", at: NSRange(location: 0, length: 3)))
 }
+
+@Test func aMemberIsNeverALocalOfTheSameName() throws {
+    let box = try Sandbox()
+    try write("export const getUsers = async () => {\n  const users = await db.user.findMany()\n}\n", to: "auth.ts", in: box.repo)
+    let file = box.repo + "/auth.ts"
+    let text = "export const getUsers = async () => {\n  const user = await db.user.findUnique()\n  return db.user.findMany()\n}\n"
+    let index = Definitions.Index.build(for: file, in: box.repo)
+    // db.user is db's, so the local user above it is no answer. The bare name still finds it.
+    #expect(index.find("user", from: file, text: text, member: true).isEmpty)
+    #expect(lines(index.find("user", from: file, text: text)) == ["auth.ts:2"])
+}

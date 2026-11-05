@@ -23,7 +23,7 @@ final class DefinitionLinks {
     private var lit: NSRange?
     /// The name under the mouse, lit only once it is known to lead somewhere.
     private var hovered: NSRange?
-    /// Answers per name while ⌘ is held, so the click is instant. Dropped when ⌘ is let go or the text changes.
+    /// Answers per name, and whether it is a member, while ⌘ is held, so the click is instant. Dropped when ⌘ is let go or the text changes.
     private var lookups: [String: Lookup] = [:]
 
     private struct Lookup {
@@ -49,7 +49,8 @@ final class DefinitionLinks {
         underline(nil)
         guard let range else { return }
         let (file, line) = (path, lineNumber(of: index))
-        lookUp((text.string as NSString).substring(with: range)) { [weak self] lookup in
+        let word = (text.string as NSString).substring(with: range)
+        lookUp(word, member: Definitions.isMember(in: text.string, at: range)) { [weak self] lookup in
             guard let self, hovered == range, !lookup.answers(from: file, line: line).isEmpty else { return }
             underline(range)
         }
@@ -63,7 +64,7 @@ final class DefinitionLinks {
         let word = (text.string as NSString).substring(with: range)
         let (file, line) = (path, lineNumber(of: index))
         let member = Definitions.isMember(in: text.string, at: range)
-        lookUp(word) { [weak self] lookup in
+        lookUp(word, member: member) { [weak self] lookup in
             guard let self, path == file else { return }
             let found = lookup.answers(from: file, line: line)
             guard !found.isEmpty else { return NSSound.beep() }
@@ -88,13 +89,14 @@ final class DefinitionLinks {
         underline(nil)
     }
 
-    private func lookUp(_ word: String, then done: @escaping (Lookup) -> Void) {
-        if let known = lookups[word] { return done(known) }
+    private func lookUp(_ word: String, member: Bool, then done: @escaping (Lookup) -> Void) {
+        let key = member ? "." + word : word
+        if let known = lookups[key] { return done(known) }
         let file = path
         DefinitionIndexes.index(for: file) { [weak self] index in
             guard let self, path == file else { return }
-            let lookup = Lookup(folder: index.folder, matches: index.find(word, from: file, text: text.string))
-            lookups[word] = lookup
+            let lookup = Lookup(folder: index.folder, matches: index.find(word, from: file, text: text.string, member: member))
+            lookups[key] = lookup
             done(lookup)
         }
     }
