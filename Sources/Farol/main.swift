@@ -91,6 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func toggleSidebar(_ sender: Any?) { windowController.toggleSidebar() }
     @objc func toggleFiles(_ sender: Any?) { windowController.toggleFiles() }
     @objc func toggleGraph(_ sender: Any?) { windowController.toggleGraph() }
+    @objc func toggleBlame(_ sender: Any?) { windowController.toggleBlame() }
     @objc func toggleReview(_ sender: Any?) { windowController.toggleReview() }
     @objc func toggleMerge(_ sender: Any?) { windowController.toggleMerge() }
     @objc func commit(_ sender: Any?) { windowController.commit() }
@@ -123,6 +124,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             // Named after where it goes, which changes with the editor you picked last.
             item.title = "Open in \(Editors.preferred?.name ?? "Finder")"
             return store.selected.map { !$0.isRemote } ?? false
+        }
+        if item.action == #selector(toggleBlame) {
+            item.title = windowController.isBlaming ? "Hide Git Blame" : "Show Git Blame"
+            return windowController.canToggleBlame
         }
         return switch item.action {
         case #selector(saveFile): windowController.canSaveFile
@@ -212,6 +217,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let view = NSMenu(title: "View")
         view.addItem(withTitle: "Toggle Sidebar", action: #selector(toggleSidebar), keyEquivalent: "b")
         view.addItem(withTitle: "Toggle Files", action: #selector(toggleFiles), keyEquivalent: "E")
+        view.addItem(withTitle: "Show Git Blame", action: #selector(toggleBlame), keyEquivalent: "")
         view.addItem(withTitle: "Toggle Git Graph", action: #selector(toggleGraph), keyEquivalent: "g")
             .keyEquivalentModifierMask = [.command, .option]
         view.addItem(withTitle: "Review Changes", action: #selector(toggleReview), keyEquivalent: "r")
