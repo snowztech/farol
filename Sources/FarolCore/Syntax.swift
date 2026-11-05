@@ -1,10 +1,10 @@
 import Foundation
 
-/// Just enough highlighting to make code easy to read: comments, strings, numbers, keywords, types and functions.
+/// Just enough highlighting to make code easy to read: comments, strings, numbers, keywords, types, functions and properties.
 /// One pass and no grammar, so it stays fast and needs no dependency.
 /// Nested template strings and the like come out wrong. A real parser would fix that if it ever matters.
 public enum Syntax {
-    public enum Kind: Equatable, CaseIterable { case keyword, string, number, comment, type, function }
+    public enum Kind: Equatable, CaseIterable { case keyword, string, number, comment, type, function, property, tag }
 
     public struct Token: Equatable {
         /// UTF-16 offsets, ready for NSAttributedString and AttributedString.
@@ -19,7 +19,7 @@ public enum Syntax {
         /// Quotes whose strings can span lines, like JavaScript's backtick.
         var multilineQuotes: Set<Character> = []
         let keywords: Set<String>
-        /// Markup: the name right after `<` or `</` is colored like a keyword.
+        /// Markup: the name right after `<` or `</` is a tag.
         var tagNames = false
         /// Markdown is colored by lines instead, see markdownTokens.
         var isMarkdown = false
@@ -119,7 +119,9 @@ public enum Syntax {
                 let afterDot = i > 0 && chars[i - 1] == code(".")
                 let isTag = language.tagNames && i > 0
                     && (chars[i - 1] == code("<") || (i > 1 && chars[i - 1] == code("/") && chars[i - 2] == code("<")))
-                if isTag || (!afterDot && language.keywords.contains(word)) {
+                if isTag {
+                    add(i, end, .tag)
+                } else if !afterDot && language.keywords.contains(word) {
                     add(i, end, .keyword)
                 } else if language.names, let kind = name(word, at: i, end: end, afterDot: afterDot) {
                     add(i, end, kind)
@@ -131,8 +133,8 @@ public enum Syntax {
         }
         return tokens
 
-        /// A call is a function, or a type being made where capitalized calls are. A capital elsewhere is a type.
-        /// Not after a dot, where Go's `prompt.System` is a field, nor in ALL_CAPS, which is a constant.
+        /// A call is a function, or a type being made where capitalized calls are. After a dot, or a key before a colon, it is a property.
+        /// A capital elsewhere is a type, but not in ALL_CAPS, which is a constant.
         func name(_ word: String, at start: Int, end: Int, afterDot: Bool) -> Kind? {
             // Before calls, since Go's `string(b)` converts to the type.
             if !afterDot, language.builtinTypes.contains(word) { return .type }
@@ -142,7 +144,20 @@ public enum Syntax {
             if next < chars.count, chars[next] == code("(") {
                 return capital && language.capitalCallsAreTypes ? .type : .function
             }
-            return capital && !afterDot && word.contains(where: \.isLowercase) ? .type : nil
+            if afterDot { return .property }
+            if isKey(start: start, colon: next) { return .property }
+            return capital && word.contains(where: \.isLowercase) ? .type : nil
+        }
+
+        /// A key before a colon, like `provider:` in a struct or an object, starting its line or right after `{`.
+        /// Anywhere else the colon gives a type, as in `const total: number` or a parameter, and the name is the variable's.
+        /// Not a path like `std::`, nor Go's `x :=`.
+        func isKey(start: Int, colon: Int) -> Bool {
+            guard colon < chars.count, chars[colon] == code(":"),
+                  colon + 1 >= chars.count || (chars[colon + 1] != code(":") && chars[colon + 1] != code("=")) else { return false }
+            var before = start - 1
+            while before >= 0, chars[before] == code(" ") || chars[before] == code("\t") { before -= 1 }
+            return before < 0 || chars[before] == newline || chars[before] == code("{")
         }
     }
 

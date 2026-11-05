@@ -61,6 +61,8 @@ struct Palette: Equatable {
     /// Tint for macOS switches and pickers. A mid gray, since white on a switch would hide its white knob.
     let control: Color
     let code: SyntaxColors
+    /// The file pane's, see SyntaxColors.
+    let editorCode: SyntaxColors
     let diff: DiffColors
     let isDark: Bool
     let style: UIStyle
@@ -112,6 +114,7 @@ struct Palette: Equatable {
         accent = Color(nsColor: fg)
         control = Color(nsColor: bg.mixed(with: fg, 0.42))
         code = SyntaxColors(background: bg, foreground: fg, ansi: ansi)
+        editorCode = SyntaxColors(background: bg, foreground: fg, ansi: ansi, editor: true)
         diff = DiffColors(background: bg, foreground: fg, added: ansi.count > 2 ? ansi[2] : fg, removed: ansi.count > 1 ? ansi[1] : fg,
                           highlight: ansi.count > 3 ? ansi[3] : fg)
         lanes = Self.lanes(matching: Array(ansi.dropFirst().prefix(6)), dark: bg.isDark)
@@ -153,18 +156,32 @@ struct SyntaxColors: Equatable {
     let comment: NSColor
     let type: NSColor
     let function: NSColor
+    let property: NSColor
+    let tag: NSColor
     /// The theme's hues, for telling commits apart at a glance. Not its red, which reads as removed next to a diff.
     let hues: [NSColor]
 
-    init(background: NSColor, foreground: NSColor, ansi: [NSColor]) {
+    /// `editor` is the file pane, where types and properties get colors of their own. Elsewhere, diffs above all, red stays for what was removed.
+    /// Properties stay plain there too, so a diff stays calm.
+    init(background: NSColor, foreground: NSColor, ansi: [NSColor], editor: Bool = false) {
         let color = { (i: Int) in ansi.count > i ? ansi[i] : foreground }
         hues = (2...6).map(color)
         keyword = color(5)
         string = color(2)
-        number = color(3)
-        comment = background.mixed(with: foreground, 0.45)
-        type = color(6)
         function = color(4)
+        // Comments stay muted in both, since they are what you read last.
+        comment = background.mixed(with: foreground, 0.45)
+        if editor {
+            number = color(2)
+            type = color(1)
+            property = color(6)
+            tag = color(1)
+        } else {
+            number = color(3)
+            type = color(6)
+            property = foreground
+            tag = keyword
+        }
     }
 
     func color(_ kind: Syntax.Kind) -> NSColor {
@@ -175,6 +192,8 @@ struct SyntaxColors: Equatable {
         case .comment: comment
         case .type: type
         case .function: function
+        case .property: property
+        case .tag: tag
         }
     }
 }
