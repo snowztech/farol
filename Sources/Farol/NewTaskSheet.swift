@@ -24,8 +24,10 @@ struct NewTaskSheet: View {
     let palette: Palette
     /// Gets a valid branch, the command that launches the agent, its task for the command to read, and the repos.
     let start: (String, String, String, [String]) -> Void
-    /// Gets a task that repeats, whose first run starts now.
+    /// Gets a task for later, once or again and again.
     let schedule: (Schedule) -> Void
+    /// Opened from the Tasks pane, so it starts set for later.
+    let later: Bool
     let close: () -> Void
 
     @AppStorage("newTask.agent") private var agent = AgentFolder.Kind.claude.rawValue
@@ -60,15 +62,15 @@ struct NewTaskSheet: View {
     @State private var repoQuery = ""
     @State private var pickingTicket = false
     @State private var pickingAgent = false
-    /// Nil for a task that runs once.
-    @State private var repeats: Schedule.Days?
-    @State private var repeatTime = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: .now) ?? .now
-    @State private var pickingRepeat = false
+    @State private var when = When.now
+    /// The day and time for later, or only the time for a repeat. Tomorrow at 9:00 to begin with.
+    @State private var at = Self.tomorrowMorning
+    @State private var pickingWhen = false
     @State private var query = ""
     @FocusState private var searching: Bool
 
     static func present(in window: NSWindow, directory: String, palette: Palette, start: @escaping (String, String, String, [String]) -> Void,
-                        schedule: @escaping (Schedule) -> Void) {
+                        later: Bool = false, schedule: @escaping (Schedule) -> Void) {
         // Git is asked off the main thread, so a slow repo can't freeze the window before the sheet shows.
         DispatchQueue.global(qos: .userInitiated).async {
             let root = Git.repoRoot(of: directory)
@@ -89,7 +91,7 @@ struct NewTaskSheet: View {
                 let view = NewTaskSheet(
                     directory: directory, repo: repo, base: base, repos: repos, root: root, checkout: checkout,
                     siblings: siblings, branches: branches, expectsTickets: expectsTickets,
-                    palette: palette, start: start, schedule: schedule,
+                    palette: palette, start: start, schedule: schedule, later: later,
                     close: { [weak window, weak sheet] in sheet.map { window?.endSheet($0) } })
                 let host = NSHostingController(rootView: view)
                 // The sheet grows with the task as it wraps onto more lines.
@@ -106,7 +108,7 @@ struct NewTaskSheet: View {
         [picked?.task ?? "", attachments.map(\.path).joined(separator: "\n"), text].filter { !$0.isEmpty }.joined(separator: "\n\n")
     }
     private var canStart: Bool {
-        !prompt.isEmpty && name != nil && !sources.isEmpty && duplicateRepoName == nil && !checkingRepos
+        !prompt.isEmpty && name != nil && !sources.isEmpty && duplicateRepoName == nil && !checkingRepos && (starts != .later || at > .now)
     }
     private var name: String? { Worktrees.branchName(from: branch) }
     private var choice: AgentFolder { AgentFolder.choice(agent, in: folders) ?? folders[0] }
@@ -133,14 +135,46 @@ struct NewTaskSheet: View {
             return WorktreeScripts.hasSetup(in: folder) ? URL(fileURLWithPath: folder).lastPathComponent : nil
         }
     }
-    /// One repo only: a schedule makes a plain worktree each run.
-    private var canRepeat: Bool { repos.isEmpty && sources.count == 1 }
-    private var repeating: Schedule.Days? { canRepeat ? repeats : nil }
-    private var hour: Int { Calendar.current.component(.hour, from: repeatTime) }
-    private var minute: Int { Calendar.current.component(.minute, from: repeatTime) }
+    enum When: Hashable { case now, later, everyDay, weekdays }
+
+    /// One repo only: a task for later makes a plain worktree each run.
+    private var canWait: Bool { repos.isEmpty && sources.count == 1 }
+    private var starts: When { canWait ? when : .now }
+    private var days: Schedule.Days? {
+        switch starts {
+        case .everyDay: .everyDay
+        case .weekdays: .weekdays
+        case .now, .later: nil
+        }
+    }
+    private var hour: Int { Calendar.current.component(.hour, from: at) }
+    private var minute: Int { Calendar.current.component(.minute, from: at) }
+    private static var tomorrowMorning: Date {
+        let calendar = Calendar.current
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: .now) ?? .now
+        return calendar.date(bySettingHour: 9, minute: 0, second: 0, of: tomorrow) ?? tomorrow
+    }
+    /// What the footer's button says: Now, Tomorrow at 9:00, Every day at 9:00.
+    private var whenLabel: String {
+        let time = Schedule.clock(hour: hour, minute: minute)
+        switch starts {
+        case .now: return "Now"
+        case .everyDay: return "Every day at \(time)"
+        case .weekdays: return "Weekdays at \(time)"
+        case .later:
+            let calendar = Calendar.current
+            if calendar.isDateInToday(at) { return "Today at \(time)" }
+            if calendar.isDateInTomorrow(at) { return "Tomorrow at \(time)" }
+            return "\(at.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))) at \(time)"
+        }
+    }
     private var subtitle: String {
-        if let repeating {
-            return "Starts now, then \(repeating.label.lowercased()) at \(Schedule.clock(hour: hour, minute: minute)), each run in its own worktree from \(base)."
+        switch starts {
+        case .later: return "Starts \(whenLabel.prefix(1).lowercased() + whenLabel.dropFirst()) in its own worktree, on a new branch from \(base)."
+        case .everyDay, .weekdays:
+            let rule = starts == .everyDay ? "every day" : "on weekdays"
+            return "Starts \(rule) at \(Schedule.clock(hour: hour, minute: minute)), each time in its own worktree from \(base)."
+        case .now: break
         }
         if repos.isEmpty, sources.count < 2 { return "The agent starts in its own worktree, on a new branch from \(base)." }
         return "Each repo you pick gets its own worktree on the same branch, side by side in one folder. The agent starts there and sees them all."
@@ -185,7 +219,7 @@ struct NewTaskSheet: View {
                             }
                         }
                     }
-                    Text("↩ start · ⇧↩ new line · paste or drop pictures and files")
+                    Text("↩ \(starts == .now ? "start" : "schedule") · ⇧↩ new line · paste or drop pictures and files")
                         .font(.system(size: 11))
                         .foregroundStyle(p.muted)
                 }
@@ -208,12 +242,11 @@ struct NewTaskSheet: View {
                     .sheetField(p, focused: focus == .branch)
                     if !branch.isEmpty, name == nil {
                         Text("Use letters, numbers, dashes or slashes.").font(.system(size: 12)).foregroundStyle(p.muted)
-                    } else if repeating != nil, let name {
+                    } else if days != nil, let name {
                         Text("Each run gets the day after it, like \(name)-\(Self.today).").font(.system(size: 12)).foregroundStyle(p.muted)
                     }
                 }
                 agentSelect(p)
-                if canRepeat { repeatSelect(p) }
                 if !setupNames.isEmpty {
                     Text("Runs .farol/setup in \(setupNames.joined(separator: ", ")) before the agent starts.")
                         .font(.system(size: 12))
@@ -223,11 +256,12 @@ struct NewTaskSheet: View {
             .padding(20)
             Rectangle().fill(p.line).frame(height: 1)
             HStack {
+                if canWait { whenSelect(p) }
                 Spacer()
                 Button("Cancel", action: close)
                     .buttonStyle(SheetButton(palette: p, primary: false))
                     .keyboardShortcut(.cancelAction)
-                Button(repeating == nil ? "Start" : "Start and Repeat", action: startTask)
+                Button(starts == .now ? "Start" : "Schedule", action: startTask)
                     .buttonStyle(SheetButton(palette: p, primary: true))
                     .keyboardShortcut(.defaultAction)
                     .disabled(!canStart)
@@ -239,6 +273,7 @@ struct NewTaskSheet: View {
         .foregroundStyle(p.text)
         .frame(width: 460)
         .sheetBackground(p)
+        .onAppear { if later { when = .later } }
         .ignoresSafeArea()
         .fileImporter(isPresented: $choosingRepos, allowedContentTypes: [.folder], allowsMultipleSelection: true) { result in
             switch result {
@@ -489,42 +524,59 @@ struct NewTaskSheet: View {
         return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
     }
 
-    /// Doesn't repeat, every day or weekdays, and the time, in one field like the agent's.
-    private func repeatSelect(_ p: Palette) -> some View {
-        SheetSelect(palette: p, open: $pickingRepeat) {
-            Image(systemName: "repeat").foregroundStyle(p.muted)
-            if let repeats {
-                Text("\(repeats.label) at \(Schedule.clock(hour: hour, minute: minute))")
-            } else {
-                Text("Doesn't repeat").foregroundStyle(p.muted)
-            }
-        } choices: {
-            VStack(alignment: .leading, spacing: 1) {
-                ForEach([nil] + Schedule.Days.allCases.map(Optional.some), id: \.self) { option in
-                    SheetChoice(palette: p) {
-                        repeats = option
-                        if option == nil { pickingRepeat = false }
-                    } label: {
-                        Text(option?.label ?? "Doesn't repeat")
-                        Spacer()
-                        if option == repeats { Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)) }
+    /// When the task starts, beside the button it changes, like a mail app's Send Later.
+    private func whenSelect(_ p: Palette) -> some View {
+        WhenButton(label: whenLabel, waiting: starts != .now, palette: p) { pickingWhen.toggle() }
+            .popover(isPresented: $pickingWhen, arrowEdge: .top) {
+                VStack(alignment: .leading, spacing: 1) {
+                    ForEach([When.now, .later, .everyDay, .weekdays], id: \.self) { option in
+                        SheetChoice(palette: p) {
+                            when = option
+                            if option == .later, at <= .now { at = Self.tomorrowMorning }
+                            if option == .now { pickingWhen = false }
+                        } label: {
+                            Image(systemName: Self.symbol(option)).frame(width: 16).foregroundStyle(p.muted)
+                            Text(Self.title(option))
+                            Spacer()
+                            if option == when { Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)) }
+                        }
+                    }
+                    if when != .now {
+                        Rectangle().fill(p.line).frame(height: 1).padding(.vertical, 5)
+                        HStack {
+                            Text(when == .later ? "On" : "At").foregroundStyle(p.muted)
+                            Spacer()
+                            DatePicker("When", selection: $at, in: when == .later ? Date.now... : Date.distantPast...,
+                                       displayedComponents: when == .later ? [.date, .hourAndMinute] : .hourAndMinute)
+                                .labelsHidden()
+                                .datePickerStyle(.stepperField)
+                        }
+                        .padding(.horizontal, 8)
+                        .frame(height: 32)
                     }
                 }
-                if repeats != nil {
-                    Rectangle().fill(p.line).frame(height: 1).padding(.vertical, 5)
-                    HStack {
-                        Text("At").foregroundStyle(p.muted)
-                        Spacer()
-                        DatePicker("At", selection: $repeatTime, displayedComponents: .hourAndMinute)
-                            .labelsHidden()
-                            .datePickerStyle(.stepperField)
-                    }
-                    .padding(.horizontal, 8)
-                    .frame(height: 32)
-                }
+                .font(.system(size: 13))
+                .foregroundStyle(p.text)
+                .padding(6)
+                .frame(width: 260)
+                .background(p.background)
             }
-            .padding(6)
-            .frame(width: 220)
+    }
+
+    private static func title(_ when: When) -> String {
+        switch when {
+        case .now: "Now"
+        case .later: "Later, once"
+        case .everyDay: "Every day"
+        case .weekdays: "Weekdays"
+        }
+    }
+
+    private static func symbol(_ when: When) -> String {
+        switch when {
+        case .now: "play"
+        case .later: "clock"
+        case .everyDay, .weekdays: "repeat"
         }
     }
 
@@ -553,11 +605,13 @@ struct NewTaskSheet: View {
 
     private func startTask() {
         guard canStart, let name else { return }
-        if let repeating, let repo = sources.first {
+        if starts != .now, let repo = sources.first {
             let title = picked?.summary ?? text.components(separatedBy: .newlines).first ?? name
+            var task = Schedule(name: String(title.prefix(48)), task: prompt, repo: repo, branch: name, agent: choice.id,
+                                days: days ?? .everyDay, hour: hour, minute: minute, since: .now)
+            if starts == .later { task.once = at }
             close()
-            return schedule(Schedule(name: String(title.prefix(48)), task: prompt, repo: repo, branch: name, agent: choice.id,
-                                     days: repeating, hour: hour, minute: minute, since: .now))
+            return schedule(task)
         }
         let command = choice.command() + " \"$\(NewTask.variable)\""
         close()
@@ -667,5 +721,35 @@ private struct TaskRepoChoice: View {
         .buttonStyle(.plain)
         .onClickableHover { hovering = $0 }
         .help(path)
+    }
+}
+
+/// The quiet footer button that says when the task starts.
+private struct WhenButton: View {
+    let label: String
+    let waiting: Bool
+    let palette: Palette
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: waiting ? "clock" : "play").font(.system(size: 11, weight: .medium))
+                Text(label)
+                Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)).foregroundStyle(palette.muted)
+            }
+            .font(.system(size: 12))
+            .foregroundStyle(waiting || hovering ? palette.text : palette.muted)
+            .padding(.horizontal, 10)
+            .frame(height: 28)
+            .background(RoundedRectangle(cornerRadius: 8).fill(hovering ? palette.raised : waiting ? palette.surface : .clear))
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(waiting ? palette.line : .clear))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onClickableHover { hovering = $0 }
+        .hoverTip("When it starts")
     }
 }

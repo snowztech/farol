@@ -46,3 +46,18 @@ private func schedule(_ days: Schedule.Days = .everyDay, since: Date) -> Schedul
 @Test func eachRunGetsTheDayInItsBranch() {
     #expect(schedule(since: at(6, 9)).branch(on: at(6, 9), calendar: calendar) == "write-article-2026-11-06")
 }
+
+@Test func aOneTimeTaskIsOwedOnceAtItsTime() {
+    var later = schedule(since: at(6, 18))
+    later.once = at(7, 9)
+    #expect(later.owed(at: at(7, 8), calendar: calendar) == nil)
+    #expect(later.owed(at: at(8, 12), calendar: calendar) == at(7, 9))
+    #expect(later.branch(on: at(7, 9), calendar: calendar) == "write-article")
+}
+
+@Test func saysWhenItRunsNextInFewWords() {
+    let daily = schedule(since: at(6, 9, 1))
+    #expect(!daily.upcoming(at: at(6, 8), calendar: calendar).hasPrefix("tmrw"))
+    #expect(daily.upcoming(at: at(6, 10), calendar: calendar).hasPrefix("tmrw "))
+    #expect(schedule(.weekdays, since: at(6, 9, 1)).upcoming(at: at(6, 10), calendar: calendar).hasPrefix("Mon"))
+}

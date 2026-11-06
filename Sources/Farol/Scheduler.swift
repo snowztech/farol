@@ -18,7 +18,7 @@ final class Scheduler: ObservableObject {
         self.store = store
         self.worktrees = worktrees
         schedules = UserDefaults.standard.data(forKey: Self.key).flatMap { try? JSONDecoder().decode([Schedule].self, from: $0) } ?? []
-        // A run closing frees its schedule, which the sidebar shows again.
+        // A run opening or closing changes what its task row shows.
         sessionsChange = store.$sessions.sink { [weak self] _ in self?.objectWillChange.send() }
         // Timers stop while the Mac sleeps and fire on waking, so a missed run starts then.
         timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in self?.tick() }
@@ -31,11 +31,9 @@ final class Scheduler: ObservableObject {
 
     func schedule(of session: Session) -> Schedule? { session.schedule.flatMap { id in schedules.first { $0.id == id } } }
 
-    /// Saves the schedule and starts its first run now, so you see it work before it's due.
     func add(_ schedule: Schedule) {
         schedules.append(schedule)
         save()
-        run(schedule.id)
     }
 
     /// Resuming owes nothing missed while paused, so it waits for the next time it's due.
@@ -69,7 +67,8 @@ final class Scheduler: ObservableObject {
                 saved.since = now
                 switch result {
                 case .success(let (session, _)):
-                    session.schedule = id
+                    // A one-time task is done once it starts. Its session is a plain one from then on.
+                    if saved.once == nil { session.schedule = id }
                     self.store.rename(session, to: saved.name)
                     saved.lastDue = due
                     saved.failure = nil
@@ -77,6 +76,7 @@ final class Scheduler: ObservableObject {
                     saved.failure = "\(error)"
                 }
             }
+            if case .success = result, schedule.once != nil { delete(id) }
         }
     }
 

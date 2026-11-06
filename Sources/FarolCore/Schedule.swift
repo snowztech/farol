@@ -1,6 +1,6 @@
 import Foundation
 
-/// A New Task that starts again at a set time, in a new worktree each run.
+/// A New Task that starts later, once or again at a set time, in a new worktree each run.
 public struct Schedule: Codable, Equatable, Identifiable, Sendable {
     public enum Days: String, Codable, CaseIterable, Sendable {
         case everyDay, weekdays
@@ -23,6 +23,8 @@ public struct Schedule: Codable, Equatable, Identifiable, Sendable {
     /// An agent config folder's id, as the New Task sheet saves it.
     public var agent: String
     public var days: Days
+    /// Set for a task that runs once, at this time, instead of on `days`.
+    public var once: Date?
     public var hour: Int
     public var minute: Int
     public var paused = false
@@ -47,6 +49,7 @@ public struct Schedule: Codable, Equatable, Identifiable, Sendable {
 
     /// The latest time a run was due after `since`, up to `now`. Several missed days owe a single run.
     public func owed(at now: Date, calendar: Calendar = .current) -> Date? {
+        if let once { return once <= now && once > since ? once : nil }
         for back in 0..<8 {
             guard let day = calendar.date(byAdding: .day, value: -back, to: now), let due = time(on: day, calendar), due <= now else { continue }
             guard runs(on: due, calendar) else { continue }
@@ -57,6 +60,7 @@ public struct Schedule: Codable, Equatable, Identifiable, Sendable {
 
     /// The first time it's due after `date`.
     public func next(after date: Date, calendar: Calendar = .current) -> Date {
+        if let once { return once }
         for ahead in 0..<8 {
             guard let day = calendar.date(byAdding: .day, value: ahead, to: date), let due = time(on: day, calendar), due > date,
                   runs(on: due, calendar) else { continue }
@@ -69,7 +73,23 @@ public struct Schedule: Codable, Equatable, Identifiable, Sendable {
     public var startedLate: Bool { lastDue.map { since.timeIntervalSince($0) > 5 * 60 } ?? false }
 
     /// Like "every day at 9:00", for the sidebar.
-    public var rule: String { "\(days.label.lowercased()) at \(Self.clock(hour: hour, minute: minute))" }
+    public var rule: String {
+        if let once { return once.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).hour().minute()) }
+        return "\(days.label.lowercased()) at \(Self.clock(hour: hour, minute: minute))"
+    }
+
+    /// When it next runs, short enough for the right of a row: 9:00 today, then tmrw 9:00, Mon 9:00 or 12 Nov 9:00.
+    public func upcoming(at now: Date, calendar: Calendar = .current) -> String {
+        let next = next(after: now, calendar: calendar)
+        var style = Date.FormatStyle(date: .omitted, time: .shortened)
+        style.timeZone = calendar.timeZone
+        let time = next.formatted(style)
+        if calendar.isDate(next, inSameDayAs: now) { return time }
+        if let tomorrow = calendar.date(byAdding: .day, value: 1, to: now), calendar.isDate(next, inSameDayAs: tomorrow) { return "tmrw \(time)" }
+        var day = next < calendar.date(byAdding: .day, value: 7, to: now)! ? Date.FormatStyle().weekday(.abbreviated) : Date.FormatStyle().day().month(.abbreviated)
+        day.timeZone = calendar.timeZone
+        return "\(next.formatted(day)) \(time)"
+    }
 
     /// The time of day in the user's own format, 9:00 or 9:00 AM.
     public static func clock(hour: Int, minute: Int, calendar: Calendar = .current) -> String {
@@ -79,6 +99,7 @@ public struct Schedule: Codable, Equatable, Identifiable, Sendable {
 
     /// The branch of a run started on `day`.
     public func branch(on day: Date, calendar: Calendar = .current) -> String {
+        if once != nil { return branch }
         let parts = calendar.dateComponents([.year, .month, .day], from: day)
         return String(format: "%@-%04d-%02d-%02d", branch, parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
     }

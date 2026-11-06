@@ -54,17 +54,13 @@ struct SidebarView: View {
                             .onDrop(of: [.text], delegate: Reorder(target: session, store: store, dragging: $dragging))
                         }
                     }
-                    // A schedule shows here between runs. While a run is open, that run's row stands for it.
-                    let between = scheduler.schedules.filter { scheduler.run(of: $0) == nil }
-                    if !between.isEmpty {
-                        RepoHeader(name: "Scheduled", palette: p)
-                        ForEach(between) { schedule in
-                            ScheduleRow(schedule: schedule, starting: scheduler.starting.contains(schedule.id), scheduler: scheduler, palette: p)
-                        }
-                    }
                 }
                 .padding(8)
                 .animation(Motion.enabled ? .spring(response: 0.32, dampingFraction: 0.86) : nil, value: store.selectedID)
+            }
+            // Only once there is a task, so a new user never meets an empty pane.
+            if !scheduler.schedules.isEmpty {
+                TasksPane(scheduler: scheduler, store: store, palette: p, onNew: commands.newLaterTask)
             }
             // Pinned below the list, so it stays in the same place however many sessions there are.
             NewTaskRow(palette: p, action: commands.newTask)
@@ -264,56 +260,153 @@ private struct SessionRow: View {
 }
 
 /// The way to start a task, at the foot of the sidebar where the tasks live. Quiet until hovered.
-/// A schedule between runs: what it does and when, with Run Now on hover.
-private struct ScheduleRow: View {
-    let schedule: Schedule
+/// What will run, under what runs now. Lighter than the sessions above: tasks are plans, not places to go.
+private struct TasksPane: View {
+    @ObservedObject var scheduler: Scheduler
+    let store: SessionStore
+    let palette: Palette
+    let onNew: () -> Void
+
+    @AppStorage("sidebar.tasksFolded") private var folded = false
+    @State private var hovering = false
+    private static let rowHeight: CGFloat = 28
+
+    var body: some View {
+        let p = palette
+        let tasks = scheduler.schedules.sorted { $0.next(after: .now) < $1.next(after: .now) }
+        let groups = Grouping.group(tasks) { $0.repo }
+        VStack(spacing: 0) {
+            Rectangle().fill(p.line).frame(height: 1)
+            HStack(spacing: 6) {
+                Text("Tasks").font(.system(size: 11, weight: .semibold))
+                Text(verbatim: "\(tasks.count)").font(.system(size: 11, design: .monospaced)).foregroundStyle(p.muted.opacity(0.7))
+                if folded, let next = tasks.first(where: { !$0.paused }) {
+                    Text("next \(next.upcoming(at: .now))")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(p.muted.opacity(0.7))
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                if hovering || !folded {
+                    CloseButton(symbol: "plus", help: "New task for later", palette: p, action: onNew)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .bold))
+                    .rotationEffect(.degrees(folded ? 0 : 90))
+                    .frame(width: 20, height: 20)
+            }
+            .foregroundStyle(hovering ? p.text : p.muted)
+            .padding(.leading, 18)
+            .padding(.trailing, 14)
+            .frame(height: 32)
+            .contentShape(Rectangle())
+            .onTapGesture { withAnimation(Motion.enabled ? .easeOut(duration: 0.15) : nil) { folded.toggle() } }
+            .onClickableHover { hovering = $0 }
+            .hoverTip(folded ? "Show tasks" : "Fold tasks")
+            if !folded {
+                let lines = tasks.count + (groups.count > 1 ? groups.count : 0)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(groups, id: \.key) { group in
+                            if groups.count > 1, let key = group.key {
+                                Text(URL(fileURLWithPath: key).lastPathComponent)
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(p.muted.opacity(0.8))
+                                    .padding(.leading, 35)
+                                    .frame(height: Self.rowHeight, alignment: .bottomLeading)
+                            }
+                            ForEach(group.items) { task in
+                                TaskRow(task: task, run: scheduler.run(of: task), starting: scheduler.starting.contains(task.id),
+                                        scheduler: scheduler, store: store, palette: p)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                }
+                // As tall as its rows up to five, so it never takes the sessions' room.
+                .frame(height: min(CGFloat(lines), 5.5) * Self.rowHeight)
+                .padding(.bottom, 4)
+            }
+        }
+    }
+}
+
+/// One task: a clock until it runs, the run's own lamp while it does, and when it runs next on the right.
+private struct TaskRow: View {
+    let task: Schedule
+    let run: Session?
     let starting: Bool
     let scheduler: Scheduler
+    let store: SessionStore
     let palette: Palette
 
     @State private var hovering = false
 
     var body: some View {
+        let p = palette
         HStack(spacing: 10) {
-            Image(systemName: schedule.paused ? "pause" : "clock")
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(palette.muted)
-                .frame(width: Lamp.size)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(schedule.name)
-                    .font(.system(size: 13))
-                    .foregroundStyle(schedule.paused ? palette.muted : palette.text.opacity(0.8))
-                    .truncationMode(.tail)
-                Text(subtitle)
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(palette.muted)
-                    .truncationMode(.tail)
+            ZStack {
+                if let run {
+                    RunLamp(session: run, palette: p)
+                } else if task.failure != nil {
+                    Circle().fill(p.waiting).frame(width: Lamp.size, height: Lamp.size)
+                } else {
+                    Image(systemName: task.paused ? "pause" : task.once == nil ? "repeat" : "clock")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(p.muted.opacity(task.paused ? 0.6 : 1))
+                }
             }
-            .lineLimit(1)
-            Spacer(minLength: 0)
-            if starting {
-                ProgressView().controlSize(.mini)
-            } else if hovering {
-                CloseButton(symbol: "play.fill", help: "Run now", palette: palette) { scheduler.run(schedule.id) }
-            }
+            .frame(width: 14)
+            Text(task.name)
+                .font(.system(size: 12))
+                .foregroundStyle(task.paused ? p.muted : p.text.opacity(0.85))
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 4)
+            trailing(p)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(hovering ? palette.hover : .clear))
+        .padding(.leading, 7)
+        .padding(.trailing, 4)
+        .frame(height: 28)
+        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(hovering ? p.hover : .clear))
         .contentShape(Rectangle())
+        .onTapGesture { if let run { store.select(run) } }
         .onClickableHover { hovering = $0 }
-        .hoverTip(schedule.failure ?? schedule.nextTip)
+        .hoverTip(tip)
         .contextMenu {
-            Button("Run Now") { scheduler.run(schedule.id) }
-            ScheduleItems(schedule: schedule, scheduler: scheduler)
+            Button("Run Now") { scheduler.run(task.id) }
+            ScheduleItems(schedule: task, scheduler: scheduler)
         }
     }
 
-    private var subtitle: String {
-        if starting { return "starting…" }
-        if schedule.failure != nil { return "didn't start" }
-        return schedule.paused ? "paused" : schedule.rule
+    @ViewBuilder private func trailing(_ p: Palette) -> some View {
+        if starting {
+            ProgressView().controlSize(.mini)
+        } else if hovering, run == nil {
+            CloseButton(symbol: "play.fill", help: "Run now", palette: p) { scheduler.run(task.id) }
+        } else {
+            Text(run != nil ? "running" : task.failure != nil ? "didn't start" : task.paused ? "paused" : task.upcoming(at: .now))
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(task.failure != nil ? p.waiting : p.muted)
+                .lineLimit(1)
+                .fixedSize()
+        }
     }
+
+    private var tip: String {
+        if let failure = task.failure { return "Didn't start: \(failure)" }
+        if run != nil { return "Running. The next run waits until you close this one." }
+        let what = task.once == nil ? "Runs \(task.rule)." : "Runs once, \(task.rule)."
+        return task.paused ? "Paused. \(what)" : what
+    }
+}
+
+/// The lamp of a task's open run, kept live as its agent works.
+private struct RunLamp: View {
+    @ObservedObject var session: Session
+    let palette: Palette
+
+    var body: some View { Lamp(activity: session.activity, selected: false, palette: palette) }
 }
 
 /// Pausing and deleting, the same on a schedule's row and on its open run.
@@ -329,16 +422,6 @@ private struct ScheduleItems: View {
 }
 
 extension Schedule {
-    /// When the next run starts, in words.
-    var nextTip: String {
-        if paused { return "Paused. Resume it to run \(rule) again." }
-        let next = next(after: .now)
-        let calendar = Calendar.current
-        let day = calendar.isDateInToday(next) ? "today" : calendar.isDateInTomorrow(next) ? "tomorrow"
-            : next.formatted(.dateTime.weekday(.wide))
-        return "Next run \(day) at \(Self.clock(hour: hour, minute: minute))"
-    }
-
     /// What the clock on an open run says.
     var runTip: String {
         var lines = ["Runs \(rule). The next run waits until you close this one."]
