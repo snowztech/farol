@@ -113,11 +113,15 @@ struct ThemeGallery: View {
         // Your Ghostty config's colors are yours too, next to the themes in your folder.
         let yours = matching.filter { $0.value.isEmpty || $0.value.hasPrefix("/") }
         let popular = Theme.popular.compactMap { name in matching.first { $0.value == name } }
-        let more = matching.filter { !farol.contains($0) && !yours.contains($0) && !popular.contains($0) }
+        let rest = matching.filter { !farol.contains($0) && !yours.contains($0) && !popular.contains($0) }
+        // The other sections sit near the top, but one of Ghostty's hundreds would be far down the list, so it comes up here.
+        let inUse = rest.filter { $0.value == current }
+        let more = rest.filter { $0.value != current }
         VStack(alignment: .leading, spacing: 0) {
             if matching.isEmpty {
                 Text("No themes match.").font(.system(size: 12)).foregroundStyle(palette.muted)
             }
+            section("In use", inUse)
             section("Farol", farol)
             section("Yours", yours)
             section("Popular", popular)
