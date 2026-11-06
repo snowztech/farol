@@ -95,23 +95,67 @@ struct ThemeGallery: View {
 
     let themes: [Theme]
 
+    /// Ghostty's themes are hundreds, so a row of them shows until you ask for the rest. A search looks through all of them.
+    @State private var showAll = false
+    private static let ghosttyPreview = 4
+
     var body: some View {
+        if !query.isEmpty {
+            grid(cards.filter { $0.name.localizedCaseInsensitiveContains(query) })
+        } else {
+            let ghostty = cards.filter { !Theme.farol.contains($0.value) && !$0.value.hasPrefix("/") && !$0.value.isEmpty }
+            VStack(alignment: .leading, spacing: 0) {
+                title("Farol", first: true)
+                grid(cards.filter { Theme.farol.contains($0.value) || $0.value.isEmpty })
+                let yours = cards.filter { $0.value.hasPrefix("/") }
+                if !yours.isEmpty {
+                    title("Yours")
+                    grid(yours)
+                }
+                title("Ghostty")
+                grid(showAll ? ghostty : preview(of: ghostty))
+                Button(showAll ? "Show fewer" : "Show all \(ghostty.count) themes") { showAll.toggle() }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(palette.accent)
+                    .padding(.top, 14)
+            }
+        }
+    }
+
+    private func grid(_ themes: [Theme]) -> some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 172), spacing: 14)], spacing: 18) {
-            ForEach(filtered, id: \.self) { theme in
+            ForEach(themes, id: \.self) { theme in
                 ThemeCard(name: theme.value == fallback ? "\(theme.name) (default)" : theme.name,
                           colors: theme.url.map(ThemeColors.load) ?? ghosttyConfig ?? ThemeColors(background: .black, foreground: .white),
-                          selected: theme.value == (selected.isEmpty ? fallback : selected), palette: palette)
+                          selected: theme.value == current, palette: palette)
                     .onTapGesture { selected = theme.value }
             }
         }
     }
 
+    private func title(_ text: String, first: Bool = false) -> some View {
+        Text(text)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(palette.muted)
+            .padding(.top, first ? 0 : 22)
+            .padding(.bottom, 8)
+    }
+
+    /// The first few, with the one in use first when it is further down, so folding the list never hides it.
+    private func preview(of ghostty: [Theme]) -> [Theme] {
+        let picked = ghostty.filter { $0.value == current }
+        return picked + ghostty.filter { $0.value != current }.prefix(Self.ghosttyPreview - picked.count)
+    }
+
     /// What is in use with nothing picked: your Ghostty config when it sets colors, Farol Beam otherwise.
     private var fallback: String { ghosttyConfig == nil ? Theme.farol[0] : "" }
 
-    private var filtered: [Theme] {
-        let cards = (ghosttyConfig == nil ? [] : [Theme(name: "Ghostty config", value: "", url: nil)]) + themes
-        return query.isEmpty ? cards : cards.filter { $0.name.localizedCaseInsensitiveContains(query) }
+    private var current: String { selected.isEmpty ? fallback : selected }
+
+    /// Your Ghostty config's colors come first when it sets any, as the theme in use until you pick one.
+    private var cards: [Theme] {
+        (ghosttyConfig == nil ? [] : [Theme(name: "Ghostty config", value: "", url: nil)]) + themes
     }
 }
 
