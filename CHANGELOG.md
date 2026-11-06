@@ -6,6 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
+- New File and New Folder in the files panel's right-click menu. The name is typed in a row where it will appear, can hold folders like `api/handler.go`, and a new file opens in a tab.
 - A status bar under the code in the file pane. The cursor's line and column sit on the left, and a click on them, or ⌘L, goes to a line.
 - Language servers in the file pane, turned on per language and off by default. Turn one on in Settings → Editor, or from the language's name at the bottom right of a file in that language, then ⌘-click a name to go to its definition, or a definition to list where it's used. Farol uses the server on your PATH (gopls, typescript-language-server, pyright, rust-analyzer, sourcekit-lsp, clangd), starts it when a file in its language opens, and stops it after 10 minutes unused. The name and a dot show its state, and a click on them, or a right-click in the code, shows its version and memory, opens its logs, restarts or stops it, and turns it off.
 - Files open in tabs above the file pane, so you can keep several open and switch with a click or ⌃Tab. A file picked in the files panel gets a tab of its own. One opened from a search or the review takes a preview tab, in italics, which the next one replaces until you edit it or double-click its tab.

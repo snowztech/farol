@@ -19,6 +19,13 @@ final class FileTree: ObservableObject {
     /// Set once the row of the file in view is in the list, so the panel can scroll to it.
     @Published private(set) var revealed: (path: String, token: UUID)?
     private var pendingReveal: String?
+    /// A new file or folder being named: a row to type in, under the folder it goes in.
+    @Published private(set) var draft: Draft?
+
+    struct Draft: Equatable {
+        let folder: String
+        let directory: Bool
+    }
 
     /// Open folders per root, so going back to a session finds its tree as you left it.
     private var expanded: [String: Set<String>] = [:]
@@ -70,6 +77,26 @@ final class FileTree: ObservableObject {
         guard let path = pendingReveal, rows.contains(where: { $0.id == path }) else { return }
         pendingReveal = nil
         revealed = (path, UUID())
+    }
+
+    /// New File or New Folder in `folder`, which opens so the row to type in has a place.
+    func startCreating(in folder: String, directory: Bool) {
+        guard let root else { return }
+        if folder != root { expanded[root, default: []].insert(folder) }
+        draft = Draft(folder: folder, directory: directory)
+        rebuild()
+    }
+
+    func cancelCreating() {
+        draft = nil
+    }
+
+    /// Made: the folder it went in is read again, and a new folder opens. A new file opens in a tab, which the tree then follows.
+    func created(_ path: String, directory: Bool) {
+        guard let root, let draft else { return }
+        self.draft = nil
+        if directory { expanded[root, default: []].insert(path) }
+        reload([draft.folder] + (directory ? [path] : []))
     }
 
     func toggle(_ folder: String) {
@@ -197,8 +224,13 @@ struct FilesPanel: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 0) {
+                        if let draft = tree.draft, draft.folder == tree.root { NewItemRow(draft: draft, depth: 0, tree: tree, palette: p, open: open) }
                         ForEach(tree.rows) { row in
-                            FileRow(row: row, selected: row.id == tree.selected, palette: p) {
+                            FileRow(row: row, selected: row.id == tree.selected, palette: p, create: { directory in
+                                // In a folder, the new one goes inside it. On a file, beside it.
+                                let folder = row.entry.isDirectory ? row.entry.path : (row.entry.path as NSString).deletingLastPathComponent
+                                tree.startCreating(in: folder, directory: directory)
+                            }) {
                                 if row.entry.isDirectory {
                                     tree.toggle(row.entry.path)
                                 } else {
@@ -206,10 +238,22 @@ struct FilesPanel: View {
                                     open(row.entry.path, nil)
                                 }
                             }
+                            if let draft = tree.draft, draft.folder == row.id {
+                                NewItemRow(draft: draft, depth: row.depth + 1, tree: tree, palette: p, open: open)
+                            }
                         }
                     }
                     .padding(.horizontal, 6)
                     .padding(.bottom, 8)
+                    // Right-clicking below the files makes the new one at the top of the project.
+                    .frame(maxWidth: .infinity, minHeight: 200, alignment: .top)
+                    .contentShape(Rectangle())
+                    .contextMenu {
+                        if let root = tree.root {
+                            Button("New File…") { tree.startCreating(in: root, directory: false) }
+                            Button("New Folder…") { tree.startCreating(in: root, directory: true) }
+                        }
+                    }
                 }
                 // No anchor, so a row already in view stays where it is and only one out of view is brought in.
                 .onChange(of: tree.revealed?.token) { _, _ in
@@ -224,6 +268,8 @@ private struct FileRow: View {
     let row: FileTree.Row
     let selected: Bool
     let palette: Palette
+    /// New File or New Folder, true for a folder.
+    let create: (Bool) -> Void
     let action: () -> Void
 
     @State private var hovering = false
@@ -252,6 +298,63 @@ private struct FileRow: View {
         .contentShape(Rectangle())
         .onClickableHover { hovering = $0 }
         .onTapGesture(perform: action)
-        .contextMenu { OpenInItems(path: row.entry.path) }
+        .contextMenu {
+            Button("New File…") { create(false) }
+            Button("New Folder…") { create(true) }
+            Divider()
+            OpenInItems(path: row.entry.path)
+        }
+    }
+}
+
+/// The row a new file or folder is named in, where it will appear. Return makes it, Escape lets it go.
+/// What's wrong with the name, like one already taken, shows under it rather than stopping you with an alert.
+private struct NewItemRow: View {
+    let draft: FileTree.Draft
+    let depth: Int
+    @ObservedObject var tree: FileTree
+    let palette: Palette
+    let open: (String, Int?) -> Void
+    @State private var name = ""
+    @State private var problem: String?
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 5) {
+                Color.clear.frame(width: 10)
+                FileIcon(path: name.isEmpty ? "a" : name, folder: draft.directory)
+                    .font(.system(size: 11))
+                    .foregroundStyle(palette.muted)
+                    .frame(width: 15)
+                TextField(draft.directory ? "Folder name" : "File name", text: $name)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+                    .focused($focused)
+                    .onSubmit(create)
+                    .onExitCommand { tree.cancelCreating() }
+                    .onChange(of: name) { _, _ in problem = nil }
+                    .onChange(of: focused) { _, now in if !now, name.isEmpty { tree.cancelCreating() } }
+            }
+            .padding(.horizontal, 4)
+            .frame(height: 24)
+            .background(RoundedRectangle(cornerRadius: 6).strokeBorder(palette.line))
+            if let problem {
+                Text(problem).font(.system(size: 11)).foregroundStyle(palette.muted).padding(.leading, 34)
+            }
+        }
+        .padding(.leading, CGFloat(depth) * 14 + 4)
+        .onAppear { focused = true }
+    }
+
+    private func create() {
+        if let problem = Files.problem(creating: name, in: draft.folder) { return self.problem = problem }
+        do {
+            let path = try Files.create(name, in: draft.folder, directory: draft.directory)
+            tree.created(path, directory: draft.directory)
+            if !draft.directory { open(path, nil) }
+        } catch {
+            problem = error.localizedDescription
+        }
     }
 }

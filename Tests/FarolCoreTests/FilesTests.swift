@@ -92,3 +92,27 @@ private func folder(_ files: [String: String]) throws -> String {
     #expect(Files.folders(from: "/p", to: "/other/a.swift") == nil)
     #expect(Files.folders(from: "/p", to: "/project/a.swift") == nil)
 }
+
+@Test func saysWhatsWrongWithANewName() throws {
+    let root = try folder(["src/a.swift": ""])
+    #expect(Files.problem(creating: "b.swift", in: root) == nil)
+    #expect(Files.problem(creating: "api/handler.go", in: root) == nil)
+    #expect(Files.problem(creating: "  ", in: root) == "Type a name.")
+    #expect(Files.problem(creating: "src", in: root) == "src already exists here.")
+    #expect(Files.problem(creating: "src/a.swift", in: root) == "src/a.swift already exists here.")
+    #expect(Files.problem(creating: "../out.txt", in: root) == "Use a name inside this folder.")
+    #expect(Files.problem(creating: "/etc/x", in: root) == "Use a name inside this folder.")
+    #expect(Files.problem(creating: "new/", in: root) == "A name can't end with a slash.")
+}
+
+@Test func createsFilesAndFoldersWithTheFoldersOnTheWay() throws {
+    let root = try folder(["src/a.swift": ""])
+    let file = try Files.create("api/v1/handler.go", in: root, directory: false)
+    #expect(FileManager.default.fileExists(atPath: file))
+    #expect(file == root + "/api/v1/handler.go")
+    var isDirectory: ObjCBool = false
+    let made = try Files.create("docs/notes", in: root, directory: true)
+    #expect(FileManager.default.fileExists(atPath: made, isDirectory: &isDirectory) && isDirectory.boolValue)
+    // Never replaces what's there.
+    #expect(throws: (any Error).self) { try Files.create("src/a.swift", in: root, directory: false) }
+}

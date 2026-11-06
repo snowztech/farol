@@ -16,6 +16,37 @@ public enum Files {
     /// Installed dependencies, which a search outside git would otherwise fill up with. Names a source folder never has.
     static let dependencies: Set<String> = ["node_modules", "Pods", "DerivedData", "__pycache__"]
 
+    /// What's wrong with `name` for a new file or folder in `folder`, said to the person typing it, or nil when it can be made.
+    /// A name can hold folders, like "api/handler.go", which are made on the way. It can't leave the folder.
+    public static func problem(creating name: String, in folder: String) -> String? {
+        let name = name.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return "Type a name." }
+        let parts = name.split(separator: "/", omittingEmptySubsequences: false)
+        guard !name.hasPrefix("/"), !parts.contains(where: { $0 == ".." || $0 == "." }) else { return "Use a name inside this folder." }
+        guard !parts.dropLast().contains(where: \.isEmpty), parts.last?.isEmpty == false else { return "A name can't end with a slash." }
+        guard parts.allSatisfy({ $0.utf8.count <= 255 }) else { return "That name is too long." }
+        guard !FileManager.default.fileExists(atPath: (folder as NSString).appendingPathComponent(name)) else {
+            return "\(name) already exists here."
+        }
+        return nil
+    }
+
+    /// Makes a new empty file, or folder, at `name` in `folder`, with any folders on the way. Returns its path.
+    /// Check `problem(creating:in:)` first. This fails rather than replace anything already there.
+    @discardableResult
+    public static func create(_ name: String, in folder: String, directory: Bool) throws -> String {
+        let path = (folder as NSString).appendingPathComponent(name.trimmingCharacters(in: .whitespaces))
+        let manager = FileManager.default
+        guard !manager.fileExists(atPath: path) else { throw CocoaError(.fileWriteFileExists) }
+        if directory {
+            try manager.createDirectory(atPath: path, withIntermediateDirectories: true)
+        } else {
+            try manager.createDirectory(atPath: (path as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+            guard manager.createFile(atPath: path, contents: Data()) else { throw CocoaError(.fileWriteUnknown) }
+        }
+        return path
+    }
+
     /// The folders to open in a tree rooted at `root` to see `file`, from the first one down to the one that holds it.
     /// Nil when the file isn't under `root`, and none for a file directly in it.
     public static func folders(from root: String, to file: String) -> [String]? {
