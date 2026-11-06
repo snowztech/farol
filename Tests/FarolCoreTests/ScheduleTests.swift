@@ -55,6 +55,22 @@ private func schedule(_ days: Schedule.Days = .everyDay, since: Date) -> Schedul
     #expect(later.branch(on: at(7, 9), calendar: calendar) == "write-article")
 }
 
+@Test func launchdOpensFarolAtEachTaskTime() throws {
+    var later = schedule(since: at(6, 18))
+    later.once = at(7, 9, 30)
+    var paused = schedule(since: at(6, 18))
+    paused.paused = true
+    let times = LaunchAgent.times(for: [schedule(since: at(6, 18)), schedule(.weekdays, since: at(6, 18)), later, paused], calendar: calendar)
+    #expect(times.first == ["Hour": 9, "Minute": 0])
+    #expect(times.dropFirst().prefix(5).map { $0["Weekday"] } == [1, 2, 3, 4, 5])
+    #expect(times.last == ["Month": 11, "Day": 7, "Hour": 9, "Minute": 30])
+    #expect(times.count == 7)
+    #expect(LaunchAgent.plist(label: "l", bundle: "b", schedules: [paused]) == nil)
+    let data = try #require(LaunchAgent.plist(label: "l", bundle: "b", schedules: [later], calendar: calendar))
+    let job = try #require(PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any])
+    #expect(job["ProgramArguments"] as? [String] == ["/usr/bin/open", "-g", "-b", "b"])
+}
+
 @Test func saysWhenItRunsNextInFewWords() {
     let daily = schedule(since: at(6, 9, 1))
     #expect(!daily.upcoming(at: at(6, 8), calendar: calendar).hasPrefix("tmrw"))

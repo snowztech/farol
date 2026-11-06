@@ -835,7 +835,7 @@ struct WhenChoices: View {
         let calendar = Calendar.current
         let day = calendar.isDateInToday(next) ? "today" : calendar.isDateInTomorrow(next) ? "tomorrow"
             : next.formatted(.dateTime.weekday(.wide).day().month(.abbreviated))
-        return "\(when == .later ? "Runs" : "First run") \(day) at \(Self.clock(minutes))"
+        return "\(when == .later ? "Runs" : "First run") \(day) at \(Self.clock(minutes)).\nFarol opens for it, even if you quit."
     }
 
     private var minutes: Int {

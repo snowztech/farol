@@ -107,5 +107,6 @@ final class Scheduler: ObservableObject {
 
     private func save() {
         UserDefaults.standard.set(try? JSONEncoder().encode(schedules), forKey: Self.key)
+        if let bundle = Bundle.main.bundleIdentifier { LaunchAgent.sync(schedules, bundle: bundle) }
     }
 }
