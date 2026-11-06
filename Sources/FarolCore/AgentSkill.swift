@@ -85,6 +85,27 @@ public struct AgentSkill {
 
     Split work this way only when the user asks for work to be split up, run in parallel or handed off. Start the tasks, wait for each, read what it did, then point the user to its branch to review.
 
+    ## Tasks for later
+
+    A task that runs later, once or on set days, is a Markdown file in `~/.farol/schedules/`. Farol reads the folder as it changes, shows each task in the sidebar's Tasks pane and starts each run in a new worktree. Write one only when the user asks for a task to run later or again:
+
+    ```
+    ---
+    name: Write the article
+    when: weekdays 9:00
+    repos: ~/dev/blog
+    branch: write-article
+    agent: claude
+    ---
+    What the agent should do, as you would type it in New Task.
+    ```
+
+    - `when`: `every day 9:00`, `weekdays 9:00`, days by name like `mon, thu 18:30`, or `once 2026-11-12 14:30`. Times are 24-hour.
+    - `repos`: one repo, or several separated by commas for a task folder with a worktree of each.
+    - `branch`: each run of a repeat gets the day after it, like `write-article-2026-11-06`. `agent`: `claude` or `codex`, as in Settings → Agents.
+    - The file name is the task's id. A file Farol can't read shows in the Tasks pane with why. Farol keeps when it last ran and its past runs itself, so leave those out.
+    - A file you write waits in the Tasks pane until the user allows it, so tell them to click Allow there.
+
     ## Shortcuts
 
     A `keybind` line adds or changes one, with Ghostty's key and action names: `keybind = cmd+shift+enter=toggle_split_zoom`.

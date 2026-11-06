@@ -13,9 +13,9 @@ private func at(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
     calendar.date(from: DateComponents(year: 2026, month: 11, day: day, hour: hour, minute: minute))!
 }
 
-private func schedule(_ days: Schedule.Days = .everyDay, since: Date) -> Schedule {
-    Schedule(name: "Article", task: "write an article", repo: "/r", branch: "write-article", agent: "claude",
-             days: days, hour: 9, minute: 0, since: since)
+private func schedule(_ weekdays: Set<Int> = Schedule.everyDay, since: Date) -> Schedule {
+    Schedule(name: "Article", task: "write an article", repos: ["/r"], branch: "write-article", agent: "claude",
+             weekdays: weekdays, hour: 9, minute: 0, since: since)
 }
 
 @Test func owesTodaysRunOnceItsTimeComes() {
@@ -36,7 +36,7 @@ private func schedule(_ days: Schedule.Days = .everyDay, since: Date) -> Schedul
 }
 
 @Test func weekdaysSkipTheWeekend() {
-    let weekdays = schedule(.weekdays, since: at(6, 9, 1))
+    let weekdays = schedule(Schedule.workweek, since: at(6, 9, 1))
     #expect(weekdays.owed(at: at(8, 12), calendar: calendar) == nil)
     #expect(weekdays.owed(at: at(9, 9), calendar: calendar) == at(9, 9))
     #expect(weekdays.next(after: at(6, 10), calendar: calendar) == at(9, 9))
@@ -60,7 +60,7 @@ private func schedule(_ days: Schedule.Days = .everyDay, since: Date) -> Schedul
     later.once = at(7, 9, 30)
     var paused = schedule(since: at(6, 18))
     paused.paused = true
-    let times = LaunchAgent.times(for: [schedule(since: at(6, 18)), schedule(.weekdays, since: at(6, 18)), later, paused], calendar: calendar)
+    let times = LaunchAgent.times(for: [schedule(since: at(6, 18)), schedule(Schedule.workweek, since: at(6, 18)), later, paused], calendar: calendar)
     #expect(times.first == ["Hour": 9, "Minute": 0])
     #expect(times.dropFirst().prefix(5).map { $0["Weekday"] } == [1, 2, 3, 4, 5])
     #expect(times.last == ["Month": 11, "Day": 7, "Hour": 9, "Minute": 30])
@@ -82,5 +82,50 @@ private func schedule(_ days: Schedule.Days = .everyDay, since: Date) -> Schedul
     let daily = schedule(since: at(6, 9, 1))
     #expect(!daily.upcoming(at: at(6, 8), calendar: calendar).hasPrefix("tmrw"))
     #expect(daily.upcoming(at: at(6, 10), calendar: calendar).hasPrefix("tmrw "))
-    #expect(schedule(.weekdays, since: at(6, 9, 1)).upcoming(at: at(6, 10), calendar: calendar).hasPrefix("Mon"))
+    #expect(schedule(Schedule.workweek, since: at(6, 9, 1)).upcoming(at: at(6, 10), calendar: calendar).hasPrefix("Mon"))
+}
+
+/// Mondays and Thursdays: Friday the 6th's next run is Monday the 9th, then Thursday the 12th.
+@Test func runsOnTheDaysPicked() {
+    let picked = schedule([2, 5], since: at(6, 9, 1))
+    #expect(picked.next(after: at(6, 10), calendar: calendar) == at(9, 9))
+    #expect(picked.next(after: at(9, 10), calendar: calendar) == at(12, 9))
+    #expect(picked.owed(at: at(11, 12), calendar: calendar) == at(9, 9))
+    #expect(LaunchAgent.times(for: [picked], calendar: calendar).map { $0["Weekday"] } == [1, 4])
+}
+
+@Test func namesTheDaysItRunsOn() {
+    var week = calendar
+    week.locale = Locale(identifier: "en_GB")
+    week.firstWeekday = 2
+    #expect(Schedule.days(Schedule.everyDay, calendar: week) == "every day")
+    #expect(Schedule.days(Schedule.workweek, calendar: week) == "weekdays")
+    #expect(Schedule.days([1, 2, 5], calendar: week) == "Mon, Thu, Sun")
+}
+
+@Test func keepsTheLatestRuns() {
+    var kept = schedule(since: at(6, 9))
+    for day in 1...25 { kept.record(.init(started: at(day, 9), branch: "b\(day)")) }
+    #expect(kept.runs.count == Schedule.kept)
+    #expect(kept.runs.first?.branch == "b25")
+}
+
+@Test func tellsATimeChangeFromAnyOtherEdit() {
+    let daily = schedule(since: at(6, 9))
+    var renamed = daily
+    renamed.name = "Other"
+    var earlier = daily
+    earlier.hour = 8
+    #expect(daily.sameTime(as: renamed))
+    #expect(!daily.sameTime(as: earlier))
+}
+
+@Test func launchdLeavesATaskNotYetAllowed() {
+    var waiting = schedule(since: at(6, 9))
+    waiting.allowed = false
+    #expect(LaunchAgent.times(for: [waiting], calendar: calendar).isEmpty)
+    var state = waiting.state
+    state.allowed = nil
+    waiting.state = state
+    #expect(waiting.allowed)
 }

@@ -15,7 +15,7 @@ final class Session: ObservableObject, Identifiable {
     /// Set through the store, which saves it.
     var panels = Panels()
     /// The schedule this session is a run of. One run is open at a time, so the next waits until this one closes.
-    var schedule: UUID?
+    var schedule: String?
     @Published var directory: String
     /// Reported per pane by agent hooks or interactive terminal titles.
     @Published private(set) var agents: [UUID: AgentActivity] = [:]
@@ -526,19 +526,25 @@ final class SessionStore: ObservableObject {
                repo: repo)
     }
 
-    /// An agent on `task` in a new worktree of the repository `directory` is in, on a branch no other has, with the task as its first prompt.
-    /// What an agent's `farol task`, the phone and a schedule start, a schedule naming the `branch` itself.
+    /// An agent on `task` in a new worktree of the repository each of `directories` is in, on a branch no other has, with the task as its first prompt.
+    /// Several get a task folder, as New Task makes. What `farol task`, the phone and a schedule start, a schedule naming the `branch`.
     /// `done` gets the session and its branch, which the session itself learns only once git answers.
-    func startTask(_ task: String, in directory: String, with agent: AgentFolder, branch named: String? = nil, copyEnvironmentFiles: Bool,
+    func startTask(_ task: String, in directories: [String], with agent: AgentFolder, branch named: String? = nil, copyEnvironmentFiles: Bool,
                    select: Bool, done: @escaping (Result<(session: Session, branch: String), Error>) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
-            guard let root = Git.repoRoot(of: directory) else {
-                return DispatchQueue.main.async { done(.failure(GitError(description: "\(directory) is not in a git repository."))) }
+            let roots = directories.map { Git.repoRoot(of: $0) }
+            if let missing = zip(directories, roots).first(where: { $1 == nil })?.0 {
+                return DispatchQueue.main.async { done(.failure(GitError(description: "\(missing) is not in a git repository."))) }
             }
-            let taken = { Git.hasBranch($0, in: root) }
+            // Several repos share one branch name and one task folder named after it, so all of them must be free.
+            let repos = roots.count == 1 ? roots.compactMap { $0 } : directories
+            let taken = { (name: String) in
+                repos.contains { Git.hasBranch(name, in: $0) } || repos.count > 1
+                    && FileManager.default.fileExists(atPath: TaskFolders.default.base.appendingPathComponent(Worktrees.folderName(for: name)).path)
+            }
             let branch = named.map { NewTask.freeBranch(named: $0, taken: taken) } ?? NewTask.freeBranch(for: task, taken: taken)
             DispatchQueue.main.async { [weak self] in
-                self?.createWorktreeSession(branch: branch, from: [root], run: agent.command() + " \"$\(NewTask.variable)\"",
+                self?.createWorktreeSession(branch: branch, from: repos, run: agent.command() + " \"$\(NewTask.variable)\"",
                                             environment: [NewTask.variable: task], copyEnvironmentFiles: copyEnvironmentFiles, select: select) {
                     if case .success(let session) = $0 { session.prompts[session.panes.focused.id] = task }
                     done($0.map { ($0, branch) })
@@ -821,5 +827,5 @@ private struct SavedSession: Codable {
     var layout: PaneLayout
     var name: String?
     var panels: Panels?
-    var schedule: UUID?
+    var schedule: String?
 }

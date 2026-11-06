@@ -1,47 +1,99 @@
 import Foundation
 
 /// A New Task that starts later, once or again at a set time, in a new worktree each run.
-public struct Schedule: Codable, Equatable, Identifiable, Sendable {
-    public enum Days: String, Codable, CaseIterable, Sendable {
-        case everyDay, weekdays
+/// What to run comes from its file, see `ScheduleFile`. What Farol learns as it runs is its `State`.
+public struct Schedule: Equatable, Identifiable, Sendable {
+    /// Kept by Farol, apart from the file you write.
+    public struct State: Codable, Equatable, Sendable {
+        public var paused = false
+        public var since: Date
+        public var lastDue: Date?
+        public var failure: String?
+        public var runs: [Run] = []
+        /// False for a file Farol didn't write, until you allow it. Nil from before this was asked, which counts as allowed.
+        public var allowed: Bool?
 
-        public var label: String {
-            switch self {
-            case .everyDay: "Every day"
-            case .weekdays: "Weekdays"
-            }
+        public init(since: Date, allowed: Bool = true) {
+            self.since = since
+            self.allowed = allowed
         }
     }
 
-    public var id = UUID()
+    /// One start, kept to show how a repeat has gone.
+    public struct Run: Codable, Equatable, Sendable {
+        public var started: Date
+        public var branch: String?
+        /// Why it didn't start.
+        public var failure: String?
+
+        public init(started: Date, branch: String? = nil, failure: String? = nil) {
+            self.started = started
+            self.branch = branch
+            self.failure = failure
+        }
+    }
+
+    /// Days of the week as Calendar counts them, 1 for Sunday.
+    public static let everyDay = Set(1...7)
+    public static let workweek: Set<Int> = [2, 3, 4, 5, 6]
+
+    /// Its file's name without `.md`.
+    public var id = UUID().uuidString
     public var name: String
     public var task: String
-    /// The repository each run branches from.
-    public var repo: String
+    /// Where each run's worktrees come from. Several repos get a task folder with a worktree of each, as New Task makes.
+    public var repos: [String]
     /// Each run's branch starts with it and ends with the day, like write-article-2026-11-06.
     public var branch: String
     /// An agent config folder's id, as the New Task sheet saves it.
     public var agent: String
-    public var days: Days
-    /// Set for a task that runs once, at this time, instead of on `days`.
+    /// The days of the week a repeat runs on.
+    public var weekdays: Set<Int>
+    /// Set for a task that runs once, at this time, instead of on `weekdays`.
     public var once: Date?
     public var hour: Int
     public var minute: Int
     public var paused = false
+    /// A task from a file someone else wrote waits for you to allow it, so an agent can't start agents later behind your back.
+    public var allowed = true
     /// When the last run started, or when the schedule was made. Nothing due before it is owed.
     public var since: Date
     /// When the last run was due, to tell a late start from one on time.
     public var lastDue: Date?
     /// Why the last run didn't start, until one does.
     public var failure: String?
+    /// The latest starts first, up to `Self.kept`.
+    public var runs: [Run] = []
+    public static let kept = 20
 
-    public init(name: String, task: String, repo: String, branch: String, agent: String, days: Days, hour: Int, minute: Int, since: Date) {
+    public var state: State {
+        get {
+            var state = State(since: since)
+            state.paused = paused
+            state.lastDue = lastDue
+            state.failure = failure
+            state.runs = runs
+            state.allowed = allowed
+            return state
+        }
+        set {
+            paused = newValue.paused
+            since = newValue.since
+            lastDue = newValue.lastDue
+            failure = newValue.failure
+            runs = newValue.runs
+            allowed = newValue.allowed ?? true
+        }
+    }
+
+    public init(name: String, task: String, repos: [String], branch: String, agent: String, weekdays: Set<Int>, hour: Int, minute: Int,
+                since: Date) {
         self.name = name
         self.task = task
-        self.repo = repo
+        self.repos = repos
         self.branch = branch
         self.agent = agent
-        self.days = days
+        self.weekdays = weekdays
         self.hour = hour
         self.minute = minute
         self.since = since
@@ -75,7 +127,30 @@ public struct Schedule: Codable, Equatable, Identifiable, Sendable {
     /// Like "every day at 9:00", for the sidebar.
     public var rule: String {
         if let once { return once.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).hour().minute()) }
-        return "\(days.label.lowercased()) at \(Self.clock(hour: hour, minute: minute))"
+        return "\(Self.days(weekdays)) at \(Self.clock(hour: hour, minute: minute))"
+    }
+
+    /// every day, weekdays, or the days by name in the order of the user's week, like Mon, Thu.
+    public static func days(_ weekdays: Set<Int>, calendar: Calendar = .current) -> String {
+        if weekdays == everyDay { return "every day" }
+        if weekdays == workweek { return "weekdays" }
+        let names = calendar.shortWeekdaySymbols
+        return week(calendar).filter(weekdays.contains).map { names[$0 - 1] }.joined(separator: ", ")
+    }
+
+    /// The days of the week from the one the user's week starts on.
+    public static func week(_ calendar: Calendar = .current) -> [Int] {
+        (0..<7).map { (calendar.firstWeekday - 1 + $0) % 7 + 1 }
+    }
+
+    /// Runs at the same times as `other`, whatever else changed.
+    public func sameTime(as other: Schedule) -> Bool {
+        weekdays == other.weekdays && once == other.once && hour == other.hour && minute == other.minute
+    }
+
+    /// Keeps a start, dropping the oldest past `kept`.
+    public mutating func record(_ run: Run) {
+        runs = Array(([run] + runs).prefix(Self.kept))
     }
 
     /// When it next runs, short enough for the right of a row: 9:00 today, then tmrw 9:00, Mon 9:00 or 12 Nov 9:00.
@@ -131,6 +206,6 @@ public struct Schedule: Codable, Equatable, Identifiable, Sendable {
     }
 
     private func runs(on day: Date, _ calendar: Calendar) -> Bool {
-        days == .everyDay || !calendar.isDateInWeekend(day)
+        weekdays.contains(calendar.component(.weekday, from: day))
     }
 }
