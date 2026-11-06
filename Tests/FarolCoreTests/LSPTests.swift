@@ -73,3 +73,33 @@ import Testing
     #expect(LSP.languageName(for: "/p/a.hpp") == "C++")
     #expect(LSP.languageName(for: "/p/notes.txt") == nil)
 }
+
+@Test func searchesWhereGoInstallsItsToolsAndOtherInstallersDo() {
+    // gopls from `go install` lands in GOBIN or a GOPATH's bin, which a shell's PATH does not have by default.
+    #expect(LSP.searchPath(shell: "/usr/bin:/bin", environment: ["GOBIN": "/g/bin", "GOPATH": "/a:/b"], home: "/h")
+        == "/usr/bin:/bin:/g/bin:/a/bin:/b/bin:/h/go/bin:/h/.cargo/bin:/h/.local/bin")
+    // Nothing is added twice, and an app opened from the Dock has none of those variables.
+    #expect(LSP.searchPath(shell: "/h/go/bin:/usr/bin", environment: [:], home: "/h") == "/h/go/bin:/usr/bin:/h/.cargo/bin:/h/.local/bin")
+}
+
+@Test func passesOverAStubThatFailsTheServersCheck() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).path
+    let (stub, real) = (root + "/stub", root + "/real")
+    for (folder, status) in [(stub, 1), (real, 0)] {
+        try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+        FileManager.default.createFile(atPath: folder + "/rust-analyzer", contents: Data("#!/bin/sh\nexit \(status)\n".utf8),
+                                       attributes: [.posixPermissions: 0o755])
+    }
+    let server = try #require(LSP.server(for: "/p/main.rs"))
+    // rustup puts a rust-analyzer in ~/.cargo/bin that fails until the component is added.
+    #expect(LSP.find(server, in: "\(stub):\(real)") == real + "/rust-analyzer")
+    #expect(LSP.find(server, in: stub) == nil)
+}
+
+@Test func installReturnsWhatAFailedCommandPrinted() {
+    func server(_ install: String) -> LSP.Server {
+        LSP.Server(name: "x", language: "X", command: "x", arguments: [], extensions: [], install: install, check: nil)
+    }
+    #expect(LSP.install(server("true")) == nil)
+    #expect(LSP.install(server("echo 'npm ERR! EACCES' >&2 && exit 243")) == "npm ERR! EACCES")
+}

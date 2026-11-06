@@ -208,7 +208,9 @@ final class FileTabs: NSView {
         // Installed from the bar a moment ago, so look again rather than keep saying it's missing.
         if installed == false { servers.recheck(server) { [weak self] in self?.refreshServer() } }
         let running = servers.existing(for: path)
-        let state: FileTabsModel.Server.State = if !servers.isEnabled(server) {
+        let state: FileTabsModel.Server.State = if servers.isInstalling(server) {
+            .installing
+        } else if !servers.isEnabled(server) {
             .off
         } else {
             switch running?.state {
@@ -249,7 +251,7 @@ final class FileTabs: NSView {
     private func openServerMenu() {
         guard let path = current?.path else { return }
         let menu = LanguageServerMenu.make(for: path, openLog: { [weak self] in self?.open($0, line: $1, keep: true) },
-                                           install: { [weak self] in self?.runCommand?($0) })
+                                           runInTerminal: { [weak self] in self?.runCommand?($0) })
         menu.popUp(positioning: nil, at: NSPoint(x: status.frame.maxX - 160, y: status.frame.minY), in: self)
     }
 
@@ -301,7 +303,7 @@ final class FileTabsModel: ObservableObject {
         enum State {
             /// Turned off for this language, so the name sits dim, and a click offers to turn it on.
             case off
-            case loading, running, stopped, failed, missing
+            case loading, running, stopped, failed, missing, installing
 
             /// The bolt's tip, like Zed's: what the servers are doing, in a few words.
             func tip(_ name: String) -> String {
@@ -312,6 +314,7 @@ final class FileTabsModel: ObservableObject {
                 case .stopped: "Language servers · \(name) starts when you ⌘-click"
                 case .failed: "Language servers · \(name) stopped with an error"
                 case .missing: "\(name) isn't installed. Click to install it"
+                case .installing: "Installing \(name)…"
                 }
             }
         }
@@ -473,7 +476,7 @@ struct FileStatusBar: View {
     @ViewBuilder private func label(_ server: FileTabsModel.Server) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
             // Lowercase, like the file names and the line and column around it.
-            Text(server.language.lowercased())
+            Text(server.state == .installing ? "\(server.language.lowercased()) · installing \(server.name)" : server.language.lowercased())
             if server.state == .failed {
                 Image(systemName: "exclamationmark.triangle").font(.system(size: 9))
             } else {
