@@ -377,13 +377,14 @@ private struct SessionPalette: View {
             HStack(spacing: 9) {
                 // In the rows' icon column, so the search and every name start at the same place.
                 Image(systemName: "magnifyingglass").foregroundStyle(p.muted).frame(width: Self.icon)
+                // A step above the rows, since it's what you look at first.
                 TextField("Search sessions, files and commands", text: $query)
                     .textFieldStyle(.plain)
+                    .font(.system(size: 15))
                     .focused($searching)
                     .onSubmit { highlighted.map(choose) }
                     .onKeyPress(.downArrow) { move(1) }
                     .onKeyPress(.upArrow) { move(-1) }
-                Text("⌘P").font(.system(size: 11, design: .monospaced)).foregroundStyle(p.muted)
             }
             .padding(.horizontal, 15)
             .padding(.vertical, 12)
@@ -409,23 +410,18 @@ private struct SessionPalette: View {
                             }
                         }
                         let commandRows = commandHits
-                        if !commandRows.isEmpty && !groups.isEmpty {
-                            Rectangle().fill(p.line).frame(height: 1).padding(.horizontal, 9).padding(.vertical, 5)
-                        }
+                        // Named like the projects above them, so every part of the list says what it holds.
+                        if !commandRows.isEmpty { RepoHeader(name: "Commands", palette: p) }
                         ForEach(commandRows, id: \.self) { command in
                             CommandChoice(
                                 command: command,
                                 lit: highlighted == .command(command),
-                                elsewhere: session.panes.focused.runsProgram,
                                 palette: p,
                                 hover: { inside in if inside { (active, steering) = (.command(command), false) } },
                                 choose: { choose(.command(command)) })
                             .id(Choice.command(command))
                         }
-                        // The file icons say what these rows are, so a line is enough to part them from the sessions.
-                        if !hits.isEmpty && !(groups.isEmpty && commandRows.isEmpty) {
-                            Rectangle().fill(p.line).frame(height: 1).padding(.horizontal, 9).padding(.vertical, 5)
-                        }
+                        if !hits.isEmpty { RepoHeader(name: "Files", palette: p) }
                         ForEach(hits, id: \.self) { path in
                             FileChoice(
                                 path: path,
@@ -436,7 +432,7 @@ private struct SessionPalette: View {
                             .id(Choice.file(path))
                         }
                         if groups.isEmpty && commandRows.isEmpty && hits.isEmpty {
-                            Text("Nothing matches.").foregroundStyle(p.muted).padding(.vertical, 12)
+                            Text("Nothing matches “\(query)”.").foregroundStyle(p.muted).padding(.vertical, 12)
                         }
                     }
                     .padding(6)
@@ -449,6 +445,8 @@ private struct SessionPalette: View {
                 // The arrows can go past the rows in view.
                 .onChange(of: active) { _, row in if steering, let row { scroll.scrollTo(row) } }
             }
+            Rectangle().fill(p.line).frame(height: 1)
+            footer(p)
         }
         // Wide enough for a file's folder and a command's text beside its name.
         .frame(width: 560)
@@ -459,6 +457,31 @@ private struct SessionPalette: View {
             listFiles()
         }
         .onChange(of: query) { _, query in (active, hits) = (nil, Files.search(files.paths, query)) }
+    }
+
+    /// The keys, and what Return does on the row it would open, said once here rather than inside the row as you move.
+    private func footer(_ p: Palette) -> some View {
+        HStack(spacing: 14) {
+            Text("↑↓ to move")
+            Text("esc to close")
+            Spacer(minLength: 8)
+            if let action = highlighted.map(action) {
+                Text("\(action) \(Text(Image(systemName: "return")).font(.system(size: 9)))").foregroundStyle(p.text)
+            }
+        }
+        .font(.system(size: 11))
+        .foregroundStyle(p.muted)
+        .padding(.horizontal, 15)
+        .frame(height: 30)
+    }
+
+    /// What Return does on a row, which differs by kind: running something, or a folder opening a session, is not what a list leads you to expect.
+    private func action(_ choice: Choice) -> String {
+        switch choice {
+        case .session(let id): id == store.selectedID ? "Stay here" : "Switch to session"
+        case .command: session.panes.focused.runsProgram ? "Run in a new pane" : "Run"
+        case .file(let path): path.hasSuffix("/") ? "Open as a new session" : "Open file"
+        }
     }
 
     /// The sidebar's groups, keeping only the sessions whose name, repo, branch or folder has every word typed.
@@ -516,81 +539,71 @@ private struct SessionPalette: View {
     }
 }
 
-/// A command the project defines, in the title's list: its name, then what it types.
+/// What every row of the ⌘P list shares: its height, inset, highlight and hover, so sessions, commands and files read as one list.
+private struct PaletteRow<Content: View>: View {
+    /// Under the arrows or the mouse.
+    let lit: Bool
+    let palette: Palette
+    let hover: (Bool) -> Void
+    let choose: () -> Void
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        Button(action: choose) {
+            HStack(spacing: 9) { content }
+                .padding(.horizontal, 9)
+                .frame(height: 30)
+                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(lit ? palette.selection : .clear))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(QuietPress())
+        .onClickableHover(hover)
+    }
+}
+
+/// A command the project defines: its name, then what it types.
 private struct CommandChoice: View {
     let command: ProjectCommand
-    /// Under the arrows or the mouse.
     let lit: Bool
-    /// A program like an agent is in front in the pane, so the command goes to a new pane.
-    let elsewhere: Bool
     let palette: Palette
     let hover: (Bool) -> Void
     let choose: () -> Void
 
     var body: some View {
-        Button(action: choose) {
-            HStack(spacing: 9) {
-                Image(systemName: "play").font(.system(size: 9)).foregroundStyle(palette.muted).frame(width: SessionPalette.icon)
-                Text(command.name).lineLimit(1).layoutPriority(1)
-                Text(command.displayCommand)
-                    .font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.tail)
-                Spacer(minLength: 8)
-                // Running something is not what a search list leads you to expect, so the row says where Return runs it.
-                if lit {
-                    Text("\(elsewhere ? "Run in a new pane" : "Run") \(Text(Image(systemName: "return")).font(.system(size: 9)))")
-                        .font(.system(size: 11)).foregroundStyle(palette.muted).fixedSize()
-                }
-            }
-            .padding(.horizontal, 9)
-            .frame(height: 30)
-            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(lit ? palette.selection : .clear))
-            .contentShape(Rectangle())
-            .hoverTip(command.global ? "Available in all projects" : "\(command.source) in \((command.folder as NSString).abbreviatingWithTildeInPath)")
+        PaletteRow(lit: lit, palette: palette, hover: hover, choose: choose) {
+            Image(systemName: "play").font(.system(size: 9)).foregroundStyle(palette.muted).frame(width: SessionPalette.icon)
+            Text(command.name).lineLimit(1).layoutPriority(1)
+            Text(command.displayCommand)
+                .font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.tail)
+            Spacer(minLength: 8)
         }
-        .buttonStyle(QuietPress())
-        .onClickableHover(hover)
+        .hoverTip(command.global ? "Available in all projects" : "\(command.source) in \((command.folder as NSString).abbreviatingWithTildeInPath)")
     }
 }
 
-/// A file or a folder in the title's list: its name, then the folder it is in.
+/// A file or a folder: its name, then the folder it is in.
 private struct FileChoice: View {
     let path: String
-    /// Under the arrows or the mouse.
     let lit: Bool
     let palette: Palette
     let hover: (Bool) -> Void
     let choose: () -> Void
 
     var body: some View {
-        Button(action: choose) {
-            HStack(spacing: 9) {
-                FileIcon(path: path).font(.system(size: 11)).foregroundStyle(palette.muted).frame(width: SessionPalette.icon)
-                Text((path as NSString).lastPathComponent).lineLimit(1).truncationMode(.middle).layoutPriority(1)
-                Text((path as NSString).deletingLastPathComponent)
-                    .font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.head)
-                Spacer(minLength: 8)
-                // A folder opening a session is not what a file list leads you to expect, so the row says what Return does.
-                // The key is drawn smaller than the words, since at their size it outweighs them.
-                if lit && path.hasSuffix("/") {
-                    Text("New session \(Text(Image(systemName: "return")).font(.system(size: 9)))")
-                        .font(.system(size: 11)).foregroundStyle(palette.muted).fixedSize()
-                }
-            }
-            .padding(.horizontal, 9)
-            .frame(height: 30)
-            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(lit ? palette.selection : .clear))
-            .contentShape(Rectangle())
+        PaletteRow(lit: lit, palette: palette, hover: hover, choose: choose) {
+            FileIcon(path: path).font(.system(size: 11)).foregroundStyle(palette.muted).frame(width: SessionPalette.icon)
+            Text((path as NSString).lastPathComponent).lineLimit(1).truncationMode(.middle).layoutPriority(1)
+            Text((path as NSString).deletingLastPathComponent)
+                .font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.head)
+            Spacer(minLength: 8)
         }
-        .buttonStyle(QuietPress())
-        .onClickableHover(hover)
     }
 }
 
-/// A session in the title's list: a check on the one you are in, its lamp, its name and branch, and its shortcut.
+/// A session: its lamp, its name and branch, a check on the one you are in, and its shortcut.
 private struct SessionChoice: View {
     @ObservedObject var session: Session
     let current: Bool
-    /// Under the arrows or the mouse.
     let lit: Bool
     let shortcut: String?
     let palette: Palette
@@ -598,37 +611,29 @@ private struct SessionChoice: View {
     let choose: () -> Void
 
     var body: some View {
-        Button(action: choose) {
-            HStack(spacing: 9) {
-                Lamp(activity: session.activity, selected: true, palette: palette).frame(width: SessionPalette.icon)
-                Text(session.displayName).lineLimit(1).truncationMode(.tail).layoutPriority(1)
-                if let branch = session.remoteLocation ?? session.branch {
-                    // A long name leaves the branch room for a lone "…", so it shows whole or not at all.
-                    ViewThatFits(in: .horizontal) {
-                        Text(branch).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).fixedSize()
-                        EmptyView()
-                    }
-                }
-                Spacer(minLength: 8)
-                if session.isWorktreeCheckout {
-                    Badge(text: "worktree", small: true, palette: palette)
-                        .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
-                }
-                // At the end, by the shortcut, so it doesn't push every name in the list to the right.
-                if current {
-                    Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).foregroundStyle(palette.text)
-                }
-                if let shortcut {
-                    Text(shortcut).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).fixedSize()
+        PaletteRow(lit: lit, palette: palette, hover: hover, choose: choose) {
+            Lamp(activity: session.activity, selected: true, palette: palette).frame(width: SessionPalette.icon)
+            Text(session.displayName).lineLimit(1).truncationMode(.tail).layoutPriority(1)
+            if let branch = session.remoteLocation ?? session.branch {
+                // A long name leaves the branch room for a lone "…", so it shows whole or not at all.
+                ViewThatFits(in: .horizontal) {
+                    Text(branch).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).fixedSize()
+                    EmptyView()
                 }
             }
-            .padding(.horizontal, 9)
-            .frame(height: 30)
-            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(lit ? palette.selection : .clear))
-            .contentShape(Rectangle())
+            Spacer(minLength: 8)
+            if session.isWorktreeCheckout {
+                Badge(text: "worktree", small: true, palette: palette)
+                    .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
+            }
+            // At the end, by the shortcut, so it doesn't push every name in the list to the right.
+            if current {
+                Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).foregroundStyle(palette.text)
+            }
+            if let shortcut {
+                Text(shortcut).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).fixedSize()
+            }
         }
-        .buttonStyle(QuietPress())
-        .onClickableHover(hover)
     }
 }
 
