@@ -200,7 +200,7 @@ private struct ThemeCard: View {
                     // The six hues side by side, since the sample above shows only three and many dark themes look alike by it.
                     HStack(spacing: 3) {
                         ForEach(1..<7, id: \.self) { i in
-                            RoundedRectangle(cornerRadius: 1.5).fill(t.ansi[i]).frame(width: 9, height: 9)
+                            Circle().fill(t.ansi[i]).frame(width: 8, height: 8)
                         }
                     }
                 }
