@@ -59,7 +59,7 @@ final class LanguageServer {
         process.arguments = server.arguments
         process.currentDirectoryURL = URL(fileURLWithPath: root)
         // Your shell's PATH, since servers start the tools they wrap, like go or node.
-        process.environment = ProcessInfo.processInfo.environment.merging(["PATH": LSP.shellPath]) { $1 }
+        process.environment = ProcessInfo.processInfo.environment.merging(["PATH": LSP.searchPath]) { $1 }
         let (stdin, stdout, stderr) = (Pipe(), Pipe(), Pipe())
         process.standardInput = stdin
         process.standardOutput = stdout

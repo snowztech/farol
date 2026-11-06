@@ -73,3 +73,11 @@ import Testing
     #expect(LSP.languageName(for: "/p/a.hpp") == "C++")
     #expect(LSP.languageName(for: "/p/notes.txt") == nil)
 }
+
+@Test func searchesWhereGoInstallsItsToolsAndOtherInstallersDo() {
+    // gopls from `go install` lands in GOBIN or a GOPATH's bin, which a shell's PATH does not have by default.
+    #expect(LSP.searchPath(shell: "/usr/bin:/bin", environment: ["GOBIN": "/g/bin", "GOPATH": "/a:/b"], home: "/h")
+        == "/usr/bin:/bin:/g/bin:/a/bin:/b/bin:/h/go/bin:/h/.cargo/bin:/h/.local/bin")
+    // Nothing is added twice, and an app opened from the Dock has none of those variables.
+    #expect(LSP.searchPath(shell: "/h/go/bin:/usr/bin", environment: [:], home: "/h") == "/h/go/bin:/usr/bin:/h/.cargo/bin:/h/.local/bin")
+}
