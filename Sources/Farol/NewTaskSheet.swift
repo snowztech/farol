@@ -26,8 +26,6 @@ struct NewTaskSheet: View {
     let start: (String, String, String, [String]) -> Void
     /// Gets a task for later, once or again and again.
     let schedule: (Schedule) -> Void
-    /// Opened from the Tasks pane, so it starts set for later.
-    let later: Bool
     let close: () -> Void
 
     @AppStorage("newTask.agent") private var agent = AgentFolder.Kind.claude.rawValue
@@ -70,7 +68,7 @@ struct NewTaskSheet: View {
     @FocusState private var searching: Bool
 
     static func present(in window: NSWindow, directory: String, palette: Palette, start: @escaping (String, String, String, [String]) -> Void,
-                        later: Bool = false, schedule: @escaping (Schedule) -> Void) {
+                        schedule: @escaping (Schedule) -> Void) {
         // Git is asked off the main thread, so a slow repo can't freeze the window before the sheet shows.
         DispatchQueue.global(qos: .userInitiated).async {
             let root = Git.repoRoot(of: directory)
@@ -91,7 +89,7 @@ struct NewTaskSheet: View {
                 let view = NewTaskSheet(
                     directory: directory, repo: repo, base: base, repos: repos, root: root, checkout: checkout,
                     siblings: siblings, branches: branches, expectsTickets: expectsTickets,
-                    palette: palette, start: start, schedule: schedule, later: later,
+                    palette: palette, start: start, schedule: schedule,
                     close: { [weak window, weak sheet] in sheet.map { window?.endSheet($0) } })
                 let host = NSHostingController(rootView: view)
                 // The sheet grows with the task as it wraps onto more lines.
@@ -266,7 +264,6 @@ struct NewTaskSheet: View {
         .foregroundStyle(p.text)
         .frame(width: 460)
         .sheetBackground(p)
-        .onAppear { if later { when = .later } }
         .ignoresSafeArea()
         .fileImporter(isPresented: $choosingRepos, allowedContentTypes: [.folder], allowsMultipleSelection: true) { result in
             switch result {
@@ -712,7 +709,7 @@ enum TaskTiming: Hashable {
     var title: String {
         switch self {
         case .now: "Now"
-        case .later: "Later, once"
+        case .later: "Once"
         case .everyDay: "Every day"
         case .weekdays: "Weekdays"
         }
@@ -753,16 +750,24 @@ struct WhenChoices: View {
             }
             if when != .now {
                 Rectangle().fill(p.line).frame(height: 1).padding(.vertical, 5)
-                HStack {
-                    Text(when == .later ? "On" : "At").foregroundStyle(p.muted)
-                    Spacer()
-                    DatePicker("When", selection: $at, in: when == .later ? Date.now... : Date.distantPast...,
-                               displayedComponents: when == .later ? [.date, .hourAndMinute] : .hourAndMinute)
+                // A day in words and a time apart, since 08/11 reads as August in one country and November in the next.
+                if when == .later {
+                    setting("Day") {
+                        Menu {
+                            ForEach(0..<14, id: \.self) { ahead in Button(Self.dayName(ahead)) { setDay(ahead) } }
+                        } label: {
+                            Text(Self.dayName(Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: .now),
+                                                                              to: Calendar.current.startOfDay(for: at)).day ?? 0))
+                        }
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
+                    }
+                }
+                setting("Time") {
+                    DatePicker("Time", selection: $at, in: when == .later ? Date.now... : Date.distantPast..., displayedComponents: .hourAndMinute)
                         .labelsHidden()
                         .datePickerStyle(.stepperField)
                 }
-                .padding(.horizontal, 8)
-                .frame(height: 32)
             }
         }
         .font(.system(size: 13))
@@ -770,5 +775,35 @@ struct WhenChoices: View {
         .padding(6)
         .frame(width: 260)
         .background(p.background)
+    }
+
+    private func setting(_ name: String, @ViewBuilder control: () -> some View) -> some View {
+        HStack {
+            Text(name).foregroundStyle(palette.muted)
+            Spacer()
+            control()
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 32)
+    }
+
+    /// Today, Tomorrow, then like Sunday 8 Nov.
+    private static func dayName(_ ahead: Int) -> String {
+        switch ahead {
+        case 0: return "Today"
+        case 1: return "Tomorrow"
+        default:
+            let day = Calendar.current.date(byAdding: .day, value: ahead, to: .now) ?? .now
+            return day.formatted(.dateTime.weekday(.wide).day().month(.abbreviated))
+        }
+    }
+
+    /// Keeps the time. Today with its time gone moves to the next hour, so a task for later is never in the past.
+    private func setDay(_ ahead: Int) {
+        let calendar = Calendar.current
+        let time = calendar.dateComponents([.hour, .minute], from: at)
+        let day = calendar.date(byAdding: .day, value: ahead, to: calendar.startOfDay(for: .now)) ?? .now
+        let picked = calendar.date(bySettingHour: time.hour ?? 9, minute: time.minute ?? 0, second: 0, of: day) ?? day
+        at = picked > .now ? picked : calendar.nextDate(after: .now, matching: DateComponents(minute: 0), matchingPolicy: .nextTime) ?? picked
     }
 }

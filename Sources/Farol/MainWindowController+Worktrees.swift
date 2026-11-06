@@ -10,12 +10,12 @@ extension MainWindowController {
 
     /// ⇧⌘N: a task, a branch and an agent in one sheet. The agent starts in a new worktree with the task as its prompt.
     /// From a folder of repos, it starts in a task folder with a worktree of each repo you pick.
-    func newTask(later: Bool = false) {
+    func newTask() {
         withRepo(purpose: "the new task", orFolderOfRepos: true) { [weak self] directory in
             guard let self, let window = self.window else { return }
             NewTaskSheet.present(in: window, directory: directory, palette: self.state.palette, start: { branch, command, task, repos in
                 self.startWorktreeSession(branch: branch, from: repos, run: command, environment: [NewTask.variable: task])
-            }, later: later, schedule: { self.scheduler.add($0) })
+            }, schedule: { self.scheduler.add($0) })
         }
     }
 

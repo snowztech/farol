@@ -60,7 +60,7 @@ struct SidebarView: View {
             }
             // Only once there is a task, so a new user never meets an empty pane.
             if !scheduler.schedules.isEmpty {
-                TasksPane(scheduler: scheduler, store: store, palette: p, onNew: commands.newLaterTask)
+                TasksPane(scheduler: scheduler, store: store, palette: p)
             }
             // Pinned below the list, so it stays in the same place however many sessions there are.
             NewTaskRow(palette: p, action: commands.newTask)
@@ -265,7 +265,6 @@ private struct TasksPane: View {
     @ObservedObject var scheduler: Scheduler
     let store: SessionStore
     let palette: Palette
-    let onNew: () -> Void
 
     @AppStorage("sidebar.tasksFolded") private var folded = false
     @State private var hovering = false
@@ -278,7 +277,7 @@ private struct TasksPane: View {
         VStack(spacing: 0) {
             Rectangle().fill(p.line).frame(height: 1)
             HStack(spacing: 6) {
-                Text("Tasks").font(.system(size: 11, weight: .semibold))
+                Text("Tasks").font(.system(size: 12, weight: .medium))
                 Text(verbatim: "\(tasks.count)").font(.system(size: 11, design: .monospaced)).foregroundStyle(p.muted.opacity(0.7))
                 if folded, let next = tasks.first(where: { !$0.paused }) {
                     Text("next \(next.upcoming(at: .now))")
@@ -287,13 +286,12 @@ private struct TasksPane: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: 0)
-                if hovering || !folded {
-                    CloseButton(symbol: "plus", help: "New task for later", palette: p, action: onNew)
-                }
+                // Like a project's, quiet until you point at it.
                 Image(systemName: "chevron.right")
                     .font(.system(size: 9, weight: .bold))
                     .rotationEffect(.degrees(folded ? 0 : 90))
                     .frame(width: 20, height: 20)
+                    .opacity(hovering || folded ? 1 : 0.35)
             }
             .foregroundStyle(hovering ? p.text : p.muted)
             .padding(.leading, 18)

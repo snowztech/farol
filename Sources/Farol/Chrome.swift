@@ -46,8 +46,6 @@ final class WindowState: ObservableObject {
 struct Commands {
     let newSession: () -> Void
     let newTask: () -> Void
-    /// New Task with its time set for later, from the Tasks pane.
-    let newLaterTask: () -> Void
     let closeSession: (Session) -> Void
     let toggleSidebar: () -> Void
     let toggleFiles: () -> Void

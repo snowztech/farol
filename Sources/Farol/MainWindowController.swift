@@ -108,7 +108,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let commands = Commands(
             newSession: { [weak self] in self?.newSession() },
             newTask: { [weak self] in self?.newTask() },
-            newLaterTask: { [weak self] in self?.newTask(later: true) },
             closeSession: { [weak self] in self?.requestClose($0) },
             toggleSidebar: { [weak self] in self?.toggleSidebar() },
             toggleFiles: { [weak self] in self?.toggleFiles() },
