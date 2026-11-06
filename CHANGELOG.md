@@ -7,8 +7,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Added
 
 - Go to definition and references in Vue files. The Vue row in Settings → Editor installs the Vue plugin for the TypeScript server, which then serves `.ts` and `.vue` files in one process. It works in the `<script>` and in the `<template>` of a component: variables and functions used in `{{ }}`, `:prop` and `@event`, a component used as a tag, a prop, and the imports of other components and scripts.
-
-- Vue files are colored by section. The script is read as JavaScript or TypeScript, the style as CSS, and the template as HTML, with its directives (`v-if`, `:prop`, `@click`) and the expressions in them and in `{{ }}` read as JavaScript. Component tags like `<my-button>` are colored whole. They had no more than tag names, strings and comments before.
+- HTML, Vue, Svelte and Astro files are colored like the code they hold. `<script>` reads as JavaScript or TypeScript, `<style>` as CSS, and Astro's frontmatter as TypeScript. Expressions read as JavaScript too: Vue's `{{ }}` and directive values like `:class` and `@click`, and Svelte's and Astro's `{ }`. Directives like `v-if`, `on:click` and `client:load` stand out, and tags like `<my-button>` are colored whole. Text between tags stays plain.
 
 ## [0.62.0] - 2026-11-06
 
