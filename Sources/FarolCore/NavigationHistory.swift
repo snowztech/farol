@@ -23,11 +23,17 @@ public struct NavigationHistory: Equatable {
     public var canGoBack: Bool { !back.isEmpty }
     public var canGoForward: Bool { !forward.isEmpty }
 
+    /// Lines apart in one file for two places to count as one, so stepping around a function doesn't take a press of back per step.
+    static let nearby = 10
+
     /// Leaving `place` for somewhere else. What had been undone is gone, as in a browser, since this is a new path.
     public mutating func record(leaving place: Place) {
         forward.removeAll()
-        // Looking again at where you already were adds nothing to go back to.
-        guard back.last != place else { return }
+        // Close to where you last left, it's the same place, now where you were most recently.
+        if let last = back.last, last.path == place.path, abs(last.line - place.line) <= Self.nearby {
+            back[back.count - 1] = place
+            return
+        }
         back.append(place)
         if back.count > Self.limit { back.removeFirst(back.count - Self.limit) }
     }

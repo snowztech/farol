@@ -48,12 +48,22 @@ private func place(_ path: String, _ line: Int) -> NavigationHistory.Place { .in
 
 @Test func keepsOnlyTheLatestHundredPlaces() {
     var history = NavigationHistory()
-    for line in 1...150 { history.record(leaving: place("a.swift", line)) }
+    for line in 1...150 { history.record(leaving: place("a.swift", line * 100)) }
     var oldest: NavigationHistory.Place?
     var current = place("z.swift", 0)
     while let previous = history.goBack(from: current) {
         oldest = previous
         current = previous
     }
-    #expect(oldest == place("a.swift", 51))
+    #expect(oldest == place("a.swift", 5100))
+}
+
+@Test func placesAFewLinesApartInOneFileCountOnce() {
+    var history = NavigationHistory()
+    history.record(leaving: place("a.swift", 10))
+    history.record(leaving: place("a.swift", 18))
+    history.record(leaving: place("b.swift", 18))
+    #expect(history.goBack(from: place("c.swift", 1)) == place("b.swift", 18))
+    #expect(history.goBack(from: place("b.swift", 18)) == place("a.swift", 18))
+    #expect(!history.canGoBack)
 }
