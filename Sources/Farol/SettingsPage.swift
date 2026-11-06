@@ -30,6 +30,10 @@ struct SettingsPage: View {
     @State private var agentError: String?
     /// Whether gh and glab are there and logged in. Empty while they are being asked.
     @State private var tools: [Forge.Kind: Forge.ToolState] = [:]
+    /// The languages whose server is turned on, by command, read when the page shows and changed by its switches.
+    @State private var enabledServers: Set<String> = []
+    /// Where each server was found, by command, once looked for. A missing one maps to nil.
+    @State private var servers: [String: String?] = [:]
     /// Where each connected account's picture is, once known.
     @State private var avatars: [Forge.Kind: URL] = [:]
     /// Whether jira-cli is there and set up. Nil while it is being asked.
@@ -62,6 +66,7 @@ struct SettingsPage: View {
         case agents = "Agents"
         case worktrees = "Worktrees"
         case integrations = "Integrations"
+        case editor = "Editor"
         case remote = "Remote"
         case shortcuts = "Shortcuts"
         case about = "About"
@@ -70,9 +75,11 @@ struct SettingsPage: View {
             switch self {
             case .terminal: "apple.terminal.fill"
             case .appearance: "paintpalette.fill"
+
             case .agents: "sparkles"
             case .worktrees: "arrow.triangle.branch"
             case .integrations: "link"
+            case .editor: "curlybraces"
             case .remote: "iphone"
             case .shortcuts: "command"
             case .about: "info"
@@ -85,9 +92,12 @@ struct SettingsPage: View {
             let hue: NSColor? = switch self {
             case .terminal: NSColor(p.done)
             case .appearance: p.code.keyword
+
             case .agents: NSColor(p.waiting)
             case .worktrees: NSColor(p.working)
             case .integrations: NSColor(p.pull)
+            // Orange, between the theme's red and yellow, a hue no other section uses.
+            case .editor: NSColor(p.removed).mixed(with: NSColor(p.waiting), 0.5)
             case .remote: NSColor(p.removed)
             case .shortcuts, .about: nil
             }
@@ -130,6 +140,7 @@ struct SettingsPage: View {
                         case .agents: agentsSection(p)
                         case .worktrees: worktreesSection(p)
                         case .integrations: integrationsSection(p)
+                        case .editor: editorSection(p)
                         case .remote: remoteSection(p)
                         case .shortcuts: shortcuts(p)
                         case .about: EmptyView()
@@ -244,7 +255,7 @@ struct SettingsPage: View {
     @ViewBuilder private func terminal(_ p: Palette) -> some View {
         Heading(title: "Terminal", detail: "Applies to every session.", palette: p)
 
-        GroupTitle(title: "Font", palette: p)
+        GroupTitle(title: "Font", first: true, palette: p)
         Card(palette: p) {
             Row(title: "Family", palette: p) {
                 Picker("", selection: $settings.fontFamily) {
@@ -319,7 +330,7 @@ struct SettingsPage: View {
     @ViewBuilder private func agentsSection(_ p: Palette) -> some View {
         Heading(title: "Agents", detail: "Set up your coding agents so Farol can tell you when they need you.", palette: p)
 
-        GroupTitle(title: "Status", palette: p)
+        GroupTitle(title: "Status", first: true, palette: p)
         Card(palette: p) {
             ForEach(Array(agentSetups.enumerated()), id: \.element.id) { agentRow($0.element, in: agentFolders[$0.offset], p) }
         }
@@ -407,10 +418,69 @@ struct SettingsPage: View {
         }
     }
 
+    @ViewBuilder private func editorSection(_ p: Palette) -> some View {
+        Heading(title: "Editor",
+                detail: "Go to definition and find references with ⌘-click. A server only runs for the languages you turn on.",
+                palette: p)
+        GroupTitle(title: "Language servers", palette: p)
+        Card(palette: p) {
+            ForEach(LSP.servers, id: \.command) { serverRow($0, p) }
+        }
+        .onAppear {
+            enabledServers = Set(LSP.servers.filter(LanguageServers.shared.isEnabled).map(\.command))
+            locateServers()
+        }
+    }
+
+    private func locateServers() {
+        LanguageServers.shared.locateAll {
+            servers = Dictionary(uniqueKeysWithValues: LSP.servers.map { ($0.command, LanguageServers.shared.location(of: $0)) })
+        }
+    }
+
+    /// Each language on its own color, a tool's identity being what a tile's color carries.
+    private func languageTile(_ server: LSP.Server) -> ToolTile {
+        let (file, hex): (String, UInt32) = switch server.command {
+        case "gopls": ("a.go", 0x00ADD8)
+        case "typescript-language-server": ("a.ts", 0x3178C6)
+        case "pyright-langserver": ("a.py", 0x3776AB)
+        case "rust-analyzer": ("a.rs", 0xCE412B)
+        case "sourcekit-lsp": ("a.swift", 0xF05138)
+        default: ("a.c", 0x00599C)
+        }
+        let color = Color(red: Double(hex >> 16 & 0xFF) / 255, green: Double(hex >> 8 & 0xFF) / 255, blue: Double(hex & 0xFF) / 255)
+        return ToolTile(file: file, color: color, size: 26)
+    }
+
+    /// The language first, since that's what you look for, and its server under it, with its switch, or how to get it.
+    private func serverRow(_ server: LSP.Server, _ p: Palette) -> some View {
+        let found = servers[server.command]
+        let on = Binding(get: { enabledServers.contains(server.command) }, set: { on in
+            if on { enabledServers.insert(server.command) } else { enabledServers.remove(server.command) }
+            LanguageServers.shared.setEnabled(on, for: server)
+        })
+        // The server's command in the terminal's type, as Agents shows each agent's.
+        return Row(title: server.language, detail: server.name, mono: true, icon: languageTile(server), palette: p) {
+            switch found {
+            case nil: ProgressView().controlSize(.mini)
+            case .some(let path?): toggle(on).help((path as NSString).abbreviatingWithTildeInPath)
+            case .some(nil):
+                // sourcekit-lsp comes with Xcode, so there is no command to run for it.
+                if server.command == "sourcekit-lsp" {
+                    Text("Comes with Xcode").font(.system(size: 12)).foregroundStyle(p.muted)
+                } else {
+                    ShipButton(title: "Install", help: "Opens a terminal with: \(server.install)", busy: false, palette: p) {
+                        runInTerminal(server.install)
+                    }
+                }
+            }
+        }
+    }
+
     @ViewBuilder private func worktreesSection(_ p: Palette) -> some View {
         Heading(title: "Worktrees", detail: "Applies to new tasks and worktree sessions.", palette: p)
 
-        GroupTitle(title: "Local environment", palette: p)
+        GroupTitle(title: "Local environment", first: true, palette: p)
         Card(palette: p) {
             Row(title: "Copy local environment files",
                 detail: "Copies ignored .env files into each new worktree so projects can run immediately. Agents in the worktree can read their values.",
@@ -423,20 +493,16 @@ struct SettingsPage: View {
     @ViewBuilder private func integrationsSection(_ p: Palette) -> some View {
         Heading(title: "Integrations", detail: "The services Farol works with, through their own command line tools.", palette: p)
 
-        GroupTitle(title: "Pull requests", palette: p)
-        Text("Farol creates pull requests and shows their state through these tools. Without them it opens the new request page in your browser.")
-            .font(.system(size: 12))
-            .foregroundStyle(p.muted)
-            .padding(.bottom, 4)
+        GroupTitle(title: "Pull requests",
+                   detail: "Farol creates pull requests and shows their state through these tools. Without them it opens the new request page in your browser.",
+                   first: true, palette: p)
         Card(palette: p) {
             ForEach(Forge.Kind.allCases, id: \.self) { toolRow($0, p) }
         }
 
-        GroupTitle(title: "Tickets", palette: p)
-        Text("New Task lists your open Jira tickets, next to the open issues of a repo on GitHub. Picking one names the branch after it and hands the agent the ticket in full.")
-            .font(.system(size: 12))
-            .foregroundStyle(p.muted)
-            .padding(.bottom, 4)
+        GroupTitle(title: "Tickets",
+                   detail: "New Task lists your open Jira tickets, next to the open issues of a repo on GitHub. Picking one names the branch after it and hands the agent the ticket in full.",
+                   palette: p)
         Card(palette: p) {
             Row(title: "Jira", detail: jiraDetail, icon: ToolTile(jira: 26), link: ("Jira CLI (jira)", Jira.docs), palette: p) {
                 toolControl(jira, avatar: jiraAvatar, setup: Jira.setupCommand(from:), p)
@@ -745,7 +811,7 @@ struct SettingsPage: View {
     @ViewBuilder private func shortcuts(_ p: Palette) -> some View {
         Heading(title: "Shortcuts", detail: "Standard terminal shortcuts, plus Farol's own for sessions.", palette: p)
         ForEach(Self.shortcutGroups, id: \.title) { group in
-            GroupTitle(title: group.title, palette: p)
+            GroupTitle(title: group.title, first: group.title == Self.shortcutGroups.first?.title, palette: p)
             Card(palette: p) {
                 ForEach(group.items, id: \.action) { item in
                     Row(title: item.action, palette: p) {
@@ -865,6 +931,9 @@ struct SettingsPage: View {
             ("Find the selected text", ["⌘E"]),
             ("Find in the files under the pane's folder", ["⇧⌘F"]),
             ("Next and previous search result", ["F4", "⇧F4"]),
+            ("Go to a line in the open file", ["⌘L"]),
+            ("Go to a definition, or list references from one (with its language server on)", ["⌘ click"]),
+            ("Next and previous file tab", ["⌃Tab", "⌃⇧Tab"]),
             ("Close find", ["esc"]),
         ]),
         ShortcutGroup(title: "Terminal", items: [
@@ -1060,14 +1129,20 @@ extension View {
 /// A small heading between rows. Sentence case, a step above the rows, no rule of its own.
 private struct GroupTitle: View {
     let title: String
+    /// What the group is for, under its title, when its rows don't say it.
+    var detail: String? = nil
+    /// Right under the page's heading, whose own space below is enough. Every page's first section then sits as far from it.
+    var first = false
     let palette: Palette
 
     var body: some View {
-        Text(title)
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(palette.muted)
-            .padding(.top, 22)
-            .padding(.bottom, 8)
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.system(size: 12, weight: .semibold))
+            if let detail { Text(detail).font(.system(size: 12)) }
+        }
+        .foregroundStyle(palette.muted)
+        .padding(.top, first ? 0 : 22)
+        .padding(.bottom, 8)
     }
 }
 

@@ -56,6 +56,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// Follows the selected session's checkout, so the title bar shows when git stops on conflicts.
     private var mergeFollow: AnyCancellable?
     private var mergeDone: AnyCancellable?
+    private var mergeSidebar: AnyCancellable?
+    /// The sidebar went away because the merge view opened, so it comes back when that closes.
+    private var sidebarHiddenForMerge = false
     private var mergeCount: AnyCancellable?
 
     let agents: AgentSettings
@@ -124,7 +127,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let filesPanel = hosting(FilesPanel(
             tree: files, state: state,
             search: fileSearch,
-            open: { [weak self] in self?.open($0, line: $1) },
+            // Picked in the tree on purpose, so it gets a tab of its own. Search results and review click through in the preview tab.
+            open: { [weak self] in self?.open($0, line: $1, keep: true) },
             openMatch: { [weak self] in self?.openMatch($0, line: $1) },
             resize: { [weak self] in self?.setFilesWidth($0) },
             startSearch: { [weak self] in self?.findInFiles() }))
@@ -385,6 +389,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
             self?.notch.refresh()
         }
+        // Three columns need the width, so the sidebar steps aside while you resolve and returns after.
+        mergeSidebar = state.$showingMerge.dropFirst().removeDuplicates().sink { [weak self] resolving in
+            // Moved off this change, since hiding the sidebar changes the same state again.
+            DispatchQueue.main.async { self?.makeRoomForMerge(resolving) }
+        }
         // Once git goes on past the last conflict, there is nothing left to show, so the terminal comes back.
         mergeDone = merge.$operation.sink { [weak self] operation in
             guard let self, operation == nil, state.showingMerge else { return }
@@ -456,7 +465,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// Asks before quitting kills running programs.
     func confirmQuit(_ reply: @escaping (Bool) -> Void) {
         // Unsaved files first, one at a time, each shown in its session.
-        if let session = store.sessions.first(where: { $0.panes.file?.isDirty == true }), let file = session.panes.file {
+        if let session = store.sessions.first(where: { $0.panes.tabs?.files.contains(where: \.isDirty) == true }),
+           let file = session.panes.unsavedFile() {
             store.select(session)
             return file.confirmClose({ [weak self] in self?.confirmQuit(reply) }, cancelled: { reply(false) })
         }
@@ -485,7 +495,22 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }, completionHandler: { TerminalView.releaseSize() })
     }
 
+    /// Closes the sidebar while the merge view is open, and opens it again after, unless you toggled it yourself meanwhile.
+    private func makeRoomForMerge(_ resolving: Bool) {
+        if resolving {
+            guard sidebarWidth.constant != 0 else { return }
+            toggleSidebar()
+            sidebarHiddenForMerge = true
+        } else {
+            let restore = sidebarHiddenForMerge
+            sidebarHiddenForMerge = false
+            if restore, sidebarWidth.constant == 0 { toggleSidebar() }
+        }
+    }
+
     func toggleSidebar() {
+        // Your own choice from here on, so closing the merge view no longer decides for you.
+        sidebarHiddenForMerge = false
         let open = sidebarWidth.constant == 0
         withAnimation(Self.panelMotion) { state.sidebarVisible = open }
         animatePanels { self.sidebarWidth.animator().constant = open ? self.state.sidebarWidth : 0 }
@@ -550,11 +575,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// Text opens in the file pane. Images, PDFs and media open in their Mac app.
     /// Anything else is shown in Finder rather than opened, since opening an unknown binary could run it.
-    private func open(_ path: String, line: Int? = nil) {
+    private func open(_ path: String, line: Int? = nil, keep: Bool = false) {
         let url = URL(fileURLWithPath: path)
         // The contents decide before the extension does, since macOS calls a TypeScript .ts a video and an SVG an image.
         if case .text? = try? Files.read(path) {
-            store.selected?.panes.open(path, line: line)
+            store.selected?.panes.open(path, line: line, keep: keep)
         } else if let type = UTType(filenameExtension: url.pathExtension),
                   [UTType.image, .pdf, .audiovisualContent].contains(where: type.conforms) {
             NSWorkspace.shared.open(url)
@@ -734,6 +759,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         store.selected?.panes.file?.mark { FileSearch.ranges(of: query, in: $0, options: options) }
     }
 
+    /// Only in the file pane with more than one tab, so ⌃Tab reaches programs in the terminal the rest of the time.
+    var canStepTab: Bool { store.selected?.panes.canStepTab == true }
+    func stepTab(_ by: Int) { store.selected?.panes.stepTab(by) }
+
     /// Only with results and a file in front, so F4 stays a key for programs in the terminal, like htop's filter, the rest of the time.
     var canStepResult: Bool { !fileSearch.matches.isEmpty && focusedFile != nil }
 
@@ -808,7 +837,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         store.sessions.forEach {
             $0.panes.theme = theme
             $0.panes.palette = state.palette
-            $0.panes.syntax = state.palette.code
+            $0.panes.syntax = state.palette.editorCode
         }
     }
 
@@ -869,6 +898,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         guard let panes = store.selected?.panes, panes.fileFocused else { return nil }
         return panes.file
     }
+
+    /// ⌘L in the file pane: the status bar's Go to Line field.
+    var canGoToLine: Bool { focusedFile != nil }
+    func goToLine() { store.selected?.panes.tabs?.askLine() }
+
+    /// View → Show Git Blame, for the file in front. Also in the right-click menu of its code and line numbers.
+    var canToggleBlame: Bool { focusedFile?.canBlame == true }
+    var isBlaming: Bool { focusedFile?.isBlaming == true }
+    func toggleBlame() { focusedFile?.toggleBlame() }
 
     var canSaveFile: Bool { state.showingMerge ? mergeEditor.mode == .text : focusedFile != nil }
 
@@ -931,7 +969,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         session.panes.autoresizingMask = [.width, .height]
         session.panes.theme = theme
         session.panes.palette = state.palette
-        session.panes.syntax = state.palette.code
+        session.panes.syntax = state.palette.editorCode
         terminalContainer.addSubview(session.panes)
     }
 
