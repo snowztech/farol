@@ -268,7 +268,8 @@ private struct TasksPane: View {
 
     @AppStorage("sidebar.tasksFolded") private var folded = false
     @State private var hovering = false
-    private static let rowHeight: CGFloat = 28
+    static let rowHeight: CGFloat = 40
+    private static let groupHeight: CGFloat = 24
 
     var body: some View {
         let p = palette
@@ -302,7 +303,7 @@ private struct TasksPane: View {
             .onClickableHover { hovering = $0 }
             .hoverTip(folded ? "Show tasks" : "Fold tasks")
             if !folded {
-                let lines = tasks.count + (groups.count > 1 ? groups.count : 0)
+                let height = CGFloat(tasks.count) * Self.rowHeight + (groups.count > 1 ? CGFloat(groups.count) * Self.groupHeight : 0)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(groups, id: \.key) { group in
@@ -310,8 +311,8 @@ private struct TasksPane: View {
                                 Text(URL(fileURLWithPath: key).lastPathComponent)
                                     .font(.system(size: 10, weight: .medium))
                                     .foregroundStyle(p.muted.opacity(0.8))
-                                    .padding(.leading, 35)
-                                    .frame(height: Self.rowHeight, alignment: .bottomLeading)
+                                    .padding(.leading, 10)
+                                    .frame(height: Self.groupHeight, alignment: .bottomLeading)
                             }
                             ForEach(group.items) { task in
                                 TaskRow(task: task, run: scheduler.run(of: task), starting: scheduler.starting.contains(task.id),
@@ -321,15 +322,15 @@ private struct TasksPane: View {
                     }
                     .padding(.horizontal, 8)
                 }
-                // As tall as its rows up to five, so it never takes the sessions' room.
-                .frame(height: min(CGFloat(lines), 5.5) * Self.rowHeight)
+                // As tall as its rows up to four and a half, so it never takes the sessions' room and a cut row says there are more.
+                .frame(height: min(height, 4.5 * Self.rowHeight))
                 .padding(.bottom, 4)
             }
         }
     }
 }
 
-/// One task: a clock until it runs, the run's own lamp while it does, and when it runs next on the right.
+/// One task: its name, when it runs under it, and the run's own lamp on the right while it runs.
 /// Clicking it changes when it runs, or opens its run while one is open.
 private struct TaskRow: View {
     let task: Schedule
@@ -346,31 +347,29 @@ private struct TaskRow: View {
 
     var body: some View {
         let p = palette
-        HStack(spacing: 10) {
-            ZStack {
-                if let run {
-                    RunLamp(session: run, palette: p)
-                } else if task.failure != nil {
-                    Circle().fill(p.waiting).frame(width: Lamp.size, height: Lamp.size)
-                } else {
-                    Image(systemName: task.paused ? "pause" : task.once == nil ? "repeat" : "clock")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(p.muted.opacity(task.paused ? 0.6 : 1))
+        // Lined up with the Tasks heading, not the sessions' lamps: a task is a plan to read, and live state sits on the right.
+        HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(task.name)
+                    .font(.system(size: 12))
+                    .foregroundStyle(task.paused ? p.muted : p.text.opacity(0.85))
+                    .truncationMode(.tail)
+                HStack(spacing: 4) {
+                    if task.once == nil, run == nil, task.failure == nil {
+                        Image(systemName: "repeat").font(.system(size: 9, weight: .semibold))
+                    }
+                    Text(when)
                 }
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(task.failure != nil ? p.waiting : p.muted)
             }
-            .frame(width: 14)
-            Text(task.name)
-                .font(.system(size: 12))
-                .foregroundStyle(task.paused ? p.muted : p.text.opacity(0.85))
-                .lineLimit(1)
-                .truncationMode(.tail)
+            .lineLimit(1)
             Spacer(minLength: 4)
             trailing(p)
         }
-        .padding(.leading, 7)
-        .padding(.trailing, 4)
-        .frame(height: 28)
-        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(hovering ? p.hover : .clear))
+        .padding(.horizontal, 10)
+        .frame(height: TasksPane.rowHeight)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(hovering ? p.hover : .clear))
         .contentShape(Rectangle())
         .onTapGesture { if let run { store.select(run) } else { edit() } }
         .onClickableHover { hovering = $0 }
@@ -404,15 +403,21 @@ private struct TaskRow: View {
     @ViewBuilder private func trailing(_ p: Palette) -> some View {
         if starting {
             ProgressView().controlSize(.mini)
-        } else if hovering, run == nil {
+        } else if let run {
+            RunLamp(session: run, palette: p)
+        } else if hovering {
             CloseButton(symbol: "play.fill", help: "Run now", palette: p) { scheduler.run(task.id) }
-        } else {
-            Text(run != nil ? "running" : task.failure != nil ? "didn't start" : task.paused ? "paused" : task.upcoming(at: .now))
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(task.failure != nil ? p.waiting : p.muted)
-                .lineLimit(1)
-                .fixedSize()
         }
+    }
+
+    /// The second line: when it runs in the words a calendar would use, or why it isn't waiting.
+    private var when: String {
+        if run != nil { return "running" }
+        if task.failure != nil { return "didn't start" }
+        let time = task.once.map { once in
+            Calendar.current.isDateInToday(once) ? "today \(task.upcoming(at: .now))" : task.upcoming(at: .now)
+        } ?? "\(task.days.label.lowercased()) \(Schedule.clock(hour: task.hour, minute: task.minute))"
+        return task.paused ? "paused · \(time)" : time
     }
 
     private var tip: String {

@@ -97,6 +97,28 @@ public struct Schedule: Codable, Equatable, Identifiable, Sendable {
         return date.formatted(date: .omitted, time: .shortened)
     }
 
+    /// Minutes into the day for a time typed any common way: 9, 905, 9:05, 9.05, 21h30, 9pm or 9:05 AM.
+    public static func minutes(typed: String) -> Int? {
+        var text = typed.lowercased().filter { !$0.isWhitespace }
+        let half = ["am", "pm", "a", "p"].first { text.hasSuffix($0) }
+        if let half { text.removeLast(half.count) }
+        let parts = text.split(omittingEmptySubsequences: false) { ":.h".contains($0) }.map(String.init)
+        guard parts.allSatisfy({ $0.allSatisfy { $0.isASCII && $0.isNumber } }), !(parts.first ?? "").isEmpty else { return nil }
+        var hour: Int?, minute: Int?
+        switch parts.count {
+        case 1 where parts[0].count <= 2: (hour, minute) = (Int(parts[0]), 0)
+        case 1 where parts[0].count <= 4: (hour, minute) = (Int(parts[0].dropLast(2)), Int(parts[0].suffix(2)))
+        case 2 where parts[1].count <= 2: (hour, minute) = (Int(parts[0]), parts[1].isEmpty ? 0 : Int(parts[1]))
+        default: return nil
+        }
+        guard var hour, let minute, minute < 60 else { return nil }
+        if let half {
+            guard (1...12).contains(hour) else { return nil }
+            hour = hour % 12 + (half.hasPrefix("p") ? 12 : 0)
+        }
+        return hour < 24 ? hour * 60 + minute : nil
+    }
+
     /// The branch of a run started on `day`.
     public func branch(on day: Date, calendar: Calendar = .current) -> String {
         if once != nil { return branch }

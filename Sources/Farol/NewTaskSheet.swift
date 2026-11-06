@@ -736,6 +736,8 @@ struct WhenChoices: View {
 
     @State private var pickingDay = false
     @State private var pickingTime = false
+    @State private var typed = ""
+    @FocusState private var typing: Bool
 
     var body: some View {
         let p = palette
@@ -762,28 +764,23 @@ struct WhenChoices: View {
                         SheetSelect(palette: p, open: $pickingDay, compact: true) {
                             Text(Self.dayName(daysAhead)).lineLimit(1)
                         } choices: {
-                            VStack(spacing: 1) {
-                                ForEach(0..<14, id: \.self) { ahead in
-                                    SheetChoice(palette: p) {
-                                        set(day: ahead, minutes: minutes)
-                                        pickingDay = false
-                                    } label: { picked(Self.dayName(ahead), ahead == daysAhead) }
-                                }
+                            MonthGrid(picked: at, palette: p) { day in
+                                let calendar = Calendar.current
+                                set(day: calendar.dateComponents([.day], from: calendar.startOfDay(for: .now), to: day).day ?? 0, minutes: minutes)
+                                pickingDay = false
                             }
-                            .padding(6)
-                            .frame(width: 200)
                         }
                     }
-                    SheetSelect(palette: p, open: $pickingTime, compact: true) {
-                        Text(Self.clock(minutes)).monospacedDigit()
-                    } choices: { timeList(p) }
-                    .frame(width: when == .later ? 96 : nil)
+                    timeField(p)
+                        .frame(width: when == .later ? 96 : nil)
                 }
                 .padding(.horizontal, 2)
                 .padding(.vertical, 2)
                 Text(firstRun)
                     .font(.system(size: 11))
                     .foregroundStyle(p.muted)
+                    // The popover sizes before the text wraps, which cut the second line to an ellipsis.
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 8)
                     .padding(.top, 6)
                     .padding(.bottom, 2)
@@ -794,6 +791,37 @@ struct WhenChoices: View {
         .padding(6)
         .frame(width: 260)
         .background(p.background)
+    }
+
+    /// Typed for any minute, like 9:05 or 21h30. The list only offers quarter hours, to pick a round time in one click.
+    private func timeField(_ p: Palette) -> some View {
+        HStack(spacing: 8) {
+            TextField("", text: $typed)
+                .textFieldStyle(.plain)
+                .monospacedDigit()
+                .focused($typing)
+                .onSubmit(commitTyped)
+            Button { pickingTime.toggle() } label: {
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(p.muted)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $pickingTime, arrowEdge: .bottom) {
+                timeList(p).font(.system(size: 13)).foregroundStyle(p.text).background(p.background)
+            }
+        }
+        .sheetField(p, focused: typing || pickingTime, padding: 6)
+        .onAppear { typed = Self.clock(minutes) }
+        .onChange(of: minutes) { _, now in if !typing { typed = Self.clock(now) } }
+        .onChange(of: typing) { _, now in if !now { commitTyped() } }
+    }
+
+    /// A time that doesn't read as one goes back to the last good one.
+    private func commitTyped() {
+        if let picked = Schedule.minutes(typed: typed) { set(day: daysAhead, minutes: picked) }
+        typed = Self.clock(minutes)
     }
 
     /// Every quarter of an hour, opened on the one picked. Times already gone today aren't offered for a task that runs once.
@@ -850,17 +878,6 @@ struct WhenChoices: View {
 
     private static func clock(_ minutes: Int) -> String { Schedule.clock(hour: minutes / 60, minute: minutes % 60) }
 
-    /// Today, Tomorrow, then like Sunday 8 Nov.
-    private static func dayName(_ ahead: Int) -> String {
-        switch ahead {
-        case 0: return "Today"
-        case 1: return "Tomorrow"
-        default:
-            let day = Calendar.current.date(byAdding: .day, value: ahead, to: .now) ?? .now
-            return day.formatted(.dateTime.weekday(.wide).day().month(.abbreviated))
-        }
-    }
-
     /// Today with its time gone moves to the next quarter hour, so a task that runs once is never in the past.
     private func set(day ahead: Int, minutes: Int) {
         let calendar = Calendar.current
@@ -870,5 +887,113 @@ struct WhenChoices: View {
         let now = calendar.dateComponents([.hour, .minute], from: .now)
         let next = (((now.hour ?? 0) * 60 + (now.minute ?? 0)) / 15 + 1) * 15
         at = calendar.date(byAdding: .minute, value: next, to: calendar.startOfDay(for: .now)) ?? picked
+    }
+
+    /// Today, Tomorrow, then like Sun 8 Nov, with the year once it isn't this one.
+    private static func dayName(_ ahead: Int) -> String {
+        switch ahead {
+        case 0: return "Today"
+        case 1: return "Tomorrow"
+        default:
+            let calendar = Calendar.current
+            let day = calendar.date(byAdding: .day, value: ahead, to: .now) ?? .now
+            let format = Date.FormatStyle.dateTime.weekday(.abbreviated).day().month(.abbreviated)
+            return day.formatted(calendar.isDate(day, equalTo: .now, toGranularity: .year) ? format : format.year())
+        }
+    }
+}
+
+/// A month to pick a day from, in the sheet's own quiet colors rather than the system's blue. Days gone are dimmed.
+private struct MonthGrid: View {
+    let palette: Palette
+    let picked: Date
+    let choose: (Date) -> Void
+    @State private var month: Date
+
+    init(picked: Date, palette: Palette, choose: @escaping (Date) -> Void) {
+        self.picked = picked
+        self.palette = palette
+        self.choose = choose
+        _month = State(initialValue: Calendar.current.dateInterval(of: .month, for: picked)?.start ?? picked)
+    }
+
+    var body: some View {
+        let calendar = Calendar.current
+        let first = calendar.dateInterval(of: .month, for: .now)?.start ?? .now
+        VStack(spacing: 6) {
+            HStack(spacing: 2) {
+                Text(month.formatted(.dateTime.month(.wide).year())).font(.system(size: 13, weight: .medium))
+                Spacer()
+                CloseButton(symbol: "chevron.left", help: "Previous month", palette: palette) { step(-1) }
+                    .disabled(month <= first)
+                    .opacity(month <= first ? 0.3 : 1)
+                CloseButton(symbol: "chevron.right", help: "Next month", palette: palette) { step(1) }
+            }
+            .padding(.leading, 6)
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(28), spacing: 2), count: 7), spacing: 2) {
+                ForEach(Array(weekdays.enumerated()), id: \.offset) { _, name in
+                    Text(name).font(.system(size: 10)).foregroundStyle(palette.muted).frame(height: 18)
+                }
+                ForEach(Array(days.enumerated()), id: \.offset) { _, day in
+                    if let day {
+                        DayCell(day: day, chosen: calendar.isDate(day, inSameDayAs: picked), palette: palette) { choose(day) }
+                    } else {
+                        Color.clear.frame(height: 26)
+                    }
+                }
+            }
+        }
+        .padding(8)
+    }
+
+    private func step(_ months: Int) {
+        month = Calendar.current.date(byAdding: .month, value: months, to: month) ?? month
+    }
+
+    /// One letter a day, starting where the user's week starts.
+    private var weekdays: [String] {
+        let calendar = Calendar.current
+        let names = calendar.veryShortStandaloneWeekdaySymbols
+        return Array(names[(calendar.firstWeekday - 1)...] + names[..<(calendar.firstWeekday - 1)])
+    }
+
+    /// The month's days, after blanks up to its first weekday.
+    private var days: [Date?] {
+        let calendar = Calendar.current
+        let count = calendar.range(of: .day, in: .month, for: month)?.count ?? 30
+        let lead = (calendar.component(.weekday, from: month) - calendar.firstWeekday + 7) % 7
+        return Array(repeating: nil, count: lead) + (0..<count).map { calendar.date(byAdding: .day, value: $0, to: month) }
+    }
+}
+
+private struct DayCell: View {
+    let day: Date
+    let chosen: Bool
+    let palette: Palette
+    let choose: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        let calendar = Calendar.current
+        let gone = day < calendar.startOfDay(for: .now)
+        Button(action: choose) {
+            Text("\(calendar.component(.day, from: day))")
+                .font(.system(size: 12, weight: chosen ? .semibold : .regular))
+                .monospacedDigit()
+                .foregroundStyle(chosen ? palette.background : gone ? palette.muted.opacity(0.5) : palette.text)
+                .frame(width: 28, height: 26)
+                .background(RoundedRectangle(cornerRadius: 6).fill(chosen ? palette.text : hovering && !gone ? palette.raised : .clear))
+                // A dot, as in Calendar. A box around today read as a second pick or as a day you can't have.
+                .overlay(alignment: .bottom) {
+                    if calendar.isDateInToday(day) {
+                        Circle().fill(chosen ? palette.background : palette.text).frame(width: 3, height: 3).padding(.bottom, 3)
+                    }
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(gone)
+        .onClickableHover { hovering = $0 }
     }
 }

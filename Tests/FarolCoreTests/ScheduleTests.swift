@@ -71,6 +71,13 @@ private func schedule(_ days: Schedule.Days = .everyDay, since: Date) -> Schedul
     #expect(job["ProgramArguments"] as? [String] == ["/usr/bin/open", "-g", "-b", "b"])
 }
 
+@Test func readsATimeTypedAnyCommonWay() {
+    let typed = ["9": 540, "905": 545, "0905": 545, "9:05": 545, "9.05": 545, "21h30": 1290, "21h": 1260,
+                 "9pm": 1260, "9:05 AM": 545, "12am": 0, "12:30 pm": 750, "23:59": 1439]
+    for (text, minutes) in typed { #expect(Schedule.minutes(typed: text) == minutes, "\(text)") }
+    for text in ["", "24:00", "9:60", "13pm", "abc", "9:5:0", ":30"] { #expect(Schedule.minutes(typed: text) == nil, "\(text)") }
+}
+
 @Test func saysWhenItRunsNextInFewWords() {
     let daily = schedule(since: at(6, 9, 1))
     #expect(!daily.upcoming(at: at(6, 8), calendar: calendar).hasPrefix("tmrw"))
