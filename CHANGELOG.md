@@ -19,7 +19,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - Farol Light is easier on the eyes: a softer white background, and every color dark enough to read on it, including the bright white and bright black some tools print in.
 - Farol Navy has colors of its own instead of Farol Beam's on a blue background: lavender text and bright blues, violets and a yellow green, like a city at night.
 - Settings → Appearance starts with your theme: its name and a preview. Click it and every theme opens beside the page, with search, a Dark and Light switch, and Farol's themes, yours, a Popular row of well known ones and the rest. A theme applies as you click it, and the page shows how it looks. Each card shows the theme's six hues, so dark themes are easier to tell apart, and your Ghostty config's colors show as Your Ghostty colors.
-- Appearance puts how Farol looks in one group, theme, style, app icon and animations, and how it's laid out in another.
+- Appearance is regrouped: the theme on its own at the top, then style, app icon and animations under Interface, and grouping sessions and the run button under Layout.
 
 ## [0.62.0] - 2026-11-06
 

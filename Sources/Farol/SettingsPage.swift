@@ -209,11 +209,15 @@ struct SettingsPage: View {
         .onClickableHover { hoveringTheme = $0 }
     }
 
-    /// How Farol looks in one card, then how it's laid out.
+    /// The theme first and on its own, since it is what people come here for, then the rest of how Farol looks, then how it's laid out.
     @ViewBuilder private func appearance(_ p: Palette) -> some View {
         Heading(title: "Appearance", detail: nil, palette: p)
         Card(palette: p) {
             themeRow(p)
+        }
+
+        GroupTitle(title: "Interface", palette: p)
+        Card(palette: p) {
             Row(title: "Style",
                 detail: "Boxed puts each panel in a rounded card. Glass puts the side panels on Liquid Glass, with the desktop blurred through them.",
                 palette: p) {
