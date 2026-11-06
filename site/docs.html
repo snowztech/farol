@@ -213,6 +213,7 @@
           <h3>Run project commands</h3>
           <p>Press <kbd>⌘P</kbd> to find commands from the project's Makefile, package.json or justfile. Return runs a command in the current pane, or in a new pane below when an agent is working there. You can also add and manage commands from the pane's Run menu.</p>
           <p>Save a script in <code>.farol/commands/</code> to share it with a project, or in <code>~/.farol/commands/</code> to use it everywhere. Commit project commands to Git and they appear in new worktrees automatically. Farol does not copy untracked commands from another checkout.</p>
+          <img class="doc-shot" src="features/palette.png" width="2400" height="1520" alt="The ⌘P list searching for test: a session, the project's test command and the test files, with a footer saying what Return does">
 
           <h3>Prepare each worktree</h3>
           <p>Commit an executable script named exactly <code>.farol/setup</code> to your repo, with no extension. Its first line chooses the interpreter, such as <code>#!/bin/sh</code> or <code>#!/usr/bin/env python3</code>. Farol runs it in the new worktree's terminal before starting the agent or chosen command. If <strong>Settings → Worktrees → Copy local environment files</strong> is on, ignored <code>.env</code> files are copied first. Agents in that worktree can read their values. For a task across repos, each repo's setup runs before the agent starts.</p>
@@ -250,6 +251,7 @@ npm ci</code></pre>
             <li><strong>Git graph:</strong> Press <kbd>⌥⌘G</kbd> to inspect branches and commits, then check out, create, rebase, delete, cherry-pick or revert.</li>
             <li><strong>Ship:</strong> Commit, push and open a pull request on GitHub or GitLab from the review panel. Untick a file in the panel or in the commit sheet to leave it out of the commit.</li>
           </ul>
+          <img class="doc-shot" src="features/git-graph.png" width="2400" height="1520" alt="The git graph panel with the branches above and the history below, two merged branches drawn as colored lanes">
 
           <h3>Resolve conflicts</h3>
           <p>When a merge, rebase, cherry-pick or revert stops on conflicts, the title bar and the session's row show how many, even when an agent started it in the background. Press <kbd>⌥⌘M</kbd> to see the files in three columns: your version, the result and the incoming one.</p>
@@ -262,7 +264,7 @@ npm ci</code></pre>
             <li><strong>Whole files:</strong> <kbd>⌃⌘←</kbd> fills the result with your side and <kbd>⌃⌘→</kbd> with the incoming one, which you can still edit or undo before <strong>Mark Resolved</strong>. For a file deleted on one side, that means keeping or deleting it, and each option shows the file it leaves before you apply it.</li>
             <li><strong>Finish:</strong> <kbd>⌘S</kbd> marks the file resolved, and <strong>Reopen</strong> puts it back in conflict until you continue. Once every file is, run the tests or ask the agent to check, then continue, skip or abort. Continuing a merge, cherry-pick or revert asks for the commit message, starting from the one git prepared. A rebase keeps each commit's message unless you choose <strong>Edit Message</strong>. <kbd>Esc</kbd> goes back to the terminal.</li>
           </ul>
-          <img class="doc-shot" src="screenshot-review.png" width="2400" height="1520" alt="Farol showing agent sessions, a terminal and the review panel with the branch changes">
+          <img class="doc-shot" src="screenshot-review.png" width="2400" height="1520" alt="Farol with plain sessions, a folded project and an open one in the sidebar, Claude Code reviewing the branch in the terminal and the review panel showing its changes since main">
         </section>
 
         <section id="outside">
@@ -299,6 +301,7 @@ font-size = 14</code></pre>
 
           <h3>Custom themes</h3>
           <p>Put Ghostty theme files in <code>~/.config/farol/themes</code>. They appear in Settings → Appearance → Theme after Farol's built-in themes. The <strong>Themes folder</strong> button opens the right location.</p>
+          <img class="doc-shot" src="features/themes.png" width="2400" height="1520" alt="Settings → Appearance with the Theme row open and the themes panel beside it, listing Farol's eight themes">
         </section>
 
         <section id="shortcuts">
