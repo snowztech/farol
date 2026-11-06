@@ -123,74 +123,58 @@ extension Theme {
     }
 }
 
-/// Every theme, searchable, opened from the Theme row in Appearance.
-/// A click applies at once so you can try a few, and Cancel puts back the one you had, as a Mac sheet's Cancel does.
-struct ThemePicker: View {
+/// Every theme, searchable, beside Appearance once you click its Theme row. A click applies at once, and the page beside it shows how it looks.
+struct ThemePanel: View {
     @Binding var selected: String
     let ghosttyConfig: ThemeColors?
     let palette: Palette
+    let close: () -> Void
 
-    @Environment(\.dismiss) private var dismiss
     @State private var query = ""
     @State private var tone = ThemeTone.all
     @State private var themes: [Theme] = []
-    @State private var original: String?
     @FocusState private var searching: Bool
 
     var body: some View {
         let p = palette
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 16) {
-                SheetHeader(title: "Theme", palette: p) {
-                    Text("A theme applies as you click it, so you can try a few. Cancel goes back to the one you had.")
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Themes").font(.system(size: 15, weight: .semibold))
+                    Spacer()
+                    CloseButton(help: "Close", palette: p, action: close)
+                        .keyboardShortcut(.cancelAction)
                 }
-                HStack(spacing: 12) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass").foregroundStyle(p.muted)
-                        TextField("Search \(themes.count) themes", text: $query)
-                            .textFieldStyle(.plain)
-                            .focused($searching)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .background(p.surface, in: RoundedRectangle(cornerRadius: 8))
-                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(searching ? p.muted : p.line))
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(p.muted)
+                    TextField("Search \(themes.count) themes", text: $query)
+                        .textFieldStyle(.plain)
+                        .focused($searching)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(p.surface, in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(searching ? p.muted : p.line))
+                HStack {
                     ToneSwitch(tone: $tone, palette: p)
+                    Spacer()
+                    ShipButton(title: "Themes folder", help: "Drop a Ghostty theme file here and it shows under Yours.",
+                               busy: false, palette: p, action: Theme.openFolder)
                 }
             }
-            .padding(20)
+            .padding(16)
             Rectangle().fill(p.line).frame(height: 1)
             ScrollView {
                 ThemeGallery(query: query, selected: $selected, ghosttyConfig: ghosttyConfig, palette: p, themes: themes, tone: tone)
-                    .padding(20)
+                    .padding(16)
             }
-            Rectangle().fill(p.line).frame(height: 1)
-            HStack {
-                Button("Themes folder", action: Theme.openFolder)
-                    .buttonStyle(SheetButton(palette: p, primary: false))
-                    .help("Drop a Ghostty theme file here and it shows under Yours.")
-                Spacer()
-                Button("Cancel") {
-                    if let original { selected = original }
-                    dismiss()
-                }
-                .buttonStyle(SheetButton(palette: p, primary: false))
-                .keyboardShortcut(.cancelAction)
-                Button("Done") { dismiss() }
-                    .buttonStyle(SheetButton(palette: p, primary: true))
-                    .keyboardShortcut(.defaultAction)
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 14)
         }
         .font(.system(size: 13))
         .foregroundStyle(p.text)
-        .frame(width: 780, height: 600)
         .background(p.background)
         .onAppear {
             // Picks up themes added to your folder since the last time.
             themes = Theme.all()
-            original = selected
             searching = true
         }
     }
