@@ -1,16 +1,12 @@
 import AppKit
 import FarolCore
 
-/// A pane that shows a file: a header with its name, then the text with line numbers.
+/// A file's text with line numbers, in a tab of the file pane, which shows its name and actions.
 /// Edits are saved with ⌘S. When an agent changes the file on disk, it reloads, or asks if you have unsaved edits.
 final class FileView: NSView {
-    private static let headerHeight: CGFloat = 26
     private static let barHeight: CGFloat = 30
 
     private(set) var path = ""
-    /// The file's folder inside its checkout, like "internal/config/", shown muted before the name.
-    private var folder = ""
-    private var titleColors = (name: NSColor.labelColor, folder: NSColor.secondaryLabelColor)
     private var language: Syntax.Language?
     private var syntax: SyntaxColors?
     private var plainColor = NSColor.textColor
@@ -19,30 +15,38 @@ final class FileView: NSView {
     private static let highlightLimit = 400_000
     private(set) var isDirty = false {
         didSet {
-            unsavedDot.isHidden = !isDirty
-            needsLayout = true
             blame.lines = isDirty ? [] : blameLines
+            if isDirty != oldValue { onStateChange?() }
         }
     }
+    /// The file, its unsaved state or its mode changed, for the tab bar to follow.
+    var onStateChange: (() -> Void)?
+    /// The cursor moved or the selection changed, for the status bar.
+    var onCursorChange: (() -> Void)?
+
+    /// Where the cursor is, from 1, and how many characters are selected. From the gutter's index of lines, so a move costs nothing.
+    var cursor: (line: Int, column: Int, selected: Int) {
+        let range = text.selectedRange()
+        let line = gutter.line(containing: range.location)
+        // While typing, the selection can move before the gutter counts the new lines, so the column never goes below 1.
+        return (line.index + 1, max(1, range.location - line.start + 1), range.length)
+    }
     var onFocus: (() -> Void)?
-    var onClose: (() -> Void)?
     /// Opens another file in this pane, from a link in the Markdown preview.
     var onOpenFile: ((String) -> Void)?
     /// Shows a commit, by its hash, in the git graph, from a click on a line's hash in the blame.
     var onShowCommit: ((String) -> Void)?
+    /// Opens a file at a line, from a ⌘-click on a name the language server placed there.
+    var onOpenAt: ((String, Int) -> Void)?
+    /// The theme's colors, for the list of definitions or references to look like the rest of Farol.
+    var palette: () -> Palette? = { nil }
+    /// The pane now shows another file, which the files panel follows.
+    var onPathChange: (() -> Void)?
 
     /// The file as last read or saved, to tell our own save from someone else's change.
     private var onDisk: String?
     private var watcher: DispatchSourceFileSystemObject?
 
-    private let header = NSView()
-    private let title = NSTextField(labelWithString: "")
-    /// Same size as the sidebar's status dots, but muted, since colored dots mean agent states.
-    private let unsavedDot = NSView()
-    private static let dotSize = Lamp.size
-    private lazy var closeButton = QuietButton(symbol: "xmark", help: "Close file (⌘W)") { [weak self] in self?.onClose?() }
-    private lazy var previewButton = QuietButton(symbol: "eye", help: "Preview") { [weak self] in self?.togglePreview() }
-    private lazy var blameButton = QuietButton(symbol: "person.text.rectangle", help: "Show git blame") { [weak self] in self?.toggleBlame() }
     /// Who last changed each line, left of the numbers. Off until you ask, and your choice holds for every file, like the Markdown preview.
     private var blaming = false
     private static let blameKey = "FarolFileBlame"
@@ -65,6 +69,7 @@ final class FileView: NSView {
     private let keepButton = NSButton(title: "Keep Mine", target: nil, action: nil)
     private let scroll = NSScrollView()
     private let text: CodeTextView
+    private lazy var links = DefinitionLinks(text: text)
     private let gutter: LineNumbers
     /// The line a search or a link opened the file at, lit until the cursor leaves it.
     private var litLine: NSRange?
@@ -85,21 +90,16 @@ final class FileView: NSView {
         super.init(frame: .zero)
         wantsLayer = true
 
-        title.font = .systemFont(ofSize: 12, weight: .medium)
-        // A narrow pane drops the start of the folder first, so the name stays readable.
-        title.lineBreakMode = .byTruncatingHead
-        header.wantsLayer = true
-        header.addSubview(title)
-        unsavedDot.wantsLayer = true
-        unsavedDot.layer?.cornerRadius = Self.dotSize / 2
-        unsavedDot.isHidden = true
-        unsavedDot.toolTip = "Unsaved changes (⌘S to save)"
-        header.addSubview(unsavedDot)
-        header.addSubview(closeButton)
-        header.addSubview(previewButton)
-        blameButton.isHidden = true
-        header.addSubview(blameButton)
         blame.onShowCommit = { [weak self] in self?.onShowCommit?($0) }
+        text.extraMenuItems = { [weak self] in
+            guard let self else { return [] }
+            var items: [NSMenuItem] = []
+            if canBlame {
+                items.append(ActionMenuItem(title: blaming ? "Hide Git Blame" : "Show Git Blame") { [weak self] in self?.toggleBlame() })
+            }
+            if let server = serverMenu() { items.append(server) }
+            return items
+        }
         blame.contextMenu = { [weak self] in self?.blameMenu(for: $0) }
         gutter.contextMenu = { [weak self] in self?.blameMenu(for: nil) }
 
@@ -125,17 +125,28 @@ final class FileView: NSView {
         container.widthTracksTextView = false
         text.textContainerInset = NSSize(width: 8, height: 6)
         text.onFocus = { [weak self] in self?.onFocus?() }
+        links.open = { [weak self] in self?.onOpenAt?($0, $1) }
+        links.palette = { [weak self] in self?.palette() }
+        links.onLink = { [weak text] in text?.linkRect = $0 }
+        text.commandLinks = { [weak self] in self.map { LanguageServers.shared.isEnabled(for: $0.path) } ?? false }
+        text.onCommandClick = { [weak self] in self?.links.click(at: $0) }
+        text.onCommandHover = { [weak self] in self?.links.hover(at: $0) }
         NotificationCenter.default.addObserver(forName: NSText.didChangeNotification, object: text, queue: .main) { [weak self] _ in
             guard let self else { return }
             // Typing a line and deleting it again leaves nothing to save.
             isDirty = text.string != onDisk
+            // The observer runs on the main queue, which the compiler can't see. This checks it, rather than hiding the warning.
+            MainActor.assumeIsolated { self.links.textChanged() }
             unmark()
             gutter.textChanged()
             highlightSoon()
         }
 
         NotificationCenter.default.addObserver(forName: NSTextView.didChangeSelectionNotification, object: text, queue: .main) { [weak self] _ in
-            guard let self, let line = litLine, !NSLocationInRange(text.selectedRange().location, line) else { return }
+            guard let self else { return }
+            gutter.needsDisplay = true
+            onCursorChange?()
+            guard let line = litLine, !NSLocationInRange(text.selectedRange().location, line) else { return }
             unlight()
         }
 
@@ -159,7 +170,7 @@ final class FileView: NSView {
         preview.onOpenFile = { [weak self] in self?.onOpenFile?($0) }
 
         gutter.onResize = { [weak self] in self?.needsLayout = true }
-        for view in [header, conflict, blame, gutter, scroll, preview, message] { addSubview(view) }
+        for view in [conflict, blame, gutter, scroll, preview, message] { addSubview(view) }
         show(path)
     }
 
@@ -178,7 +189,7 @@ final class FileView: NSView {
         return range.length > 0 ? (textView.string as NSString).substring(with: range) : nil
     }
 
-    /// A click on the header or the line numbers picks this pane too, so ⌘W closes the file and not a terminal.
+    /// A click on the line numbers picks this pane too, so ⌘W closes the file and not a terminal.
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(textView)
     }
@@ -187,7 +198,14 @@ final class FileView: NSView {
 
     private var showsPreview: Bool { Markdown.handles(path) && previewing && message.isHidden }
 
-    private func togglePreview() {
+    /// Markdown reads as source or rendered.
+    var canPreview: Bool { Markdown.handles(path) && message.isHidden }
+    var isPreviewing: Bool { previewing }
+    /// A checkout's file shown as source has someone to blame for each line.
+    var canBlame: Bool { inCheckout && !scroll.isHidden }
+    var isBlaming: Bool { blaming }
+
+    func togglePreview() {
         let focused = window?.firstResponder === textView
         previewing.toggle()
         UserDefaults.standard.set(previewing, forKey: Self.previewKey)
@@ -198,18 +216,13 @@ final class FileView: NSView {
     /// Shows the source or the preview. The preview reads the text being edited, so unsaved edits show too.
     private func updateMode() {
         let markdown = Markdown.handles(path)
-        previewButton.isHidden = !markdown
-        previewButton.show(symbol: previewing ? "chevron.left.forwardslash.chevron.right" : "eye",
-                           help: previewing ? "Show the source" : "Preview")
         preview.isHidden = !showsPreview
         scroll.isHidden = !message.isHidden || showsPreview
         gutter.isHidden = scroll.isHidden
         blame.isHidden = !showsBlame
-        blameButton.isHidden = !inCheckout || scroll.isHidden
-        blameButton.isOn = blaming
-        blameButton.show(symbol: "person.text.rectangle", help: blaming ? "Hide git blame" : "Show git blame")
         if showsPreview { preview.show(text.string, path: path) }
         needsLayout = true
+        onStateChange?()
     }
 
     /// Loads another file into the same pane. Callers check `isDirty` first, see confirmClose.
@@ -223,16 +236,38 @@ final class FileView: NSView {
         blameGeneration += 1
         blameLines = []
         blame.lines = []
-        folder = ""
         language = Syntax.language(for: path)
-        updateTitle()
-        title.toolTip = (path as NSString).abbreviatingWithTildeInPath
         load(keepingPosition: false)
         watch()
         findFolder()
+        links.path = path
+        onPathChange?()
     }
 
-    /// Asks git where the checkout starts, off the main thread. Outside a checkout the header shows only the name.
+    /// The language server's menu, the status bar's own, in the code's right-click menu too, where turning it on is a click.
+    private func serverMenu() -> NSMenuItem? {
+        guard let kind = LSP.server(for: path) else { return nil }
+        // Off, one plain item rather than a submenu holding only it.
+        guard LanguageServers.shared.isEnabled(kind) else {
+            guard LanguageServers.shared.isInstalled(kind) != false else { return nil }
+            return ActionMenuItem(title: "Enable Language Server") { LanguageServers.shared.setEnabled(true, for: kind) }
+        }
+        let item = NSMenuItem(title: "Language Server", action: nil, keyEquivalent: "")
+        item.submenu = LanguageServerMenu.make(for: path) { [weak self] in self?.onOpenAt?($0, $1) }
+        return item
+    }
+
+    /// Its tab came to the front, so its language server can start loading, if they are on.
+    func warmLanguageServer() {
+        links.warm()
+    }
+
+    /// Its tab closed, so the language server can forget the file.
+    func closed() {
+        links.closed()
+    }
+
+    /// Asks git whether the file is in a checkout, off the main thread, since only then is there someone to blame.
     private func findFolder() {
         let path = path
         let directory = (path as NSString).deletingLastPathComponent
@@ -240,8 +275,6 @@ final class FileView: NSView {
             let top = Git.topLevel(of: directory)
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.path == path, let top, directory.hasPrefix(top + "/") else { return }
-                self.folder = String(directory.dropFirst(top.count + 1)) + "/"
-                self.updateTitle()
                 self.inCheckout = true
                 self.loadBlame()
                 self.updateMode()
@@ -254,7 +287,7 @@ final class FileView: NSView {
     /// Keeps its width while there are unsaved edits, so the code doesn't jump. It is blank then, since git numbers the saved file.
     private var showsBlame: Bool { blaming && inCheckout && !blameMissing && !scroll.isHidden }
 
-    private func toggleBlame() {
+    func toggleBlame() {
         blaming.toggle()
         UserDefaults.standard.set(blaming, forKey: Self.blameKey)
         loadBlame()
@@ -298,19 +331,18 @@ final class FileView: NSView {
         }
     }
 
-    /// The line the cursor is on, counting from 1.
-    var currentLine: Int {
+    /// How many lines the file has, for Go to Line to say.
+    var lineCount: Int { gutter.count }
+
+    /// Go to Line: the line near the top, the cursor at the column, both clamped to what the file has.
+    func goTo(line: Int, column: Int) {
+        reveal(line: min(max(line, 1), lineCount))
         let string = text.string as NSString
-        let end = min(text.selectedRange().location, string.length)
-        var line = 1
-        var index = 0
-        while index < end {
-            let found = string.range(of: "\n", range: NSRange(location: index, length: end - index))
-            guard found.location != NSNotFound else { break }
-            line += 1
-            index = NSMaxRange(found)
-        }
-        return line
+        let start = text.selectedRange().location
+        let end = NSMaxRange(string.lineRange(for: NSRange(location: start, length: 0)))
+        let length = max(0, end - start - (end > start && string.character(at: end - 1) == 0x0A ? 1 : 0))
+        text.setSelectedRange(NSRange(location: start + min(max(column - 1, 0), length), length: 0))
+        window?.makeFirstResponder(text)
     }
 
     /// Puts the cursor on a line and scrolls it near the top, for opening a file at its first change.
@@ -429,15 +461,6 @@ final class FileView: NSView {
         updateMode()
     }
 
-    private func updateTitle() {
-        let font = title.font ?? .systemFont(ofSize: 12)
-        let name = (path as NSString).lastPathComponent
-        let result = NSMutableAttributedString(string: folder, attributes: [.font: font, .foregroundColor: titleColors.folder])
-        result.append(NSAttributedString(string: name, attributes: [.font: font, .foregroundColor: titleColors.name]))
-        title.attributedStringValue = result
-        needsLayout = true
-    }
-
     // MARK: Saving
 
     /// Writes in place rather than replacing the file, so its permissions, like a script's executable bit, stay.
@@ -531,16 +554,8 @@ final class FileView: NSView {
 
     func apply(background: NSColor, foreground: NSColor) {
         layer?.backgroundColor = background.cgColor
-        // Same color as the text below, so the header reads as a row of the pane, not a bar on top of it.
-        header.layer?.backgroundColor = background.cgColor
         conflict.layer?.backgroundColor = background.mixed(with: foreground, 0.07).cgColor
         conflictText.textColor = foreground
-        titleColors = (background.mixed(with: foreground, 0.75), background.mixed(with: foreground, 0.45))
-        unsavedDot.layer?.backgroundColor = background.mixed(with: foreground, 0.55).cgColor
-        updateTitle()
-        closeButton.apply(background: background, foreground: foreground)
-        previewButton.apply(background: background, foreground: foreground)
-        blameButton.apply(background: background, foreground: foreground)
         themeColors = (background, foreground)
         preview.apply(background: background, foreground: foreground, syntax: syntax)
         message.textColor = background.mixed(with: foreground, 0.55)
@@ -548,7 +563,8 @@ final class FileView: NSView {
         CodeText.apply(to: text, background: background, foreground: foreground)
         plainColor = foreground
         highlight()
-        gutter.colors = (background, background.mixed(with: foreground, 0.35))
+        gutter.colors = (background, background.mixed(with: foreground, 0.35), background.mixed(with: foreground, 0.8))
+        text.currentLineColor = background.mixed(with: foreground, 0.045)
         blame.colors = (background, foreground)
     }
 
@@ -585,31 +601,21 @@ final class FileView: NSView {
 
     override func layout() {
         super.layout()
-        let h = Self.headerHeight
-        header.frame = NSRect(x: 0, y: 0, width: bounds.width, height: h)
-        closeButton.frame = NSRect(x: bounds.width - 28, y: 3, width: 20, height: 20)
-        previewButton.frame = NSRect(x: bounds.width - 52, y: 3, width: 20, height: 20)
-        // The dot follows the name, and the name gives up room first when the pane is narrow.
-        blameButton.frame = NSRect(x: bounds.width - 52 - (previewButton.isHidden ? 0 : 24), y: 3, width: 20, height: 20)
-        let room = max(0, bounds.width - 48 - Self.dotSize - 8 - (previewButton.isHidden ? 0 : 24) - (blameButton.isHidden ? 0 : 24))
-        let titleWidth = min(ceil(title.attributedStringValue.size().width) + 4, room)
-        title.frame = NSRect(x: 12, y: 5, width: titleWidth, height: 16)
-        unsavedDot.frame = NSRect(x: title.frame.maxX + 4, y: (h - Self.dotSize) / 2, width: Self.dotSize, height: Self.dotSize)
         let bar = conflict.isHidden ? 0 : Self.barHeight
-        conflict.frame = NSRect(x: 0, y: h, width: bounds.width, height: bar)
+        conflict.frame = NSRect(x: 0, y: 0, width: bounds.width, height: bar)
         keepButton.sizeToFit()
         reloadButton.sizeToFit()
         keepButton.frame.origin = NSPoint(x: bounds.width - keepButton.frame.width - 10, y: (bar - keepButton.frame.height) / 2)
         reloadButton.frame.origin = NSPoint(x: keepButton.frame.minX - reloadButton.frame.width - 6, y: keepButton.frame.minY)
         conflictText.frame = NSRect(x: 12, y: (bar - 16) / 2, width: max(0, reloadButton.frame.minX - 20), height: 16)
-        let body = max(0, bounds.height - h - bar)
+        let body = max(0, bounds.height - bar)
         blame.style = BlameColumn.Style(pane: bounds.width)
         let blameWidth = showsBlame ? blame.style.width : 0
-        blame.frame = NSRect(x: 0, y: h + bar, width: blameWidth, height: body)
-        gutter.frame = NSRect(x: blameWidth, y: h + bar, width: gutter.width, height: body)
+        blame.frame = NSRect(x: 0, y: bar, width: blameWidth, height: body)
+        gutter.frame = NSRect(x: blameWidth, y: bar, width: gutter.width, height: body)
         let start = blameWidth + gutter.width
-        scroll.frame = NSRect(x: start, y: h + bar, width: max(0, bounds.width - start), height: body)
-        preview.frame = NSRect(x: 0, y: h + bar, width: bounds.width, height: body)
+        scroll.frame = NSRect(x: start, y: bar, width: max(0, bounds.width - start), height: body)
+        preview.frame = NSRect(x: 0, y: bar, width: bounds.width, height: body)
         // At least as big as the visible area, so short files still fill it and clicks land in the text.
         text.minSize = scroll.contentSize
         message.frame = NSRect(x: 12, y: bounds.midY - 10, width: max(0, bounds.width - 24), height: 20)
@@ -618,6 +624,148 @@ final class FileView: NSView {
 
 private final class CodeTextView: NSTextView {
     var onFocus: (() -> Void)?
+
+    // MARK: The cursor's line
+
+    /// A faint band across the pane on the cursor's line, so your place is easy to find. Not while text is selected.
+    var currentLineColor: NSColor? { didSet { needsDisplay = true } }
+    /// Its top and height, with no width: the band is as wide as the view when drawn, so a resize needs nothing.
+    private var currentLine: NSRect?
+
+    override func drawBackground(in rect: NSRect) {
+        super.drawBackground(in: rect)
+        guard let color = currentLineColor, let line = currentLine else { return }
+        let band = NSRect(x: 0, y: line.minY, width: bounds.width, height: line.height)
+        guard band.intersects(rect) else { return }
+        color.setFill()
+        band.fill()
+    }
+
+    override func setSelectedRanges(_ ranges: [NSValue], affinity: NSSelectionAffinity, stillSelecting: Bool) {
+        super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelecting)
+        // Only the old and new lines are drawn again, not the whole pane.
+        let old = currentLine
+        currentLine = cursorLine()
+        guard old != currentLine else { return }
+        for line in [old, currentLine].compactMap({ $0 }) {
+            setNeedsDisplay(NSRect(x: 0, y: line.minY, width: bounds.width, height: line.height))
+        }
+    }
+
+    private func cursorLine() -> NSRect? {
+        guard selectedRange().length == 0, let layout = layoutManager else { return nil }
+        let length = (string as NSString).length
+        let location = selectedRange().location
+        // After a final line break the cursor sits on a line with no characters, which only the extra fragment describes.
+        let fragment = location >= length && (length == 0 || (string as NSString).character(at: length - 1) == 0x0A)
+            ? layout.extraLineFragmentRect
+            : layout.lineFragmentRect(forGlyphAt: layout.glyphIndexForCharacter(at: min(location, max(length - 1, 0))), effectiveRange: nil)
+        guard fragment.height > 0 else { return nil }
+        return NSRect(x: 0, y: fragment.minY + textContainerOrigin.y, width: 0, height: fragment.height)
+    }
+
+    // MARK: ⌘ over a name, for go to definition and references
+
+    /// Whether ⌘ over a name means anything, which is only with language servers on. Off, ⌘-click is the text view's own.
+    var commandLinks: () -> Bool = { false }
+    /// A ⌘-click, with the character it landed on, which a click would otherwise only select.
+    var onCommandClick: ((Int) -> Void)?
+    /// The character under the mouse while ⌘ is held, or nil when it isn't or the mouse is elsewhere.
+    var onCommandHover: ((Int?) -> Void)?
+    /// Where the name that would open is drawn, so the pointer can be a hand over it.
+    var linkRect: NSRect? {
+        didSet { pointAtLink() }
+    }
+    private var tracking: NSTrackingArea?
+    private var flagsMonitor: Any?
+
+    override func mouseDown(with event: NSEvent) {
+        guard event.modifierFlags.contains(.command), event.clickCount == 1, commandLinks(),
+              let index = character(at: convert(event.locationInWindow, from: nil)) else {
+            return super.mouseDown(with: event)
+        }
+        // The click first, while the answer found on hover is still kept.
+        onCommandClick?(index)
+        onCommandHover?(nil)
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let tracking { removeTrackingArea(tracking) }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self)
+        addTrackingArea(area)
+        tracking = area
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        hover(holding: event.modifierFlags)
+        if linkRect != nil { pointAtLink() }
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        onCommandHover?(nil)
+    }
+
+    /// The text under the mouse moves, so the name lit is another one.
+    override func scrollWheel(with event: NSEvent) {
+        super.scrollWheel(with: event)
+        hover(holding: NSEvent.modifierFlags)
+    }
+
+    /// Pressing or letting go of ⌘ with the mouse still is a change too.
+    /// flagsChanged reaches only the focused view, so the pane watches the window's events, as a terminal usually has the focus.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let flagsMonitor { NSEvent.removeMonitor(flagsMonitor) }
+        flagsMonitor = nil
+        guard window != nil else { return }
+        flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            if event.window === self?.window { self?.hover(holding: event.modifierFlags) }
+            return event
+        }
+    }
+
+    private func hover(holding flags: NSEvent.ModifierFlags) {
+        guard commandLinks() else { return }
+        guard flags.contains(.command), let window else { return onCommandHover?(nil) ?? () }
+        let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        // Only what is on screen, since the text runs on above and below the pane.
+        onCommandHover?(visibleRect.contains(point) ? character(at: point) : nil)
+    }
+
+    private func character(at point: NSPoint) -> Int? {
+        guard let layout = layoutManager, let container = textContainer, bounds.contains(point) else { return nil }
+        let inside = NSPoint(x: point.x - textContainerOrigin.x, y: point.y - textContainerOrigin.y)
+        return layout.characterIndex(for: inside, in: container, fractionOfDistanceBetweenInsertionPoints: nil)
+    }
+
+    /// A text view puts its I-beam back on every move, over any cursor rect, so the hand is set after it.
+    /// Also when the answer arrives with the mouse still.
+    private func pointAtLink() {
+        guard let window else { return }
+        let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        if let linkRect, linkRect.contains(point) {
+            NSCursor.pointingHand.set()
+        } else if visibleRect.contains(point) {
+            NSCursor.iBeam.set()
+        }
+    }
+
+    // MARK: Menus
+    /// Items after the text's own, like git blame, where a right-click in the code finds them.
+    var extraMenuItems: (() -> [NSMenuItem])?
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = super.menu(for: event) ?? NSMenu()
+        let extra = extraMenuItems?() ?? []
+        if !extra.isEmpty {
+            menu.addItem(.separator())
+            extra.forEach(menu.addItem)
+        }
+        return menu
+    }
 
     override func becomeFirstResponder() -> Bool {
         let accepted = super.becomeFirstResponder()
@@ -645,7 +793,8 @@ private final class LineNumbers: NSView {
     private var lineStarts: [Int] = [0]
     private(set) var width: CGFloat = 0
     var onResize: (() -> Void)?
-    var colors = (background: NSColor.black, text: NSColor.gray) { didSet { needsDisplay = true } }
+    /// `current` is the cursor's line number, brighter so your place is easy to find.
+    var colors = (background: NSColor.black, text: NSColor.gray, current: NSColor.white) { didSet { needsDisplay = true } }
 
     init(textView: NSTextView) {
         self.textView = textView
@@ -682,10 +831,14 @@ private final class LineNumbers: NSView {
         colors.background.setFill()
         bounds.fill()
         let attributes: [NSAttributedString.Key: Any] = [.font: Self.font, .foregroundColor: colors.text]
+        var current = attributes
+        current[.foregroundColor] = colors.current
+        let cursor = textView.map { firstLine(atOrBefore: $0.selectedRange().location) }
         forEachVisibleLine { line, top, height in
             let label = "\(line + 1)" as NSString
-            let size = label.size(withAttributes: attributes)
-            label.draw(at: NSPoint(x: width - size.width - 10, y: top + (height - size.height) / 2), withAttributes: attributes)
+            let style = line == cursor ? current : attributes
+            let size = label.size(withAttributes: style)
+            label.draw(at: NSPoint(x: width - size.width - 10, y: top + (height - size.height) / 2), withAttributes: style)
         }
     }
 
@@ -704,6 +857,14 @@ private final class LineNumbers: NSView {
             body(line, fragment.minY + textView.textContainerOrigin.y - visible.minY, fragment.height)
             line += 1
         }
+    }
+
+    var count: Int { lineStarts.count }
+
+    /// The line holding `location`, from 0, and where it starts.
+    func line(containing location: Int) -> (index: Int, start: Int) {
+        let index = firstLine(atOrBefore: location)
+        return (index, lineStarts[index])
     }
 
     private func firstLine(atOrBefore location: Int) -> Int {

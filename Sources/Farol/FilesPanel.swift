@@ -14,8 +14,18 @@ final class FileTree: ObservableObject {
 
     @Published private(set) var root: String?
     @Published private(set) var rows: [Row] = []
-    /// The file last opened from the panel, highlighted until another session is shown.
+    /// The file in view in the file pane, highlighted. A click on a row sets it too, before the pane catches up.
     @Published var selected: String?
+    /// Set once the row of the file in view is in the list, so the panel can scroll to it.
+    @Published private(set) var revealed: (path: String, token: UUID)?
+    private var pendingReveal: String?
+    /// A new file or folder being named: a row to type in, under the folder it goes in.
+    @Published private(set) var draft: Draft?
+
+    struct Draft: Equatable {
+        let folder: String
+        let directory: Bool
+    }
 
     /// Open folders per root, so going back to a session finds its tree as you left it.
     private var expanded: [String: Set<String>] = [:]
@@ -36,6 +46,57 @@ final class FileTree: ObservableObject {
         guard let root else { return }
         watcher = FolderWatcher(root) { [weak self] in self?.changed($0) }
         reload()
+    }
+
+    /// Highlights the file in view, opening the folders on the way to it so its row is there, and scrolling to it.
+    /// A file outside the folder shown, or none, leaves nothing highlighted.
+    func follow(_ path: String?) {
+        guard let root, let path else {
+            selected = nil
+            pendingReveal = nil
+            return
+        }
+        // Compared as the tree's rows spell them, which follow every link, since the folder may be reached through one.
+        let file = Files.realPath(path)
+        guard let folders = Files.folders(from: Files.realPath(root), to: file).map(Set.init) else {
+            selected = nil
+            pendingReveal = nil
+            return
+        }
+        selected = file
+        pendingReveal = file
+        if folders.isSubset(of: expanded[root, default: []]) {
+            revealIfListed()
+        } else {
+            expanded[root, default: []].formUnion(folders)
+            rebuild()
+        }
+    }
+
+    private func revealIfListed() {
+        guard let path = pendingReveal, rows.contains(where: { $0.id == path }) else { return }
+        pendingReveal = nil
+        revealed = (path, UUID())
+    }
+
+    /// New File or New Folder in `folder`, which opens so the row to type in has a place.
+    func startCreating(in folder: String, directory: Bool) {
+        guard let root else { return }
+        if folder != root { expanded[root, default: []].insert(folder) }
+        draft = Draft(folder: folder, directory: directory)
+        rebuild()
+    }
+
+    func cancelCreating() {
+        draft = nil
+    }
+
+    /// Made: the folder it went in is read again, and a new folder opens. A new file opens in a tab, which the tree then follows.
+    func created(_ path: String, directory: Bool) {
+        guard let root, let draft else { return }
+        self.draft = nil
+        if directory { expanded[root, default: []].insert(path) }
+        reload([draft.folder] + (directory ? [path] : []))
     }
 
     func toggle(_ folder: String) {
@@ -77,6 +138,7 @@ final class FileTree: ObservableObject {
         }
         add(root, depth: 0, dimmed: false)
         self.rows = rows
+        revealIfListed()
     }
 
     /// Git touches .git at every shell prompt, so only a .gitignore edit asks git again.
@@ -145,7 +207,9 @@ struct FilesPanel: View {
                 .foregroundStyle(tree.root == nil ? p.muted : p.text)
                 .lineLimit(1)
             Spacer(minLength: 0)
-            if let root = tree.root { OpenInButton(path: root, palette: p) }
+            if let root = tree.root {
+                OpenInButton(path: root, palette: p)
+            }
             // Lit only while searching, like the gear while Settings shows. Clicked again, it goes back to the tree, as Esc does.
             IconButton(symbol: "magnifyingglass", help: state.filesSearching ? "Back to the files (esc)" : "Find in Files (⇧⌘F)",
                        active: state.filesSearching, palette: p) {
@@ -159,21 +223,44 @@ struct FilesPanel: View {
 
     private func tree(_ p: Palette) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(tree.rows) { row in
-                        FileRow(row: row, selected: row.id == tree.selected, palette: p) {
-                            if row.entry.isDirectory {
-                                tree.toggle(row.entry.path)
-                            } else {
-                                tree.selected = row.entry.path
-                                open(row.entry.path, nil)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        if let draft = tree.draft, draft.folder == tree.root { NewItemRow(draft: draft, depth: 0, tree: tree, palette: p, open: open) }
+                        ForEach(tree.rows) { row in
+                            FileRow(row: row, selected: row.id == tree.selected, palette: p, create: { directory in
+                                // In a folder, the new one goes inside it. On a file, beside it.
+                                let folder = row.entry.isDirectory ? row.entry.path : (row.entry.path as NSString).deletingLastPathComponent
+                                tree.startCreating(in: folder, directory: directory)
+                            }) {
+                                if row.entry.isDirectory {
+                                    tree.toggle(row.entry.path)
+                                } else {
+                                    tree.selected = row.entry.path
+                                    open(row.entry.path, nil)
+                                }
+                            }
+                            if let draft = tree.draft, draft.folder == row.id {
+                                NewItemRow(draft: draft, depth: row.depth + 1, tree: tree, palette: p, open: open)
                             }
                         }
                     }
+                    .padding(.horizontal, 6)
+                    .padding(.bottom, 8)
                 }
-                .padding(.horizontal, 6)
-                .padding(.bottom, 8)
+                // Anywhere in the tree that isn't a row, like the space below it, is the project itself: the same menu as a row, for its root.
+                .contextMenu {
+                    if let root = tree.root {
+                        Button("New File…") { tree.startCreating(in: root, directory: false) }
+                        Button("New Folder…") { tree.startCreating(in: root, directory: true) }
+                        Divider()
+                        OpenInItems(path: root)
+                    }
+                }
+                // No anchor, so a row already in view stays where it is and only one out of view is brought in.
+                .onChange(of: tree.revealed?.token) { _, _ in
+                    if let path = tree.revealed?.path { proxy.scrollTo(path) }
+                }
             }
         }
     }
@@ -183,6 +270,8 @@ private struct FileRow: View {
     let row: FileTree.Row
     let selected: Bool
     let palette: Palette
+    /// New File or New Folder, true for a folder.
+    let create: (Bool) -> Void
     let action: () -> Void
 
     @State private var hovering = false
@@ -211,6 +300,63 @@ private struct FileRow: View {
         .contentShape(Rectangle())
         .onClickableHover { hovering = $0 }
         .onTapGesture(perform: action)
-        .contextMenu { OpenInItems(path: row.entry.path) }
+        .contextMenu {
+            Button("New File…") { create(false) }
+            Button("New Folder…") { create(true) }
+            Divider()
+            OpenInItems(path: row.entry.path)
+        }
+    }
+}
+
+/// The row a new file or folder is named in, where it will appear. Return makes it, Escape lets it go.
+/// What's wrong with the name, like one already taken, shows under it rather than stopping you with an alert.
+private struct NewItemRow: View {
+    let draft: FileTree.Draft
+    let depth: Int
+    @ObservedObject var tree: FileTree
+    let palette: Palette
+    let open: (String, Int?) -> Void
+    @State private var name = ""
+    @State private var problem: String?
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 5) {
+                Color.clear.frame(width: 10)
+                FileIcon(path: name.isEmpty ? "a" : name, folder: draft.directory)
+                    .font(.system(size: 11))
+                    .foregroundStyle(palette.muted)
+                    .frame(width: 15)
+                TextField(draft.directory ? "Folder name" : "File name", text: $name)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+                    .focused($focused)
+                    .onSubmit(create)
+                    .onExitCommand { tree.cancelCreating() }
+                    .onChange(of: name) { _, _ in problem = nil }
+                    .onChange(of: focused) { _, now in if !now, name.isEmpty { tree.cancelCreating() } }
+            }
+            .padding(.horizontal, 4)
+            .frame(height: 24)
+            .background(RoundedRectangle(cornerRadius: 6).strokeBorder(palette.line))
+            if let problem {
+                Text(problem).font(.system(size: 11)).foregroundStyle(palette.muted).padding(.leading, 34)
+            }
+        }
+        .padding(.leading, CGFloat(depth) * 14 + 4)
+        .onAppear { focused = true }
+    }
+
+    private func create() {
+        if let problem = Files.problem(creating: name, in: draft.folder) { return self.problem = problem }
+        do {
+            let path = try Files.create(name, in: draft.folder, directory: draft.directory)
+            tree.created(path, directory: draft.directory)
+            if !draft.directory { open(path, nil) }
+        } catch {
+            problem = error.localizedDescription
+        }
     }
 }

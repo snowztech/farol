@@ -8,6 +8,32 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - Back and forward through the files and lines you jumped between, with ⇧⌘← and ⇧⌘→ or the Go menu. Following a search result or a definition into another file no longer means searching again to return to where you were.
 
+## [0.61.0] - 2026-11-06
+
+Files open in tabs, with richer colors, a status bar and optional language servers for go to definition.
+
+### Added
+
+- New File and New Folder in the files panel's right-click menu, on a row or on the space below the files for the top of the project. The name is typed in a row where it will appear, can hold folders like `api/handler.go`, and a new file opens in a tab.
+- A status bar under the code in the file pane. The cursor's line and column sit on the left, and a click on them, or ⌘L, goes to a line.
+- Language servers in the file pane, turned on per language and off by default. Turn one on in Settings → Editor, or from the language's name at the bottom right of a file in that language, then ⌘-click a name to go to its definition, or a definition to list where it's used. Farol uses the server on your PATH (gopls, typescript-language-server, pyright, rust-analyzer, sourcekit-lsp, clangd), starts it when a file in its language opens, and stops it after 10 minutes unused. The name and a dot show its state, and a click on them, or a right-click in the code, shows its version and memory, opens its logs, restarts or stops it, and turns it off.
+- Files open in tabs above the file pane, so you can keep several open and switch with a click or ⌃Tab. A file picked in the files panel gets a tab of its own. One opened from a search or the review takes a preview tab, in italics, which the next one replaces until you edit it or double-click its tab.
+- Code in the file pane is easier to read at a glance. Types, functions and properties each get their own color from your theme, beside keywords, strings and numbers. Diffs keep their calmer colors, so red still means removed there.
+
+### Changed
+
+- The tab in front reads at a glance: its name in medium weight, the other tabs a step dimmer.
+- The file pane marks the line the cursor is on, with a faint band and its number in full color in the gutter.
+- Git blame left the tab bar. Show it by right-clicking the code or the line numbers, or from View → Show Git Blame.
+- The sidebar steps aside while you resolve merge conflicts, so the three columns get the width, and comes back when you are done unless you toggled it yourself.
+- A pane shown on the phone takes the size of whoever acted last. Opening or typing in the terminal on the phone fits it to the phone, and touching the Mac's keyboard or mouse gives it back at once, instead of after a wait.
+
+### Fixed
+
+- Settings pages start their first section the same distance under the title, and Integrations explains each group under its name rather than in a loose line above the list.
+- The tab in front stays fully in view when tabs fill the bar, and language marks no longer run into the file name.
+- The files panel highlights the file you are looking at. It followed only the last file you clicked in the panel, so a file opened from a search result or the blame was never lit. It now follows the file pane, opens the folders on the way to the file and scrolls to it.
+
 ## [0.60.0] - 2026-11-04
 
 Create pull requests from Farol, in one click or written first.
@@ -1220,7 +1246,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.60.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.61.0...HEAD
+[0.61.0]: https://github.com/snowztech/farol/releases/tag/v0.61.0
 [0.60.0]: https://github.com/snowztech/farol/releases/tag/v0.60.0
 [0.59.1]: https://github.com/snowztech/farol/releases/tag/v0.59.1
 [0.59.0]: https://github.com/snowztech/farol/releases/tag/v0.59.0

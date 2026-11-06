@@ -3,14 +3,14 @@ import FarolCore
 import GhosttyTerminal
 import SwiftUI
 
-/// A session's terminals and at most one open file, split into panes. Each split holds two children and the share the first one gets.
+/// A session's terminals and at most one file pane, with a tab per open file, split into panes. Each split holds two children and the share the first one gets.
 /// Layout is plain arithmetic on that tree, which maps directly onto Ghostty's resize and equalize requests.
 final class PaneContainer: NSView {
     final class Node {
         enum Axis { case horizontal, vertical }
 
         var terminal: TerminalView?
-        var file: FileView?
+        var tabs: FileTabs?
         var axis = Axis.horizontal
         var children: [Node] = []
         var ratio: CGFloat = 0.5
@@ -22,12 +22,12 @@ final class PaneContainer: NSView {
             self.terminal = terminal
         }
 
-        init(file: FileView) {
-            self.file = file
+        init(tabs: FileTabs) {
+            self.tabs = tabs
         }
 
         /// What a leaf shows. Nil for a split.
-        var view: NSView? { terminal ?? file }
+        var view: NSView? { terminal ?? tabs }
 
         var leaves: [TerminalView] { terminal.map { [$0] } ?? children.flatMap(\.leaves) }
     }
@@ -38,8 +38,10 @@ final class PaneContainer: NSView {
     private(set) var root: Node
     /// The terminal with focus, or the last one that had it while the file pane has focus.
     private(set) var focused: TerminalView
-    /// Opening another file replaces what it shows, so a session never fills up with file panes.
-    private(set) var file: FileView?
+    /// Opening another file adds a tab to it, so a session never fills up with file panes.
+    private(set) var tabs: FileTabs?
+    /// The file in front in the file pane.
+    var file: FileView? { tabs?.current }
     private(set) var fileFocused = false
     private var zoomed = false
     private var dragging: Node?
@@ -49,14 +51,14 @@ final class PaneContainer: NSView {
         didSet {
             needsDisplay = true
             searchBar?.apply(background: theme.background, foreground: theme.foreground)
-            file?.apply(background: theme.background, foreground: theme.foreground)
+            tabs?.files.forEach { $0.apply(background: theme.background, foreground: theme.foreground) }
             chips.values.forEach { $0.apply(background: theme.background, foreground: theme.foreground) }
             applyFocus()
         }
     }
-    var palette: Palette?
+    var palette: Palette? { didSet { tabs?.palette = palette } }
     /// Code colors for the file pane, from the same theme.
-    var syntax: SyntaxColors? { didSet { if let syntax { file?.highlight(with: syntax) } } }
+    var syntax: SyntaxColors? { didSet { if let syntax { tabs?.files.forEach { $0.highlight(with: syntax) } } } }
     private var dividerColor: NSColor { theme.background.mixed(with: theme.foreground, 0.11) }
     private var searchBar: SearchBar?
     /// Only panes you named have one.
@@ -83,6 +85,8 @@ final class PaneContainer: NSView {
     var onLayoutChange: (() -> Void)?
     /// A file's blame asked for a commit, by its hash.
     var onShowCommit: ((String) -> Void)?
+    /// The file pane shows another file, or closes, so the files panel can highlight the one in view.
+    var onFileChange: ((String?) -> Void)?
 
     var terminals: [TerminalView] { root.leaves }
 
@@ -96,7 +100,8 @@ final class PaneContainer: NSView {
     /// Rebuilds saved panes. `make` creates a terminal in a folder, given the conversation its agent had. A file that is gone leaves its space to its neighbor.
     init(_ layout: PaneLayout, make: (String, AgentConversation?) -> TerminalView) {
         var names: [(TerminalView, String)] = []
-        var file: FileView?
+        var files: (paths: [String], active: Int)?
+        let placeholder = Node(nil)
         func build(_ layout: PaneLayout) -> Node? {
             switch layout {
             case .terminal(let directory, let name, let conversation):
@@ -104,9 +109,12 @@ final class PaneContainer: NSView {
                 if let name { names.append((terminal, name)) }
                 return Node(terminal)
             case .file(let path):
-                guard file == nil, FileManager.default.fileExists(atPath: path) else { return nil }
-                file = FileView(path: path)
-                return Node(file: file!)
+                return build(.files(paths: [path], active: 0))
+            case .files(let paths, let active):
+                guard files == nil, paths.contains(where: { FileManager.default.fileExists(atPath: $0) }) else { return nil }
+                files = (paths, active)
+                // Filled once the container exists, since the tabs wire their files into it.
+                return placeholder
             case .split(let horizontal, let ratio, let first, let second):
                 guard let a = build(first) else { return build(second) }
                 guard let b = build(second) else { return a }
@@ -123,9 +131,12 @@ final class PaneContainer: NSView {
         focused = root.leaves[0]
         super.init(frame: .zero)
         root.leaves.forEach(adopt)
-        if let file {
-            self.file = file
-            adopt(file)
+        if let files {
+            let tabs = makeTabs()
+            placeholder.tabs = tabs
+            tabs.restore(files.paths, active: files.active)
+            // Every file went missing between the check and now.
+            if tabs.files.isEmpty { removeTabs() }
         }
         for (terminal, name) in names { labels[terminal.id] = makeLabel(for: terminal, name: name) }
     }
@@ -136,7 +147,9 @@ final class PaneContainer: NSView {
                 return .terminal(directory: terminal.workingDirectory ?? NSHomeDirectory(), name: labels[terminal.id]?.name,
                                  conversation: conversations[terminal.id])
             }
-            if let file = node.file { return .file(path: file.path) }
+            if let tabs = node.tabs {
+                return .files(paths: tabs.files.map(\.path), active: tabs.current.flatMap { tabs.files.firstIndex(of: $0) } ?? 0)
+            }
             return .split(horizontal: node.axis == .horizontal, ratio: Double(node.ratio),
                           first: snapshot(node.children[0]), second: snapshot(node.children[1]))
         }
@@ -151,53 +164,34 @@ final class PaneContainer: NSView {
 
     /// Puts `terminal` next to the focused pane, on the side `direction` points to.
     func split(_ direction: TerminalRequest.Direction, with terminal: TerminalView) {
-        insert(Node(terminal), beside: fileFocused ? file! : focused, direction)
+        insert(Node(terminal), beside: fileFocused ? tabs! : focused, direction)
         adopt(terminal)
         focus(terminal)
         onLayoutChange?()
     }
 
     /// Shows the file in the file pane, opening one right of the focused terminal if there is none yet.
-    /// `line` scrolls to it, for opening a file at a change. Where you were is kept, so ⇧⌘← comes back to it.
-    func open(_ path: String, line: Int? = nil) {
-        show(path, line: line)
-    }
-
-    /// Where the open file's cursor is, or nil without a file.
-    private var place: NavigationHistory.Place? {
-        file.map { NavigationHistory.Place(path: $0.path, line: $0.currentLine) }
-    }
-
-    /// `moved` runs once the file really changes, which an unsaved file can refuse. Without it the jump is recorded.
-    private func show(_ path: String, line: Int?, moved: (() -> Void)? = nil) {
-        if let file {
-            // Read before the file changes, and only once an unsaved file has agreed to go.
-            let left = place
-            let jumps = file.path != path || line.map { $0 != left?.line } == true
-            let record = { [weak self] in
-                if let moved { moved() } else if jumps, let left { self?.history.record(leaving: left) }
-            }
-            guard file.path != path else {
-                record()
-                if let line { file.reveal(line: line) }
-                return focusFile()
-            }
-            return file.confirmClose { [weak self, weak file] in
-                record()
-                file?.show(path)
-                if let line { file?.reveal(line: line) }
-                self?.focusFile()
-                self?.onLayoutChange?()
-            }
-        } else {
-            let file = FileView(path: path)
-            self.file = file
-            insert(Node(file: file), beside: focused, .right)
-            adopt(file)
-            if let line { file.reveal(line: line) }
+    /// `line` scrolls to it, for opening a file at a change. Unless `keep`, it takes the preview tab, see FileTabs.
+    /// Where you were is kept, so ⇧⌘← comes back to it.
+    func open(_ path: String, line: Int? = nil, keep: Bool = false) {
+        if let left = place, left.path != path || line.map({ $0 != left.line }) == true {
+            history.record(leaving: left)
         }
+        show(path, line: line, keep: keep)
+    }
+
+    /// Where the file in front has its cursor, or nil without a file.
+    private var place: NavigationHistory.Place? {
+        file.map { NavigationHistory.Place(path: $0.path, line: $0.cursor.line) }
+    }
+
+    private func show(_ path: String, line: Int?, keep: Bool) {
+        if tabs == nil {
+            let tabs = makeTabs()
+            insert(Node(tabs: tabs), beside: focused, .right)
+        }
+        tabs?.open(path, line: line, keep: keep)
         focusFile()
-        onLayoutChange?()
     }
 
     /// Every jump in the file pane, so a chain of definitions can be walked back and forth.
@@ -206,37 +200,62 @@ final class PaneContainer: NSView {
     var canGoBack: Bool { file != nil && history.canGoBack }
     var canGoForward: Bool { file != nil && history.canGoForward }
 
-    /// To the file and line you were at before the last jump. A file that is gone is passed over.
+    /// To the file and line you were at before the last jump, in its tab if it still has one. A file that is gone is passed over.
     func goBack() {
-        var next = history
-        guard let here = place, let there = next.goBack(from: here, where: Self.exists) else { return }
-        show(there.path, line: there.line) { [weak self] in self?.history = next }
+        guard let here = place, let there = history.goBack(from: here, where: Self.exists) else { return }
+        show(there.path, line: there.line, keep: false)
     }
 
     func goForward() {
-        var next = history
-        guard let here = place, let there = next.goForward(from: here, where: Self.exists) else { return }
-        show(there.path, line: there.line) { [weak self] in self?.history = next }
+        guard let here = place, let there = history.goForward(from: here, where: Self.exists) else { return }
+        show(there.path, line: there.line, keep: false)
     }
 
     private static func exists(_ place: NavigationHistory.Place) -> Bool {
         FileManager.default.fileExists(atPath: place.path)
     }
 
+    private func makeTabs() -> FileTabs {
+        let tabs = FileTabs(palette: palette) { [weak self] in self?.adopt($0) }
+        tabs.autoresizingMask = []
+        // Another tab in front, or one opened or closed: the files panel lights the file now in front.
+        tabs.onChange = { [weak self] in
+            self?.onFileChange?(self?.file?.path)
+            self?.onLayoutChange?()
+        }
+        tabs.runCommand = { [weak self] in _ = self?.runInNewPane?($0) }
+        tabs.onEmpty = { [weak self] in self?.removeTabs() }
+        self.tabs = tabs
+        addSubview(tabs)
+        needsLayout = true
+        return tabs
+    }
+
+    var canStepTab: Bool { fileFocused && (tabs?.files.count ?? 0) > 1 }
+
+    func stepTab(_ by: Int) {
+        tabs?.step(by)
+        focusFile()
+    }
+
+    /// The first file with unsaved edits, brought to the front, for a question about closing or quitting.
+    func unsavedFile() -> FileView? { tabs?.unsaved() }
+
     private func focusFile() {
         if let file { window?.makeFirstResponder(file.textView) }
     }
 
-    /// Asks first when the file has unsaved edits.
+    /// ⌘W in the file pane: the tab in front, asking first when it has unsaved edits. The pane goes with its last tab.
     func closeFile() {
-        file?.confirmClose { [weak self] in self?.removeFile() }
+        if let file { tabs?.close(file) }
     }
 
-    private func removeFile() {
-        guard let file, let leaf = node(of: file) else { return }
-        self.file = nil
+    private func removeTabs() {
+        guard let tabs, let leaf = node(of: tabs) else { return }
+        self.tabs = nil
+        onFileChange?(nil)
         detach(leaf)
-        file.removeFromSuperview()
+        tabs.removeFromSuperview()
         if fileFocused { focus(focused) }
         fileFocused = false
         onLayoutChange?()
@@ -267,9 +286,9 @@ final class PaneContainer: NSView {
     /// Turns the leaf showing `view` into a split of it and `new`.
     private func insert(_ new: Node, beside view: NSView, _ direction: TerminalRequest.Direction) {
         guard let leaf = node(of: view) else { return }
-        let old = leaf.terminal.map { Node($0) } ?? Node(file: leaf.file!)
+        let old = leaf.terminal.map { Node($0) } ?? Node(tabs: leaf.tabs!)
         leaf.terminal = nil
-        leaf.file = nil
+        leaf.tabs = nil
         leaf.axis = direction == .left || direction == .right ? .horizontal : .vertical
         leaf.children = direction == .left || direction == .up ? [new, old] : [old, new]
         leaf.ratio = 0.5
@@ -284,7 +303,7 @@ final class PaneContainer: NSView {
         let parent = leaf.parent!
         let sibling = parent.children.first { $0 !== leaf }!
         parent.terminal = sibling.terminal
-        parent.file = sibling.file
+        parent.tabs = sibling.tabs
         parent.axis = sibling.axis
         parent.children = sibling.children
         parent.ratio = sibling.ratio
@@ -315,7 +334,7 @@ final class PaneContainer: NSView {
         return collect(root)
     }
 
-    private var focusedPane: NSView { fileFocused ? file! : focused }
+    private var focusedPane: NSView { fileFocused ? tabs! : focused }
 
     func goto(_ target: TerminalRequest.SplitTarget) {
         let all = panes
@@ -382,11 +401,11 @@ final class PaneContainer: NSView {
         super.layout()
         if zoomed, let leaf = node(of: focused) {
             terminals.forEach { $0.isHidden = $0 !== focused }
-            file?.isHidden = true
+            tabs?.isHidden = true
             place(leaf, in: bounds)
         } else {
             terminals.forEach { $0.isHidden = false }
-            file?.isHidden = false
+            tabs?.isHidden = false
             place(root, in: bounds)
         }
         applyFocus()
@@ -854,21 +873,24 @@ final class PaneContainer: NSView {
             self?.fileFocused = true
             self?.applyFocus()
         }
-        file.onClose = { [weak self] in self?.closeFile() }
         file.onOpenFile = { [weak self] in self?.open($0) }
         file.onShowCommit = { [weak self] in self?.onShowCommit?($0) }
-        addSubview(file)
-        needsLayout = true
+        file.onOpenAt = { [weak self] in self?.open($0, line: $1) }
+        file.palette = { [weak self] in self?.palette }
+        // A preview tab shows another file in the same view, which the files panel follows when it's the one in front.
+        file.onPathChange = { [weak self, weak file] in
+            if let file, file === self?.file { self?.onFileChange?(file.path) }
+        }
     }
 
     private func applyFocus() {
-        let single = (terminals.count == 1 && file == nil) || zoomed
+        let single = (terminals.count == 1 && tabs == nil) || zoomed
         for terminal in terminals {
             let active = terminal === focused && !fileFocused
             terminal.alphaValue = single || active ? 1 : Self.unfocusedAlpha
             labels[terminal.id]?.apply(background: theme.background, foreground: theme.foreground, focused: active)
         }
-        file?.alphaValue = single || fileFocused ? 1 : Self.unfocusedAlpha
+        tabs?.alphaValue = single || fileFocused ? 1 : Self.unfocusedAlpha
     }
 
     private func node(of view: NSView) -> Node? {
@@ -903,13 +925,15 @@ final class PaneContainer: NSView {
 indirect enum PaneLayout: Codable {
     /// `name` and `conversation` are optional, so layouts saved before them still load.
     case terminal(directory: String, name: String? = nil, conversation: AgentConversation? = nil)
+    /// A layout saved before tabs, read as one tab.
     case file(path: String)
+    case files(paths: [String], active: Int)
     case split(horizontal: Bool, ratio: Double, first: PaneLayout, second: PaneLayout)
 
     var directories: [String] {
         switch self {
         case .terminal(let directory, _, _): [directory]
-        case .file: []
+        case .file, .files: []
         case .split(_, _, let first, let second): first.directories + second.directories
         }
     }

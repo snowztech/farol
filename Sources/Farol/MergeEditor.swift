@@ -542,7 +542,7 @@ final class MergeEditor: NSView, NSTextStorageDelegate, NSTextViewDelegate {
     /// Coloring all of it makes the layout start over, which is slow on a long file. A comment opened in a chunk still colors the lines below.
     private func recolor(from start: Int) {
         guard let colors, let storage = centerView.textStorage, start < storage.length else { return }
-        let kinds: [Syntax.Kind] = [.keyword, .string, .number, .comment]
+        let kinds = Syntax.Kind.allCases
         // Per UTF-16 unit, a place in `palette`: plain, then the token kinds, then fold labels.
         let palette = [colors.foreground] + kinds.map { syntax?.color($0) ?? colors.foreground } + [colors.muted]
         var wanted = [UInt8](repeating: 0, count: storage.length - start)
