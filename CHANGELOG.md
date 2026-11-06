@@ -9,6 +9,12 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - Go to definition and references in Vue files. The Vue row in Settings → Editor installs the Vue plugin for the TypeScript server, which then serves `.ts` and `.vue` files in one process. It works in the `<script>` and in the `<template>` of a component: variables and functions used in `{{ }}`, `:prop` and `@event`, a component used as a tag, a prop, and the imports of other components and scripts.
 - HTML, Vue, Svelte and Astro files are colored like the code they hold. `<script>` reads as JavaScript or TypeScript, `<style>` as CSS, and Astro's frontmatter as TypeScript. Expressions read as JavaScript too: Vue's `{{ }}` and directive values like `:class` and `@click`, and Svelte's and Astro's `{ }`. Directives like `v-if`, `on:click` and `client:load` stand out, and tags like `<my-button>` are colored whole. Text between tags stays plain.
 - `go.mod` and `go.work` files are colored: their directives, comments and the Go version.
+- Farol Dusk, a warm theme for the evening: soft pastels on a dusky violet, with an amber cursor like a lighthouse lamp.
+
+### Changed
+
+- Farol Light is easier on the eyes: a softer white background, and every color dark enough to read on it, including the bright white and bright black some tools print in.
+- Farol Navy has colors of its own instead of Farol Beam's on a blue background: lavender text and bright blues, violets and a yellow green, like a city at night.
 
 ## [0.62.0] - 2026-11-06
 
