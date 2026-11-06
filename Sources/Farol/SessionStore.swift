@@ -14,6 +14,8 @@ final class Session: ObservableObject, Identifiable {
     @Published var customName: String?
     /// Set through the store, which saves it.
     var panels = Panels()
+    /// The schedule this session is a run of. One run is open at a time, so the next waits until this one closes.
+    var schedule: UUID?
     @Published var directory: String
     /// Reported per pane by agent hooks or interactive terminal titles.
     @Published private(set) var agents: [UUID: AgentActivity] = [:]
@@ -525,15 +527,16 @@ final class SessionStore: ObservableObject {
     }
 
     /// An agent on `task` in a new worktree of the repository `directory` is in, on a branch no other has, with the task as its first prompt.
-    /// What an agent's `farol task` and the phone start. The New Task sheet asks for its branch and repos itself.
+    /// What an agent's `farol task`, the phone and a schedule start, a schedule naming the `branch` itself.
     /// `done` gets the session and its branch, which the session itself learns only once git answers.
-    func startTask(_ task: String, in directory: String, with agent: AgentFolder, copyEnvironmentFiles: Bool, select: Bool,
-                   done: @escaping (Result<(session: Session, branch: String), Error>) -> Void) {
+    func startTask(_ task: String, in directory: String, with agent: AgentFolder, branch named: String? = nil, copyEnvironmentFiles: Bool,
+                   select: Bool, done: @escaping (Result<(session: Session, branch: String), Error>) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
             guard let root = Git.repoRoot(of: directory) else {
                 return DispatchQueue.main.async { done(.failure(GitError(description: "\(directory) is not in a git repository."))) }
             }
-            let branch = NewTask.freeBranch(for: task) { Git.hasBranch($0, in: root) }
+            let taken = { Git.hasBranch($0, in: root) }
+            let branch = named.map { NewTask.freeBranch(named: $0, taken: taken) } ?? NewTask.freeBranch(for: task, taken: taken)
             DispatchQueue.main.async { [weak self] in
                 self?.createWorktreeSession(branch: branch, from: [root], run: agent.command() + " \"$\(NewTask.variable)\"",
                                             environment: [NewTask.variable: task], copyEnvironmentFiles: copyEnvironmentFiles, select: select) {
@@ -713,6 +716,7 @@ final class SessionStore: ObservableObject {
             let session = create(panes, directory: panes.focused.workingDirectory ?? NSHomeDirectory())
             session.customName = entry.name
             session.panels = entry.panels ?? Panels()
+            session.schedule = entry.schedule
             // Kept before the agent reports again, so quitting right away still resumes it next time.
             session.conversations = resumed
         }
@@ -723,7 +727,8 @@ final class SessionStore: ObservableObject {
     private func save() {
         let defaults = UserDefaults.standard
         let saved = sessions.map {
-            SavedSession(layout: $0.panes.layoutSnapshot(conversations: $0.conversations), name: $0.customName, panels: $0.panels)
+            SavedSession(layout: $0.panes.layoutSnapshot(conversations: $0.conversations), name: $0.customName, panels: $0.panels,
+                         schedule: $0.schedule)
         }
         defaults.set(try? JSONEncoder().encode(saved), forKey: Self.savedSessions)
         defaults.removeObject(forKey: Self.savedLayouts)
@@ -816,4 +821,5 @@ private struct SavedSession: Codable {
     var layout: PaneLayout
     var name: String?
     var panels: Panels?
+    var schedule: UUID?
 }

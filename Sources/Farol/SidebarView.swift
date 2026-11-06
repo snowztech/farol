@@ -1,4 +1,5 @@
 import Combine
+import FarolCore
 import SwiftUI
 
 struct SidebarView: View {
@@ -6,6 +7,7 @@ struct SidebarView: View {
 
     @ObservedObject var store: SessionStore
     @ObservedObject var state: WindowState
+    @ObservedObject var scheduler: Scheduler
     let commands: Commands
     let resize: (CGFloat) -> Void
 
@@ -35,6 +37,8 @@ struct SidebarView: View {
                             SessionRow(
                                 session: session,
                                 selected: session.id == store.selectedID && !state.showingSettings,
+                                schedule: scheduler.schedule(of: session),
+                                scheduler: scheduler,
                                 palette: p,
                                 highlight: selection,
                                 // Reselecting would pull focus back into the terminal, which a rename would lose.
@@ -53,6 +57,10 @@ struct SidebarView: View {
                 }
                 .padding(8)
                 .animation(Motion.enabled ? .spring(response: 0.32, dampingFraction: 0.86) : nil, value: store.selectedID)
+            }
+            // Only once there is a task, so a new user never meets an empty pane.
+            if !scheduler.schedules.isEmpty {
+                TasksPane(scheduler: scheduler, store: store, palette: p)
             }
             // Pinned below the list, so it stays in the same place however many sessions there are.
             NewTaskRow(palette: p, action: commands.newTask)
@@ -100,6 +108,8 @@ struct SidebarView: View {
 private struct SessionRow: View {
     @ObservedObject var session: Session
     let selected: Bool
+    let schedule: Schedule?
+    let scheduler: Scheduler
     let palette: Palette
     let highlight: Namespace.ID
     let onSelect: () -> Void
@@ -134,6 +144,7 @@ private struct SessionRow: View {
         .contextMenu {
             Button("Rename", action: startEditing)
             Button("Close Session", action: onClose)
+            if let schedule { ScheduleItems(schedule: schedule, scheduler: scheduler) }
             // Over ssh the folder is on the server, where the Mac's apps can't reach it.
             if !session.isRemote {
                 Divider()
@@ -157,13 +168,22 @@ private struct SessionRow: View {
                 let name = Text(session.displayName)
                     .font(.system(size: 13, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? palette.text : palette.text.opacity(0.8))
-                if session.isWorktreeCheckout {
+                if session.isWorktreeCheckout || schedule != nil {
                     // The name gives way first, so the tag stays whole and never shrinks to a stray "w…".
                     HStack(spacing: 6) {
                         name.lineLimit(1).truncationMode(.tail)
-                        Badge(text: "worktree", small: true, palette: palette)
-                            .layoutPriority(1)
-                            .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
+                        if let schedule {
+                            Image(systemName: "clock")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(palette.muted)
+                                .layoutPriority(1)
+                                .hoverTip(schedule.runTip)
+                        }
+                        if session.isWorktreeCheckout {
+                            Badge(text: "worktree", small: true, palette: palette)
+                                .layoutPriority(1)
+                                .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
+                        }
                     }
                 } else {
                     name
@@ -240,6 +260,206 @@ private struct SessionRow: View {
 }
 
 /// The way to start a task, at the foot of the sidebar where the tasks live. Quiet until hovered.
+/// What will run, under what runs now. Lighter than the sessions above: tasks are plans, not places to go.
+private struct TasksPane: View {
+    @ObservedObject var scheduler: Scheduler
+    let store: SessionStore
+    let palette: Palette
+
+    @AppStorage("sidebar.tasksFolded") private var folded = false
+    @State private var hovering = false
+    static let rowHeight: CGFloat = 40
+    private static let groupHeight: CGFloat = 24
+
+    var body: some View {
+        let p = palette
+        let tasks = scheduler.schedules.sorted { $0.next(after: .now) < $1.next(after: .now) }
+        let groups = Grouping.group(tasks) { $0.repo }
+        VStack(spacing: 0) {
+            Rectangle().fill(p.line).frame(height: 1)
+            HStack(spacing: 6) {
+                Text("Tasks").font(.system(size: 12, weight: .medium))
+                Text(verbatim: "\(tasks.count)").font(.system(size: 11, design: .monospaced)).foregroundStyle(p.muted.opacity(0.7))
+                if folded, let next = tasks.first(where: { !$0.paused }) {
+                    Text("next \(next.upcoming(at: .now))")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(p.muted.opacity(0.7))
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                // Like a project's, quiet until you point at it.
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .bold))
+                    .rotationEffect(.degrees(folded ? 0 : 90))
+                    .frame(width: 20, height: 20)
+                    .opacity(hovering || folded ? 1 : 0.35)
+            }
+            .foregroundStyle(hovering ? p.text : p.muted)
+            .padding(.leading, 18)
+            .padding(.trailing, 14)
+            .frame(height: 32)
+            .contentShape(Rectangle())
+            .onTapGesture { withAnimation(Motion.enabled ? .easeOut(duration: 0.15) : nil) { folded.toggle() } }
+            .onClickableHover { hovering = $0 }
+            .hoverTip(folded ? "Show tasks" : "Fold tasks")
+            if !folded {
+                let height = CGFloat(tasks.count) * Self.rowHeight + (groups.count > 1 ? CGFloat(groups.count) * Self.groupHeight : 0)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(groups, id: \.key) { group in
+                            if groups.count > 1, let key = group.key {
+                                Text(URL(fileURLWithPath: key).lastPathComponent)
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(p.muted.opacity(0.8))
+                                    .padding(.leading, 10)
+                                    .frame(height: Self.groupHeight, alignment: .bottomLeading)
+                            }
+                            ForEach(group.items) { task in
+                                TaskRow(task: task, run: scheduler.run(of: task), starting: scheduler.starting.contains(task.id),
+                                        scheduler: scheduler, store: store, palette: p)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                }
+                // As tall as its rows up to four and a half, so it never takes the sessions' room and a cut row says there are more.
+                .frame(height: min(height, 4.5 * Self.rowHeight))
+                .padding(.bottom, 4)
+            }
+        }
+    }
+}
+
+/// One task: its name, when it runs under it, and the run's own lamp on the right while it runs.
+/// Clicking it changes when it runs, or opens its run while one is open.
+private struct TaskRow: View {
+    let task: Schedule
+    let run: Session?
+    let starting: Bool
+    let scheduler: Scheduler
+    let store: SessionStore
+    let palette: Palette
+
+    @State private var hovering = false
+    @State private var editing = false
+    @State private var timing = TaskTiming.everyDay
+    @State private var at = Date.now
+
+    var body: some View {
+        let p = palette
+        // Lined up with the Tasks heading, not the sessions' lamps: a task is a plan to read, and live state sits on the right.
+        HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(task.name)
+                    .font(.system(size: 12))
+                    .foregroundStyle(task.paused ? p.muted : p.text.opacity(0.85))
+                    .truncationMode(.tail)
+                HStack(spacing: 4) {
+                    if task.once == nil, run == nil, task.failure == nil {
+                        Image(systemName: "repeat").font(.system(size: 9, weight: .semibold))
+                    }
+                    Text(when)
+                }
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(task.failure != nil ? p.waiting : p.muted)
+            }
+            .lineLimit(1)
+            Spacer(minLength: 4)
+            trailing(p)
+        }
+        .padding(.horizontal, 10)
+        .frame(height: TasksPane.rowHeight)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(hovering ? p.hover : .clear))
+        .contentShape(Rectangle())
+        .onTapGesture { if let run { store.select(run) } else { edit() } }
+        .onClickableHover { hovering = $0 }
+        .hoverTip(editing ? "" : tip)
+        .contextMenu {
+            Button("Run Now") { scheduler.run(task.id) }
+            Button("Change Time…", action: edit)
+            ScheduleItems(schedule: task, scheduler: scheduler)
+        }
+        // Beside the sidebar, so the rows stay in view. Each change is saved as you make it, like the rest of Farol's settings.
+        .popover(isPresented: $editing, arrowEdge: .trailing) {
+            WhenChoices(when: $timing, at: $at, offersNow: false, palette: palette) {}
+                .onChange(of: timing) { retime() }
+                .onChange(of: at) { retime() }
+        }
+    }
+
+    private func edit() {
+        timing = task.once != nil ? .later : task.days == .everyDay ? .everyDay : .weekdays
+        at = task.once ?? Calendar.current.date(bySettingHour: task.hour, minute: task.minute, second: 0, of: .now) ?? .now
+        editing = true
+    }
+
+    private func retime() {
+        let calendar = Calendar.current
+        let days: Schedule.Days? = timing == .everyDay ? .everyDay : timing == .weekdays ? .weekdays : nil
+        scheduler.retime(task.id, days: days, once: timing == .later ? at : nil,
+                         hour: calendar.component(.hour, from: at), minute: calendar.component(.minute, from: at))
+    }
+
+    @ViewBuilder private func trailing(_ p: Palette) -> some View {
+        if starting {
+            ProgressView().controlSize(.mini)
+        } else if let run {
+            RunLamp(session: run, palette: p)
+        } else if hovering {
+            CloseButton(symbol: "play.fill", help: "Run now", palette: p) { scheduler.run(task.id) }
+        }
+    }
+
+    /// The second line: when it runs in the words a calendar would use, or why it isn't waiting.
+    private var when: String {
+        if run != nil { return "running" }
+        if task.failure != nil { return "didn't start" }
+        let time = task.once.map { once in
+            Calendar.current.isDateInToday(once) ? "today \(task.upcoming(at: .now))" : task.upcoming(at: .now)
+        } ?? "\(task.days.label.lowercased()) \(Schedule.clock(hour: task.hour, minute: task.minute))"
+        return task.paused ? "paused · \(time)" : time
+    }
+
+    private var tip: String {
+        if let failure = task.failure { return "Didn't start: \(failure)" }
+        if run != nil { return "Running. The next run waits until you close this one." }
+        let what = task.once == nil ? "Runs \(task.rule)." : "Runs once, \(task.rule)."
+        return task.paused ? "Paused. \(what)" : what
+    }
+}
+
+/// The lamp of a task's open run, kept live as its agent works.
+private struct RunLamp: View {
+    @ObservedObject var session: Session
+    let palette: Palette
+
+    var body: some View { Lamp(activity: session.activity, selected: false, palette: palette) }
+}
+
+/// Pausing and deleting, the same on a schedule's row and on its open run.
+private struct ScheduleItems: View {
+    let schedule: Schedule
+    let scheduler: Scheduler
+
+    var body: some View {
+        Divider()
+        Button(schedule.paused ? "Resume Schedule" : "Pause Schedule") { scheduler.setPaused(!schedule.paused, schedule.id) }
+        Button("Delete Schedule") { scheduler.delete(schedule.id) }
+    }
+}
+
+extension Schedule {
+    /// What the clock on an open run says.
+    var runTip: String {
+        var lines = ["Runs \(rule). The next run waits until you close this one."]
+        if startedLate {
+            lines.append("This one started at \(since.formatted(date: .omitted, time: .shortened)), late because the Mac was asleep or Farol was closed.")
+        }
+        if paused { lines.append("Paused.") }
+        return lines.joined(separator: "\n")
+    }
+}
+
 private struct NewTaskRow: View {
     let palette: Palette
     let action: () -> Void

@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Tasks for later. In New Task, the button beside Start picks when it runs: now, once later like tomorrow at 9:00, every day or on weekdays at a time. Each run gets its own worktree, and a repeat's branch ends with the day, like `write-article-2026-11-06`. Tasks wait in a Tasks pane under the sessions, which shows when each runs next and folds to one line. Click a task to change when it runs. Run Now is on hover and Pause and Delete on right-click. While a repeat's run is open its row shows the run's lamp and the next run waits until you close it. Farol opens in the background at a task's time even if you quit it, and a run missed while the Mac slept starts once it wakes.
+
 ## [0.63.0] - 2026-11-06
 
 Four new Farol themes, a theme for Light Mode and one for Dark Mode, Vue in the editor, and a wider ⌘P list.

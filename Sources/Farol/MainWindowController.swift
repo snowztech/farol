@@ -77,6 +77,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var notchPlace: AnyCancellable?
     private var sessionsChange: AnyCancellable?
     private(set) lazy var remote = RemoteBridge(store: store, worktrees: worktreeSettings)
+    private(set) lazy var scheduler = Scheduler(store: store, worktrees: worktreeSettings)
     private lazy var control = AgentControl(store: store, agents: agents, worktrees: worktreeSettings)
     private var remoteSwitch: AnyCancellable?
     private var awakeSwitch: AnyCancellable?
@@ -121,7 +122,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
         let root = NSView()
         let topBar = hosting(TopBar(state: state, store: store, updates: updates, review: review, merge: merge, commands: commands))
-        let sidebar = hosting(SidebarView(store: store, state: state, commands: commands,
+        let sidebar = hosting(SidebarView(store: store, state: state, scheduler: scheduler, commands: commands,
                                           resize: { [weak self] in self?.setSidebarWidth($0) }))
         sidebar.clipsToBounds = true
         let filesPanel = hosting(FilesPanel(
