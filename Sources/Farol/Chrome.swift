@@ -307,15 +307,20 @@ private struct SessionMenu: View {
     private func present() {
         guard let window = NSApp.mainWindow ?? NSApp.keyWindow else { return state.switchingSession = false }
         // Dropping from the title, the only centered thing in the bar and the one the eye lines it up with.
-        let midX = titleMidX
+        let (midX, frame, margin) = (titleMidX, window.frame, CGFloat(16))
+        let top = frame.maxY - MainWindowController.topBarHeight - 6
+        // Inside the window whatever its size: as wide as there is room for, and the list as tall as what is left under the search and above the footer.
+        let width = min(SessionPalette.width, frame.width - 2 * margin)
+        let listHeight = max(top - frame.minY - margin - SessionPalette.chrome, 90)
         FloatingPanel.show(palette: state.palette, over: window, place: { size, _ in
-            NSPoint(x: window.frame.minX + midX - size.width / 2,
-                    y: window.frame.maxY - MainWindowController.topBarHeight - 6 - size.height)
+            // Under the title, or as near as the window's edges allow.
+            let x = min(max(frame.minX + midX - size.width / 2, frame.minX + margin), frame.maxX - margin - size.width)
+            return NSPoint(x: x, y: top - size.height)
         }, dismissed: {
             closedAt = Date()
             state.switchingSession = false
         }) { _ in
-            SessionPalette(session: session, store: store, state: state, commands: commands)
+            SessionPalette(session: session, store: store, state: state, commands: commands, width: width, maxListHeight: listHeight)
         }
     }
 }
@@ -332,6 +337,13 @@ private struct SessionPalette: View {
     @ObservedObject var store: SessionStore
     @ObservedObject var state: WindowState
     let commands: Commands
+    var width = SessionPalette.width
+    var maxListHeight: CGFloat = 400
+
+    /// Wide enough for a file's folder and a command's text beside its name, in a window that has the room.
+    static let width: CGFloat = 560
+    /// The search above the list and the footer below it, which a short window still has to fit.
+    static let chrome: CGFloat = 90
 
     @State private var query = ""
     /// The row the arrows or the mouse are on. Without one, Return goes to the first match.
@@ -444,7 +456,7 @@ private struct SessionPalette: View {
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
                 }
                 // An exact height, which the panel follows as rows come and go.
-                .frame(height: min(listHeight, 400))
+                .frame(height: min(listHeight, maxListHeight))
                 // Crossing the gaps and headers between rows keeps the highlight. Leaving the list hands Return back to the session you are in, as a menu would.
                 .onHover { inside in if !inside { active = nil } }
                 // The arrows can go past the rows in view.
@@ -453,8 +465,7 @@ private struct SessionPalette: View {
             Rectangle().fill(p.line).frame(height: 1)
             footer(p)
         }
-        // Wide enough for a file's folder and a command's text beside its name.
-        .frame(width: 560)
+        .frame(width: width)
         .font(.system(size: 13))
         .foregroundStyle(p.text)
         .onAppear {

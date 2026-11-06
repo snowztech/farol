@@ -67,6 +67,7 @@ private final class Panel: NSPanel {
     var dismissed: (() -> Void)?
     private var monitor: Any?
     private var takeover: Any?
+    private var resize: Any?
 
     init() {
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
@@ -96,6 +97,10 @@ private final class Panel: NSPanel {
             [weak self] note in
             if note.object as? NSWindow !== self { MainActor.assumeIsolated { self?.dismiss() } }
         }
+        // Its size and place were worked out for the window as it was, so a resize closes it, as it would a menu.
+        resize = NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification, object: parent, queue: .main) {
+            [weak self] _ in MainActor.assumeIsolated { self?.dismiss() }
+        }
     }
 
     /// Only once another window really has the keyboard, since taking it can bounce once while the panel comes up.
@@ -112,6 +117,8 @@ private final class Panel: NSPanel {
         monitor = nil
         if let takeover { NotificationCenter.default.removeObserver(takeover) }
         takeover = nil
+        if let resize { NotificationCenter.default.removeObserver(resize) }
+        resize = nil
         parent?.removeChildWindow(self)
         orderOut(nil)
         if Self.current === self { Self.current = nil }
