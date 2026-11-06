@@ -380,7 +380,8 @@ private struct FileTabItem: View {
         let p = palette
         HStack(spacing: 6) {
             // Against the name, so every icon sits as far from it, whatever its width. Go's wide mark reaches into the padding instead.
-            FileIcon(path: tab.path).font(.system(size: 11)).foregroundStyle(p.muted).frame(width: 20, alignment: .trailing)
+            FileIcon(path: tab.path, alignment: .trailing).font(.system(size: 11)).foregroundStyle(p.muted)
+                .frame(width: 20, alignment: .trailing)
             // The one in front in medium weight and the others a step dimmer, so the tab you're in reads at a glance.
             Text(tab.name)
                 .font(.system(size: 12, weight: active ? .medium : .regular))
