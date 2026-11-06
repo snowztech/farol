@@ -17,6 +17,8 @@ final class FileTabs: NSView {
     var onEmpty: (() -> Void)?
     /// Runs a command in a new terminal pane, as installing a language server does, so you see it happen.
     var runCommand: ((String) -> Void)?
+    /// Go to Line is about to move the cursor to this line of the file in front, so the place it leaves can be gone back to.
+    var willJump: ((String, Int) -> Void)?
 
     private let model = FileTabsModel()
     private let bar: NSHostingView<FileTabBar>
@@ -239,6 +241,7 @@ final class FileTabs: NSView {
     private func goToLine(_ text: String) {
         let parts = text.split(separator: ":").map { Int($0.trimmingCharacters(in: .whitespaces)) }
         guard let current, let line = parts.first ?? nil else { return }
+        willJump?(current.path, line)
         current.goTo(line: line, column: parts.count > 1 ? (parts[1] ?? 1) : 1)
     }
 

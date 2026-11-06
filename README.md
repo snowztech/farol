@@ -231,12 +231,12 @@ Each tmux window there shows up on the phone next to your Mac's sessions. `farol
 | Name the focused pane | ⇧⌘R |
 | Find, next, previous | ⌘F, ⌘G, ⇧⌘G |
 | Find the selected text | ⌘E |
-| Back and forward through the files and lines you jumped between | ⌃⌘← and ⌃⌘→ |
 | Toggle sidebar | ⌘B |
 | Toggle files | ⇧⌘E |
 | Save the open file | ⌘S |
 | Go to a line in the open file | ⌘L |
 | Next and previous file tab | ⌃Tab and ⌃⇧Tab |
+| Back and forward through the files and lines you jumped between, also on the mouse's side buttons | ⌃⌘← and ⌃⌘→ |
 | Go to a definition, or list references from one (with its language server on) | ⌘ click |
 | Review changes | ⌥⌘R |
 | Commit | ⌥⌘C |

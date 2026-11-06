@@ -174,10 +174,14 @@ final class PaneContainer: NSView {
     /// `line` scrolls to it, for opening a file at a change. Unless `keep`, it takes the preview tab, see FileTabs.
     /// Where you were is kept, so ⌃⌘← comes back to it.
     func open(_ path: String, line: Int? = nil, keep: Bool = false) {
+        record(jumpingTo: path, line: line)
+        show(path, line: line, keep: keep)
+    }
+
+    private func record(jumpingTo path: String, line: Int?) {
         if let left = place, left.path != path || line.map({ $0 != left.line }) == true {
             history.record(leaving: left)
         }
-        show(path, line: line, keep: keep)
     }
 
     /// Where the file in front has its cursor, or nil without a file.
@@ -197,8 +201,9 @@ final class PaneContainer: NSView {
     /// Every jump in the file pane, so a chain of definitions can be walked back and forth.
     private var history = NavigationHistory()
 
-    var canGoBack: Bool { file != nil && history.canGoBack }
-    var canGoForward: Bool { file != nil && history.canGoForward }
+    /// Only from the file pane, so in a terminal ⌃⌘ arrows still resize the pane.
+    var canGoBack: Bool { fileFocused && file != nil && history.canGoBack }
+    var canGoForward: Bool { fileFocused && file != nil && history.canGoForward }
 
     /// To the file and line you were at before the last jump, in its tab if it still has one. A file that is gone is passed over.
     func goBack() {
@@ -224,6 +229,7 @@ final class PaneContainer: NSView {
             self?.onLayoutChange?()
         }
         tabs.runCommand = { [weak self] in _ = self?.runInNewPane?($0) }
+        tabs.willJump = { [weak self] in self?.record(jumpingTo: $0, line: $1) }
         tabs.onEmpty = { [weak self] in self?.removeTabs() }
         self.tabs = tabs
         addSubview(tabs)
@@ -534,6 +540,16 @@ final class PaneContainer: NSView {
         let point = convert(event.locationInWindow, from: nil)
         let terminal = terminals.first { !$0.isHidden && $0.frame.contains(point) }
         if terminal !== hovered { hover(terminal) }
+    }
+
+    /// The mouse's side buttons go back and forward over the file pane, as in a browser. Over a terminal they are the program's.
+    override func otherMouseUp(with event: NSEvent) {
+        guard let tabs, tabs.frame.contains(convert(event.locationInWindow, from: nil)) else { return super.otherMouseUp(with: event) }
+        switch event.buttonNumber {
+        case 3: goBack()
+        case 4: goForward()
+        default: super.otherMouseUp(with: event)
+        }
     }
 
     override func mouseExited(with event: NSEvent) {
