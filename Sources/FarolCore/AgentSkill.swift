@@ -97,7 +97,7 @@ public struct AgentSkill {
 
     `theme` takes the exact name of a bundled theme. Each one is a file in `/Applications/Farol.app/Contents/Resources/ghostty/themes`, so list that folder to find the name. When Farol is installed somewhere else, the folder is `Contents/Resources/ghostty/themes` inside that app. Farol's own are `Farol Beam` (the default), `Farol Dark`, `Farol Fog`, `Farol Navy`, `Farol Dusk`, `Farol Ember`, `Farol Dawn` and `Farol Light`.
 
-    To switch with macOS light and dark mode, name one theme for each: `theme = light:Farol Dawn,dark:Farol Dusk`. Settings → Appearance → Follow macOS appearance writes the same line.
+    To use one theme in Light Mode and another in Dark Mode, name one for each: `theme = light:Farol Dawn,dark:Farol Dusk`. Settings → Appearance → Match system appearance writes the same line.
 
     A custom theme is a file of Ghostty config in `~/.config/farol/themes`, with `background`, `foreground`, `cursor-color` and `palette = 0=#45475a` through 15. Set it by its full path, starting at `/`: `theme = /Users/name/.config/farol/themes/mine`.
 

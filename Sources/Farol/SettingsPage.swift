@@ -190,7 +190,7 @@ struct SettingsPage: View {
 
     // MARK: Sections
 
-    /// The theme in use, or one row for each appearance while following macOS, then the switch between the two.
+    /// The theme in use, or one row for each appearance while matching the system, then the switch between the two.
     @ViewBuilder private func themeCard(_ p: Palette) -> some View {
         Card(palette: p) {
             if let pair = ThemePair(settings.theme) {
@@ -200,8 +200,8 @@ struct SettingsPage: View {
             } else {
                 themeRow(.single, Theme.named(Theme.current(settings.theme, ghosttyConfig: state.ghosttyConfigPreview)), showing: false, p)
             }
-            Row(title: "Follow macOS appearance",
-                detail: "A light theme while macOS is light and a dark one while it's dark, switching when macOS does.",
+            Row(title: "Match system appearance",
+                detail: "Uses your light theme in Light Mode and your dark theme in Dark Mode.",
                 palette: p) {
                 toggle(followsMacOS)
             }

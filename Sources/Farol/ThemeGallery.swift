@@ -118,7 +118,7 @@ extension Theme {
         return Theme(name: value, value: value, url: TerminalRuntime.themesDirectory?.appendingPathComponent(value))
     }
 
-    /// For turning on Follow macOS appearance: the theme you have stays on its side, and Farol's closest fills the other.
+    /// For turning on Match system appearance: the theme you have stays on its side, and Farol's closest fills the other.
     /// Your Ghostty colors can't be half a pair, so they start from Farol Beam.
     static func pair(for value: String) -> ThemePair {
         let theme = value.isEmpty ? farol[0] : value
@@ -255,7 +255,7 @@ struct ThemeGallery: View {
     private var cards: [Theme] { (ghosttyConfig == nil ? [] : [Theme.ghosttyColors]) + themes }
 }
 
-/// The one theme, or a side of the pair while following macOS.
+/// The one theme, or a side of the pair while matching the system appearance.
 enum ThemeSlot: Hashable {
     case single, light, dark
 

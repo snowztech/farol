@@ -267,7 +267,7 @@ font-size = 14
 
 The file uses Ghostty's format, so every terminal option in the [Ghostty docs](https://ghostty.org/docs/config) works: fonts, colors, cursor, padding, keybinds. Options for Ghostty's own window, tabs and quick terminal do nothing, since Farol draws its own window. If you also use Ghostty, your Ghostty config loads first and Farol's file wins.
 
-To switch themes with macOS light and dark mode, turn on **Follow macOS appearance** in Settings → Appearance, or name one theme for each: `theme = light:Farol Dawn,dark:Farol Dusk`.
+To use one theme in Light Mode and another in Dark Mode, turn on **Match system appearance** in Settings → Appearance, or name one for each: `theme = light:Farol Dawn,dark:Farol Dusk`.
 
 When you save a key or a value Farol cannot read, it tells you which one, and Settings → Terminal keeps the list until it is fixed.
 
