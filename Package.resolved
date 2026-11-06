@@ -1,13 +1,13 @@
 {
-  "originHash" : "f5142f745b2b185a720f2fd2783182cd5bd53bf27f4a2f4971638705ae6bbb11",
+  "originHash" : "01fb3354ab61a5cd7ffacafaee560776d7e235fa7c785e574cc2c734add97eb4",
   "pins" : [
     {
       "identity" : "farol-remote",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/snowztech/farol-remote",
       "state" : {
-        "revision" : "2f87cf0ae824f229a00935518026f91862a0d76a",
-        "version" : "0.22.0"
+        "revision" : "96732791df5004690af13f81dd622621d132c42d",
+        "version" : "0.23.0"
       }
     },
     {
