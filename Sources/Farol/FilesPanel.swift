@@ -207,7 +207,10 @@ struct FilesPanel: View {
                 .foregroundStyle(tree.root == nil ? p.muted : p.text)
                 .lineLimit(1)
             Spacer(minLength: 0)
-            if let root = tree.root { OpenInButton(path: root, palette: p) }
+            if let root = tree.root {
+                NewItemMenu(tree: tree, root: root, palette: p).disabled(state.filesSearching)
+                OpenInButton(path: root, palette: p)
+            }
             // Lit only while searching, like the gear while Settings shows. Clicked again, it goes back to the tree, as Esc does.
             IconButton(symbol: "magnifyingglass", help: state.filesSearching ? "Back to the files (esc)" : "Find in Files (⇧⌘F)",
                        active: state.filesSearching, palette: p) {
@@ -245,14 +248,12 @@ struct FilesPanel: View {
                     }
                     .padding(.horizontal, 6)
                     .padding(.bottom, 8)
-                    // Right-clicking below the files makes the new one at the top of the project.
-                    .frame(maxWidth: .infinity, minHeight: 200, alignment: .top)
-                    .contentShape(Rectangle())
-                    .contextMenu {
-                        if let root = tree.root {
-                            Button("New File…") { tree.startCreating(in: root, directory: false) }
-                            Button("New Folder…") { tree.startCreating(in: root, directory: true) }
-                        }
+                }
+                // Anywhere in the tree that isn't a row, like the space below it, makes the new one at the top of the project.
+                .contextMenu {
+                    if let root = tree.root {
+                        Button("New File…") { tree.startCreating(in: root, directory: false) }
+                        Button("New Folder…") { tree.startCreating(in: root, directory: true) }
                     }
                 }
                 // No anchor, so a row already in view stays where it is and only one out of view is brought in.
@@ -356,5 +357,33 @@ private struct NewItemRow: View {
         } catch {
             problem = error.localizedDescription
         }
+    }
+}
+
+/// The header's plus: New File or New Folder at the top of the project, where right-clicking a row can't reach.
+/// Drawn like the header's other icons, since a button inside a menu's label would take the click from it.
+private struct NewItemMenu: View {
+    @ObservedObject var tree: FileTree
+    let root: String
+    let palette: Palette
+    @State private var hovering = false
+
+    var body: some View {
+        Menu {
+            Button("New File…") { tree.startCreating(in: root, directory: false) }
+            Button("New Folder…") { tree.startCreating(in: root, directory: true) }
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 13, weight: .medium))
+                .frame(width: 26, height: 20)
+                .foregroundStyle(hovering ? palette.text : palette.muted)
+                .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised : .clear))
+                .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .onClickableHover { hovering = $0 }
+        .hoverTip("New file or folder")
     }
 }

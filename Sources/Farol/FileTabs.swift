@@ -381,10 +381,11 @@ private struct FileTabItem: View {
         HStack(spacing: 6) {
             // As wide as the widest mark, Go's, so none spills over the name.
             FileIcon(path: tab.path).font(.system(size: 11)).foregroundStyle(p.muted).frame(width: 20)
+            // The one in front in medium weight and the others a step dimmer, so the tab you're in reads at a glance.
             Text(tab.name)
-                .font(.system(size: 12))
+                .font(.system(size: 12, weight: active ? .medium : .regular))
                 .italic(tab.preview)
-                .foregroundStyle(active ? p.text : p.muted)
+                .foregroundStyle(active ? p.text : p.text.opacity(0.7))
                 .lineLimit(1)
             if let folder = tab.folder {
                 Text(folder).font(.system(size: 11)).foregroundStyle(p.muted).lineLimit(1)
