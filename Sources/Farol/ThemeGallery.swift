@@ -72,7 +72,7 @@ struct Theme: Hashable {
     static let userDirectory = Settings.fileURL.deletingLastPathComponent().appendingPathComponent("themes")
 
     /// Farol's own. The first is in use until a theme is picked, unless your Ghostty config sets its own colors.
-    static let farol = ["Farol Beam", "Farol Dark", "Farol Fog", "Farol Navy", "Farol Dusk", "Farol Dawn", "Farol Light"]
+    static let farol = ["Farol Beam", "Farol Dark", "Farol Fog", "Farol Navy", "Farol Dusk", "Farol Ember", "Farol Dawn", "Farol Light"]
 
     /// A hand pick of well known themes from Ghostty's set, not a count of anything, with light ones so the Light filter keeps some.
     /// One missing from a later Ghostty is left out.
@@ -174,6 +174,45 @@ struct ThemeGallery: View {
 /// The gallery's filter, since people browse for a dark theme or a light one.
 enum ThemeTone: String, CaseIterable {
     case all = "All", dark = "Dark", light = "Light"
+}
+
+/// All, Dark and Light, drawn like the search field and the button beside it. A native segmented control's rounder shape and own cursor sat oddly in that row.
+struct ToneSwitch: View {
+    @Binding var tone: ThemeTone
+    let palette: Palette
+
+    @Namespace private var pill
+    @State private var hovering: ThemeTone?
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(ThemeTone.allCases, id: \.self) { option in
+                Button {
+                    withAnimation(Motion.enabled ? .easeOut(duration: 0.15) : nil) { tone = option }
+                } label: {
+                    Text(option.rawValue)
+                        .font(.system(size: 13, weight: option == tone ? .medium : .regular))
+                        .foregroundStyle(option == tone || hovering == option ? palette.text : palette.muted)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 4)
+                        .background {
+                            if option == tone {
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(palette.selection)
+                                    .matchedGeometryEffect(id: "pill", in: pill)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(QuietPress())
+                .onClickableHover { hovering = $0 ? option : (hovering == option ? nil : hovering) }
+            }
+        }
+        .padding(3)
+        .background(palette.surface, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(palette.line))
+        .fixedSize()
+    }
 }
 
 private struct ThemeCard: View {

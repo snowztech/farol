@@ -247,13 +247,7 @@ struct SettingsPage: View {
             .background(p.surface, in: RoundedRectangle(cornerRadius: 8))
             .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(p.line))
 
-            Picker("", selection: $themeTone) {
-                ForEach(ThemeTone.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
-            .hoverRing(p)
+            ToneSwitch(tone: $themeTone, palette: p)
 
             ShipButton(title: "Themes folder", busy: false, palette: p, action: openThemesFolder)
         }

@@ -11,6 +11,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - `go.mod` and `go.work` files are colored: their directives, comments and the Go version.
 - Farol Dusk, a warm theme for the evening: soft pastels on a dusky violet, with an amber cursor like a lighthouse lamp.
 - Farol Dawn, its morning side: warm paper, ink dark text and the same amber cursor, for working in light mode without a cold white.
+- Farol Ember, a retro theme in earth tones: cream on charcoal brown, with burnt orange, olive and sage, after the fire lighthouses burned before electric lamps.
 - Farol Fog, a dimmed theme: a soft slate gray with quieter text and muted colors, for long sessions or a dim room.
 
 ### Changed
