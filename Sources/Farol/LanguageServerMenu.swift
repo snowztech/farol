@@ -6,8 +6,8 @@ import FarolCore
 /// Built when it opens, so the memory is read then and not on every redraw.
 @MainActor
 enum LanguageServerMenu {
-    /// `install` runs a command in a new terminal pane, for a server that isn't installed yet.
-    static func make(for path: String, openLog: @escaping (String, Int) -> Void, install: @escaping (String) -> Void = { _ in }) -> NSMenu {
+    /// `runInTerminal` runs a command in a new terminal pane, for an install that needs you, like one asking for a password.
+    static func make(for path: String, openLog: @escaping (String, Int) -> Void, runInTerminal: ((String) -> Void)? = nil) -> NSMenu {
         let servers = LanguageServers.shared
         let menu = NSMenu()
         guard let kind = LSP.server(for: path) else { return menu }
@@ -15,10 +15,27 @@ enum LanguageServerMenu {
         let installed = servers.isInstalled(kind) != false
         // Not installed, or off for this language: the same shape as when it runs, its state then what to do about it.
         guard installed, servers.isEnabled(kind) else {
+            if servers.isInstalling(kind) {
+                menu.addItem(title(kind.name, state: "installing", symbol: "arrow.down.circle"))
+                return menu
+            }
+            if !installed, servers.installError(kind) != nil {
+                menu.addItem(title(kind.name, state: "couldn't install", symbol: "exclamationmark.triangle"))
+                menu.addItem(.separator())
+                menu.addItem(action("Show Output", "chevron.left.forwardslash.chevron.right") {
+                    let log = servers.installLog(of: kind)
+                    openLog(log.path, log.lines)
+                })
+                menu.addItem(action("Try Again", "arrow.clockwise") { servers.install(kind) })
+                if let runInTerminal {
+                    menu.addItem(action("Install in Terminal", "terminal") { runInTerminal(kind.install) })
+                }
+                return menu
+            }
             menu.addItem(title(kind.name, state: installed ? "off" : "not installed", symbol: "circle"))
             menu.addItem(.separator())
             if !installed {
-                menu.addItem(action("Install Language Server", "arrow.down.circle") { install(kind.install) })
+                menu.addItem(action("Install Language Server", "arrow.down.circle") { servers.install(kind) })
             } else {
                 menu.addItem(action("Enable Language Server", "play.fill") { servers.setEnabled(true, for: kind) })
             }

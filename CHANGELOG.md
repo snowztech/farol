@@ -8,6 +8,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - Back and forward through the files and lines you jumped between, with ⌃⌘← and ⌃⌘→, the Go menu or the mouse's side buttons. A definition, a search result, Go to Line or a file opened from the panel each counts as a jump, and jumps a few lines apart count once. Following a search result or a definition into another file no longer means searching again to return to where you were.
 
+### Changed
+
+- Install a language server in one click, from Settings → Editor or the language's name under a file, without leaving what you are doing. It installs in the background, shows installing where its switch or dot is, and turns on when done, so ⌘-click works right away. If it fails, the menu shows why and can run it in a terminal instead, for an install that asks for a password.
+
 ### Fixed
 
 - Settings → Editor offered to install a language server again after it was installed. Farol looked only on the PATH of your shell, and `go install` puts gopls in `~/go/bin` (or GOBIN, or each GOPATH's `bin`), which a shell doesn't have by default. It now looks there too, and in `~/.cargo/bin` and `~/.local/bin`, and starts the server with them on its PATH.

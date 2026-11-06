@@ -112,6 +112,17 @@ public enum LSP {
             .filter { FileManager.default.isExecutableFile(atPath: $0) }
     }
 
+    /// Runs the server's install command with your shell's PATH, and returns what it printed if it failed.
+    /// Waits for it to end, so not on the main thread.
+    public static func install(_ server: Server) -> String? {
+        do {
+            try Git.run("/bin/sh", ["-c", server.install], in: NSHomeDirectory(), named: server.name + " install")
+            return nil
+        } catch {
+            return (error as? GitError)?.description ?? error.localizedDescription
+        }
+    }
+
     /// Whether `executable` exits cleanly on `arguments`. One still going after a few seconds counts, since a stub fails at once.
     static func runs(_ executable: String, _ arguments: [String], path: String) -> Bool {
         let process = Process()

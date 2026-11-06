@@ -95,3 +95,11 @@ import Testing
     #expect(LSP.find(server, in: "\(stub):\(real)") == real + "/rust-analyzer")
     #expect(LSP.find(server, in: stub) == nil)
 }
+
+@Test func installReturnsWhatAFailedCommandPrinted() {
+    func server(_ install: String) -> LSP.Server {
+        LSP.Server(name: "x", language: "X", command: "x", arguments: [], extensions: [], install: install, check: nil)
+    }
+    #expect(LSP.install(server("true")) == nil)
+    #expect(LSP.install(server("echo 'npm ERR! EACCES' >&2 && exit 243")) == "npm ERR! EACCES")
+}
