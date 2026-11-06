@@ -15,14 +15,21 @@ final class FileTabs: NSView {
     var onChange: (() -> Void)?
     /// The last tab closed, so the pane itself goes.
     var onEmpty: (() -> Void)?
+    /// Runs a command in a new terminal pane, as installing a language server does, so you see it happen.
+    var runCommand: ((String) -> Void)?
 
     private let model = FileTabsModel()
     private let bar: NSHostingView<FileTabBar>
     private static let barHeight: CGFloat = 32
+    /// The bar under the code: its language servers on the left, the cursor and the language on the right.
+    /// Always there with a file open, so the code never shifts.
+    private let status: NSHostingView<FileStatusBar>
+    private static let statusHeight: CGFloat = 24
 
     init(palette: Palette?, adopt: @escaping (FileView) -> Void) {
         self.adopt = adopt
         bar = NSHostingView(rootView: FileTabBar(model: model))
+        status = NSHostingView(rootView: FileStatusBar(model: model))
         super.init(frame: .zero)
         model.palette = palette
         model.select = { [weak self] id in
@@ -35,9 +42,13 @@ final class FileTabs: NSView {
         model.keep = { [weak self] id in self?.file(id).map { self?.keep($0) } }
         model.closeOthers = { [weak self] id in self?.file(id).map { self?.close(except: $0) } }
         model.togglePreview = { [weak self] in self?.current?.togglePreview() }
-        model.toggleBlame = { [weak self] in self?.current?.toggleBlame() }
         model.closeAll = { [weak self] in self?.close(except: nil) }
+        model.openServerMenu = { [weak self] in self?.openServerMenu() }
+        model.askLine = { [weak self] in self?.askLine() }
         addSubview(bar)
+        addSubview(status)
+        NotificationCenter.default.addObserver(self, selector: #selector(serversChanged), name: LanguageServers.didChange, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(serversTurnedOn), name: LanguageServers.didTurnOn, object: nil)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -64,7 +75,12 @@ final class FileTabs: NSView {
             return select(preview)
         }
         let file = FileView(path: path)
-        file.showsHeader = false
+        file.onCursorChange = { [weak self, weak file] in
+            guard let self, let file, file === current else { return }
+            refreshFacts()
+            // Back in the file after installing its server in a pane: notice it. Throttled, and only while it's missing.
+            if model.server?.state == .missing { refreshServer() }
+        }
         file.onStateChange = { [weak self, weak file] in
             // An edit keeps the file, so the next click through doesn't replace work in progress.
             if let file, file.isDirty, self?.preview === file { self?.preview = nil }
@@ -90,6 +106,8 @@ final class FileTabs: NSView {
         needsLayout = true
         refresh()
         onChange?()
+        // Only the tab in front, so tabs restored at launch don't each start a server.
+        file.warmLanguageServer()
     }
 
     /// ⌃Tab and ⌃⇧Tab: the next or previous tab, round from the last to the first.
@@ -122,6 +140,7 @@ final class FileTabs: NSView {
     private func remove(_ file: FileView) {
         guard let index = files.firstIndex(of: file) else { return }
         files.remove(at: index)
+        file.closed()
         file.removeFromSuperview()
         guard !files.isEmpty else {
             current = nil
@@ -153,14 +172,90 @@ final class FileTabs: NSView {
         model.active = current.map(ObjectIdentifier.init)
         model.canPreview = current?.canPreview == true
         model.previewing = current?.isPreviewing == true
-        model.canBlame = current?.canBlame == true
-        model.blaming = current?.isBlaming == true
+        refreshFacts()
+        refreshServer()
+    }
+
+    // MARK: Status bar
+
+    /// Where the cursor is, for the bar under the code.
+    private func refreshFacts() {
+        guard let current else { return model.facts = nil }
+        let cursor = current.cursor
+        let facts = FileTabsModel.Facts(
+            cursor: "\(cursor.line):\(cursor.column)" + (cursor.selected > 0 ? " (\(cursor.selected) selected)" : ""),
+            line: cursor.line, lines: current.lineCount)
+        if model.facts != facts { model.facts = facts }
+    }
+
+    // MARK: Language server
+
+    @objc private func serversChanged() { refreshServer() }
+    @objc private func serversTurnedOn() { current?.warmLanguageServer() }
+
+    /// The bolt in the status bar follows the file in front's server: its dot filled while it runs, empty when stopped.
+    /// A spinner while it loads the project. Gray, since a colored dot in Farol is an agent's.
+    private func refreshServer() {
+        let servers = LanguageServers.shared
+        guard let path = current?.path, let server = LSP.server(for: path) else {
+            if model.server != nil { model.server = nil }
+            return
+        }
+        let installed = servers.isInstalled(server)
+        if installed == nil { servers.locateAll { [weak self] in self?.refreshServer() } }
+        // Installed from the bar a moment ago, so look again rather than keep saying it's missing.
+        if installed == false { servers.recheck(server) { [weak self] in self?.refreshServer() } }
+        let running = servers.existing(for: path)
+        let state: FileTabsModel.Server.State = if !servers.isEnabled(server) {
+            .off
+        } else {
+            switch running?.state {
+            case .starting: .loading
+            case .running: .running
+            case .failed: .failed
+            case .stopped, nil: installed == false ? .missing : .stopped
+            }
+        }
+        let status = FileTabsModel.Server(name: server.name, language: LSP.languageName(for: path) ?? server.language,
+                                          state: state)
+        if model.server != status { model.server = status }
+    }
+
+    /// ⌘L or a click on the line and column: a field to type where to go, at the top of the file, where Zed and VS Code put it.
+    func askLine() {
+        guard let current, let window, let facts = model.facts, let palette = model.palette else { return }
+        let file = window.convertToScreen(current.convert(current.bounds, to: nil))
+        FloatingPanel.show(palette: palette, over: window, place: { size, _ in
+            NSPoint(x: file.midX - size.width / 2, y: file.maxY - size.height - 10)
+        }) { dismiss in
+            GoToLine(facts: facts, palette: palette) { [weak self] text in
+                dismiss()
+                self?.goToLine(text)
+            }
+        }
+    }
+
+    /// "12" goes to line 12, "12:5" to its fifth column. Anything else leaves the cursor where it was.
+    private func goToLine(_ text: String) {
+        let parts = text.split(separator: ":").map { Int($0.trimmingCharacters(in: .whitespaces)) }
+        guard let current, let line = parts.first ?? nil else { return }
+        current.goTo(line: line, column: parts.count > 1 ? (parts[1] ?? 1) : 1)
+    }
+
+    /// The same menu as a right-click in the code, opened above the server's name.
+    private func openServerMenu() {
+        guard let path = current?.path else { return }
+        let menu = LanguageServerMenu.make(for: path, openLog: { [weak self] in self?.open($0, line: $1, keep: true) },
+                                           install: { [weak self] in self?.runCommand?($0) })
+        menu.popUp(positioning: nil, at: NSPoint(x: status.frame.maxX - 160, y: status.frame.minY), in: self)
     }
 
     override func layout() {
         super.layout()
+        let foot = Self.statusHeight
         bar.frame = NSRect(x: 0, y: 0, width: bounds.width, height: Self.barHeight)
-        current?.frame = NSRect(x: 0, y: Self.barHeight, width: bounds.width, height: max(0, bounds.height - Self.barHeight))
+        current?.frame = NSRect(x: 0, y: Self.barHeight, width: bounds.width, height: max(0, bounds.height - Self.barHeight - foot))
+        status.frame = NSRect(x: 0, y: bounds.height - foot, width: bounds.width, height: foot)
     }
 
     /// A click on the bar picks the pane, as a click on a file's header did.
@@ -184,15 +279,49 @@ final class FileTabsModel: ObservableObject {
     @Published var palette: Palette?
     @Published var canPreview = false
     @Published var previewing = false
-    @Published var canBlame = false
-    @Published var blaming = false
+    /// The file in front's language server, beside its language in the status bar. Nil with language servers off.
+    @Published var server: Server?
+    @Published var facts: Facts?
+
+    struct Facts: Equatable {
+        let cursor: String
+        let line: Int
+        let lines: Int
+    }
+
+    struct Server: Equatable {
+        let name: String
+        /// The file's language, which the bar shows, since a server's name like sourcekit-lsp means little to most people.
+        let language: String
+        let state: State
+
+        enum State {
+            /// Turned off for this language, so the name sits dim, and a click offers to turn it on.
+            case off
+            case loading, running, stopped, failed, missing
+
+            /// The bolt's tip, like Zed's: what the servers are doing, in a few words.
+            func tip(_ name: String) -> String {
+                switch self {
+                case .off: "Language server off. Click to enable \(name)"
+                case .loading: "Language servers · \(name) is loading the project"
+                case .running: "Language servers · \(name) is running"
+                case .stopped: "Language servers · \(name) starts when you ⌘-click"
+                case .failed: "Language servers · \(name) stopped with an error"
+                case .missing: "\(name) isn't installed. Click to install it"
+                }
+            }
+        }
+    }
+
     var select: (ObjectIdentifier) -> Void = { _ in }
     var close: (ObjectIdentifier) -> Void = { _ in }
     var keep: (ObjectIdentifier) -> Void = { _ in }
     var closeOthers: (ObjectIdentifier) -> Void = { _ in }
     var togglePreview: () -> Void = {}
-    var toggleBlame: () -> Void = {}
     var closeAll: () -> Void = {}
+    var openServerMenu: () -> Void = {}
+    var askLine: () -> Void = {}
 }
 
 struct FileTabBar: View {
@@ -210,16 +339,13 @@ struct FileTabBar: View {
                         }
                         .padding(.horizontal, 6)
                     }
-                    // A tab opened past the edge comes into view.
-                    .onChange(of: model.active) { _, active in
-                        if let active { withAnimation(Motion.enabled ? .easeOut(duration: 0.15) : nil) { scroll.scrollTo(active) } }
-                    }
+                    // The tab in front stays in full view, also when a tab opens past the edge or the bar narrows.
+                    // After layout, since a tab added in the same change has no width yet to scroll to.
+                    .onChange(of: model.active) { _, _ in reveal(scroll) }
+                    .onChange(of: model.tabs) { _, _ in reveal(scroll) }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { _ in reveal(scroll) }
                 }
                 HStack(spacing: 2) {
-                    if model.canBlame {
-                        IconButton(symbol: "person.text.rectangle", help: model.blaming ? "Hide git blame" : "Show git blame",
-                                   active: model.blaming, palette: p, action: model.toggleBlame)
-                    }
                     if model.canPreview {
                         IconButton(symbol: model.previewing ? "chevron.left.forwardslash.chevron.right" : "eye",
                                    help: model.previewing ? "Show the source" : "Preview", palette: p, action: model.togglePreview)
@@ -230,6 +356,13 @@ struct FileTabBar: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .overlay(alignment: .bottom) { Rectangle().fill(p.line).frame(height: 1) }
+        }
+    }
+
+    private func reveal(_ scroll: ScrollViewProxy) {
+        guard let active = model.active else { return }
+        DispatchQueue.main.async {
+            withAnimation(Motion.enabled ? .easeOut(duration: 0.15) : nil) { scroll.scrollTo(active) }
         }
     }
 }
@@ -246,7 +379,8 @@ private struct FileTabItem: View {
     var body: some View {
         let p = palette
         HStack(spacing: 6) {
-            FileIcon(path: tab.path).font(.system(size: 11)).foregroundStyle(p.muted).frame(width: 14)
+            // As wide as the widest mark, Go's, so none spills over the name.
+            FileIcon(path: tab.path).font(.system(size: 11)).foregroundStyle(p.muted).frame(width: 20)
             Text(tab.name)
                 .font(.system(size: 12))
                 .italic(tab.preview)
@@ -295,5 +429,132 @@ private struct FileTabItem: View {
             }
         }
         .frame(width: 16, height: 16)
+    }
+}
+
+/// The bar under the code, in small muted type, as Zed has it: the cursor's line and column on the left, which opens Go to Line.
+/// On the right the language server and its state, which opens its menu, or the file's language when there is none.
+struct FileStatusBar: View {
+    @ObservedObject var model: FileTabsModel
+
+    var body: some View {
+        if let p = model.palette, let facts = model.facts {
+            HStack(spacing: 14) {
+                StatusButton(palette: p, tip: "Go to Line (⌘L)", action: model.askLine) { _ in
+                    Text(facts.cursor).monospacedDigit()
+                }
+                Spacer(minLength: 8)
+                if let server = model.server {
+                    // The language and a dot in every state, so the corner stays quiet. A click opens the menu, which says what to do.
+                    StatusButton(palette: p, tip: server.state.tip(server.name), action: model.openServerMenu) { _ in
+                        label(server)
+                    }
+                }
+            }
+            .font(.system(size: 11))
+            .foregroundStyle(p.muted)
+            .lineLimit(1)
+            .padding(.horizontal, 6)
+            // A point lower, for the divider along the top, so the text looks centered rather than measures it.
+            .padding(.top, 1)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(p.background)
+            .overlay(alignment: .top) { Rectangle().fill(p.line).frame(height: 1) }
+        }
+    }
+
+    /// The language and one gray dot, in the same place in every state, so only the dot changes.
+    /// Gray, since a colored dot in Farol is an agent's.
+    @ViewBuilder private func label(_ server: FileTabsModel.Server) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            // Lowercase, like the file names and the line and column around it.
+            Text(server.language.lowercased())
+            if server.state == .failed {
+                Image(systemName: "exclamationmark.triangle").font(.system(size: 9))
+            } else {
+                ServerDot(state: server.state, on: model.palette?.text ?? .primary)
+            }
+        }
+        .opacity(server.state == .off || server.state == .missing ? 0.7 : 1)
+    }
+}
+
+/// One dot, centered on the lowercase language name: its middle half an x-height above the baseline, from the font itself.
+/// Bright, in the text's color, while the server runs, and faint otherwise. Still, so the corner stays quiet.
+private struct ServerDot: View {
+    let state: FileTabsModel.Server.State
+    let on: Color
+    /// The status bar's type, whose lowercase letters the dot centers on.
+    private static let xHeight = NSFont.systemFont(ofSize: 11).xHeight
+
+    var body: some View {
+        Circle()
+            .fill(state == .running ? on : Color.secondary)
+            .frame(width: 5, height: 5)
+            .opacity(state == .running ? 1 : 0.5)
+            // Lined up on the text's baseline, the circle's center lands half an x-height above it.
+            .alignmentGuide(.firstTextBaseline) { $0.height / 2 + Self.xHeight / 2 }
+    }
+}
+
+/// Something in the status bar that does something: brighter under the mouse, with the hand and a tip.
+private struct StatusButton<Label: View>: View {
+    let palette: Palette
+    /// Nil when the label already says what a click does.
+    let tip: String?
+    let action: () -> Void
+    /// Gets whether the mouse is over it, for a label that says what a click does once you point at it.
+    @ViewBuilder let label: (Bool) -> Label
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            label(hovering)
+                .foregroundStyle(hovering ? palette.text : palette.muted)
+                .padding(.horizontal, 6)
+                .frame(height: 18)
+                .background(RoundedRectangle(cornerRadius: 4).fill(hovering ? palette.hover : .clear))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(QuietPress())
+        .onClickableHover { hovering = $0 }
+        // The pointer style alone didn't take in this bar, under the file's text view, so the hand is also set while over it.
+        .onContinuousHover { phase in if case .active = phase { NSCursor.pointingHand.set() } }
+        .hoverTip(tip ?? "")
+    }
+}
+
+/// Go to Line, shaped like the ⌘P switcher: a field with its mark and shortcut, then where you are and what to type.
+private struct GoToLine: View {
+    let facts: FileTabsModel.Facts
+    let palette: Palette
+    let go: (String) -> Void
+    @State private var text = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        let p = palette
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "number").foregroundStyle(p.muted)
+                TextField("Go to line", text: $text)
+                    .textFieldStyle(.plain)
+                    .focused($focused)
+                    .onSubmit { go(text) }
+                Text("⌘L").font(.system(size: 11, design: .monospaced)).foregroundStyle(p.muted)
+            }
+            .padding(12)
+            Rectangle().fill(p.line).frame(height: 1)
+            Text("Line \(facts.line) of \(facts.lines). Type a line, or line:column like 12:5.")
+                .font(.system(size: 11))
+                .foregroundStyle(p.muted)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+        }
+        .font(.system(size: 13))
+        .foregroundStyle(p.text)
+        .frame(width: 320)
+        .onAppear { focused = true }
     }
 }
