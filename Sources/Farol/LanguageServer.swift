@@ -154,7 +154,7 @@ final class LanguageServer {
 
     private func initialize() {
         let folder: [String: Any] = ["uri": LSP.uri(for: root), "name": (root as NSString).lastPathComponent]
-        let params: [String: Any] = [
+        var params: [String: Any] = [
             "processId": ProcessInfo.processInfo.processIdentifier,
             "clientInfo": ["name": "Farol"],
             "rootUri": LSP.uri(for: root),
@@ -169,6 +169,7 @@ final class LanguageServer {
                 ],
             ],
         ]
+        if let options = LSP.initializationOptions(for: server) { params["initializationOptions"] = options }
         let id = takeID()
         pending[id] = { [weak self] result in
             guard let self, state == .starting else { return }
