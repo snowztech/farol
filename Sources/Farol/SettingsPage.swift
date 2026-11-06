@@ -427,7 +427,7 @@ struct SettingsPage: View {
                 palette: p)
         GroupTitle(title: "Language servers", palette: p)
         Card(palette: p) {
-            ForEach(LSP.servers, id: \.command) { serverRow($0, p) }
+            ForEach(LSP.servers, id: \.id) { serverRow($0, p) }
         }
         .onAppear { LanguageServers.shared.locateAll(then: showServers) }
         // An install ending turns its server on, and the row follows.
@@ -436,18 +436,19 @@ struct SettingsPage: View {
 
     private func showServers() {
         let shared = LanguageServers.shared
-        enabledServers = Set(LSP.servers.filter(shared.isEnabled).map(\.command))
+        enabledServers = Set(LSP.servers.filter(shared.isEnabled).map(\.id))
         servers = Dictionary(uniqueKeysWithValues: LSP.servers.compactMap { server in
-            shared.isInstalled(server).map { _ in (server.command, shared.location(of: server)) }
+            shared.isInstalled(server).map { _ in (server.id, shared.location(of: server)) }
         })
-        installing = Set(LSP.servers.filter(shared.isInstalling).map(\.command))
-        installErrors = Dictionary(uniqueKeysWithValues: LSP.servers.compactMap { server in shared.installError(server).map { (server.command, $0) } })
+        installing = Set(LSP.servers.filter(shared.isInstalling).map(\.id))
+        installErrors = Dictionary(uniqueKeysWithValues: LSP.servers.compactMap { server in shared.installError(server).map { (server.id, $0) } })
     }
 
     /// Each language on its own color, a tool's identity being what a tile's color carries.
     private func languageTile(_ server: LSP.Server) -> ToolTile {
-        let (file, hex): (String, UInt32) = switch server.command {
+        let (file, hex): (String, UInt32) = switch server.id {
         case "gopls": ("a.go", 0x00ADD8)
+        case "vue": ("a.vue", 0x42B883)
         case "typescript-language-server": ("a.ts", 0x3178C6)
         case "pyright-langserver": ("a.py", 0x3776AB)
         case "rust-analyzer": ("a.rs", 0xCE412B)
@@ -460,9 +461,9 @@ struct SettingsPage: View {
 
     /// The language first, since that's what you look for, and its server under it, with its switch, or how to get it.
     private func serverRow(_ server: LSP.Server, _ p: Palette) -> some View {
-        let found = servers[server.command]
-        let on = Binding(get: { enabledServers.contains(server.command) }, set: { on in
-            if on { enabledServers.insert(server.command) } else { enabledServers.remove(server.command) }
+        let found = servers[server.id]
+        let on = Binding(get: { enabledServers.contains(server.id) }, set: { on in
+            if on { enabledServers.insert(server.id) } else { enabledServers.remove(server.id) }
             LanguageServers.shared.setEnabled(on, for: server)
         })
         // The server's command in the terminal's type, as Agents shows each agent's.
@@ -470,10 +471,10 @@ struct SettingsPage: View {
             switch found {
             case nil: ProgressView().controlSize(.mini)
             case .some(let path?): toggle(on).help((path as NSString).abbreviatingWithTildeInPath)
-            case .some(nil) where installing.contains(server.command):
+            case .some(nil) where installing.contains(server.id):
                 ProgressView().controlSize(.mini).help("Installing \(server.name)")
             case .some(nil):
-                if let error = installErrors[server.command] {
+                if let error = installErrors[server.id] {
                     // The terminal shows the whole error, and takes a password if the install wants one.
                     HStack(spacing: 10) {
                         Text("Couldn't install").font(.system(size: 12)).foregroundStyle(p.muted).help(error)

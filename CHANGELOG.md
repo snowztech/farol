@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Go to definition and references in Vue files. The Vue row in Settings → Editor installs the Vue plugin for the TypeScript server, which then serves `.ts` and `.vue` files in one process. It works in the `<script>` and in the `<template>` of a component: variables and functions used in `{{ }}`, `:prop` and `@event`, a component used as a tag, a prop, and the imports of other components and scripts.
+
 ## [0.62.0] - 2026-11-06
 
 Go back after a jump, install language servers in one click, and a smoother terminal on the phone.
