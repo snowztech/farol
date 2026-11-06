@@ -128,6 +128,10 @@ public final class TerminalView: NSView {
             }
         }
 
+        // Each terminal picks its own theme for the scheme, so a `light:A,dark:B` one needs telling which.
+        if let surface { ghostty_surface_set_color_scheme(surface, runtime.isDark ? GHOSTTY_COLOR_SCHEME_DARK : GHOSTTY_COLOR_SCHEME_LIGHT) }
+        NotificationCenter.default.addObserver(self, selector: #selector(followColorScheme), name: TerminalRuntime.colorSchemeDidChange, object: runtime)
+
         addTrackingArea(NSTrackingArea(
             rect: .zero,
             options: [.mouseMoved, .cursorUpdate, .activeInKeyWindow, .inVisibleRect],
@@ -160,9 +164,18 @@ public final class TerminalView: NSView {
         layer?.needsDisplayOnBoundsChange = visible
     }
 
+    @objc private func followColorScheme(_ note: Notification) {
+        guard let surface, let runtime = note.object as? TerminalRuntime else { return }
+        ghostty_surface_set_color_scheme(surface, runtime.isDark ? GHOSTTY_COLOR_SCHEME_DARK : GHOSTTY_COLOR_SCHEME_LIGHT)
+    }
+
     /// Runs on the main thread during ghostty_app_tick. C strings are only valid for this call.
     func handle(_ action: ghostty_action_s) -> Bool {
         switch action.tag {
+        // Ghostty asks for the same config again after this terminal's color scheme changed, so it can pick the other theme.
+        case GHOSTTY_ACTION_RELOAD_CONFIG where action.action.reload_config.soft:
+            guard let surface, let app = ghostty_surface_app(surface), let runtime = TerminalRuntime.from(app) else { return false }
+            ghostty_surface_update_config(surface, runtime.config)
         case GHOSTTY_ACTION_SET_TITLE:
             guard let title = action.action.set_title.title else { return false }
             self.title = String(cString: title)

@@ -4,7 +4,10 @@ import GhosttyKit
 /// Process-wide libghostty state. Create one at launch and share it with every TerminalView.
 public final class TerminalRuntime {
     private(set) var app: ghostty_app_t!
-    private var config: ghostty_config_t!
+    /// What the files say. A `theme = light:A,dark:B` in it holds both, and Ghostty picks one for the color scheme.
+    private(set) var config: ghostty_config_t!
+    /// The config with the theme for the current color scheme picked, which is where the colors are read.
+    private var applied: ghostty_config_t?
     private let overrideFiles: [URL]
 
     /// Colors from the user's Ghostty config alone, before Farol's overrides. Nil when it sets none, which leaves Farol Beam.
@@ -19,8 +22,13 @@ public final class TerminalRuntime {
     /// What libghostty could not read in the config files, one message per problem. Empty when all of it was read.
     public private(set) var configErrors: [String] = []
 
-    /// Called on the main thread after reloadConfig() applied new settings.
+    /// Called on the main thread once new settings or a new color scheme are applied.
     public var onConfigChange: (() -> Void)?
+
+    /// Whether macOS shows dark mode, as last told to `follow(dark:)`. Ghostty starts out light.
+    public private(set) var isDark = false
+    /// Posted when the color scheme changes, for each terminal to take it, since each one picks its own theme.
+    static let colorSchemeDidChange = Notification.Name("FarolTerminalColorSchemeDidChange")
 
     /// `overrideFiles` load after the user's Ghostty config, so they win.
     public init(overrideFiles: [URL] = []) {
@@ -56,9 +64,20 @@ public final class TerminalRuntime {
             if target.tag == GHOSTTY_TARGET_SURFACE, let ud = ghostty_surface_userdata(target.target.surface) {
                 return TerminalView.from(ud).handle(action)
             }
-            guard let app, let ud = ghostty_app_userdata(app), let request = TerminalRequest(action) else { return false }
+            guard let app, let ud = ghostty_app_userdata(app) else { return false }
             let runtime = Unmanaged<TerminalRuntime>.fromOpaque(ud).takeUnretainedValue()
-            guard let onRequest = runtime.onRequest else { return false }
+            switch action.tag {
+            // A soft reload is Ghostty asking to apply the same config again, as after the color scheme changed. Nothing is read from disk.
+            case GHOSTTY_ACTION_RELOAD_CONFIG where action.action.reload_config.soft:
+                ghostty_app_update_config(app, runtime.config)
+                return true
+            case GHOSTTY_ACTION_CONFIG_CHANGE:
+                runtime.apply(action.action.config_change.config)
+                return true
+            default:
+                break
+            }
+            guard let request = TerminalRequest(action), let onRequest = runtime.onRequest else { return false }
             DispatchQueue.main.async { onRequest(request) }
             return true
         }
@@ -83,14 +102,33 @@ public final class TerminalRuntime {
         app = ghostty_app_new(&rt, config)
     }
 
-    /// Re-reads all config files and applies them to every open terminal.
+    /// Re-reads all config files and applies them to every open terminal. Ghostty answers with the applied config, which calls onConfigChange.
     public func reloadConfig() {
         let old = config
         config = Self.loadConfig(overrideFiles)
         configErrors = Self.errors(in: config)
         ghostty_app_update_config(app, config)
         ghostty_config_free(old)
-        onConfigChange?()
+    }
+
+    /// Tells Ghostty whether macOS shows dark mode, so a `light:A,dark:B` theme switches with it.
+    public func follow(dark: Bool) {
+        guard dark != isDark || applied == nil else { return }
+        isDark = dark
+        ghostty_app_set_color_scheme(app, dark ? GHOSTTY_COLOR_SCHEME_DARK : GHOSTTY_COLOR_SCHEME_LIGHT)
+        NotificationCenter.default.post(name: Self.colorSchemeDidChange, object: self)
+    }
+
+    /// Keeps a copy of the config Ghostty applied, since the one it passes only lives for the call.
+    private func apply(_ resolved: ghostty_config_t?) {
+        guard let resolved, let copy = ghostty_config_clone(resolved) else { return }
+        if let applied { ghostty_config_free(applied) }
+        applied = copy
+        DispatchQueue.main.async { self.onConfigChange?() }
+    }
+
+    static func from(_ app: ghostty_app_t) -> TerminalRuntime? {
+        ghostty_app_userdata(app).map { Unmanaged<TerminalRuntime>.fromOpaque($0).takeUnretainedValue() }
     }
 
     /// libghostty gives no file or line, so the same mistake on two lines reads the same and is listed once.
@@ -102,14 +140,14 @@ public final class TerminalRuntime {
     }
 
     /// Theme colors, so window chrome can match the terminal.
-    public var backgroundColor: NSColor { Self.color(config, "background") ?? .black }
-    public var foregroundColor: NSColor { Self.color(config, "foreground") ?? .white }
+    public var backgroundColor: NSColor { Self.color(applied ?? config, "background") ?? .black }
+    public var foregroundColor: NSColor { Self.color(applied ?? config, "foreground") ?? .white }
 
     /// The theme's 16 ANSI colors, the ones programs like `ls` use. Empty if Ghostty cannot report them.
     public var ansiColors: [NSColor] {
         var palette = ghostty_config_palette_s()
         let key = "palette"
-        guard ghostty_config_get(config, &palette, key, UInt(key.utf8.count)) else { return [] }
+        guard ghostty_config_get(applied ?? config, &palette, key, UInt(key.utf8.count)) else { return [] }
         return withUnsafeBytes(of: palette.colors) { Array($0.bindMemory(to: ghostty_config_color_s.self).prefix(16)) }
             .map(Self.nsColor)
     }
