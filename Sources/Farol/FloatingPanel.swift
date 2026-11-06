@@ -6,13 +6,15 @@ import SwiftUI
 @MainActor
 enum FloatingPanel {
     /// `place` gets the content's size and the screen's visible frame and says where its bottom left goes, in screen points.
-    /// It is then kept on screen. `content` gets a way to close the panel.
+    /// It is then kept on screen. `content` gets a way to close the panel. `dismissed` runs however it closes.
     static func show<Content: View>(palette: Palette, over window: NSWindow, place: (NSSize, NSRect) -> NSPoint,
+                                    dismissed: (() -> Void)? = nil,
                                     @ViewBuilder content: (@escaping () -> Void) -> Content) {
         Panel.current?.dismiss()
         let panel = Panel()
+        panel.dismissed = dismissed
         let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
-        let hosting = NSHostingView(rootView: content { [weak panel] in panel?.dismiss() }
+        let hosting = FittingHost(rootView: content { [weak panel] in panel?.dismiss() }
             .background(palette.boxed ? palette.surface : palette.background)
             .clipShape(shape)
             .overlay(shape.strokeBorder(palette.line))
@@ -27,12 +29,30 @@ enum FloatingPanel {
         panel.setFrame(NSRect(origin: origin, size: size), display: false)
         panel.present(over: window)
     }
+
+    /// Closes the one open, if any.
+    static func dismiss() { Panel.current?.dismiss() }
+}
+
+/// Follows its content's height with its top edge held, so a list that fills in after opening, or narrows as you type, grows down from where it opened.
+private final class FittingHost<Content: View>: NSHostingView<Content> {
+    override func invalidateIntrinsicContentSize() {
+        super.invalidateIntrinsicContentSize()
+        guard let window else { return }
+        let height = fittingSize.height
+        guard height != window.frame.height else { return }
+        var frame = window.frame
+        frame.origin.y += frame.height - height
+        frame.size.height = height
+        window.setFrame(frame, display: true)
+    }
 }
 
 /// A borderless panel that takes the keyboard for its list, and goes away on a click anywhere else or when another window takes over.
 private final class Panel: NSPanel {
     /// Held here, since nothing else keeps a borderless panel alive once it is shown.
     static var current: Panel?
+    var dismissed: (() -> Void)?
     private var monitor: Any?
     private var takeover: Any?
 
@@ -83,5 +103,6 @@ private final class Panel: NSPanel {
         parent?.removeChildWindow(self)
         orderOut(nil)
         if Self.current === self { Self.current = nil }
+        dismissed?()
     }
 }

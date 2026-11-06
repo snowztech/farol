@@ -265,37 +265,27 @@ private struct GitButton: View {
 }
 
 /// The title opens a searchable list of every session, grouped like the sidebar, so you can switch with the sidebar closed.
-/// Typing also finds the files and folders of the checkout or the folder you are in, and the commands its project defines.
+/// The list is a panel of its own under the title bar, like Go to Line, rather than a popover, whose arrow tied it to the title as a menu.
 private struct SessionMenu: View {
-    private enum Choice: Hashable {
-        case session(UUID)
-        case command(ProjectCommand)
-        case file(String)
-    }
-
     @ObservedObject var session: Session
     @ObservedObject var store: SessionStore
     @ObservedObject var state: WindowState
     let commands: Commands
 
     @State private var hovering = false
-    @State private var query = ""
-    /// The row the arrows or the mouse are on. Without one, Return goes to the first match.
-    @State private var active: Choice?
-    /// The files and folders around you, listed each time the list opens, and the ones that match what is typed.
-    @State private var files: (root: String, paths: [String]) = ("", [])
-    @State private var hits: [String] = []
-    /// What the project defines to run, in its Makefile, package.json or justfile, read each time the list opens.
-    @State private var projectCommands: [ProjectCommand] = []
-    @State private var listHeight: CGFloat = 0
-    @FocusState private var searching: Bool
+    /// Where the title sits across the window, so the list opens centered under it between the open panels.
+    @State private var titleMidX: CGFloat = 0
+    /// A click on the title closes the list before the button sees it, which would open it again, so a close just before counts.
+    @State private var closedAt = Date.distantPast
 
-    private var palette: Palette { state.palette }
     private var open: Bool { state.switchingSession }
 
     var body: some View {
-        let p = palette
-        Button { state.switchingSession.toggle() } label: {
+        let p = state.palette
+        Button {
+            guard Date().timeIntervalSince(closedAt) > 0.3 else { return }
+            state.switchingSession.toggle()
+        } label: {
             HStack(spacing: 5) {
                 Text(session.displayName)
                 Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
@@ -310,12 +300,50 @@ private struct SessionMenu: View {
         .fixedSize()
         .onClickableHover { hovering = $0 }
         .hoverTip("Switch session (⌘P)")
-        .popover(isPresented: $state.switchingSession, arrowEdge: .bottom) { list(p) }
-        .onChange(of: state.switchingSession) { _, open in
-            if open { listFiles() } else { (query, active, files, hits, projectCommands) = ("", nil, ("", []), [], []) }
-        }
-        .onChange(of: query) { _, query in (active, hits) = (nil, Files.search(files.paths, query)) }
+        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).midX } action: { titleMidX = $0 }
+        .onChange(of: state.switchingSession) { _, open in if open { present() } else { FloatingPanel.dismiss() } }
     }
+
+    private func present() {
+        guard let window = NSApp.mainWindow ?? NSApp.keyWindow else { return state.switchingSession = false }
+        let midX = titleMidX
+        FloatingPanel.show(palette: state.palette, over: window, place: { size, _ in
+            NSPoint(x: window.frame.minX + midX - size.width / 2,
+                    y: window.frame.maxY - MainWindowController.topBarHeight - 6 - size.height)
+        }, dismissed: {
+            closedAt = Date()
+            state.switchingSession = false
+        }) { _ in
+            SessionPalette(session: session, store: store, state: state, commands: commands)
+        }
+    }
+}
+
+/// What the title's list holds: the sessions, then once you type, the project's commands and the files around you.
+private struct SessionPalette: View {
+    private enum Choice: Hashable {
+        case session(UUID)
+        case command(ProjectCommand)
+        case file(String)
+    }
+
+    @ObservedObject var session: Session
+    @ObservedObject var store: SessionStore
+    @ObservedObject var state: WindowState
+    let commands: Commands
+
+    @State private var query = ""
+    /// The row the arrows or the mouse are on. Without one, Return goes to the first match.
+    @State private var active: Choice?
+    /// The files and folders around you, listed each time the list opens, and the ones that match what is typed.
+    @State private var files: (root: String, paths: [String]) = ("", [])
+    @State private var hits: [String] = []
+    /// What the project defines to run, in its Makefile, package.json or justfile, read each time the list opens.
+    @State private var projectCommands: [ProjectCommand] = []
+    @State private var listHeight: CGFloat = 0
+    @FocusState private var searching: Bool
+
+    private var palette: Palette { state.palette }
 
     private func listFiles() {
         let root = session.topLevel ?? session.directory
@@ -325,7 +353,7 @@ private struct SessionMenu: View {
             let paths = Files.searchable(in: root)
             let found = local ? ProjectCommands.find(in: folder, top: top, globalDirectory: ProjectCommands.globalDirectory) : []
             DispatchQueue.main.async {
-                guard open else { return }
+                guard state.switchingSession else { return }
                 (files, hits, projectCommands) = ((root, paths), Files.search(paths, query), found)
             }
         }
@@ -341,7 +369,8 @@ private struct SessionMenu: View {
         }
     }
 
-    private func list(_ p: Palette) -> some View {
+    var body: some View {
+        let p = palette
         let groups = matches
         return VStack(spacing: 0) {
             HStack(spacing: 8) {
@@ -418,18 +447,21 @@ private struct SessionMenu: View {
                     .padding(6)
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
                 }
-                // An exact height, since the popover only follows its rows when it has no other choice.
-                .frame(height: min(listHeight, 320))
+                // An exact height, which the panel follows as rows come and go.
+                .frame(height: min(listHeight, 400))
                 // The arrows can go past the rows in view.
                 .onChange(of: active) { _, row in if let row { scroll.scrollTo(row) } }
             }
         }
-        .frame(width: 420)
+        // Wide enough for a file's folder and a command's text beside its name.
+        .frame(width: 560)
         .font(.system(size: 13))
         .foregroundStyle(p.text)
-        // Boxed, the list is one more panel, in the color of the panels around the terminal.
-        .background(p.boxed ? p.surface : p.background)
-        .onAppear { searching = true }
+        .onAppear {
+            searching = true
+            listFiles()
+        }
+        .onChange(of: query) { _, query in (active, hits) = (nil, Files.search(files.paths, query)) }
     }
 
     /// The sidebar's groups, keeping only the sessions whose name, repo, branch or folder has every word typed.

@@ -8,7 +8,7 @@ import GhosttyTerminal
 /// Top bar, session sidebar, and the selected terminal or the settings page.
 final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// Same height as the native title bar, so the buttons line up with the traffic lights.
-    private static let topBarHeight: CGFloat = 28
+    static let topBarHeight: CGFloat = 28
     /// Panels open fast and settle softly. The same curve drives the AppKit widths and the SwiftUI views that follow them.
     private static let panelDuration: TimeInterval = 0.28
     private static let panelCurve = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.25, 1)
