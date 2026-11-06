@@ -892,6 +892,7 @@ final class PaneContainer: NSView {
         file.onOpenFile = { [weak self] in self?.open($0) }
         file.onShowCommit = { [weak self] in self?.onShowCommit?($0) }
         file.onOpenAt = { [weak self] in self?.open($0, line: $1) }
+        file.onMovePane = { [weak self] in self?.goto(.direction($0)) }
         file.palette = { [weak self] in self?.palette }
         // A preview tab shows another file in the same view, which the files panel follows when it's the one in front.
         file.onPathChange = { [weak self, weak file] in
