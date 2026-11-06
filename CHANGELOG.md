@@ -22,6 +22,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - Settings → Appearance starts with your theme: its name and a preview. Click it and every theme opens beside the page, with search, a Dark and Light switch, and Farol's themes, yours, a Popular row of well known ones and the rest. A theme applies as you click it, and the page shows how it looks. Each card shows the theme's six hues, so dark themes are easier to tell apart, and your Ghostty config's colors show as Your Ghostty colors.
 - Appearance is regrouped: the theme on its own at the top, then style, app icon and animations under Interface, and grouping sessions and the run button under Layout.
 
+### Fixed
+
+- The Farol skill for coding agents knows Settings as it is now: the Editor's language servers, everything in Appearance, and letting Farol Voice control sessions. It was missing them, so an agent couldn't say where they live.
+
 ## [0.62.0] - 2026-11-06
 
 Go back after a jump, install language servers in one click, and a smoother terminal on the phone.
