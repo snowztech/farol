@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.64.0] - 2026-11-07
+
+Tasks for later: a New Task that runs once at a set time or again on the days you pick, kept as a file you or an agent can write.
+
 ### Added
 
 - Tasks for later. In New Task, the button beside Start picks when it runs: now, once on any day from a calendar, or again on the days of the week you pick, at any time you type. A task can span several repos, like one started now. Each run gets its own worktree, and a repeat's branch ends with the day, like `write-article-2026-11-06`. Tasks wait in a Tasks pane under the sessions, which shows when each runs next and folds to one line. Click a task to change its name, prompt or time and see how its runs went. Run Now is on hover, and Pause and Delete on right-click. Each task is a Markdown file in `~/.farol/schedules/` that you or an agent can write, edit or sync, and the pane follows the folder as it changes. A file Farol didn't write waits for you to allow it before it runs. The Farol skill teaches coding agents the format, so you can ask one to set up a task. While a repeat's run is open its row shows the run's lamp and the next run waits until you close it. Farol opens in the background at a task's time even if you quit it, and a run missed while the Mac slept starts once it wakes.
@@ -1294,7 +1298,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.63.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.64.0...HEAD
+[0.64.0]: https://github.com/snowztech/farol/releases/tag/v0.64.0
 [0.63.0]: https://github.com/snowztech/farol/releases/tag/v0.63.0
 [0.62.0]: https://github.com/snowztech/farol/releases/tag/v0.62.0
 [0.61.0]: https://github.com/snowztech/farol/releases/tag/v0.61.0
