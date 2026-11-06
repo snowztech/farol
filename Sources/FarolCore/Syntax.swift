@@ -23,6 +23,8 @@ public enum Syntax {
         var tagNames = false
         /// Markdown is colored by lines instead, see markdownTokens.
         var isMarkdown = false
+        /// A Vue component is colored by its sections instead, see vueTokens.
+        var isVue = false
         /// Names are colored too: a type by its capital, a function by the ( after it. Off where neither convention holds.
         var names = false
         /// A capitalized call is a type being made, like Swift's `Token(range:)`. In Go or JavaScript, `NewEngine(` is a function.
@@ -47,7 +49,8 @@ public enum Syntax {
         case "json", "jsonc": return json
         case "yml", "yaml", "toml", "ini", "conf": return config
         case "css", "scss": return css
-        case "html", "htm", "xml", "svg", "plist", "vue", "svelte": return html
+        case "vue": return vue
+        case "html", "htm", "xml", "svg", "plist", "svelte": return html
         case "md", "markdown", "mdx": return markdown
         default: return nil
         }
@@ -67,6 +70,7 @@ public enum Syntax {
 
     public static func tokens(in text: String, _ language: Language) -> [Token] {
         if language.isMarkdown { return markdownTokens(in: text) }
+        if language.isVue { return vueTokens(in: text) }
         let chars = Array(text.utf16)
         var tokens: [Token] = []
         var i = 0
@@ -213,7 +217,7 @@ public enum Syntax {
 
     private static func isDigit(_ c: UInt16) -> Bool { c >= 48 && c <= 57 }
 
-    private static func isWord(_ c: UInt16) -> Bool {
+    static func isWord(_ c: UInt16) -> Bool {
         isDigit(c) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95 || c == 36 || c == 64
     }
 
@@ -262,6 +266,9 @@ public enum Syntax {
     /// No `//` comments either, or every `https://` would start one.
     static let html = Language(lineComments: [], blockComments: [("<!--", "-->"), ("/*", "*/")], quotes: ["\""],
                                keywords: words("DOCTYPE doctype"), tagNames: true)
+
+    /// Read by section, see vueTokens, so its own lists stay empty.
+    static let vue = Language(lineComments: [], blockComments: [], quotes: [], keywords: [], isVue: true)
 
     static let markdown = Language(lineComments: [], blockComments: [], quotes: [], keywords: [], isMarkdown: true)
 

@@ -90,3 +90,112 @@ private func tokens(_ text: String, _ path: String) -> [String] {
     #expect(tokens("let map: [String: Int]", "a.swift") == ["let:keyword", "String:type", "Int:type"])
     #expect(tokens("x := 1", "a.go") == ["1:number"])
 }
+
+@Test func vueColorsTheScriptAsTypeScript() {
+    let code = "<script setup lang=\"ts\">\nimport { ref } from 'vue'\nconst count = ref<number>(0)\nfunction save(): void {}\ninterface User { name: string }\n</script>"
+    #expect(tokens(code, "A.vue") == [
+        "script:tag",
+        "\"ts\":string",
+        "import:keyword",
+        "from:keyword",
+        "'vue':string",
+        "const:keyword",
+        "number:type",
+        "0:number",
+        "function:keyword",
+        "save:function",
+        "void:keyword",
+        "interface:keyword",
+        "User:type",
+        "name:property",
+        "string:type",
+        "script:tag",
+    ])
+}
+
+@Test func vueColorsDirectivesAndTheExpressionsInThem() {
+    let code = "<template>\n  <my-button v-if=\"count > 0 && ok\" :class=\"{ active: isOn }\" @click=\"save($event)\" title='hi' id=\"a\">{{ user.name }} - {{ total + 1 }}</my-button>\n</template>"
+    #expect(tokens(code, "A.vue") == [
+        "template:tag",
+        "my-button:tag",
+        "v-if:keyword",
+        "0:number",
+        ":class:keyword",
+        "active:property",
+        "@click:keyword",
+        "save:function",
+        "'hi':string",
+        "\"a\":string",
+        "name:property",
+        "1:number",
+        "my-button:tag",
+        "template:tag",
+    ])
+}
+
+@Test func vueTagNamesKeepTheirHyphensAndALessThanIsNoTag() {
+    let code = "<template><router-link to=\"/a\">go</router-link><p>1 < 2</p><MyCard v-for=\"c in cards\" :key=\"c.id\" /></template>"
+    #expect(tokens(code, "A.vue") == [
+        "template:tag",
+        "router-link:tag",
+        "\"/a\":string",
+        "router-link:tag",
+        "p:tag",
+        "1:number",
+        "2:number",
+        "p:tag",
+        "MyCard:tag",
+        "v-for:keyword",
+        "in:keyword",
+        ":key:keyword",
+        "id:property",
+        "template:tag",
+    ])
+}
+
+@Test func vueLeavesATagInsideAnHtmlCommentAlone() {
+    let code = "<template><!-- <div v-if=\"x\"> --><p>a</p></template>"
+    #expect(tokens(code, "A.vue") == [
+        "template:tag",
+        "<!-- <div v-if=\"x\"> -->:comment",
+        "p:tag",
+        "p:tag",
+        "template:tag",
+    ])
+}
+
+@Test func anUnclosedQuoteInAVueScriptStopsAtItsLine() {
+    let code = "<template><p>ok</p></template>\n<script>\nconst s = \"unclosed\n</script>\n<style>.b { color: blue }</style>"
+    #expect(tokens(code, "A.vue") == [
+        "template:tag",
+        "p:tag",
+        "p:tag",
+        "template:tag",
+        "script:tag",
+        "const:keyword",
+        "\"unclosed:string",
+        "script:tag",
+        "style:tag",
+        "style:tag",
+    ])
+}
+
+@Test func vueReadsEveryScriptAndStyleBlock() {
+    let code = "<script>\nexport default { name: 'A' }\n</script>\n<script setup>\nconst n = 1\n</script>\n<style scoped>\n.a { color: red !important /* c */ }\n</style>"
+    #expect(tokens(code, "A.vue") == [
+        "script:tag",
+        "export:keyword",
+        "default:keyword",
+        "name:property",
+        "'A':string",
+        "script:tag",
+        "script:tag",
+        "const:keyword",
+        "1:number",
+        "script:tag",
+        "style:tag",
+        "important:keyword",
+        "/* c */:comment",
+        "style:tag",
+    ])
+}

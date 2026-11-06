@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Vue files are colored by section. The script is read as JavaScript or TypeScript, the style as CSS, and the template as HTML, with its directives (`v-if`, `:prop`, `@click`) and the expressions in them and in `{{ }}` read as JavaScript. Component tags like `<my-button>` are colored whole. They had no more than tag names, strings and comments before.
+
 ## [0.62.0] - 2026-11-06
 
 Go back after a jump, install language servers in one click, and a smoother terminal on the phone.
