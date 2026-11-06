@@ -279,6 +279,8 @@ private struct NewTaskRow: View {
 struct RepoHeader: View {
     let name: String
     let palette: Palette
+    /// At the top of its list, where the room above it is the list's own, so it adds none.
+    var first = false
 
     var body: some View {
         Text(name)
@@ -287,7 +289,7 @@ struct RepoHeader: View {
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 10)
-            .padding(.top, 12)
+            .padding(.top, first ? 2 : 12)
             .padding(.bottom, 4)
     }
 }

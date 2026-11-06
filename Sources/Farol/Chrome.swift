@@ -399,7 +399,7 @@ private struct SessionPalette: View {
                     VStack(spacing: 1) {
                         ForEach(groups, id: \.key) { group in
                             if let key = group.key {
-                                RepoHeader(name: URL(fileURLWithPath: key).lastPathComponent, palette: p)
+                                RepoHeader(name: URL(fileURLWithPath: key).lastPathComponent, palette: p, first: group.key == groups.first?.key)
                             }
                             ForEach(group.items) { item in
                                 SessionChoice(
@@ -415,7 +415,8 @@ private struct SessionPalette: View {
                         }
                         let commandRows = commandHits
                         // Named like the projects above them, so every part of the list says what it holds.
-                        if !commandRows.isEmpty { RepoHeader(name: "Commands", palette: p) }
+                        // A section that opens the list sits as close under the search as a session would.
+                        if !commandRows.isEmpty { RepoHeader(name: "Commands", palette: p, first: groups.isEmpty) }
                         ForEach(commandRows, id: \.self) { command in
                             CommandChoice(
                                 command: command,
@@ -425,7 +426,7 @@ private struct SessionPalette: View {
                                 choose: { choose(.command(command)) })
                             .id(Choice.command(command))
                         }
-                        if !hits.isEmpty { RepoHeader(name: "Files", palette: p) }
+                        if !hits.isEmpty { RepoHeader(name: "Files", palette: p, first: groups.isEmpty && commandRows.isEmpty) }
                         ForEach(hits, id: \.self) { path in
                             FileChoice(
                                 path: path,
