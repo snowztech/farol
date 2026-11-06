@@ -268,3 +268,28 @@ import Testing
     #expect(History.requestBase("shared", in: box.repo) == "shared")
     #expect(History.requestBase("local-only", in: box.repo) == nil)
 }
+
+@Test func timesEachCheckFromEitherTool() throws {
+    let github = #"""
+    [{"statusCheckRollup":[
+      {"name":"test","status":"COMPLETED","conclusion":"SUCCESS","startedAt":"2026-11-06T15:17:25Z","completedAt":"2026-11-06T15:19:53Z"},
+      {"name":"lint","status":"IN_PROGRESS","startedAt":"2026-11-06T15:17:25Z","completedAt":"0001-01-01T00:00:00Z"},
+      {"name":"build","status":"QUEUED"}]}]
+    """#
+    let checks = Forge.checks(from: github)
+    let now = try #require(checks.first { $0.name == "lint" }?.started).addingTimeInterval(190)
+    #expect(checks.map { "\($0.name) \($0.timing(now: now))" } == ["build queued", "lint running 3m 10s", "test passed 2m 28s"])
+    // A year 1 end is gh's way of saying it hasn't ended.
+    #expect(checks.first { $0.name == "lint" }?.finished == nil)
+
+    let gitlab = #"{"jobs":[{"name":"test","status":"failed","started_at":"2026-11-06T15:00:00.000Z","finished_at":"2026-11-06T15:00:48.000Z"},{"name":"docs","status":"skipped"}]}"#
+    #expect(Forge.checks(from: gitlab).map { $0.timing() } == ["failed after 48s", "skipped"])
+}
+
+@Test func writesADurationInItsTwoBiggestUnits() {
+    #expect(Forge.Check.duration(48) == "48s")
+    #expect(Forge.Check.duration(190) == "3m 10s")
+    #expect(Forge.Check.duration(120) == "2m")
+    #expect(Forge.Check.duration(3900) == "1h 5m")
+    #expect(Forge.Check.duration(-5) == "0s")
+}

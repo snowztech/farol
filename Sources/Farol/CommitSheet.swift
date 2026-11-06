@@ -139,19 +139,34 @@ private struct ChecksButton: View {
         .onClickableHover { hovering = $0 }
         .hoverTip(summary)
         .popover(isPresented: $open, arrowEdge: .bottom) {
-            VStack(spacing: 1) {
-                ForEach(Array(checks.enumerated()), id: \.offset) { _, check in
-                    SheetChoice(palette: palette) {
-                        if let url = check.url { NSWorkspace.shared.open(url) }
-                        open = false
-                    } label: {
-                        CheckMark(state: check.state, palette: palette)
-                        Text(check.name).lineLimit(1)
+            // Ticks each second while a step runs, so its time counts up, and stays still once all are done.
+            TimelineView(.periodic(from: .now, by: checks.contains { $0.state == .running } ? 1 : 3600)) { context in
+                VStack(alignment: .leading, spacing: 1) {
+                    // The hover tip's words, which the open popover would otherwise hide.
+                    Text(summary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(palette.muted)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                    ForEach(Array(checks.enumerated()), id: \.offset) { _, check in
+                        SheetChoice(palette: palette) {
+                            if let url = check.url { NSWorkspace.shared.open(url) }
+                            open = false
+                        } label: {
+                            CheckMark(state: check.state, palette: palette)
+                            Text(check.name).lineLimit(1)
+                            Spacer(minLength: 16)
+                            Text(check.timing(now: context.date)).foregroundStyle(palette.muted).monospacedDigit()
+                            // A row opens the step's log on the forge, which nothing else in it says.
+                            if check.url != nil {
+                                Image(systemName: "arrow.up.right").font(.system(size: 9, weight: .semibold)).foregroundStyle(palette.muted)
+                            }
+                        }
                     }
                 }
             }
             .padding(6)
-            .frame(minWidth: 220)
+            .frame(minWidth: 260)
             .font(.system(size: 12))
             .foregroundStyle(palette.text)
             .background(palette.background)
