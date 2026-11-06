@@ -17,6 +17,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Changed
 
+- The ⌘P list is a wider panel under the title, without the popover's arrow, so a file's folder and a command's text show beside their names. Commands and files have their own headings, a footer says what Return does on the row you're on, every row lines up under the search, and the highlight stays put as the mouse crosses the list.
 - The checks next to a pull request in the review panel say how the pipeline stands, and how long each step ran or has been running, counting up while it runs. An arrow on each step shows it opens its log.
 - Farol Light is easier on the eyes: a softer white background, and every color dark enough to read on it, including the bright white and bright black some tools print in.
 - Farol Navy has colors of its own instead of Farol Beam's on a blue background: lavender text and bright blues, violets and a yellow green, like a city at night.

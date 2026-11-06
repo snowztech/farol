@@ -265,37 +265,27 @@ private struct GitButton: View {
 }
 
 /// The title opens a searchable list of every session, grouped like the sidebar, so you can switch with the sidebar closed.
-/// Typing also finds the files and folders of the checkout or the folder you are in, and the commands its project defines.
+/// The list is a panel of its own under the title bar, like Go to Line, rather than a popover, whose arrow tied it to the title as a menu.
 private struct SessionMenu: View {
-    private enum Choice: Hashable {
-        case session(UUID)
-        case command(ProjectCommand)
-        case file(String)
-    }
-
     @ObservedObject var session: Session
     @ObservedObject var store: SessionStore
     @ObservedObject var state: WindowState
     let commands: Commands
 
     @State private var hovering = false
-    @State private var query = ""
-    /// The row the arrows or the mouse are on. Without one, Return goes to the first match.
-    @State private var active: Choice?
-    /// The files and folders around you, listed each time the list opens, and the ones that match what is typed.
-    @State private var files: (root: String, paths: [String]) = ("", [])
-    @State private var hits: [String] = []
-    /// What the project defines to run, in its Makefile, package.json or justfile, read each time the list opens.
-    @State private var projectCommands: [ProjectCommand] = []
-    @State private var listHeight: CGFloat = 0
-    @FocusState private var searching: Bool
+    /// Where the title sits across the window. It is centered between the open panels, so the list is centered under it rather than on the window.
+    @State private var titleMidX: CGFloat = 0
+    /// A click on the title closes the list before the button sees it, which would open it again, so a close just before counts.
+    @State private var closedAt = Date.distantPast
 
-    private var palette: Palette { state.palette }
     private var open: Bool { state.switchingSession }
 
     var body: some View {
-        let p = palette
-        Button { state.switchingSession.toggle() } label: {
+        let p = state.palette
+        Button {
+            guard Date().timeIntervalSince(closedAt) > 0.3 else { return }
+            state.switchingSession.toggle()
+        } label: {
             HStack(spacing: 5) {
                 Text(session.displayName)
                 Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
@@ -310,12 +300,67 @@ private struct SessionMenu: View {
         .fixedSize()
         .onClickableHover { hovering = $0 }
         .hoverTip("Switch session (⌘P)")
-        .popover(isPresented: $state.switchingSession, arrowEdge: .bottom) { list(p) }
-        .onChange(of: state.switchingSession) { _, open in
-            if open { listFiles() } else { (query, active, files, hits, projectCommands) = ("", nil, ("", []), [], []) }
-        }
-        .onChange(of: query) { _, query in (active, hits) = (nil, Files.search(files.paths, query)) }
+        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).midX } action: { titleMidX = $0 }
+        .onChange(of: state.switchingSession) { _, open in if open { present() } else { FloatingPanel.dismiss() } }
     }
+
+    private func present() {
+        guard let window = NSApp.mainWindow ?? NSApp.keyWindow else { return state.switchingSession = false }
+        // Dropping from the title, the only centered thing in the bar and the one the eye lines it up with.
+        let (midX, frame, margin) = (titleMidX, window.frame, CGFloat(16))
+        let top = frame.maxY - MainWindowController.topBarHeight - 6
+        // Inside the window whatever its size: as wide as there is room for, and the list as tall as what is left under the search and above the footer.
+        let width = min(SessionPalette.width, frame.width - 2 * margin)
+        let listHeight = max(top - frame.minY - margin - SessionPalette.chrome, 90)
+        FloatingPanel.show(palette: state.palette, over: window, place: { size, _ in
+            // Under the title, or as near as the window's edges allow.
+            let x = min(max(frame.minX + midX - size.width / 2, frame.minX + margin), frame.maxX - margin - size.width)
+            return NSPoint(x: x, y: top - size.height)
+        }, dismissed: {
+            closedAt = Date()
+            state.switchingSession = false
+        }) { _ in
+            SessionPalette(session: session, store: store, state: state, commands: commands, width: width, maxListHeight: listHeight)
+        }
+    }
+}
+
+/// What the title's list holds: the sessions, then once you type, the project's commands and the files around you.
+private struct SessionPalette: View {
+    private enum Choice: Hashable {
+        case session(UUID)
+        case command(ProjectCommand)
+        case file(String)
+    }
+
+    @ObservedObject var session: Session
+    @ObservedObject var store: SessionStore
+    @ObservedObject var state: WindowState
+    let commands: Commands
+    var width = SessionPalette.width
+    var maxListHeight: CGFloat = 400
+
+    /// Wide enough for a file's folder and a command's text beside its name, in a window that has the room.
+    static let width: CGFloat = 560
+    /// The search above the list and the footer below it, which a short window still has to fit.
+    static let chrome: CGFloat = 90
+
+    @State private var query = ""
+    /// The row the arrows or the mouse are on. Without one, Return goes to the first match.
+    @State private var active: Choice?
+    /// The files and folders around you, listed each time the list opens, and the ones that match what is typed.
+    @State private var files: (root: String, paths: [String]) = ("", [])
+    @State private var hits: [String] = []
+    /// What the project defines to run, in its Makefile, package.json or justfile, read each time the list opens.
+    @State private var projectCommands: [ProjectCommand] = []
+    @State private var listHeight: CGFloat = 0
+    /// The arrows moved the highlight, so the list follows it. The mouse moving it must not scroll the row out from under it.
+    @State private var steering = false
+    @FocusState private var searching: Bool
+
+    private var palette: Palette { state.palette }
+    /// The width of the column the search glass, the lamps and the file and command icons share.
+    static let icon: CGFloat = 16
 
     private func listFiles() {
         let root = session.topLevel ?? session.directory
@@ -325,7 +370,7 @@ private struct SessionMenu: View {
             let paths = Files.searchable(in: root)
             let found = local ? ProjectCommands.find(in: folder, top: top, globalDirectory: ProjectCommands.globalDirectory) : []
             DispatchQueue.main.async {
-                guard open else { return }
+                guard state.switchingSession else { return }
                 (files, hits, projectCommands) = ((root, paths), Files.search(paths, query), found)
             }
         }
@@ -341,21 +386,24 @@ private struct SessionMenu: View {
         }
     }
 
-    private func list(_ p: Palette) -> some View {
+    var body: some View {
+        let p = palette
         let groups = matches
         return VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").foregroundStyle(p.muted)
-                // Return takes the first match, so a session is a few letters away.
+            HStack(spacing: 9) {
+                // In the rows' icon column, so the search and every name start at the same place.
+                Image(systemName: "magnifyingglass").foregroundStyle(p.muted).frame(width: Self.icon)
+                // A step above the rows, since it's what you look at first.
                 TextField("Search sessions, files and commands", text: $query)
                     .textFieldStyle(.plain)
+                    .font(.system(size: 15))
                     .focused($searching)
                     .onSubmit { highlighted.map(choose) }
                     .onKeyPress(.downArrow) { move(1) }
                     .onKeyPress(.upArrow) { move(-1) }
-                Text("⌘P").font(.system(size: 11, design: .monospaced)).foregroundStyle(p.muted)
             }
-            .padding(12)
+            .padding(.horizontal, 15)
+            .padding(.vertical, 12)
             Rectangle().fill(p.line).frame(height: 1)
             ScrollViewReader { scroll in
                 ScrollView {
@@ -363,7 +411,7 @@ private struct SessionMenu: View {
                     VStack(spacing: 1) {
                         ForEach(groups, id: \.key) { group in
                             if let key = group.key {
-                                RepoHeader(name: URL(fileURLWithPath: key).lastPathComponent, palette: p)
+                                RepoHeader(name: URL(fileURLWithPath: key).lastPathComponent, palette: p, first: group.key == groups.first?.key)
                             }
                             ForEach(group.items) { item in
                                 SessionChoice(
@@ -372,64 +420,84 @@ private struct SessionMenu: View {
                                     lit: highlighted == .session(item.id),
                                     shortcut: shortcut(for: item),
                                     palette: p,
-                                    // Leaving a row hands Return back to the session you are in, as a menu would.
-                                    hover: { inside in
-                                        if inside { active = .session(item.id) } else if active == .session(item.id) { active = nil }
-                                    },
+                                    hover: { inside in if inside { (active, steering) = (.session(item.id), false) } },
                                     choose: { choose(.session(item.id)) })
                                 .id(Choice.session(item.id))
                             }
                         }
                         let commandRows = commandHits
-                        if !commandRows.isEmpty && !groups.isEmpty {
-                            Rectangle().fill(p.line).frame(height: 1).padding(.horizontal, 9).padding(.vertical, 5)
-                        }
+                        // Named like the projects above them, so every part of the list says what it holds.
+                        // A section that opens the list sits as close under the search as a session would.
+                        if !commandRows.isEmpty { RepoHeader(name: "Commands", palette: p, first: groups.isEmpty) }
                         ForEach(commandRows, id: \.self) { command in
                             CommandChoice(
                                 command: command,
                                 lit: highlighted == .command(command),
-                                elsewhere: session.panes.focused.runsProgram,
                                 palette: p,
-                                hover: { inside in
-                                    if inside { active = .command(command) } else if active == .command(command) { active = nil }
-                                },
+                                hover: { inside in if inside { (active, steering) = (.command(command), false) } },
                                 choose: { choose(.command(command)) })
                             .id(Choice.command(command))
                         }
-                        // The file icons say what these rows are, so a line is enough to part them from the sessions.
-                        if !hits.isEmpty && !(groups.isEmpty && commandRows.isEmpty) {
-                            Rectangle().fill(p.line).frame(height: 1).padding(.horizontal, 9).padding(.vertical, 5)
-                        }
+                        if !hits.isEmpty { RepoHeader(name: "Files", palette: p, first: groups.isEmpty && commandRows.isEmpty) }
                         ForEach(hits, id: \.self) { path in
                             FileChoice(
                                 path: path,
                                 lit: highlighted == .file(path),
                                 palette: p,
-                                hover: { inside in
-                                    if inside { active = .file(path) } else if active == .file(path) { active = nil }
-                                },
+                                hover: { inside in if inside { (active, steering) = (.file(path), false) } },
                                 choose: { choose(.file(path)) })
                             .id(Choice.file(path))
                         }
                         if groups.isEmpty && commandRows.isEmpty && hits.isEmpty {
-                            Text("Nothing matches.").foregroundStyle(p.muted).padding(.vertical, 12)
+                            Text("Nothing matches “\(query)”.").foregroundStyle(p.muted).padding(.vertical, 12)
                         }
                     }
                     .padding(6)
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
                 }
-                // An exact height, since the popover only follows its rows when it has no other choice.
-                .frame(height: min(listHeight, 320))
+                // An exact height, which the panel follows as rows come and go.
+                .frame(height: min(listHeight, maxListHeight))
+                // Crossing the gaps and headers between rows keeps the highlight. Leaving the list hands Return back to the session you are in, as a menu would.
+                .onHover { inside in if !inside { active = nil } }
                 // The arrows can go past the rows in view.
-                .onChange(of: active) { _, row in if let row { scroll.scrollTo(row) } }
+                .onChange(of: active) { _, row in if steering, let row { scroll.scrollTo(row) } }
             }
+            Rectangle().fill(p.line).frame(height: 1)
+            footer(p)
         }
-        .frame(width: 420)
+        .frame(width: width)
         .font(.system(size: 13))
         .foregroundStyle(p.text)
-        // Boxed, the list is one more panel, in the color of the panels around the terminal.
-        .background(p.boxed ? p.surface : p.background)
-        .onAppear { searching = true }
+        .onAppear {
+            searching = true
+            listFiles()
+        }
+        .onChange(of: query) { _, query in (active, hits) = (nil, Files.search(files.paths, query)) }
+    }
+
+    /// The keys, and what Return does on the row it would open, said once here rather than inside the row as you move.
+    private func footer(_ p: Palette) -> some View {
+        HStack(spacing: 14) {
+            Text("↑↓ to move")
+            Text("esc to close")
+            Spacer(minLength: 8)
+            if let action = highlighted.map(action) {
+                Text("\(action) \(Text(Image(systemName: "return")).font(.system(size: 9)))").foregroundStyle(p.text)
+            }
+        }
+        .font(.system(size: 11))
+        .foregroundStyle(p.muted)
+        .padding(.horizontal, 15)
+        .frame(height: 30)
+    }
+
+    /// What Return does on a row, which differs by kind: running something, or a folder opening a session, is not what a list leads you to expect.
+    private func action(_ choice: Choice) -> String {
+        switch choice {
+        case .session(let id): id == store.selectedID ? "Stay here" : "Switch to session"
+        case .command: session.panes.focused.runsProgram ? "Run in a new pane" : "Run"
+        case .file(let path): path.hasSuffix("/") ? "Open as a new session" : "Open file"
+        }
     }
 
     /// The sidebar's groups, keeping only the sessions whose name, repo, branch or folder has every word typed.
@@ -460,6 +528,7 @@ private struct SessionMenu: View {
         let shown = shown
         guard !shown.isEmpty else { return .handled }
         let index = highlighted.flatMap(shown.firstIndex) ?? 0
+        steering = true
         active = shown[(index + step + shown.count) % shown.count]
         return .handled
     }
@@ -486,85 +555,71 @@ private struct SessionMenu: View {
     }
 }
 
-/// A command the project defines, in the title's list: its name, then what it types.
+/// What every row of the ⌘P list shares: its height, inset, highlight and hover, so sessions, commands and files read as one list.
+private struct PaletteRow<Content: View>: View {
+    /// Under the arrows or the mouse.
+    let lit: Bool
+    let palette: Palette
+    let hover: (Bool) -> Void
+    let choose: () -> Void
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        Button(action: choose) {
+            HStack(spacing: 9) { content }
+                .padding(.horizontal, 9)
+                .frame(height: 30)
+                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(lit ? palette.selection : .clear))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(QuietPress())
+        .onClickableHover(hover)
+    }
+}
+
+/// A command the project defines: its name, then what it types.
 private struct CommandChoice: View {
     let command: ProjectCommand
-    /// Under the arrows or the mouse.
     let lit: Bool
-    /// A program like an agent is in front in the pane, so the command goes to a new pane.
-    let elsewhere: Bool
     let palette: Palette
     let hover: (Bool) -> Void
     let choose: () -> Void
 
     var body: some View {
-        Button(action: choose) {
-            HStack(spacing: 9) {
-                // The room of a session's check and lamp, so every name starts at the same place.
-                Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).hidden()
-                Image(systemName: "play").font(.system(size: 9)).foregroundStyle(palette.muted).frame(width: Lamp.size)
-                Text(command.name).lineLimit(1).layoutPriority(1)
-                Text(command.displayCommand)
-                    .font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.tail)
-                Spacer(minLength: 8)
-                // Running something is not what a search list leads you to expect, so the row says where Return runs it.
-                if lit {
-                    Text("\(elsewhere ? "Run in a new pane" : "Run") \(Text(Image(systemName: "return")).font(.system(size: 9)))")
-                        .font(.system(size: 11)).foregroundStyle(palette.muted).fixedSize()
-                }
-            }
-            .padding(.horizontal, 9)
-            .frame(height: 30)
-            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(lit ? palette.selection : .clear))
-            .contentShape(Rectangle())
-            .hoverTip(command.global ? "Available in all projects" : "\(command.source) in \((command.folder as NSString).abbreviatingWithTildeInPath)")
+        PaletteRow(lit: lit, palette: palette, hover: hover, choose: choose) {
+            Image(systemName: "play").font(.system(size: 9)).foregroundStyle(palette.muted).frame(width: SessionPalette.icon)
+            Text(command.name).lineLimit(1).layoutPriority(1)
+            Text(command.displayCommand)
+                .font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.tail)
+            Spacer(minLength: 8)
         }
-        .buttonStyle(QuietPress())
-        .onClickableHover(hover)
+        .hoverTip(command.global ? "Available in all projects" : "\(command.source) in \((command.folder as NSString).abbreviatingWithTildeInPath)")
     }
 }
 
-/// A file or a folder in the title's list: its name, then the folder it is in.
+/// A file or a folder: its name, then the folder it is in.
 private struct FileChoice: View {
     let path: String
-    /// Under the arrows or the mouse.
     let lit: Bool
     let palette: Palette
     let hover: (Bool) -> Void
     let choose: () -> Void
 
     var body: some View {
-        Button(action: choose) {
-            HStack(spacing: 9) {
-                // The room of a session's check and lamp, so every name starts at the same place.
-                Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).hidden()
-                FileIcon(path: path).font(.system(size: 11)).foregroundStyle(palette.muted).frame(width: Lamp.size)
-                Text((path as NSString).lastPathComponent).lineLimit(1).truncationMode(.middle).layoutPriority(1)
-                Text((path as NSString).deletingLastPathComponent)
-                    .font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.head)
-                Spacer(minLength: 8)
-                // A folder opening a session is not what a file list leads you to expect, so the row says what Return does.
-                // The key is drawn smaller than the words, since at their size it outweighs them.
-                if lit && path.hasSuffix("/") {
-                    Text("New session \(Text(Image(systemName: "return")).font(.system(size: 9)))")
-                        .font(.system(size: 11)).foregroundStyle(palette.muted).fixedSize()
-                }
-            }
-            .padding(.horizontal, 9)
-            .frame(height: 30)
-            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(lit ? palette.selection : .clear))
-            .contentShape(Rectangle())
+        PaletteRow(lit: lit, palette: palette, hover: hover, choose: choose) {
+            FileIcon(path: path).font(.system(size: 11)).foregroundStyle(palette.muted).frame(width: SessionPalette.icon)
+            Text((path as NSString).lastPathComponent).lineLimit(1).truncationMode(.middle).layoutPriority(1)
+            Text((path as NSString).deletingLastPathComponent)
+                .font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.head)
+            Spacer(minLength: 8)
         }
-        .buttonStyle(QuietPress())
-        .onClickableHover(hover)
     }
 }
 
-/// A session in the title's list: a check on the one you are in, its lamp, its name and branch, and its shortcut.
+/// A session: its lamp, its name and branch, a check on the one you are in, and its shortcut.
 private struct SessionChoice: View {
     @ObservedObject var session: Session
     let current: Bool
-    /// Under the arrows or the mouse.
     let lit: Bool
     let shortcut: String?
     let palette: Palette
@@ -572,37 +627,29 @@ private struct SessionChoice: View {
     let choose: () -> Void
 
     var body: some View {
-        Button(action: choose) {
-            HStack(spacing: 9) {
-                // Always takes its room, so every name starts at the same place.
-                Image(systemName: "checkmark").font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(palette.text)
-                    .opacity(current ? 1 : 0)
-                Lamp(activity: session.activity, selected: true, palette: palette)
-                Text(session.displayName).lineLimit(1).truncationMode(.tail).layoutPriority(1)
-                if let branch = session.remoteLocation ?? session.branch {
-                    // A long name leaves the branch room for a lone "…", so it shows whole or not at all.
-                    ViewThatFits(in: .horizontal) {
-                        Text(branch).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).fixedSize()
-                        EmptyView()
-                    }
-                }
-                Spacer(minLength: 8)
-                if session.isWorktreeCheckout {
-                    Badge(text: "worktree", small: true, palette: palette)
-                        .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
-                }
-                if let shortcut {
-                    Text(shortcut).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).fixedSize()
+        PaletteRow(lit: lit, palette: palette, hover: hover, choose: choose) {
+            Lamp(activity: session.activity, selected: true, palette: palette).frame(width: SessionPalette.icon)
+            Text(session.displayName).lineLimit(1).truncationMode(.tail).layoutPriority(1)
+            if let branch = session.remoteLocation ?? session.branch {
+                // A long name leaves the branch room for a lone "…", so it shows whole or not at all.
+                ViewThatFits(in: .horizontal) {
+                    Text(branch).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).fixedSize()
+                    EmptyView()
                 }
             }
-            .padding(.horizontal, 9)
-            .frame(height: 30)
-            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(lit ? palette.selection : .clear))
-            .contentShape(Rectangle())
+            Spacer(minLength: 8)
+            if session.isWorktreeCheckout {
+                Badge(text: "worktree", small: true, palette: palette)
+                    .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
+            }
+            // At the end, by the shortcut, so it doesn't push every name in the list to the right.
+            if current {
+                Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).foregroundStyle(palette.text)
+            }
+            if let shortcut {
+                Text(shortcut).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).fixedSize()
+            }
         }
-        .buttonStyle(QuietPress())
-        .onClickableHover(hover)
     }
 }
 
