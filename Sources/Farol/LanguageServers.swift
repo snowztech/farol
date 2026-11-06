@@ -30,6 +30,48 @@ final class LanguageServers {
     }
 
     /// By checkout and server, since gopls for one worktree knows nothing of another's.
+    /// Servers installing now, and why the last install of each failed, by command.
+    private var installing: Set<String> = []
+    private var installErrors: [String: String] = [:]
+
+    func isInstalling(_ server: LSP.Server) -> Bool { installing.contains(server.command) }
+    func installError(_ server: LSP.Server) -> String? { installErrors[server.command] }
+
+    /// Installs it in the background and turns it on once it runs, since asking to install it is asking to use it.
+    func install(_ server: LSP.Server) {
+        guard installing.insert(server.command).inserted else { return }
+        installErrors[server.command] = nil
+        changed()
+        DispatchQueue.global(qos: .userInitiated).async {
+            let failure = LSP.install(server)
+            let found = LSP.find(server, in: LSP.searchPath)
+            DispatchQueue.main.async {
+                self.installing.remove(server.command)
+                self.executables[server.command] = found
+                if found != nil { return self.setEnabled(true, for: server) }
+                // xcode-select only opens Apple's installer, which finishes after it returns.
+                self.installErrors[server.command] = failure ?? (server.install.hasPrefix("xcode-select")
+                    ? "Finish installing in Apple's window, then try again."
+                    : "It installed, but \(server.command) isn't on your PATH.")
+                self.changed()
+            }
+        }
+    }
+
+    /// The failed install's output as a file, for the file pane to open.
+    func installLog(of server: LSP.Server) -> (path: String, lines: Int) {
+        let text = "$ \(server.install)\n\n" + (installErrors[server.command] ?? "") + "\n"
+        let file = logFolder().appendingPathComponent("\(server.name) install.log")
+        try? text.write(to: file, atomically: true, encoding: .utf8)
+        return (file.path, text.split(separator: "\n", omittingEmptySubsequences: false).count)
+    }
+
+    private func logFolder() -> URL {
+        let folder = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Farol")
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder
+    }
+
     private var running: [String: LanguageServer] = [:]
     /// The checkout a folder is in, asked of git once per folder.
     private var tops: [String: String] = [:]
@@ -49,7 +91,7 @@ final class LanguageServers {
         let known = executables[server.command]
         DispatchQueue.global(qos: .userInitiated).async {
             let root = Git.topLevel(of: directory) ?? directory
-            let executable = known ?? LSP.locate(server.command, in: LSP.searchPath)
+            let executable = known ?? LSP.find(server, in: LSP.searchPath)
             DispatchQueue.main.async {
                 self.tops[directory] = root
                 self.executables[server.command] = executable
@@ -100,7 +142,7 @@ final class LanguageServers {
     /// Looks for every server again, as after installing one from Settings.
     func locateAll(then done: @escaping () -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
-            let found = LSP.servers.map { ($0.command, LSP.locate($0.command, in: LSP.searchPath)) }
+            let found = LSP.servers.map { ($0.command, LSP.find($0, in: LSP.searchPath)) }
             DispatchQueue.main.async {
                 for (command, path) in found { self.executables[command] = path }
                 done()
@@ -124,9 +166,7 @@ final class LanguageServers {
 
     /// The server's log written to ~/Library/Logs/Farol, to open in a tab like any file. Returns its path and line count.
     func logFile(of server: LanguageServer) -> (path: String, lines: Int) {
-        let folder = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Farol")
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let file = folder.appendingPathComponent("\(server.server.name) \((server.root as NSString).lastPathComponent).log")
+        let file = logFolder().appendingPathComponent("\(server.server.name) \((server.root as NSString).lastPathComponent).log")
         try? (server.log.joined(separator: "\n") + "\n").write(to: file, atomically: true, encoding: .utf8)
         return (file.path, max(1, server.log.count))
     }

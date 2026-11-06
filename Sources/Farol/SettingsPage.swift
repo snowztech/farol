@@ -34,6 +34,9 @@ struct SettingsPage: View {
     @State private var enabledServers: Set<String> = []
     /// Where each server was found, by command, once looked for. A missing one maps to nil.
     @State private var servers: [String: String?] = [:]
+    /// The servers installing now, and why the last install of each failed, by command.
+    @State private var installing: Set<String> = []
+    @State private var installErrors: [String: String] = [:]
     /// Where each connected account's picture is, once known.
     @State private var avatars: [Forge.Kind: URL] = [:]
     /// Whether jira-cli is there and set up. Nil while it is being asked.
@@ -426,16 +429,19 @@ struct SettingsPage: View {
         Card(palette: p) {
             ForEach(LSP.servers, id: \.command) { serverRow($0, p) }
         }
-        .onAppear {
-            enabledServers = Set(LSP.servers.filter(LanguageServers.shared.isEnabled).map(\.command))
-            locateServers()
-        }
+        .onAppear { LanguageServers.shared.locateAll(then: showServers) }
+        // An install ending turns its server on, and the row follows.
+        .onReceive(NotificationCenter.default.publisher(for: LanguageServers.didChange)) { _ in showServers() }
     }
 
-    private func locateServers() {
-        LanguageServers.shared.locateAll {
-            servers = Dictionary(uniqueKeysWithValues: LSP.servers.map { ($0.command, LanguageServers.shared.location(of: $0)) })
-        }
+    private func showServers() {
+        let shared = LanguageServers.shared
+        enabledServers = Set(LSP.servers.filter(shared.isEnabled).map(\.command))
+        servers = Dictionary(uniqueKeysWithValues: LSP.servers.compactMap { server in
+            shared.isInstalled(server).map { _ in (server.command, shared.location(of: server)) }
+        })
+        installing = Set(LSP.servers.filter(shared.isInstalling).map(\.command))
+        installErrors = Dictionary(uniqueKeysWithValues: LSP.servers.compactMap { server in shared.installError(server).map { (server.command, $0) } })
     }
 
     /// Each language on its own color, a tool's identity being what a tile's color carries.
@@ -464,13 +470,20 @@ struct SettingsPage: View {
             switch found {
             case nil: ProgressView().controlSize(.mini)
             case .some(let path?): toggle(on).help((path as NSString).abbreviatingWithTildeInPath)
+            case .some(nil) where installing.contains(server.command):
+                ProgressView().controlSize(.mini).help("Installing \(server.name)")
             case .some(nil):
-                // sourcekit-lsp comes with Xcode, so there is no command to run for it.
-                if server.command == "sourcekit-lsp" {
-                    Text("Comes with Xcode").font(.system(size: 12)).foregroundStyle(p.muted)
+                if let error = installErrors[server.command] {
+                    // The terminal shows the whole error, and takes a password if the install wants one.
+                    HStack(spacing: 10) {
+                        Text("Couldn't install").font(.system(size: 12)).foregroundStyle(p.muted).help(error)
+                        ShipButton(title: "Install in Terminal", help: "Opens a terminal with: \(server.install)", busy: false, palette: p) {
+                            runInTerminal(server.install)
+                        }
+                    }
                 } else {
-                    ShipButton(title: "Install", help: "Opens a terminal with: \(server.install)", busy: false, palette: p) {
-                        runInTerminal(server.install)
+                    ShipButton(title: "Install", help: "Runs: \(server.install)", busy: false, palette: p) {
+                        LanguageServers.shared.install(server)
                     }
                 }
             }
