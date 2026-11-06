@@ -18,7 +18,7 @@
     <a href="https://discord.gg/XGY4jHU29d"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=flat&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
-<p align="center"><img src="site/screenshot-review.png" width="800" alt="Farol with agent sessions in the sidebar, one working, one waiting for you and one done, Claude Code in the terminal and the review panel showing the branch's changes since main"></p>
+<p align="center"><img src="site/screenshot-review.png" width="800" alt="Farol with sessions grouped by project in the sidebar, one working, one waiting for you and a second project folded, Claude Code reviewing the branch in the terminal and the review panel showing its changes since main"></p>
 
 Run several coding agents side by side, each in its own session, and Farol shows you which one is working, which one is done and which one needs you. Farol is Portuguese for lighthouse.
 
@@ -63,7 +63,11 @@ When a new version is out, an Update button shows in the title bar. Click it and
 
 Commit an executable `.farol/setup` to prepare each new worktree. Give it a shebang and run `chmod +x .farol/setup`. Farol copies ignored `.env` files first if enabled in Settings → Worktrees, then runs setup in the terminal before starting the agent or chosen command. If setup fails, the worktree stays open and the agent does not start. An optional `.farol/teardown` runs when you remove the worktree. The [task docs](https://farol.sh/docs#tasks) show an example and explain retries and tasks across repos.
 
-<p align="center"><img src="site/features/files.png" width="800" alt="The files panel next to the terminal, with src/store.ts open in a pane with syntax colors and line numbers"></p>
+<p align="center"><img src="site/features/files.png" width="800" alt="The files panel next to the terminal, with src/search.ts open in a pane with syntax colors and line numbers, and git log in the terminal"></p>
+<p align="center">
+  <img src="site/features/palette.png" width="395" alt="The ⌘P list searching for test: a session, the project's test command and the test files, with a footer saying what Return does">
+  <img src="site/features/git-graph.png" width="395" alt="The git graph panel with the branches above and the history below, two merged branches drawn as colored lanes">
+</p>
 
 Coming next: pipeline status and review comments in the sidebar, tasks from GitLab issues, and sessions that show their ticket. See [ROADMAP.md](ROADMAP.md).
 
