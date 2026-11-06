@@ -271,7 +271,7 @@ When you save a key or a value Farol cannot read, it tells you which one, and Se
 
 ### Custom themes
 
-Drop a theme file in `~/.config/farol/themes` and it shows up in Settings → Themes, right after Farol's own. Settings has a **Themes folder** button that opens it. A theme file is a few lines of Ghostty config:
+Drop a theme file in `~/.config/farol/themes` and it shows up in Settings → Appearance → Theme, right after Farol's own. Settings has a **Themes folder** button that opens it. A theme file is a few lines of Ghostty config:
 
 ```
 background = #1e1e2e

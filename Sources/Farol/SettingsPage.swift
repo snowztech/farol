@@ -58,16 +58,14 @@ struct SettingsPage: View {
         get { state.settingsSection }
         nonmutating set { state.settingsSection = newValue }
     }
-    @State private var themeQuery = ""
-    @State private var themeTone = ThemeTone.all
+    @State private var pickingTheme = false
+    @State private var hoveringTheme = false
     @Namespace private var navHighlight
     @AppStorage(Motion.key) private var animations = true
-    @State private var themes = Theme.all()
 
     enum Section: String, CaseIterable {
         case terminal = "Terminal"
         case appearance = "Appearance"
-        case themes = "Themes"
         case agents = "Agents"
         case worktrees = "Worktrees"
         case integrations = "Integrations"
@@ -80,7 +78,6 @@ struct SettingsPage: View {
             switch self {
             case .terminal: "apple.terminal.fill"
             case .appearance: "paintpalette.fill"
-            case .themes: "swatchpalette.fill"
 
             case .agents: "sparkles"
             case .worktrees: "arrow.triangle.branch"
@@ -98,7 +95,6 @@ struct SettingsPage: View {
             let hue: NSColor? = switch self {
             case .terminal: NSColor(p.done)
             case .appearance: p.code.keyword
-            case .themes: p.code.type
 
             case .agents: NSColor(p.waiting)
             case .worktrees: NSColor(p.working)
@@ -143,7 +139,6 @@ struct SettingsPage: View {
                     VStack(alignment: .leading, spacing: 0) {
                         switch section {
                         case .appearance: appearance(p)
-                        case .themes: themesSection(p)
                         case .terminal: terminal(p)
                         case .agents: agentsSection(p)
                         case .worktrees: worktreesSection(p)
@@ -176,9 +171,33 @@ struct SettingsPage: View {
 
     // MARK: Sections
 
+    /// The theme in use, the row people come to Appearance for. Its preview is the way in, so the whole row opens the picker.
+    private func themeRow(_ p: Palette) -> some View {
+        let theme = Theme.named(Theme.current(settings.theme, ghosttyConfig: state.ghosttyConfigPreview))
+        return Button { pickingTheme = true } label: {
+            Row(title: "Theme", detail: theme.name, palette: p) {
+                HStack(spacing: 10) {
+                    ThemePreview(colors: theme.colors(state.ghosttyConfigPreview), hues: theme.url != nil)
+                        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(hoveringTheme ? p.muted : p.line))
+                        .frame(width: 200)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(hoveringTheme ? p.text : p.muted)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(QuietPress())
+        .onClickableHover { hoveringTheme = $0 }
+        .sheet(isPresented: $pickingTheme) {
+            ThemePicker(selected: $settings.theme, ghosttyConfig: state.ghosttyConfigPreview, palette: state.palette)
+        }
+    }
+
     @ViewBuilder private func appearance(_ p: Palette) -> some View {
         Heading(title: "Appearance", detail: nil, palette: p)
         Card(palette: p) {
+            themeRow(p)
             Row(title: "App icon", detail: "Shown in the Dock while Farol runs.", palette: p) {
                 Picker("", selection: $appIcon) {
                     ForEach(AppIcon.allCases, id: \.self) { icon in
@@ -228,42 +247,6 @@ struct SettingsPage: View {
                 toggle($animations)
             }
         }
-    }
-
-    /// A page of its own, since the themes are hundreds and a page above or below them would be scrolled past.
-    @ViewBuilder private func themesSection(_ p: Palette) -> some View {
-        Heading(title: "Themes",
-                detail: "Applies to every session as soon as you pick it. To add your own, drop a Ghostty theme file in the themes folder.",
-                palette: p)
-        CurrentTheme(picked: settings.theme, ghosttyConfig: state.ghosttyConfigPreview, themes: themes, palette: p)
-            .padding(.bottom, 24)
-        HStack(spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").foregroundStyle(p.muted)
-                TextField("Search \(themes.filter { $0.url != nil }.count) themes", text: $themeQuery)
-                    .textFieldStyle(.plain)
-            }
-            .font(.system(size: 13))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(p.surface, in: RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(p.line))
-
-            ToneSwitch(tone: $themeTone, palette: p)
-
-            ShipButton(title: "Themes folder", busy: false, palette: p, action: openThemesFolder)
-        }
-        .padding(.bottom, 20)
-
-        ThemeGallery(query: themeQuery, selected: $settings.theme,
-                     ghosttyConfig: state.ghosttyConfigPreview, palette: p, themes: themes, tone: themeTone)
-            // Picks up themes added while Farol runs.
-            .onAppear { themes = Theme.all() }
-    }
-
-    private func openThemesFolder() {
-        try? FileManager.default.createDirectory(at: Theme.userDirectory, withIntermediateDirectories: true)
-        NSWorkspace.shared.open(Theme.userDirectory)
     }
 
     @ViewBuilder private func terminal(_ p: Palette) -> some View {
