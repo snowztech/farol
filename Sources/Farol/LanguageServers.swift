@@ -49,7 +49,7 @@ final class LanguageServers {
         let known = executables[server.command]
         DispatchQueue.global(qos: .userInitiated).async {
             let root = Git.topLevel(of: directory) ?? directory
-            let executable = known ?? LSP.locate(server.command, in: LSP.searchPath)
+            let executable = known ?? LSP.find(server, in: LSP.searchPath)
             DispatchQueue.main.async {
                 self.tops[directory] = root
                 self.executables[server.command] = executable
@@ -100,7 +100,7 @@ final class LanguageServers {
     /// Looks for every server again, as after installing one from Settings.
     func locateAll(then done: @escaping () -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
-            let found = LSP.servers.map { ($0.command, LSP.locate($0.command, in: LSP.searchPath)) }
+            let found = LSP.servers.map { ($0.command, LSP.find($0, in: LSP.searchPath)) }
             DispatchQueue.main.async {
                 for (command, path) in found { self.executables[command] = path }
                 done()

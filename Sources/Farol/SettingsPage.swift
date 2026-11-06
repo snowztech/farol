@@ -465,13 +465,8 @@ struct SettingsPage: View {
             case nil: ProgressView().controlSize(.mini)
             case .some(let path?): toggle(on).help((path as NSString).abbreviatingWithTildeInPath)
             case .some(nil):
-                // sourcekit-lsp comes with Xcode, so there is no command to run for it.
-                if server.command == "sourcekit-lsp" {
-                    Text("Comes with Xcode").font(.system(size: 12)).foregroundStyle(p.muted)
-                } else {
-                    ShipButton(title: "Install", help: "Opens a terminal with: \(server.install)", busy: false, palette: p) {
-                        runInTerminal(server.install)
-                    }
+                ShipButton(title: "Install", help: "Opens a terminal with: \(server.install)", busy: false, palette: p) {
+                    runInTerminal(server.install)
                 }
             }
         }

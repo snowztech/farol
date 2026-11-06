@@ -17,9 +17,7 @@ enum LanguageServerMenu {
         guard installed, servers.isEnabled(kind) else {
             menu.addItem(title(kind.name, state: installed ? "off" : "not installed", symbol: "circle"))
             menu.addItem(.separator())
-            if !installed, kind.command == "sourcekit-lsp" {
-                menu.addItem(disabled("Comes with Xcode"))
-            } else if !installed {
+            if !installed {
                 menu.addItem(action("Install Language Server", "arrow.down.circle") { install(kind.install) })
             } else {
                 menu.addItem(action("Enable Language Server", "play.fill") { servers.setEnabled(true, for: kind) })
@@ -74,12 +72,6 @@ enum LanguageServerMenu {
                                        attributes: [.font: NSFont.menuFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor]))
         item.attributedTitle = text
         item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
-        item.isEnabled = false
-        return item
-    }
-
-    private static func disabled(_ title: String) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         item.isEnabled = false
         return item
     }
