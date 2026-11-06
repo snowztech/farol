@@ -19,10 +19,10 @@ public enum Syntax {
         /// Quotes whose strings can span lines, like JavaScript's backtick.
         var multilineQuotes: Set<Character> = []
         let keywords: Set<String>
-        /// Markup: the name right after `<` or `</` is a tag.
-        var tagNames = false
         /// Markdown is colored by lines instead, see markdownTokens.
         var isMarkdown = false
+        /// HTML and the component files built on it are read by markupTokens instead.
+        var markup: Markup?
         /// Names are colored too: a type by its capital, a function by the ( after it. Off where neither convention holds.
         var names = false
         /// A capitalized call is a type being made, like Swift's `Token(range:)`. In Go or JavaScript, `NewEngine(` is a function.
@@ -35,6 +35,7 @@ public enum Syntax {
     public static func language(for path: String) -> Language? {
         let name = (path as NSString).lastPathComponent
         if ["Makefile", "Dockerfile", "Gemfile", "Rakefile"].contains(name) { return name == "Gemfile" || name == "Rakefile" ? ruby : shell }
+        if name == "go.mod" || name == "go.work" { return goModule }
         switch (name as NSString).pathExtension.lowercased() {
         case "swift": return swift
         case "go": return go
@@ -47,7 +48,10 @@ public enum Syntax {
         case "json", "jsonc": return json
         case "yml", "yaml", "toml", "ini", "conf": return config
         case "css", "scss": return css
-        case "html", "htm", "xml", "svg", "plist", "vue", "svelte": return html
+        case "html", "htm", "xhtml", "xml", "svg", "plist": return html
+        case "vue": return vue
+        case "svelte": return svelte
+        case "astro": return astro
         case "md", "markdown", "mdx": return markdown
         default: return nil
         }
@@ -67,6 +71,7 @@ public enum Syntax {
 
     public static func tokens(in text: String, _ language: Language) -> [Token] {
         if language.isMarkdown { return markdownTokens(in: text) }
+        if let markup = language.markup { return markupTokens(in: text, markup) }
         let chars = Array(text.utf16)
         var tokens: [Token] = []
         var i = 0
@@ -106,7 +111,8 @@ public enum Syntax {
                 if end < chars.count, chars[end] == c { end += 1 }
                 add(i, end, .string)
                 i = end
-            } else if isDigit(c), i == 0 || !isWord(chars[i - 1]) {
+            // A digit after `name.` goes on the name, like `v1.2.3` or Rust's `t.0`. CSS's `.5` is still a number.
+            } else if isDigit(c), i == 0 || !(isWord(chars[i - 1]) || chars[i - 1] == code(".") && i > 1 && isWord(chars[i - 2])) {
                 var end = i
                 while end < chars.count, isWord(chars[end]) || chars[end] == code(".") { end += 1 }
                 add(i, end, .number)
@@ -117,11 +123,7 @@ public enum Syntax {
                 let word = String(utf16CodeUnits: Array(chars[i..<end]), count: end - i)
                 // A dotted name like `.default` or `obj.type` is a member, not the keyword.
                 let afterDot = i > 0 && chars[i - 1] == code(".")
-                let isTag = language.tagNames && i > 0
-                    && (chars[i - 1] == code("<") || (i > 1 && chars[i - 1] == code("/") && chars[i - 2] == code("<")))
-                if isTag {
-                    add(i, end, .tag)
-                } else if !afterDot && language.keywords.contains(word) {
+                if !afterDot && language.keywords.contains(word) {
                     add(i, end, .keyword)
                 } else if language.names, let kind = name(word, at: i, end: end, afterDot: afterDot) {
                     add(i, end, kind)
@@ -209,11 +211,11 @@ public enum Syntax {
         return tokens
     }
 
-    private static func code(_ c: Unicode.Scalar) -> UInt16 { UInt16(c.value) }
+    static func code(_ c: Unicode.Scalar) -> UInt16 { UInt16(c.value) }
 
     private static func isDigit(_ c: UInt16) -> Bool { c >= 48 && c <= 57 }
 
-    private static func isWord(_ c: UInt16) -> Bool {
+    static func isWord(_ c: UInt16) -> Bool {
         isDigit(c) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95 || c == 36 || c == 64
     }
 
@@ -247,6 +249,10 @@ public enum Syntax {
         "def end class module if elsif else unless while until for in do return yield begin rescue ensure raise self nil true false and or not then case when require require_relative attr_reader attr_accessor private"),
         names: true)
 
+    /// go.mod and go.work. A version like v1.2.3 starts with a letter, so only `go 1.22` gets a number.
+    static let goModule = Language(lineComments: ["//"], blockComments: [], quotes: ["\"", "`"], keywords: words(
+        "module go toolchain godebug require replace exclude retract tool use"))
+
     static let shell = Language(lineComments: ["#"], blockComments: [], quotes: ["\"", "'"], keywords: words(
         "if then else elif fi for while until do done case esac in function return local export readonly set unset exit true false source"))
 
@@ -260,8 +266,16 @@ public enum Syntax {
 
     /// Only double quotes, since an apostrophe in page text would otherwise color the rest of its line.
     /// No `//` comments either, or every `https://` would start one.
-    static let html = Language(lineComments: [], blockComments: [("<!--", "-->"), ("/*", "*/")], quotes: ["\""],
-                               keywords: words("DOCTYPE doctype"), tagNames: true)
+    static let html = Language(lineComments: [], blockComments: [], quotes: [], keywords: [], markup: Markup())
+
+    static let vue = Language(lineComments: [], blockComments: [], quotes: [], keywords: [], markup: Markup(
+        expression: ("{{", "}}"), directives: ["v-", ":", "@", "#"], quotedCode: true))
+
+    static let svelte = Language(lineComments: [], blockComments: [], quotes: [], keywords: [], markup: Markup(
+        expression: ("{", "}"), directives: ["on:", "bind:", "class:", "style:", "use:", "transition:", "in:", "out:", "animate:", "let:"]))
+
+    static let astro = Language(lineComments: [], blockComments: [], quotes: [], keywords: [], markup: Markup(
+        expression: ("{", "}"), directives: ["client:", "server:", "set:", "is:", "transition:", "define:"], frontmatter: true))
 
     static let markdown = Language(lineComments: [], blockComments: [], quotes: [], keywords: [], isMarkdown: true)
 
