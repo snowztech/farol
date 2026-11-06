@@ -1063,16 +1063,15 @@ final class RemoteBridge: ObservableObject {
     /// The panes sized for a phone.
     private var fitted: Set<UUID> = []
 
-    /// Gives a pane a phone shows the phone's size, so Claude Code and the shell draw for the phone, as tmux's `window-size latest`.
-    /// Whoever acted last has it: the phone opening or typing into the terminal takes it, and the Mac's keyboard or mouse gives it back.
-    /// The phone closing the terminal gives it back too.
+    /// Gives a pane a phone shows the phone's size, so Claude Code and the shell draw for the phone, as an SSH client's would.
+    /// The phone keeps it while the terminal is open, since switching on any Mac keystroke made the pane jump between two widths.
+    /// The Mac takes it back only with the button on the pane, until the phone acts again.
     private func refit() {
-        let idle = CGEventSource.secondsSinceLastEventType(.hidSystemState, eventType: CGEventType(rawValue: ~0)!)
-        let macActed = Date.now.addingTimeInterval(-idle)
         var wanted: [UUID: (cols: Int, rows: Int)] = [:]
         for phone in phones.values where phone.device != nil {
-            guard let fit = phone.fit, phone.terminal == fit.session, fit.cols > 0, fit.rows > 0 else { continue }
-            if phone.acted > macActed { wanted[fit.session] = (fit.cols, fit.rows) }
+            guard let fit = phone.fit, phone.terminal == fit.session, fit.cols > 0, fit.rows > 0,
+                  let terminal = pane(fit.session)?.terminal, phone.acted > terminal.tookBack else { continue }
+            wanted[fit.session] = (fit.cols, fit.rows)
         }
         for id in fitted where wanted[id] == nil { pane(id)?.terminal.unfit() }
         for (id, size) in wanted { pane(id)?.terminal.fit(cols: size.cols, rows: size.rows) }
