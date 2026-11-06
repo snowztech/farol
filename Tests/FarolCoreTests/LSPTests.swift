@@ -104,44 +104,44 @@ import Testing
     #expect(LSP.install(server("echo 'npm ERR! EACCES' >&2 && exit 243")) == "npm ERR! EACCES")
 }
 
-@Test func vueHasItsOwnServerEntryAndTheOthersKeepTheirIds() {
+@Test func vueIsAPluginOfTheTypeScriptServer() {
     let vue = LSP.server(for: "/p/Cart.vue")
+    let typescript = LSP.server(for: "/p/App.tsx")
     #expect(vue?.id == "vue")
-    #expect(vue?.command == "typescript-language-server")
-    #expect(LSP.server(for: "/p/App.tsx")?.id == "typescript-language-server")
+    #expect(typescript?.id == "typescript-language-server")
+    #expect(vue.map(LSP.host(of:)) == typescript)
+    #expect(typescript.map(LSP.host(of:)) == typescript)
     #expect(LSP.languageName(for: "Cart.vue") == "Vue")
     #expect(LSP.languageID(for: "Cart.vue") == "vue")
-    // A saved choice is named by the id, which stays the command for every server but the bundle.
+    // A saved choice is named by the id, which stays the command for every server but a plugin.
     #expect(Set(LSP.servers.map(\.id)).count == LSP.servers.count)
-    #expect(LSP.servers.filter { $0.bundle == nil }.allSatisfy { $0.id == $0.command })
+    #expect(LSP.servers.filter { $0.plugin == nil }.allSatisfy { $0.id == $0.command })
 }
 
-@Test func startsABundleWithItsPluginOnceItIsInstalled() throws {
+@Test func aPluginIsFoundAndLoadedOnceItIsInstalled() throws {
     let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).path
     let vue = try #require(LSP.server(for: "/p/Cart.vue"))
-    // Nothing to load before the install, and the server isn't found, even with the plain one on the PATH, which doesn't know Vue.
-    let plain = home + "/plain"
-    try FileManager.default.createDirectory(atPath: plain, withIntermediateDirectories: true)
-    FileManager.default.createFile(atPath: plain + "/typescript-language-server", contents: Data("#!/bin/sh\necho 6.0.3\n".utf8),
+    let plugin = try #require(vue.plugin)
+    let bin = home + "/bin"
+    try FileManager.default.createDirectory(atPath: bin, withIntermediateDirectories: true)
+    FileManager.default.createFile(atPath: bin + "/typescript-language-server", contents: Data("#!/bin/sh\necho 6.0.3\n".utf8),
                                    attributes: [.posixPermissions: 0o755])
-    #expect(LSP.initializationOptions(for: vue, home: home) == nil)
-    #expect(LSP.find(vue, in: plain, home: home) == nil)
-    #expect(LSP.find(try #require(LSP.server(for: "/p/App.ts")), in: plain, home: home) == plain + "/typescript-language-server")
+    // The server alone doesn't know Vue, so there is nothing for a .vue file until the plugin is in.
+    #expect(LSP.find(vue, in: bin, home: home) == nil)
+    #expect(LSP.initializationOptions(loading: [plugin], home: home) == nil)
 
-    let root = home + "/.farol/language-servers/vue/node_modules"
-    try FileManager.default.createDirectory(atPath: root + "/.bin", withIntermediateDirectories: true)
-    try FileManager.default.createDirectory(atPath: root + "/@vue/typescript-plugin", withIntermediateDirectories: true)
-    FileManager.default.createFile(atPath: root + "/@vue/typescript-plugin/package.json", contents: Data("{}".utf8))
-    let tool = root + "/.bin/typescript-language-server"
-    FileManager.default.createFile(atPath: tool, contents: Data("#!/bin/sh\necho 6.0.3\n".utf8), attributes: [.posixPermissions: 0o755])
+    let modules = home + "/.farol/language-servers/vue/node_modules"
+    try FileManager.default.createDirectory(atPath: modules + "/@vue/typescript-plugin", withIntermediateDirectories: true)
+    FileManager.default.createFile(atPath: modules + "/@vue/typescript-plugin/package.json", contents: Data("{}".utf8))
 
-    #expect(LSP.find(vue, in: plain, home: home) == tool)
-    let options = try #require(LSP.initializationOptions(for: vue, home: home))
-    #expect((options["tsserver"] as? [String: String])?["path"] == root + "/typescript/lib")
-    let plugin = (options["plugins"] as? [[String: Any]])?.first
-    #expect(plugin?["name"] as? String == "@vue/typescript-plugin")
-    #expect(plugin?["location"] as? String == root + "/@vue/typescript-plugin")
-    #expect(plugin?["languages"] as? [String] == ["vue"])
-    // A server without a bundle is told nothing.
-    #expect(LSP.initializationOptions(for: try #require(LSP.server(for: "/p/main.go")), home: home) == nil)
+    // The plugin runs in the TypeScript server on the PATH, the same one .ts files use.
+    #expect(LSP.find(vue, in: bin, home: home) == bin + "/typescript-language-server")
+    let options = try #require(LSP.initializationOptions(loading: [plugin], home: home))
+    // A fallback, so a project's own TypeScript still wins.
+    #expect((options["tsserver"] as? [String: String]) == ["fallbackPath": modules + "/typescript/lib"])
+    let loaded = (options["plugins"] as? [[String: Any]])?.first
+    #expect(loaded?["name"] as? String == "@vue/typescript-plugin")
+    #expect(loaded?["location"] as? String == modules + "/@vue/typescript-plugin")
+    #expect(loaded?["languages"] as? [String] == ["vue"])
+    #expect(LSP.initializationOptions(loading: [], home: home) == nil)
 }

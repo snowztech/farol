@@ -17,13 +17,13 @@ final class LanguageServers {
     /// Whether the file's language has a server and it is turned on.
     func isEnabled(for path: String) -> Bool { LSP.server(for: path).map(isEnabled) ?? false }
 
+    /// Stops the process it shares with others too, like TypeScript's with Vue's plugin, since plugins load only at start.
+    /// The next file that needs it starts it again with what is on now.
     func setEnabled(_ on: Bool, for server: LSP.Server) {
         UserDefaults.standard.set(on, forKey: Self.enabledKey(server))
-        if !on {
-            for (key, running) in running where running.server == server {
-                running.stop()
-                self.running[key] = nil
-            }
+        for (key, running) in running where running.server.command == server.command {
+            running.stop()
+            self.running[key] = nil
         }
         changed()
         if on { NotificationCenter.default.post(name: Self.didTurnOn, object: nil) }
@@ -43,7 +43,11 @@ final class LanguageServers {
         installErrors[server.id] = nil
         changed()
         DispatchQueue.global(qos: .userInitiated).async {
-            let failure = LSP.install(server)
+            // A plugin needs its server, so one click gets both.
+            let host = LSP.host(of: server)
+            var failure: String?
+            if host != server, LSP.find(host, in: LSP.searchPath) == nil { failure = LSP.install(host) }
+            failure = failure ?? LSP.install(server)
             let found = LSP.find(server, in: LSP.searchPath)
             DispatchQueue.main.async {
                 self.installing.remove(server.id)
@@ -52,7 +56,8 @@ final class LanguageServers {
                 // xcode-select only opens Apple's installer, which finishes after it returns.
                 self.installErrors[server.id] = failure ?? (server.install.hasPrefix("xcode-select")
                     ? "Finish installing in Apple's window, then try again."
-                    : "It installed, but \(server.command) isn't on your PATH.")
+                    : server.plugin.map { "It installed, but \($0.package) isn't in ~/.farol/language-servers/\($0.folder)." }
+                        ?? "It installed, but \(server.command) isn't on your PATH.")
                 self.changed()
             }
         }
@@ -179,7 +184,9 @@ final class LanguageServers {
         guard let executable else { return nil }
         let key = key(server, root)
         if let found = running[key] { return found }
-        let started = LanguageServer(server: server, root: root)
+        let host = LSP.host(of: server)
+        let plugins = LSP.servers.filter { $0.command == host.command && isEnabled($0) }.compactMap(\.plugin)
+        let started = LanguageServer(server: host, root: root, options: LSP.initializationOptions(loading: plugins))
         started.onStateChange = { [weak self] in self?.changed() }
         running[key] = started
         started.start(executable: executable)
@@ -208,7 +215,8 @@ final class LanguageServers {
         changed()
     }
 
-    private func key(_ server: LSP.Server, _ root: String) -> String { server.id + "\0" + root }
+    /// By command, so a plugin's files and its server's share one process.
+    private func key(_ server: LSP.Server, _ root: String) -> String { server.command + "\0" + root }
 
     private func changed() {
         NotificationCenter.default.post(name: Self.didChange, object: nil)

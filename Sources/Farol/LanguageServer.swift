@@ -47,9 +47,13 @@ final class LanguageServer {
     /// Long enough for the first answer, which waits for the server to load the project: gopls took 12 seconds on a small one.
     private static let timeout: TimeInterval = 30
 
-    init(server: LSP.Server, root: String) {
+    /// What it is told at start, like the plugins to load.
+    private let options: [String: Any]?
+
+    init(server: LSP.Server, root: String, options: [String: Any]? = nil) {
         self.server = server
         self.root = root
+        self.options = options
     }
 
     func start(executable: String) {
@@ -169,7 +173,7 @@ final class LanguageServer {
                 ],
             ],
         ]
-        if let options = LSP.initializationOptions(for: server) { params["initializationOptions"] = options }
+        if let options { params["initializationOptions"] = options }
         let id = takeID()
         pending[id] = { [weak self] result in
             guard let self, state == .starting else { return }
