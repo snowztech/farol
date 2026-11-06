@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Back and forward through the files and lines you jumped between, with ⌃⌘← and ⌃⌘→, the Go menu or the mouse's side buttons. A definition, a search result, Go to Line or a file opened from the panel each counts as a jump, and jumps a few lines apart count once. Following a search result or a definition into another file no longer means searching again to return to where you were.
+
 ## [0.61.0] - 2026-11-06
 
 Files open in tabs, with richer colors, a status bar and optional language servers for go to definition.
