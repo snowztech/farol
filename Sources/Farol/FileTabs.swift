@@ -17,6 +17,8 @@ final class FileTabs: NSView {
     var onEmpty: (() -> Void)?
     /// Runs a command in a new terminal pane, as installing a language server does, so you see it happen.
     var runCommand: ((String) -> Void)?
+    /// Go to Line is about to move the cursor to this line of the file in front, so the place it leaves can be gone back to.
+    var willJump: ((String, Int) -> Void)?
 
     private let model = FileTabsModel()
     private let bar: NSHostingView<FileTabBar>
@@ -239,6 +241,7 @@ final class FileTabs: NSView {
     private func goToLine(_ text: String) {
         let parts = text.split(separator: ":").map { Int($0.trimmingCharacters(in: .whitespaces)) }
         guard let current, let line = parts.first ?? nil else { return }
+        willJump?(current.path, line)
         current.goTo(line: line, column: parts.count > 1 ? (parts[1] ?? 1) : 1)
     }
 
@@ -379,12 +382,14 @@ private struct FileTabItem: View {
     var body: some View {
         let p = palette
         HStack(spacing: 6) {
-            // As wide as the widest mark, Go's, so none spills over the name.
-            FileIcon(path: tab.path).font(.system(size: 11)).foregroundStyle(p.muted).frame(width: 20)
+            // Against the name, so every icon sits as far from it, whatever its width. Go's wide mark reaches into the padding instead.
+            FileIcon(path: tab.path, alignment: .trailing).font(.system(size: 11)).foregroundStyle(p.muted)
+                .frame(width: 20, alignment: .trailing)
+            // The one in front in medium weight and the others a step dimmer, so the tab you're in reads at a glance.
             Text(tab.name)
-                .font(.system(size: 12))
+                .font(.system(size: 12, weight: active ? .medium : .regular))
                 .italic(tab.preview)
-                .foregroundStyle(active ? p.text : p.muted)
+                .foregroundStyle(active ? p.text : p.text.opacity(0.7))
                 .lineLimit(1)
             if let folder = tab.folder {
                 Text(folder).font(.system(size: 11)).foregroundStyle(p.muted).lineLimit(1)

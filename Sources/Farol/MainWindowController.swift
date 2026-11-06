@@ -656,7 +656,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             return
         }
         filesRoot = session.$topLevel.combineLatest(session.$directory, session.$isRemote)
-            .sink { [weak self] topLevel, directory, remote in self?.files.show(remote ? nil : topLevel ?? directory) }
+            .sink { [weak self, weak session] topLevel, directory, remote in
+                self?.files.show(remote ? nil : topLevel ?? directory)
+                self?.files.follow(session?.panes.file?.path)
+            }
     }
 
     private func followGraph(_ session: Session?) {
@@ -758,6 +761,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let (query, options) = (fileSearch.query, fileSearch.options)
         store.selected?.panes.file?.mark { FileSearch.ranges(of: query, in: $0, options: options) }
     }
+
+    var canGoBack: Bool { store.selected?.panes.canGoBack == true }
+    var canGoForward: Bool { store.selected?.panes.canGoForward == true }
+
+    /// ⌃⌘←: the file and line you were at before the last jump, as after following a definition into another file.
+    func goBack() { store.selected?.panes.goBack() }
+
+    /// ⌃⌘→: back to where you were when you went back.
+    func goForward() { store.selected?.panes.goForward() }
 
     /// Only in the file pane with more than one tab, so ⌃Tab reaches programs in the terminal the rest of the time.
     var canStepTab: Bool { store.selected?.panes.canStepTab == true }
@@ -965,6 +977,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     private func host(_ session: Session) {
         session.panes.onShowCommit = { [weak self] in self?.showInGraph($0) }
+        // Only the session on screen drives the panel, since another's file pane may change in the background.
+        session.panes.onFileChange = { [weak self, weak session] path in
+            guard let self, let session, session === self.store.selected else { return }
+            self.files.follow(path)
+        }
         session.panes.frame = terminalContainer.bounds
         session.panes.autoresizingMask = [.width, .height]
         session.panes.theme = theme

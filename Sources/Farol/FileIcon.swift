@@ -11,6 +11,8 @@ struct FileIcon: View {
     var size: CGFloat = 18
     /// A square the mark must stay inside, as on a tile. Wide marks like Go's shrink to fit instead of spilling out.
     var fit: CGFloat?
+    /// Which side a wide mark spills from. Trailing keeps it off a name that follows, as in a tab.
+    var alignment: Alignment = .center
 
     var body: some View {
         if let glyph = Self.glyph(for: path, folder: folder), let fit {
@@ -19,7 +21,8 @@ struct FileIcon: View {
         } else if let glyph = Self.glyph(for: path, folder: folder) {
             // Seti's marks are drawn small in their square, so this size reads like a symbol beside it.
             // They take a symbol's room whatever frame they sit in, and a wide one, like Go's, spills past it rather than shrinking.
-            Text(verbatim: glyph).font(.custom("seti", size: size)).fixedSize().frame(width: size * 0.83, height: size * 0.78)
+            Text(verbatim: glyph).font(.custom("seti", size: size)).fixedSize()
+                .frame(width: size * 0.83, height: size * 0.78, alignment: alignment)
         } else {
             Image(systemName: Self.symbol(for: path, folder: folder))
         }

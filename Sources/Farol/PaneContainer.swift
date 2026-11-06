@@ -85,6 +85,8 @@ final class PaneContainer: NSView {
     var onLayoutChange: (() -> Void)?
     /// A file's blame asked for a commit, by its hash.
     var onShowCommit: ((String) -> Void)?
+    /// The file pane shows another file, or closes, so the files panel can highlight the one in view.
+    var onFileChange: ((String?) -> Void)?
 
     var terminals: [TerminalView] { root.leaves }
 
@@ -170,7 +172,24 @@ final class PaneContainer: NSView {
 
     /// Shows the file in the file pane, opening one right of the focused terminal if there is none yet.
     /// `line` scrolls to it, for opening a file at a change. Unless `keep`, it takes the preview tab, see FileTabs.
+    /// Where you were is kept, so ⌃⌘← comes back to it.
     func open(_ path: String, line: Int? = nil, keep: Bool = false) {
+        record(jumpingTo: path, line: line)
+        show(path, line: line, keep: keep)
+    }
+
+    private func record(jumpingTo path: String, line: Int?) {
+        if let left = place, left.path != path || line.map({ $0 != left.line }) == true {
+            history.record(leaving: left)
+        }
+    }
+
+    /// Where the file in front has its cursor, or nil without a file.
+    private var place: NavigationHistory.Place? {
+        file.map { NavigationHistory.Place(path: $0.path, line: $0.cursor.line) }
+    }
+
+    private func show(_ path: String, line: Int?, keep: Bool) {
         if tabs == nil {
             let tabs = makeTabs()
             insert(Node(tabs: tabs), beside: focused, .right)
@@ -179,11 +198,38 @@ final class PaneContainer: NSView {
         focusFile()
     }
 
+    /// Every jump in the file pane, so a chain of definitions can be walked back and forth.
+    private var history = NavigationHistory()
+
+    /// Only from the file pane, so in a terminal ⌃⌘ arrows still resize the pane.
+    var canGoBack: Bool { fileFocused && file != nil && history.canGoBack }
+    var canGoForward: Bool { fileFocused && file != nil && history.canGoForward }
+
+    /// To the file and line you were at before the last jump, in its tab if it still has one. A file that is gone is passed over.
+    func goBack() {
+        guard let here = place, let there = history.goBack(from: here, where: Self.exists) else { return }
+        show(there.path, line: there.line, keep: false)
+    }
+
+    func goForward() {
+        guard let here = place, let there = history.goForward(from: here, where: Self.exists) else { return }
+        show(there.path, line: there.line, keep: false)
+    }
+
+    private static func exists(_ place: NavigationHistory.Place) -> Bool {
+        FileManager.default.fileExists(atPath: place.path)
+    }
+
     private func makeTabs() -> FileTabs {
         let tabs = FileTabs(palette: palette) { [weak self] in self?.adopt($0) }
         tabs.autoresizingMask = []
-        tabs.onChange = { [weak self] in self?.onLayoutChange?() }
+        // Another tab in front, or one opened or closed: the files panel lights the file now in front.
+        tabs.onChange = { [weak self] in
+            self?.onFileChange?(self?.file?.path)
+            self?.onLayoutChange?()
+        }
         tabs.runCommand = { [weak self] in _ = self?.runInNewPane?($0) }
+        tabs.willJump = { [weak self] in self?.record(jumpingTo: $0, line: $1) }
         tabs.onEmpty = { [weak self] in self?.removeTabs() }
         self.tabs = tabs
         addSubview(tabs)
@@ -213,6 +259,7 @@ final class PaneContainer: NSView {
     private func removeTabs() {
         guard let tabs, let leaf = node(of: tabs) else { return }
         self.tabs = nil
+        onFileChange?(nil)
         detach(leaf)
         tabs.removeFromSuperview()
         if fileFocused { focus(focused) }
@@ -493,6 +540,16 @@ final class PaneContainer: NSView {
         let point = convert(event.locationInWindow, from: nil)
         let terminal = terminals.first { !$0.isHidden && $0.frame.contains(point) }
         if terminal !== hovered { hover(terminal) }
+    }
+
+    /// The mouse's side buttons go back and forward over the file pane, as in a browser. Over a terminal they are the program's.
+    override func otherMouseUp(with event: NSEvent) {
+        guard let tabs, tabs.frame.contains(convert(event.locationInWindow, from: nil)) else { return super.otherMouseUp(with: event) }
+        switch event.buttonNumber {
+        case 3: goBack()
+        case 4: goForward()
+        default: super.otherMouseUp(with: event)
+        }
     }
 
     override func mouseExited(with event: NSEvent) {
@@ -836,6 +893,10 @@ final class PaneContainer: NSView {
         file.onShowCommit = { [weak self] in self?.onShowCommit?($0) }
         file.onOpenAt = { [weak self] in self?.open($0, line: $1) }
         file.palette = { [weak self] in self?.palette }
+        // A preview tab shows another file in the same view, which the files panel follows when it's the one in front.
+        file.onPathChange = { [weak self, weak file] in
+            if let file, file === self?.file { self?.onFileChange?(file.path) }
+        }
     }
 
     private func applyFocus() {
