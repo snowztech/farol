@@ -59,7 +59,7 @@ public struct AgentSkill {
     Everything else is kept by the app, where only the user can change it, in Settings (⌘,). For these, tell the user where to click:
 
     - Appearance: picking the theme and Match system appearance, both written to `theme` in the config file, then the panel style, the app icon, animations, grouping sessions by project and the run button on panes.
-    - Agents: connecting Claude Code, Codex, OpenCode and Pi, one row per account, notifications, the Dock badge, the menu bar lighthouse or the status panel at the notch or screen edge, what new sessions start with, whether agent conversations resume when Farol opens, letting agents start tasks and message sessions, and letting Farol Voice control sessions.
+    - Agents: connecting Claude Code, Codex, OpenCode and Pi, one row per account, notifications, the Dock badge, the menu bar lighthouse or the status panel at the notch or screen edge, what new sessions start with, whether agent conversations resume when Farol opens, and letting agents start tasks and message sessions.
     - Editor: the language servers behind go to definition and find references with ⌘-click, one switch per language: Go, TypeScript and JavaScript, Vue, Python, Rust, Swift, and C, C++ and Objective-C. A missing server installs from its row.
     - Worktrees: copying ignored `.env` files into each new worktree.
     - Integrations: the `gh`, `glab` and jira-cli accounts, and which Jira tickets New Task lists.

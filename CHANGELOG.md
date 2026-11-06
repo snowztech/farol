@@ -24,7 +24,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Fixed
 
-- The Farol skill for coding agents knows Settings as it is now: the Editor's language servers, everything in Appearance, and letting Farol Voice control sessions. It was missing them, so an agent couldn't say where they live.
+- The Farol skill for coding agents knows Settings as it is now: the Editor's language servers and everything in Appearance. It was missing them, so an agent couldn't say where they live.
 
 ## [0.62.0] - 2026-11-06
 
