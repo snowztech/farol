@@ -332,6 +332,7 @@ private struct TasksPane: View {
 }
 
 /// One task: a clock until it runs, the run's own lamp while it does, and when it runs next on the right.
+/// Clicking it changes when it runs, or opens its run while one is open.
 private struct TaskRow: View {
     let task: Schedule
     let run: Session?
@@ -341,6 +342,9 @@ private struct TaskRow: View {
     let palette: Palette
 
     @State private var hovering = false
+    @State private var editing = false
+    @State private var timing = TaskTiming.everyDay
+    @State private var at = Date.now
 
     var body: some View {
         let p = palette
@@ -370,13 +374,33 @@ private struct TaskRow: View {
         .frame(height: 28)
         .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(hovering ? p.hover : .clear))
         .contentShape(Rectangle())
-        .onTapGesture { if let run { store.select(run) } }
+        .onTapGesture { if let run { store.select(run) } else { edit() } }
         .onClickableHover { hovering = $0 }
-        .hoverTip(tip)
+        .hoverTip(editing ? "" : tip)
         .contextMenu {
             Button("Run Now") { scheduler.run(task.id) }
+            Button("Change Time…", action: edit)
             ScheduleItems(schedule: task, scheduler: scheduler)
         }
+        // Beside the sidebar, so the rows stay in view. Each change is saved as you make it, like the rest of Farol's settings.
+        .popover(isPresented: $editing, arrowEdge: .trailing) {
+            WhenChoices(when: $timing, at: $at, offersNow: false, palette: palette) {}
+                .onChange(of: timing) { retime() }
+                .onChange(of: at) { retime() }
+        }
+    }
+
+    private func edit() {
+        timing = task.once != nil ? .later : task.days == .everyDay ? .everyDay : .weekdays
+        at = task.once ?? Calendar.current.date(bySettingHour: task.hour, minute: task.minute, second: 0, of: .now) ?? .now
+        editing = true
+    }
+
+    private func retime() {
+        let calendar = Calendar.current
+        let days: Schedule.Days? = timing == .everyDay ? .everyDay : timing == .weekdays ? .weekdays : nil
+        scheduler.retime(task.id, days: days, once: timing == .later ? at : nil,
+                         hour: calendar.component(.hour, from: at), minute: calendar.component(.minute, from: at))
     }
 
     @ViewBuilder private func trailing(_ p: Palette) -> some View {

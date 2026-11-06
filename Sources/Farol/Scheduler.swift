@@ -44,6 +44,18 @@ final class Scheduler: ObservableObject {
         }
     }
 
+    /// A new time owes nothing missed under the old one, so it waits until it's next due.
+    func retime(_ id: UUID, days: Schedule.Days?, once: Date?, hour: Int, minute: Int) {
+        update(id) { saved in
+            if let days { saved.days = days }
+            saved.once = once
+            saved.hour = hour
+            saved.minute = minute
+            saved.since = max(saved.since, .now)
+            saved.failure = nil
+        }
+    }
+
     func delete(_ id: UUID) {
         schedules.removeAll { $0.id == id }
         store.sessions.filter { $0.schedule == id }.forEach { $0.schedule = nil }

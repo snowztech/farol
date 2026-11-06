@@ -62,9 +62,9 @@ struct NewTaskSheet: View {
     @State private var repoQuery = ""
     @State private var pickingTicket = false
     @State private var pickingAgent = false
-    @State private var when = When.now
+    @State private var when = TaskTiming.now
     /// The day and time for later, or only the time for a repeat. Tomorrow at 9:00 to begin with.
-    @State private var at = Self.tomorrowMorning
+    @State private var at = TaskTiming.tomorrowMorning
     @State private var pickingWhen = false
     @State private var query = ""
     @FocusState private var searching: Bool
@@ -135,11 +135,9 @@ struct NewTaskSheet: View {
             return WorktreeScripts.hasSetup(in: folder) ? URL(fileURLWithPath: folder).lastPathComponent : nil
         }
     }
-    enum When: Hashable { case now, later, everyDay, weekdays }
-
     /// One repo only: a task for later makes a plain worktree each run.
     private var canWait: Bool { repos.isEmpty && sources.count == 1 }
-    private var starts: When { canWait ? when : .now }
+    private var starts: TaskTiming { canWait ? when : .now }
     private var days: Schedule.Days? {
         switch starts {
         case .everyDay: .everyDay
@@ -149,11 +147,6 @@ struct NewTaskSheet: View {
     }
     private var hour: Int { Calendar.current.component(.hour, from: at) }
     private var minute: Int { Calendar.current.component(.minute, from: at) }
-    private static var tomorrowMorning: Date {
-        let calendar = Calendar.current
-        let tomorrow = calendar.date(byAdding: .day, value: 1, to: .now) ?? .now
-        return calendar.date(bySettingHour: 9, minute: 0, second: 0, of: tomorrow) ?? tomorrow
-    }
     /// What the footer's button says: Now, Tomorrow at 9:00, Every day at 9:00.
     private var whenLabel: String {
         let time = Schedule.clock(hour: hour, minute: minute)
@@ -528,56 +521,8 @@ struct NewTaskSheet: View {
     private func whenSelect(_ p: Palette) -> some View {
         WhenButton(label: whenLabel, waiting: starts != .now, palette: p) { pickingWhen.toggle() }
             .popover(isPresented: $pickingWhen, arrowEdge: .top) {
-                VStack(alignment: .leading, spacing: 1) {
-                    ForEach([When.now, .later, .everyDay, .weekdays], id: \.self) { option in
-                        SheetChoice(palette: p) {
-                            when = option
-                            if option == .later, at <= .now { at = Self.tomorrowMorning }
-                            if option == .now { pickingWhen = false }
-                        } label: {
-                            Image(systemName: Self.symbol(option)).frame(width: 16).foregroundStyle(p.muted)
-                            Text(Self.title(option))
-                            Spacer()
-                            if option == when { Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)) }
-                        }
-                    }
-                    if when != .now {
-                        Rectangle().fill(p.line).frame(height: 1).padding(.vertical, 5)
-                        HStack {
-                            Text(when == .later ? "On" : "At").foregroundStyle(p.muted)
-                            Spacer()
-                            DatePicker("When", selection: $at, in: when == .later ? Date.now... : Date.distantPast...,
-                                       displayedComponents: when == .later ? [.date, .hourAndMinute] : .hourAndMinute)
-                                .labelsHidden()
-                                .datePickerStyle(.stepperField)
-                        }
-                        .padding(.horizontal, 8)
-                        .frame(height: 32)
-                    }
-                }
-                .font(.system(size: 13))
-                .foregroundStyle(p.text)
-                .padding(6)
-                .frame(width: 260)
-                .background(p.background)
+                WhenChoices(when: $when, at: $at, offersNow: true, palette: p) { pickingWhen = false }
             }
-    }
-
-    private static func title(_ when: When) -> String {
-        switch when {
-        case .now: "Now"
-        case .later: "Later, once"
-        case .everyDay: "Every day"
-        case .weekdays: "Weekdays"
-        }
-    }
-
-    private static func symbol(_ when: When) -> String {
-        switch when {
-        case .now: "play"
-        case .later: "clock"
-        case .everyDay, .weekdays: "repeat"
-        }
     }
 
     private func agentSelect(_ p: Palette) -> some View {
@@ -751,5 +696,79 @@ private struct WhenButton: View {
         .buttonStyle(.plain)
         .onClickableHover { hovering = $0 }
         .hoverTip("When it starts")
+    }
+}
+
+/// When a task runs. Now is only for a new task: a saved one runs now from its row instead.
+enum TaskTiming: Hashable {
+    case now, later, everyDay, weekdays
+
+    static var tomorrowMorning: Date {
+        let calendar = Calendar.current
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: .now) ?? .now
+        return calendar.date(bySettingHour: 9, minute: 0, second: 0, of: tomorrow) ?? tomorrow
+    }
+
+    var title: String {
+        switch self {
+        case .now: "Now"
+        case .later: "Later, once"
+        case .everyDay: "Every day"
+        case .weekdays: "Weekdays"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .now: "play"
+        case .later: "clock"
+        case .everyDay, .weekdays: "repeat"
+        }
+    }
+}
+
+/// The choices of when, then the day and time or only the time, for New Task's footer and a task's row.
+struct WhenChoices: View {
+    @Binding var when: TaskTiming
+    @Binding var at: Date
+    let offersNow: Bool
+    let palette: Palette
+    /// Picking Now leaves nothing more to set.
+    let done: () -> Void
+
+    var body: some View {
+        let p = palette
+        VStack(alignment: .leading, spacing: 1) {
+            ForEach(offersNow ? [TaskTiming.now, .later, .everyDay, .weekdays] : [.later, .everyDay, .weekdays], id: \.self) { option in
+                SheetChoice(palette: p) {
+                    when = option
+                    if option == .later, at <= .now { at = TaskTiming.tomorrowMorning }
+                    if option == .now { done() }
+                } label: {
+                    Image(systemName: option.symbol).frame(width: 16).foregroundStyle(p.muted)
+                    Text(option.title)
+                    Spacer()
+                    if option == when { Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)) }
+                }
+            }
+            if when != .now {
+                Rectangle().fill(p.line).frame(height: 1).padding(.vertical, 5)
+                HStack {
+                    Text(when == .later ? "On" : "At").foregroundStyle(p.muted)
+                    Spacer()
+                    DatePicker("When", selection: $at, in: when == .later ? Date.now... : Date.distantPast...,
+                               displayedComponents: when == .later ? [.date, .hourAndMinute] : .hourAndMinute)
+                        .labelsHidden()
+                        .datePickerStyle(.stepperField)
+                }
+                .padding(.horizontal, 8)
+                .frame(height: 32)
+            }
+        }
+        .font(.system(size: 13))
+        .foregroundStyle(p.text)
+        .padding(6)
+        .frame(width: 260)
+        .background(p.background)
     }
 }
