@@ -18,6 +18,7 @@ enum FloatingPanel {
             .background(palette.boxed ? palette.surface : palette.background)
             .clipShape(shape)
             .overlay(shape.strokeBorder(palette.line))
+            .modifier(GrowIn())
             .onExitCommand { [weak panel] in panel?.dismiss() })
         let size = hosting.fittingSize
         hosting.frame = NSRect(origin: .zero, size: size)
@@ -32,6 +33,17 @@ enum FloatingPanel {
 
     /// Closes the one open, if any.
     static func dismiss() { Panel.current?.dismiss() }
+}
+
+/// Opens from a touch smaller at its top edge, the way a menu drops, so it reads as coming from above rather than appearing.
+private struct GrowIn: ViewModifier {
+    @State private var shown = !Motion.enabled
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(shown ? 1 : 0.97, anchor: .top)
+            .onAppear { withAnimation(.easeOut(duration: 0.12)) { shown = true } }
+    }
 }
 
 /// Follows its content's height with its top edge held, so a list that fills in after opening, or narrows as you type, grows down from where it opened.
