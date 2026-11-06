@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Scheduled tasks. In New Task, Repeat runs the task every day or on weekdays at a time you pick. The first run starts right away so you see it work, then each run gets its own worktree on a branch ending with the day, like `write-article-2026-11-06`. Between runs a schedule waits under Scheduled in the sidebar, with Run Now on hover and Pause and Delete on right-click. While a run is open its row has a clock, and the next run waits until you close it. A run missed while the Mac slept or Farol was closed starts as soon as Farol is awake and open again.
+
 ## [0.63.0] - 2026-11-06
 
 Four new Farol themes, a theme for Light Mode and one for Dark Mode, Vue in the editor, and a wider ⌘P list.

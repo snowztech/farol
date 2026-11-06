@@ -24,6 +24,8 @@ struct NewTaskSheet: View {
     let palette: Palette
     /// Gets a valid branch, the command that launches the agent, its task for the command to read, and the repos.
     let start: (String, String, String, [String]) -> Void
+    /// Gets a task that repeats, whose first run starts now.
+    let schedule: (Schedule) -> Void
     let close: () -> Void
 
     @AppStorage("newTask.agent") private var agent = AgentFolder.Kind.claude.rawValue
@@ -58,10 +60,15 @@ struct NewTaskSheet: View {
     @State private var repoQuery = ""
     @State private var pickingTicket = false
     @State private var pickingAgent = false
+    /// Nil for a task that runs once.
+    @State private var repeats: Schedule.Days?
+    @State private var repeatTime = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: .now) ?? .now
+    @State private var pickingRepeat = false
     @State private var query = ""
     @FocusState private var searching: Bool
 
-    static func present(in window: NSWindow, directory: String, palette: Palette, start: @escaping (String, String, String, [String]) -> Void) {
+    static func present(in window: NSWindow, directory: String, palette: Palette, start: @escaping (String, String, String, [String]) -> Void,
+                        schedule: @escaping (Schedule) -> Void) {
         // Git is asked off the main thread, so a slow repo can't freeze the window before the sheet shows.
         DispatchQueue.global(qos: .userInitiated).async {
             let root = Git.repoRoot(of: directory)
@@ -82,7 +89,7 @@ struct NewTaskSheet: View {
                 let view = NewTaskSheet(
                     directory: directory, repo: repo, base: base, repos: repos, root: root, checkout: checkout,
                     siblings: siblings, branches: branches, expectsTickets: expectsTickets,
-                    palette: palette, start: start,
+                    palette: palette, start: start, schedule: schedule,
                     close: { [weak window, weak sheet] in sheet.map { window?.endSheet($0) } })
                 let host = NSHostingController(rootView: view)
                 // The sheet grows with the task as it wraps onto more lines.
@@ -126,7 +133,15 @@ struct NewTaskSheet: View {
             return WorktreeScripts.hasSetup(in: folder) ? URL(fileURLWithPath: folder).lastPathComponent : nil
         }
     }
+    /// One repo only: a schedule makes a plain worktree each run.
+    private var canRepeat: Bool { repos.isEmpty && sources.count == 1 }
+    private var repeating: Schedule.Days? { canRepeat ? repeats : nil }
+    private var hour: Int { Calendar.current.component(.hour, from: repeatTime) }
+    private var minute: Int { Calendar.current.component(.minute, from: repeatTime) }
     private var subtitle: String {
+        if let repeating {
+            return "Starts now, then \(repeating.label.lowercased()) at \(Schedule.clock(hour: hour, minute: minute)), each run in its own worktree from \(base)."
+        }
         if repos.isEmpty, sources.count < 2 { return "The agent starts in its own worktree, on a new branch from \(base)." }
         return "Each repo you pick gets its own worktree on the same branch, side by side in one folder. The agent starts there and sees them all."
     }
@@ -193,9 +208,12 @@ struct NewTaskSheet: View {
                     .sheetField(p, focused: focus == .branch)
                     if !branch.isEmpty, name == nil {
                         Text("Use letters, numbers, dashes or slashes.").font(.system(size: 12)).foregroundStyle(p.muted)
+                    } else if repeating != nil, let name {
+                        Text("Each run gets the day after it, like \(name)-\(Self.today).").font(.system(size: 12)).foregroundStyle(p.muted)
                     }
                 }
                 agentSelect(p)
+                if canRepeat { repeatSelect(p) }
                 if !setupNames.isEmpty {
                     Text("Runs .farol/setup in \(setupNames.joined(separator: ", ")) before the agent starts.")
                         .font(.system(size: 12))
@@ -209,7 +227,7 @@ struct NewTaskSheet: View {
                 Button("Cancel", action: close)
                     .buttonStyle(SheetButton(palette: p, primary: false))
                     .keyboardShortcut(.cancelAction)
-                Button("Start", action: startTask)
+                Button(repeating == nil ? "Start" : "Start and Repeat", action: startTask)
                     .buttonStyle(SheetButton(palette: p, primary: true))
                     .keyboardShortcut(.defaultAction)
                     .disabled(!canStart)
@@ -466,6 +484,50 @@ struct NewTaskSheet: View {
         }
     }
 
+    private static var today: String {
+        let parts = Calendar.current.dateComponents([.year, .month, .day], from: .now)
+        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    }
+
+    /// Doesn't repeat, every day or weekdays, and the time, in one field like the agent's.
+    private func repeatSelect(_ p: Palette) -> some View {
+        SheetSelect(palette: p, open: $pickingRepeat) {
+            Image(systemName: "repeat").foregroundStyle(p.muted)
+            if let repeats {
+                Text("\(repeats.label) at \(Schedule.clock(hour: hour, minute: minute))")
+            } else {
+                Text("Doesn't repeat").foregroundStyle(p.muted)
+            }
+        } choices: {
+            VStack(alignment: .leading, spacing: 1) {
+                ForEach([nil] + Schedule.Days.allCases.map(Optional.some), id: \.self) { option in
+                    SheetChoice(palette: p) {
+                        repeats = option
+                        if option == nil { pickingRepeat = false }
+                    } label: {
+                        Text(option?.label ?? "Doesn't repeat")
+                        Spacer()
+                        if option == repeats { Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)) }
+                    }
+                }
+                if repeats != nil {
+                    Rectangle().fill(p.line).frame(height: 1).padding(.vertical, 5)
+                    HStack {
+                        Text("At").foregroundStyle(p.muted)
+                        Spacer()
+                        DatePicker("At", selection: $repeatTime, displayedComponents: .hourAndMinute)
+                            .labelsHidden()
+                            .datePickerStyle(.stepperField)
+                    }
+                    .padding(.horizontal, 8)
+                    .frame(height: 32)
+                }
+            }
+            .padding(6)
+            .frame(width: 220)
+        }
+    }
+
     private func agentSelect(_ p: Palette) -> some View {
         SheetSelect(palette: p, open: $pickingAgent) {
             ToolTile(agent: choice.kind, size: 18)
@@ -491,6 +553,12 @@ struct NewTaskSheet: View {
 
     private func startTask() {
         guard canStart, let name else { return }
+        if let repeating, let repo = sources.first {
+            let title = picked?.summary ?? text.components(separatedBy: .newlines).first ?? name
+            close()
+            return schedule(Schedule(name: String(title.prefix(48)), task: prompt, repo: repo, branch: name, agent: choice.id,
+                                     days: repeating, hour: hour, minute: minute, since: .now))
+        }
         let command = choice.command() + " \"$\(NewTask.variable)\""
         close()
         // The worktree may fail and show why, which needs this sheet gone first.

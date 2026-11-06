@@ -158,7 +158,11 @@ public enum ControlError: Error, Equatable, CustomStringConvertible {
 extension NewTask {
     /// A branch for a task that no branch or worktree has yet, so a task never lands on someone else's work.
     public static func freeBranch(for task: String, taken: (String) -> Bool) -> String {
-        let base = branchName(for: task).isEmpty ? "task" : branchName(for: task)
+        freeBranch(named: branchName(for: task).isEmpty ? "task" : branchName(for: task), taken: taken)
+    }
+
+    /// `base`, or with the first number after it that no branch has.
+    public static func freeBranch(named base: String, taken: (String) -> Bool) -> String {
         guard taken(base) else { return base }
         return (2...).lazy.map { "\(base)-\($0)" }.first { !taken($0) }!
     }

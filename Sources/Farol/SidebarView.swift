@@ -1,4 +1,5 @@
 import Combine
+import FarolCore
 import SwiftUI
 
 struct SidebarView: View {
@@ -6,6 +7,7 @@ struct SidebarView: View {
 
     @ObservedObject var store: SessionStore
     @ObservedObject var state: WindowState
+    @ObservedObject var scheduler: Scheduler
     let commands: Commands
     let resize: (CGFloat) -> Void
 
@@ -35,6 +37,8 @@ struct SidebarView: View {
                             SessionRow(
                                 session: session,
                                 selected: session.id == store.selectedID && !state.showingSettings,
+                                schedule: scheduler.schedule(of: session),
+                                scheduler: scheduler,
                                 palette: p,
                                 highlight: selection,
                                 // Reselecting would pull focus back into the terminal, which a rename would lose.
@@ -48,6 +52,14 @@ struct SidebarView: View {
                                 return NSItemProvider(object: session.id.uuidString as NSString)
                             }
                             .onDrop(of: [.text], delegate: Reorder(target: session, store: store, dragging: $dragging))
+                        }
+                    }
+                    // A schedule shows here between runs. While a run is open, that run's row stands for it.
+                    let between = scheduler.schedules.filter { scheduler.run(of: $0) == nil }
+                    if !between.isEmpty {
+                        RepoHeader(name: "Scheduled", palette: p)
+                        ForEach(between) { schedule in
+                            ScheduleRow(schedule: schedule, starting: scheduler.starting.contains(schedule.id), scheduler: scheduler, palette: p)
                         }
                     }
                 }
@@ -100,6 +112,8 @@ struct SidebarView: View {
 private struct SessionRow: View {
     @ObservedObject var session: Session
     let selected: Bool
+    let schedule: Schedule?
+    let scheduler: Scheduler
     let palette: Palette
     let highlight: Namespace.ID
     let onSelect: () -> Void
@@ -134,6 +148,7 @@ private struct SessionRow: View {
         .contextMenu {
             Button("Rename", action: startEditing)
             Button("Close Session", action: onClose)
+            if let schedule { ScheduleItems(schedule: schedule, scheduler: scheduler) }
             // Over ssh the folder is on the server, where the Mac's apps can't reach it.
             if !session.isRemote {
                 Divider()
@@ -157,13 +172,22 @@ private struct SessionRow: View {
                 let name = Text(session.displayName)
                     .font(.system(size: 13, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? palette.text : palette.text.opacity(0.8))
-                if session.isWorktreeCheckout {
+                if session.isWorktreeCheckout || schedule != nil {
                     // The name gives way first, so the tag stays whole and never shrinks to a stray "w…".
                     HStack(spacing: 6) {
                         name.lineLimit(1).truncationMode(.tail)
-                        Badge(text: "worktree", small: true, palette: palette)
-                            .layoutPriority(1)
-                            .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
+                        if let schedule {
+                            Image(systemName: "clock")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(palette.muted)
+                                .layoutPriority(1)
+                                .hoverTip(schedule.runTip)
+                        }
+                        if session.isWorktreeCheckout {
+                            Badge(text: "worktree", small: true, palette: palette)
+                                .layoutPriority(1)
+                                .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")
+                        }
                     }
                 } else {
                     name
@@ -240,6 +264,92 @@ private struct SessionRow: View {
 }
 
 /// The way to start a task, at the foot of the sidebar where the tasks live. Quiet until hovered.
+/// A schedule between runs: what it does and when, with Run Now on hover.
+private struct ScheduleRow: View {
+    let schedule: Schedule
+    let starting: Bool
+    let scheduler: Scheduler
+    let palette: Palette
+
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: schedule.paused ? "pause" : "clock")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(palette.muted)
+                .frame(width: Lamp.size)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(schedule.name)
+                    .font(.system(size: 13))
+                    .foregroundStyle(schedule.paused ? palette.muted : palette.text.opacity(0.8))
+                    .truncationMode(.tail)
+                Text(subtitle)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(palette.muted)
+                    .truncationMode(.tail)
+            }
+            .lineLimit(1)
+            Spacer(minLength: 0)
+            if starting {
+                ProgressView().controlSize(.mini)
+            } else if hovering {
+                CloseButton(symbol: "play.fill", help: "Run now", palette: palette) { scheduler.run(schedule.id) }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(hovering ? palette.hover : .clear))
+        .contentShape(Rectangle())
+        .onClickableHover { hovering = $0 }
+        .hoverTip(schedule.failure ?? schedule.nextTip)
+        .contextMenu {
+            Button("Run Now") { scheduler.run(schedule.id) }
+            ScheduleItems(schedule: schedule, scheduler: scheduler)
+        }
+    }
+
+    private var subtitle: String {
+        if starting { return "starting…" }
+        if schedule.failure != nil { return "didn't start" }
+        return schedule.paused ? "paused" : schedule.rule
+    }
+}
+
+/// Pausing and deleting, the same on a schedule's row and on its open run.
+private struct ScheduleItems: View {
+    let schedule: Schedule
+    let scheduler: Scheduler
+
+    var body: some View {
+        Divider()
+        Button(schedule.paused ? "Resume Schedule" : "Pause Schedule") { scheduler.setPaused(!schedule.paused, schedule.id) }
+        Button("Delete Schedule") { scheduler.delete(schedule.id) }
+    }
+}
+
+extension Schedule {
+    /// When the next run starts, in words.
+    var nextTip: String {
+        if paused { return "Paused. Resume it to run \(rule) again." }
+        let next = next(after: .now)
+        let calendar = Calendar.current
+        let day = calendar.isDateInToday(next) ? "today" : calendar.isDateInTomorrow(next) ? "tomorrow"
+            : next.formatted(.dateTime.weekday(.wide))
+        return "Next run \(day) at \(Self.clock(hour: hour, minute: minute))"
+    }
+
+    /// What the clock on an open run says.
+    var runTip: String {
+        var lines = ["Runs \(rule). The next run waits until you close this one."]
+        if startedLate {
+            lines.append("This one started at \(since.formatted(date: .omitted, time: .shortened)), late because the Mac was asleep or Farol was closed.")
+        }
+        if paused { lines.append("Paused.") }
+        return lines.joined(separator: "\n")
+    }
+}
+
 private struct NewTaskRow: View {
     let palette: Palette
     let action: () -> Void

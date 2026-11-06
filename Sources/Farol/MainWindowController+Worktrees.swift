@@ -13,9 +13,9 @@ extension MainWindowController {
     func newTask() {
         withRepo(purpose: "the new task", orFolderOfRepos: true) { [weak self] directory in
             guard let self, let window = self.window else { return }
-            NewTaskSheet.present(in: window, directory: directory, palette: self.state.palette) { branch, command, task, repos in
+            NewTaskSheet.present(in: window, directory: directory, palette: self.state.palette, start: { branch, command, task, repos in
                 self.startWorktreeSession(branch: branch, from: repos, run: command, environment: [NewTask.variable: task])
-            }
+            }, schedule: { self.scheduler.add($0) })
         }
     }
 
