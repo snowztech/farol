@@ -21,11 +21,25 @@ final class FileView: NSView {
     }
     /// The file, its unsaved state or its mode changed, for the tab bar to follow.
     var onStateChange: (() -> Void)?
+    /// The cursor moved or the selection changed, for the status bar.
+    var onCursorChange: (() -> Void)?
+
+    /// Where the cursor is, from 1, and how many characters are selected. From the gutter's index of lines, so a move costs nothing.
+    var cursor: (line: Int, column: Int, selected: Int) {
+        let range = text.selectedRange()
+        let line = gutter.line(containing: range.location)
+        // While typing, the selection can move before the gutter counts the new lines, so the column never goes below 1.
+        return (line.index + 1, max(1, range.location - line.start + 1), range.length)
+    }
     var onFocus: (() -> Void)?
     /// Opens another file in this pane, from a link in the Markdown preview.
     var onOpenFile: ((String) -> Void)?
     /// Shows a commit, by its hash, in the git graph, from a click on a line's hash in the blame.
     var onShowCommit: ((String) -> Void)?
+    /// Opens a file at a line, from a ⌘-click on a name the language server placed there.
+    var onOpenAt: ((String, Int) -> Void)?
+    /// The theme's colors, for the list of definitions or references to look like the rest of Farol.
+    var palette: () -> Palette? = { nil }
 
     /// The file as last read or saved, to tell our own save from someone else's change.
     private var onDisk: String?
@@ -53,6 +67,7 @@ final class FileView: NSView {
     private let keepButton = NSButton(title: "Keep Mine", target: nil, action: nil)
     private let scroll = NSScrollView()
     private let text: CodeTextView
+    private lazy var links = DefinitionLinks(text: text)
     private let gutter: LineNumbers
     /// The line a search or a link opened the file at, lit until the cursor leaves it.
     private var litLine: NSRange?
@@ -75,8 +90,13 @@ final class FileView: NSView {
 
         blame.onShowCommit = { [weak self] in self?.onShowCommit?($0) }
         text.extraMenuItems = { [weak self] in
-            guard let self, canBlame else { return [] }
-            return [ActionMenuItem(title: blaming ? "Hide Git Blame" : "Show Git Blame") { [weak self] in self?.toggleBlame() }]
+            guard let self else { return [] }
+            var items: [NSMenuItem] = []
+            if canBlame {
+                items.append(ActionMenuItem(title: blaming ? "Hide Git Blame" : "Show Git Blame") { [weak self] in self?.toggleBlame() })
+            }
+            if let server = serverMenu() { items.append(server) }
+            return items
         }
         blame.contextMenu = { [weak self] in self?.blameMenu(for: $0) }
         gutter.contextMenu = { [weak self] in self?.blameMenu(for: nil) }
@@ -103,10 +123,18 @@ final class FileView: NSView {
         container.widthTracksTextView = false
         text.textContainerInset = NSSize(width: 8, height: 6)
         text.onFocus = { [weak self] in self?.onFocus?() }
+        links.open = { [weak self] in self?.onOpenAt?($0, $1) }
+        links.palette = { [weak self] in self?.palette() }
+        links.onLink = { [weak text] in text?.linkRect = $0 }
+        text.commandLinks = { [weak self] in self.map { LanguageServers.shared.isEnabled(for: $0.path) } ?? false }
+        text.onCommandClick = { [weak self] in self?.links.click(at: $0) }
+        text.onCommandHover = { [weak self] in self?.links.hover(at: $0) }
         NotificationCenter.default.addObserver(forName: NSText.didChangeNotification, object: text, queue: .main) { [weak self] _ in
             guard let self else { return }
             // Typing a line and deleting it again leaves nothing to save.
             isDirty = text.string != onDisk
+            // The observer runs on the main queue, which the compiler can't see. This checks it, rather than hiding the warning.
+            MainActor.assumeIsolated { self.links.textChanged() }
             unmark()
             gutter.textChanged()
             highlightSoon()
@@ -115,6 +143,7 @@ final class FileView: NSView {
         NotificationCenter.default.addObserver(forName: NSTextView.didChangeSelectionNotification, object: text, queue: .main) { [weak self] _ in
             guard let self else { return }
             gutter.needsDisplay = true
+            onCursorChange?()
             guard let line = litLine, !NSLocationInRange(text.selectedRange().location, line) else { return }
             unlight()
         }
@@ -209,6 +238,30 @@ final class FileView: NSView {
         load(keepingPosition: false)
         watch()
         findFolder()
+        links.path = path
+    }
+
+    /// The language server's menu, the status bar's own, in the code's right-click menu too, where turning it on is a click.
+    private func serverMenu() -> NSMenuItem? {
+        guard let kind = LSP.server(for: path) else { return nil }
+        // Off, one plain item rather than a submenu holding only it.
+        guard LanguageServers.shared.isEnabled(kind) else {
+            guard LanguageServers.shared.isInstalled(kind) != false else { return nil }
+            return ActionMenuItem(title: "Enable Language Server") { LanguageServers.shared.setEnabled(true, for: kind) }
+        }
+        let item = NSMenuItem(title: "Language Server", action: nil, keyEquivalent: "")
+        item.submenu = LanguageServerMenu.make(for: path) { [weak self] in self?.onOpenAt?($0, $1) }
+        return item
+    }
+
+    /// Its tab came to the front, so its language server can start loading, if they are on.
+    func warmLanguageServer() {
+        links.warm()
+    }
+
+    /// Its tab closed, so the language server can forget the file.
+    func closed() {
+        links.closed()
     }
 
     /// Asks git whether the file is in a checkout, off the main thread, since only then is there someone to blame.
@@ -273,6 +326,20 @@ final class FileView: NSView {
                 updateMode()
             }
         }
+    }
+
+    /// How many lines the file has, for Go to Line to say.
+    var lineCount: Int { gutter.count }
+
+    /// Go to Line: the line near the top, the cursor at the column, both clamped to what the file has.
+    func goTo(line: Int, column: Int) {
+        reveal(line: min(max(line, 1), lineCount))
+        let string = text.string as NSString
+        let start = text.selectedRange().location
+        let end = NSMaxRange(string.lineRange(for: NSRange(location: start, length: 0)))
+        let length = max(0, end - start - (end > start && string.character(at: end - 1) == 0x0A ? 1 : 0))
+        text.setSelectedRange(NSRange(location: start + min(max(column - 1, 0), length), length: 0))
+        window?.makeFirstResponder(text)
     }
 
     /// Puts the cursor on a line and scrolls it near the top, for opening a file at its first change.
@@ -594,6 +661,95 @@ private final class CodeTextView: NSTextView {
         return NSRect(x: 0, y: fragment.minY + textContainerOrigin.y, width: 0, height: fragment.height)
     }
 
+    // MARK: ⌘ over a name, for go to definition and references
+
+    /// Whether ⌘ over a name means anything, which is only with language servers on. Off, ⌘-click is the text view's own.
+    var commandLinks: () -> Bool = { false }
+    /// A ⌘-click, with the character it landed on, which a click would otherwise only select.
+    var onCommandClick: ((Int) -> Void)?
+    /// The character under the mouse while ⌘ is held, or nil when it isn't or the mouse is elsewhere.
+    var onCommandHover: ((Int?) -> Void)?
+    /// Where the name that would open is drawn, so the pointer can be a hand over it.
+    var linkRect: NSRect? {
+        didSet { pointAtLink() }
+    }
+    private var tracking: NSTrackingArea?
+    private var flagsMonitor: Any?
+
+    override func mouseDown(with event: NSEvent) {
+        guard event.modifierFlags.contains(.command), event.clickCount == 1, commandLinks(),
+              let index = character(at: convert(event.locationInWindow, from: nil)) else {
+            return super.mouseDown(with: event)
+        }
+        // The click first, while the answer found on hover is still kept.
+        onCommandClick?(index)
+        onCommandHover?(nil)
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let tracking { removeTrackingArea(tracking) }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self)
+        addTrackingArea(area)
+        tracking = area
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        hover(holding: event.modifierFlags)
+        if linkRect != nil { pointAtLink() }
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        onCommandHover?(nil)
+    }
+
+    /// The text under the mouse moves, so the name lit is another one.
+    override func scrollWheel(with event: NSEvent) {
+        super.scrollWheel(with: event)
+        hover(holding: NSEvent.modifierFlags)
+    }
+
+    /// Pressing or letting go of ⌘ with the mouse still is a change too.
+    /// flagsChanged reaches only the focused view, so the pane watches the window's events, as a terminal usually has the focus.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let flagsMonitor { NSEvent.removeMonitor(flagsMonitor) }
+        flagsMonitor = nil
+        guard window != nil else { return }
+        flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            if event.window === self?.window { self?.hover(holding: event.modifierFlags) }
+            return event
+        }
+    }
+
+    private func hover(holding flags: NSEvent.ModifierFlags) {
+        guard commandLinks() else { return }
+        guard flags.contains(.command), let window else { return onCommandHover?(nil) ?? () }
+        let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        // Only what is on screen, since the text runs on above and below the pane.
+        onCommandHover?(visibleRect.contains(point) ? character(at: point) : nil)
+    }
+
+    private func character(at point: NSPoint) -> Int? {
+        guard let layout = layoutManager, let container = textContainer, bounds.contains(point) else { return nil }
+        let inside = NSPoint(x: point.x - textContainerOrigin.x, y: point.y - textContainerOrigin.y)
+        return layout.characterIndex(for: inside, in: container, fractionOfDistanceBetweenInsertionPoints: nil)
+    }
+
+    /// A text view puts its I-beam back on every move, over any cursor rect, so the hand is set after it.
+    /// Also when the answer arrives with the mouse still.
+    private func pointAtLink() {
+        guard let window else { return }
+        let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        if let linkRect, linkRect.contains(point) {
+            NSCursor.pointingHand.set()
+        } else if visibleRect.contains(point) {
+            NSCursor.iBeam.set()
+        }
+    }
+
     // MARK: Menus
     /// Items after the text's own, like git blame, where a right-click in the code finds them.
     var extraMenuItems: (() -> [NSMenuItem])?
@@ -698,6 +854,14 @@ private final class LineNumbers: NSView {
             body(line, fragment.minY + textView.textContainerOrigin.y - visible.minY, fragment.height)
             line += 1
         }
+    }
+
+    var count: Int { lineStarts.count }
+
+    /// The line holding `location`, from 0, and where it starts.
+    func line(containing location: Int) -> (index: Int, start: Int) {
+        let index = firstLine(atOrBefore: location)
+        return (index, lineStarts[index])
     }
 
     private func firstLine(atOrBefore location: Int) -> Int {

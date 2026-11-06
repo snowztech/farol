@@ -183,6 +183,7 @@ final class PaneContainer: NSView {
         let tabs = FileTabs(palette: palette) { [weak self] in self?.adopt($0) }
         tabs.autoresizingMask = []
         tabs.onChange = { [weak self] in self?.onLayoutChange?() }
+        tabs.runCommand = { [weak self] in _ = self?.runInNewPane?($0) }
         tabs.onEmpty = { [weak self] in self?.removeTabs() }
         self.tabs = tabs
         addSubview(tabs)
@@ -833,6 +834,8 @@ final class PaneContainer: NSView {
         }
         file.onOpenFile = { [weak self] in self?.open($0) }
         file.onShowCommit = { [weak self] in self?.onShowCommit?($0) }
+        file.onOpenAt = { [weak self] in self?.open($0, line: $1) }
+        file.palette = { [weak self] in self?.palette }
     }
 
     private func applyFocus() {
