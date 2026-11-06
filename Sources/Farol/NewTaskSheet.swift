@@ -678,7 +678,8 @@ private struct WhenButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                Image(systemName: waiting ? "clock" : "play").font(.system(size: 11, weight: .medium))
+                // The same clock either way, so the control is easy to find again. Only its weight says a time is set.
+                Image(systemName: "clock").font(.system(size: 11, weight: .medium))
                 Text(label)
                 Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)).foregroundStyle(palette.muted)
             }
