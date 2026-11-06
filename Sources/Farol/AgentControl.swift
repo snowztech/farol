@@ -213,7 +213,7 @@ final class AgentControl {
                 ?? "Connect an agent in Settings → Agents first."))
         }
         // Opened beside the one on screen, so an agent's task never takes the window from you.
-        store.startTask(text, in: directory, with: folder, copyEnvironmentFiles: worktrees.copyEnvironmentFiles, select: false) { [weak self] result in
+        store.startTask(text, in: [directory], with: folder, copyEnvironmentFiles: worktrees.copyEnvironmentFiles, select: false) { [weak self] result in
             guard let self else { return }
             switch result {
             case .success(let (session, branch)):

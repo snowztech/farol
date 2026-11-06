@@ -59,7 +59,7 @@ struct SidebarView: View {
                 .animation(Motion.enabled ? .spring(response: 0.32, dampingFraction: 0.86) : nil, value: store.selectedID)
             }
             // Only once there is a task, so a new user never meets an empty pane.
-            if !scheduler.schedules.isEmpty {
+            if !scheduler.schedules.isEmpty || !scheduler.unreadable.isEmpty {
                 TasksPane(scheduler: scheduler, store: store, palette: p)
             }
             // Pinned below the list, so it stays in the same place however many sessions there are.
@@ -274,7 +274,7 @@ private struct TasksPane: View {
     var body: some View {
         let p = palette
         let tasks = scheduler.schedules.sorted { $0.next(after: .now) < $1.next(after: .now) }
-        let groups = Grouping.group(tasks) { $0.repo }
+        let groups = Grouping.group(tasks) { $0.repos.joined(separator: "\n") }
         VStack(spacing: 0) {
             Rectangle().fill(p.line).frame(height: 1)
             HStack(spacing: 6) {
@@ -303,12 +303,13 @@ private struct TasksPane: View {
             .onClickableHover { hovering = $0 }
             .hoverTip(folded ? "Show tasks" : "Fold tasks")
             if !folded {
-                let height = CGFloat(tasks.count) * Self.rowHeight + (groups.count > 1 ? CGFloat(groups.count) * Self.groupHeight : 0)
+                let rows = tasks.count + scheduler.unreadable.count
+                let height = CGFloat(rows) * Self.rowHeight + (groups.count > 1 ? CGFloat(groups.count) * Self.groupHeight : 0)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(groups, id: \.key) { group in
                             if groups.count > 1, let key = group.key {
-                                Text(URL(fileURLWithPath: key).lastPathComponent)
+                                Text(key.split(separator: "\n").map { URL(fileURLWithPath: String($0)).lastPathComponent }.joined(separator: " + "))
                                     .font(.system(size: 10, weight: .medium))
                                     .foregroundStyle(p.muted.opacity(0.8))
                                     .padding(.leading, 10)
@@ -319,6 +320,7 @@ private struct TasksPane: View {
                                         scheduler: scheduler, store: store, palette: p)
                             }
                         }
+                        ForEach(scheduler.unreadable, id: \.file) { UnreadableRow(unreadable: $0, palette: p) }
                     }
                     .padding(.horizontal, 8)
                 }
@@ -327,6 +329,34 @@ private struct TasksPane: View {
                 .padding(.bottom, 4)
             }
         }
+    }
+}
+
+/// A file in the tasks folder Farol can't read, with why on hover. Clicking opens it to fix.
+private struct UnreadableRow: View {
+    let unreadable: Scheduler.Unreadable
+    let palette: Palette
+
+    @State private var hovering = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(unreadable.file.deletingPathExtension().lastPathComponent)
+                .font(.system(size: 12))
+                .foregroundStyle(palette.text.opacity(0.85))
+            Text("can't read · click to fix")
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(palette.waiting)
+        }
+        .lineLimit(1)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .frame(height: TasksPane.rowHeight)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(hovering ? palette.hover : .clear))
+        .contentShape(Rectangle())
+        .onTapGesture { NSWorkspace.shared.open(unreadable.file) }
+        .onClickableHover { hovering = $0 }
+        .hoverTip("\(unreadable.file.lastPathComponent): \(unreadable.problem)")
     }
 }
 
@@ -341,9 +371,6 @@ private struct TaskRow: View {
     let palette: Palette
 
     @State private var hovering = false
-    @State private var editing = false
-    @State private var timing = TaskTiming.everyDay
-    @State private var at = Date.now
 
     var body: some View {
         let p = palette
@@ -355,13 +382,13 @@ private struct TaskRow: View {
                     .foregroundStyle(task.paused ? p.muted : p.text.opacity(0.85))
                     .truncationMode(.tail)
                 HStack(spacing: 4) {
-                    if task.once == nil, run == nil, task.failure == nil {
+                    if task.once == nil, run == nil, task.failure == nil, task.allowed {
                         Image(systemName: "repeat").font(.system(size: 9, weight: .semibold))
                     }
                     Text(when)
                 }
                 .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(task.failure != nil ? p.waiting : p.muted)
+                .foregroundStyle(task.failure != nil || !task.allowed ? p.waiting : p.muted)
             }
             .lineLimit(1)
             Spacer(minLength: 4)
@@ -371,33 +398,25 @@ private struct TaskRow: View {
         .frame(height: TasksPane.rowHeight)
         .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(hovering ? p.hover : .clear))
         .contentShape(Rectangle())
-        .onTapGesture { if let run { store.select(run) } else { edit() } }
+        // One place to change a task, its name, prompt and time together, rather than a popover for the time and a sheet for the rest.
+        .onTapGesture { if let run { store.select(run) } else { openEditor() } }
         .onClickableHover { hovering = $0 }
-        .hoverTip(editing ? "" : tip)
+        .hoverTip(tip)
         .contextMenu {
             Button("Run Now") { scheduler.run(task.id) }
-            Button("Change Time…", action: edit)
+            Button("Edit Task…", action: openEditor)
+            // Each task is a Markdown file you can edit anywhere, sync or hand to an agent.
+            Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([scheduler.file(of: task)]) }
             ScheduleItems(schedule: task, scheduler: scheduler)
         }
-        // Beside the sidebar, so the rows stay in view. Each change is saved as you make it, like the rest of Farol's settings.
-        .popover(isPresented: $editing, arrowEdge: .trailing) {
-            WhenChoices(when: $timing, at: $at, offersNow: false, palette: palette) {}
-                .onChange(of: timing) { retime() }
-                .onChange(of: at) { retime() }
+    }
+
+    /// The sheet also asks to allow a task from someone else's file, so you read what it does before it can run.
+    private func openEditor() {
+        EditTaskSheet.present(task, in: NSApp.keyWindow, palette: palette) { edit in
+            scheduler.edit(task.id, name: edit.name, task: edit.task, weekdays: edit.weekdays, once: edit.once, hour: edit.hour,
+                           minute: edit.minute)
         }
-    }
-
-    private func edit() {
-        timing = task.once != nil ? .later : task.days == .everyDay ? .everyDay : .weekdays
-        at = task.once ?? Calendar.current.date(bySettingHour: task.hour, minute: task.minute, second: 0, of: .now) ?? .now
-        editing = true
-    }
-
-    private func retime() {
-        let calendar = Calendar.current
-        let days: Schedule.Days? = timing == .everyDay ? .everyDay : timing == .weekdays ? .weekdays : nil
-        scheduler.retime(task.id, days: days, once: timing == .later ? at : nil,
-                         hour: calendar.component(.hour, from: at), minute: calendar.component(.minute, from: at))
     }
 
     @ViewBuilder private func trailing(_ p: Palette) -> some View {
@@ -405,6 +424,10 @@ private struct TaskRow: View {
             ProgressView().controlSize(.mini)
         } else if let run {
             RunLamp(session: run, palette: p)
+        } else if !task.allowed {
+            Button("Allow") { scheduler.allow(task.id) }
+                .buttonStyle(SheetButton(palette: p, primary: false))
+                .hoverTip("Let it run at its times. Click the task to read it first.")
         } else if hovering {
             CloseButton(symbol: "play.fill", help: "Run now", palette: p) { scheduler.run(task.id) }
         }
@@ -413,14 +436,16 @@ private struct TaskRow: View {
     /// The second line: when it runs in the words a calendar would use, or why it isn't waiting.
     private var when: String {
         if run != nil { return "running" }
+        if !task.allowed { return "waits for your OK" }
         if task.failure != nil { return "didn't start" }
         let time = task.once.map { once in
             Calendar.current.isDateInToday(once) ? "today \(task.upcoming(at: .now))" : task.upcoming(at: .now)
-        } ?? "\(task.days.label.lowercased()) \(Schedule.clock(hour: task.hour, minute: task.minute))"
+        } ?? "\(Schedule.days(task.weekdays)) \(Schedule.clock(hour: task.hour, minute: task.minute))"
         return task.paused ? "paused · \(time)" : time
     }
 
     private var tip: String {
+        if !task.allowed { return "Made outside Farol, maybe by an agent. It won't run until you allow it. Click to read it first." }
         if let failure = task.failure { return "Didn't start: \(failure)" }
         if run != nil { return "Running. The next run waits until you close this one." }
         let what = task.once == nil ? "Runs \(task.rule)." : "Runs once, \(task.rule)."
@@ -443,8 +468,8 @@ private struct ScheduleItems: View {
 
     var body: some View {
         Divider()
-        Button(schedule.paused ? "Resume Schedule" : "Pause Schedule") { scheduler.setPaused(!schedule.paused, schedule.id) }
-        Button("Delete Schedule") { scheduler.delete(schedule.id) }
+        Button(schedule.paused ? "Resume Task" : "Pause Task") { scheduler.setPaused(!schedule.paused, schedule.id) }
+        Button("Delete Task") { scheduler.delete(schedule.id) }
     }
 }
 

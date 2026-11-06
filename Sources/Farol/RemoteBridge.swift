@@ -688,7 +688,7 @@ final class RemoteBridge: ObservableObject {
             return tell(.refused(command: command.id, reason: "The Mac could not start that task. Pick the project again and retry."), id)
         }
         startingTasks.insert(command.id)
-        store.startTask(words, in: project, with: folder, copyEnvironmentFiles: worktrees.copyEnvironmentFiles, select: false) { [weak self] result in
+        store.startTask(words, in: [project], with: folder, copyEnvironmentFiles: worktrees.copyEnvironmentFiles, select: false) { [weak self] result in
             guard let self else { return }
             startingTasks.remove(command.id)
             switch result {

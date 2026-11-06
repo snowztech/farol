@@ -63,6 +63,7 @@ struct NewTaskSheet: View {
     @State private var when = TaskTiming.now
     /// The day and time for later, or only the time for a repeat. Tomorrow at 9:00 to begin with.
     @State private var at = TaskTiming.tomorrowMorning
+    @State private var weekdays = Schedule.everyDay
     @State private var pickingWhen = false
     @State private var query = ""
     @FocusState private var searching: Bool
@@ -133,39 +134,27 @@ struct NewTaskSheet: View {
             return WorktreeScripts.hasSetup(in: folder) ? URL(fileURLWithPath: folder).lastPathComponent : nil
         }
     }
-    /// One repo only: a task for later makes a plain worktree each run.
-    private var canWait: Bool { repos.isEmpty && sources.count == 1 }
-    private var starts: TaskTiming { canWait ? when : .now }
-    private var days: Schedule.Days? {
-        switch starts {
-        case .everyDay: .everyDay
-        case .weekdays: .weekdays
-        case .now, .later: nil
-        }
-    }
+    private var starts: TaskTiming { when }
+    /// Several repos get a task folder each run, with a worktree of each.
+    private var several: Bool { !repos.isEmpty || sources.count > 1 }
     private var hour: Int { Calendar.current.component(.hour, from: at) }
     private var minute: Int { Calendar.current.component(.minute, from: at) }
-    /// What the footer's button says: Now, Tomorrow at 9:00, Every day at 9:00.
-    private var whenLabel: String {
-        let time = Schedule.clock(hour: hour, minute: minute)
-        switch starts {
-        case .now: return "Now"
-        case .everyDay: return "Every day at \(time)"
-        case .weekdays: return "Weekdays at \(time)"
-        case .later:
-            let calendar = Calendar.current
-            if calendar.isDateInToday(at) { return "Today at \(time)" }
-            if calendar.isDateInTomorrow(at) { return "Tomorrow at \(time)" }
-            return "\(at.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))) at \(time)"
-        }
+    private var whenLabel: String { starts.label(at: at, weekdays: weekdays) }
+    /// A run later branches from the repo itself, since the worktree you're in may be gone by then.
+    private var laterBase: String {
+        guard let root, let checkout, checkout != root else { return base }
+        return "what \(repo) has checked out then"
     }
+
     private var subtitle: String {
-        switch starts {
-        case .later: return "Starts \(whenLabel.prefix(1).lowercased() + whenLabel.dropFirst()) in its own worktree, on a new branch from \(base)."
-        case .everyDay, .weekdays:
-            let rule = starts == .everyDay ? "every day" : "on weekdays"
-            return "Starts \(rule) at \(Schedule.clock(hour: hour, minute: minute)), each time in its own worktree from \(base)."
-        case .now: break
+        let start = whenLabel.prefix(1).lowercased() + whenLabel.dropFirst()
+        let rule = weekdays == Schedule.everyDay || weekdays == Schedule.workweek ? start : "on \(start)"
+        switch (starts, several) {
+        case (.later, false): return "Starts \(start) in its own worktree, on a new branch from \(laterBase)."
+        case (.repeats, false): return "Starts \(rule), each time in its own worktree from \(laterBase)."
+        case (.later, true): return "Starts \(start) with a worktree of each repo you pick, side by side in one folder."
+        case (.repeats, true): return "Starts \(rule), each time with new worktrees of the repos you pick, side by side in one folder."
+        case (.now, _): break
         }
         if repos.isEmpty, sources.count < 2 { return "The agent starts in its own worktree, on a new branch from \(base)." }
         return "Each repo you pick gets its own worktree on the same branch, side by side in one folder. The agent starts there and sees them all."
@@ -233,7 +222,7 @@ struct NewTaskSheet: View {
                     .sheetField(p, focused: focus == .branch)
                     if !branch.isEmpty, name == nil {
                         Text("Use letters, numbers, dashes or slashes.").font(.system(size: 12)).foregroundStyle(p.muted)
-                    } else if days != nil, let name {
+                    } else if starts == .repeats, let name {
                         Text("Each run gets the day after it, like \(name)-\(Self.today).").font(.system(size: 12)).foregroundStyle(p.muted)
                     }
                 }
@@ -247,7 +236,7 @@ struct NewTaskSheet: View {
             .padding(20)
             Rectangle().fill(p.line).frame(height: 1)
             HStack {
-                if canWait { whenSelect(p) }
+                whenSelect(p)
                 Spacer()
                 Button("Cancel", action: close)
                     .buttonStyle(SheetButton(palette: p, primary: false))
@@ -518,7 +507,7 @@ struct NewTaskSheet: View {
     private func whenSelect(_ p: Palette) -> some View {
         WhenButton(label: whenLabel, waiting: starts != .now, palette: p) { pickingWhen.toggle() }
             .popover(isPresented: $pickingWhen, arrowEdge: .top) {
-                WhenChoices(when: $when, at: $at, offersNow: true, palette: p) { pickingWhen = false }
+                WhenChoices(when: $when, at: $at, weekdays: $weekdays, offersNow: true, palette: p) { pickingWhen = false }
             }
     }
 
@@ -547,10 +536,12 @@ struct NewTaskSheet: View {
 
     private func startTask() {
         guard canStart, let name else { return }
-        if starts != .now, let repo = sources.first {
+        if starts != .now {
             let title = picked?.summary ?? text.components(separatedBy: .newlines).first ?? name
-            var task = Schedule(name: String(title.prefix(48)), task: prompt, repo: repo, branch: name, agent: choice.id,
-                                days: days ?? .everyDay, hour: hour, minute: minute, since: .now)
+            // The repo itself, not a worktree you happen to be in, which may be gone by the next run.
+            var task = Schedule(name: String(title.prefix(48)), task: prompt, repos: sources.map { $0 == directory ? root ?? $0 : $0 },
+                                branch: name, agent: choice.id,
+                                weekdays: starts == .repeats ? weekdays : Schedule.everyDay, hour: hour, minute: minute, since: .now)
             if starts == .later { task.once = at }
             close()
             return schedule(task)
@@ -667,7 +658,7 @@ private struct TaskRepoChoice: View {
 }
 
 /// The quiet footer button that says when the task starts.
-private struct WhenButton: View {
+struct WhenButton: View {
     let label: String
     let waiting: Bool
     let palette: Palette
@@ -699,7 +690,7 @@ private struct WhenButton: View {
 
 /// When a task runs. Now is only for a new task: a saved one runs now from its row instead.
 enum TaskTiming: Hashable {
-    case now, later, everyDay, weekdays
+    case now, later, repeats
 
     static var tomorrowMorning: Date {
         let calendar = Calendar.current
@@ -711,8 +702,23 @@ enum TaskTiming: Hashable {
         switch self {
         case .now: "Now"
         case .later: "Once"
-        case .everyDay: "Every day"
-        case .weekdays: "Weekdays"
+        case .repeats: "Repeat"
+        }
+    }
+
+    /// What the When button says: Now, Tomorrow at 9:00, Mon, Thu at 9:00.
+    func label(at: Date, weekdays: Set<Int>) -> String {
+        let calendar = Calendar.current
+        let time = Schedule.clock(hour: calendar.component(.hour, from: at), minute: calendar.component(.minute, from: at))
+        switch self {
+        case .now: return "Now"
+        case .repeats:
+            let days = Schedule.days(weekdays)
+            return "\(days.prefix(1).uppercased() + days.dropFirst()) at \(time)"
+        case .later:
+            if calendar.isDateInToday(at) { return "Today at \(time)" }
+            if calendar.isDateInTomorrow(at) { return "Tomorrow at \(time)" }
+            return "\(at.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))) at \(time)"
         }
     }
 
@@ -720,7 +726,7 @@ enum TaskTiming: Hashable {
         switch self {
         case .now: "play"
         case .later: "clock"
-        case .everyDay, .weekdays: "repeat"
+        case .repeats: "repeat"
         }
     }
 }
@@ -729,6 +735,7 @@ enum TaskTiming: Hashable {
 struct WhenChoices: View {
     @Binding var when: TaskTiming
     @Binding var at: Date
+    @Binding var weekdays: Set<Int>
     let offersNow: Bool
     let palette: Palette
     /// Picking Now leaves nothing more to set.
@@ -742,7 +749,7 @@ struct WhenChoices: View {
     var body: some View {
         let p = palette
         VStack(alignment: .leading, spacing: 1) {
-            ForEach(offersNow ? [TaskTiming.now, .later, .everyDay, .weekdays] : [.later, .everyDay, .weekdays], id: \.self) { option in
+            ForEach(offersNow ? [TaskTiming.now, .later, .repeats] : [.later, .repeats], id: \.self) { option in
                 SheetChoice(palette: p) {
                     when = option
                     if option == .later, at <= .now { at = TaskTiming.tomorrowMorning }
@@ -758,6 +765,7 @@ struct WhenChoices: View {
             }
             if when != .now {
                 Rectangle().fill(p.line).frame(height: 1).padding(.vertical, 5)
+                if when == .repeats { dayToggles(p) }
                 // A day in words and a time apart, since 08/11 reads as August in one country and November in the next.
                 HStack(spacing: 6) {
                     if when == .later {
@@ -793,6 +801,26 @@ struct WhenChoices: View {
         .background(p.background)
     }
 
+    /// The days a repeat runs on, in the order of the user's week. The last one can't be turned off, so a repeat always runs.
+    private func dayToggles(_ p: Palette) -> some View {
+        let names = Calendar.current.veryShortStandaloneWeekdaySymbols
+        let long = Calendar.current.weekdaySymbols
+        return HStack(spacing: 4) {
+            ForEach(Schedule.week(), id: \.self) { day in
+                DayToggle(letter: names[day - 1], on: weekdays.contains(day), palette: p) {
+                    if weekdays.contains(day) {
+                        if weekdays.count > 1 { weekdays.remove(day) }
+                    } else {
+                        weekdays.insert(day)
+                    }
+                }
+                .hoverTip(long[day - 1])
+            }
+        }
+        .padding(.horizontal, 2)
+        .padding(.bottom, 6)
+    }
+
     /// Typed for any minute, like 9:05 or 21h30. The list only offers quarter hours, to pick a round time in one click.
     private func timeField(_ p: Palette) -> some View {
         HStack(spacing: 8) {
@@ -824,27 +852,33 @@ struct WhenChoices: View {
         typed = Self.clock(minutes)
     }
 
-    /// Every quarter of an hour, opened on the one picked. Times already gone today aren't offered for a task that runs once.
+    /// Every quarter of an hour, opened on the one picked. Today, for a task that runs once, it starts at the next five minutes.
     private func timeList(_ p: Palette) -> some View {
-        let gone = when == .later && daysAhead == 0
-        let now = Calendar.current.dateComponents([.hour, .minute], from: .now)
-        let first = gone ? ((now.hour ?? 0) * 60 + (now.minute ?? 0)) / 15 + 1 : 0
+        let soon = when == .later && daysAhead == 0 ? Self.soon : nil
+        let times = (soon.map { [$0] } ?? []) + stride(from: 0, to: 24 * 60, by: 15).filter { $0 > (soon ?? -1) }
         return ScrollViewReader { reader in
             ScrollView {
                 LazyVStack(spacing: 1) {
-                    ForEach(first..<96, id: \.self) { quarter in
+                    ForEach(times, id: \.self) { time in
                         SheetChoice(palette: p) {
-                            set(day: daysAhead, minutes: quarter * 15)
+                            set(day: daysAhead, minutes: time)
                             pickingTime = false
-                        } label: { picked(Self.clock(quarter * 15), quarter * 15 == minutes).monospacedDigit() }
-                        .id(quarter)
+                        } label: { picked(Self.clock(time), time == minutes).monospacedDigit() }
+                        .id(time)
                     }
                 }
                 .padding(6)
             }
             .frame(width: 120, height: 240)
-            .onAppear { reader.scrollTo(minutes / 15, anchor: .center) }
+            .onAppear { reader.scrollTo(times.last { $0 <= minutes } ?? times.first, anchor: .center) }
         }
+    }
+
+    /// The next five minutes from now, in minutes into today. Past 23:55 there's no more of today to offer.
+    private static var soon: Int? {
+        let now = Calendar.current.dateComponents([.hour, .minute], from: .now)
+        let next = ((now.hour ?? 0) * 60 + (now.minute ?? 0)) / 5 * 5 + 5
+        return next < 24 * 60 ? next : nil
     }
 
     private func picked(_ title: String, _ chosen: Bool) -> some View {
@@ -857,8 +891,8 @@ struct WhenChoices: View {
 
     /// When it really starts, worked out for you: weekdays picked on a Friday evening start on Monday.
     private var firstRun: String {
-        let days: Schedule.Days = when == .weekdays ? .weekdays : .everyDay
-        let rule = Schedule(name: "", task: "", repo: "", branch: "", agent: "", days: days, hour: minutes / 60, minute: minutes % 60, since: .now)
+        let rule = Schedule(name: "", task: "", repos: [], branch: "", agent: "", weekdays: weekdays, hour: minutes / 60, minute: minutes % 60,
+                            since: .now)
         let next = when == .later ? at : rule.next(after: .now)
         let calendar = Calendar.current
         let day = calendar.isDateInToday(next) ? "today" : calendar.isDateInTomorrow(next) ? "tomorrow"
@@ -878,14 +912,13 @@ struct WhenChoices: View {
 
     private static func clock(_ minutes: Int) -> String { Schedule.clock(hour: minutes / 60, minute: minutes % 60) }
 
-    /// Today with its time gone moves to the next quarter hour, so a task that runs once is never in the past.
+    /// Today with its time gone moves to the next five minutes, so a task that runs once is never in the past and today stays pickable late in the evening.
     private func set(day ahead: Int, minutes: Int) {
         let calendar = Calendar.current
         let day = calendar.date(byAdding: .day, value: ahead, to: calendar.startOfDay(for: .now)) ?? .now
         let picked = calendar.date(byAdding: .minute, value: minutes, to: day) ?? day
         guard when == .later, picked <= .now else { return at = picked }
-        let now = calendar.dateComponents([.hour, .minute], from: .now)
-        let next = (((now.hour ?? 0) * 60 + (now.minute ?? 0)) / 15 + 1) * 15
+        let next = Self.soon ?? 24 * 60
         at = calendar.date(byAdding: .minute, value: next, to: calendar.startOfDay(for: .now)) ?? picked
     }
 
@@ -994,6 +1027,30 @@ private struct DayCell: View {
         }
         .buttonStyle(.plain)
         .disabled(gone)
+        .onClickableHover { hovering = $0 }
+    }
+}
+
+/// One day of the week a repeat can run on, filled when it does.
+private struct DayToggle: View {
+    let letter: String
+    let on: Bool
+    let palette: Palette
+    let toggle: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: toggle) {
+            Text(letter)
+                .font(.system(size: 12, weight: on ? .semibold : .regular))
+                .foregroundStyle(on ? palette.background : palette.muted)
+                .frame(maxWidth: .infinity)
+                .frame(height: 26)
+                .background(RoundedRectangle(cornerRadius: 6).fill(on ? palette.text : hovering ? palette.raised : palette.surface))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
         .onClickableHover { hovering = $0 }
     }
 }

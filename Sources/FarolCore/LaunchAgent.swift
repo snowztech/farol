@@ -3,16 +3,16 @@ import Foundation
 /// A launchd job that opens Farol at each task's time, so a task still runs after Farol was quit.
 /// Farol's own scheduler decides what runs once it's open. launchd only gets it there.
 public enum LaunchAgent {
-    /// launchd's `StartCalendarInterval` entries for the tasks that aren't paused. launchd counts weekdays from Sunday as 0.
+    /// launchd's `StartCalendarInterval` entries for the tasks that aren't paused and are allowed. launchd counts weekdays from Sunday as 0, Calendar from 1.
     public static func times(for schedules: [Schedule], calendar: Calendar = .current) -> [[String: Int]] {
-        schedules.filter { !$0.paused }.flatMap { schedule -> [[String: Int]] in
+        schedules.filter { !$0.paused && $0.allowed }.flatMap { schedule -> [[String: Int]] in
             if let once = schedule.once {
                 let day = calendar.dateComponents([.month, .day, .hour, .minute], from: once)
                 return [["Month": day.month ?? 1, "Day": day.day ?? 1, "Hour": day.hour ?? 0, "Minute": day.minute ?? 0]]
             }
             let time = ["Hour": schedule.hour, "Minute": schedule.minute]
-            guard schedule.days == .weekdays else { return [time] }
-            return (1...5).map { time.merging(["Weekday": $0]) { $1 } }
+            guard schedule.weekdays != Schedule.everyDay else { return [time] }
+            return schedule.weekdays.sorted().map { time.merging(["Weekday": $0 - 1]) { $1 } }
         }
     }
 

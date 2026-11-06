@@ -63,7 +63,7 @@ public struct Worktrees {
     }
 
     /// A branch as one folder name, since its slashes would nest folders.
-    static func folderName(for branch: String) -> String {
+    public static func folderName(for branch: String) -> String {
         branch.replacingOccurrences(of: "/", with: "-")
     }
 
