@@ -58,10 +58,10 @@ struct SettingsPage: View {
         get { state.settingsSection }
         nonmutating set { state.settingsSection = newValue }
     }
-    @State private var themeQuery = ""
+    @State private var pickingTheme = false
+    @State private var hoveringTheme = false
     @Namespace private var navHighlight
     @AppStorage(Motion.key) private var animations = true
-    @State private var themes = Theme.all()
 
     enum Section: String, CaseIterable {
         case terminal = "Terminal"
@@ -157,12 +157,26 @@ struct SettingsPage: View {
                     .frame(maxWidth: .infinity)
                 }
             }
+            // Beside the page rather than over it, so the page recolors as you click through themes.
+            if pickingTheme, section == .appearance {
+                HStack(spacing: 0) {
+                    Rectangle().fill(p.line).frame(width: 1)
+                    ThemePanel(selected: $settings.theme, ghosttyConfig: state.ghosttyConfigPreview, palette: p) {
+                        withAnimation(Motion.enabled ? .easeOut(duration: 0.2) : nil) { pickingTheme = false }
+                    }
+                    .frame(width: 400)
+                }
+                .transition(.move(edge: .trailing))
+            }
         }
         .background(p.background)
         .foregroundStyle(p.text)
         .tint(p.control)
         .onAppear(perform: refreshAgents)
-        .onChange(of: section) { _, _ in refreshAgents() }
+        .onChange(of: section) { _, _ in
+            refreshAgents()
+            pickingTheme = false
+        }
         // The page stays alive while hidden, so coming back from a login in the terminal has to ask again.
         .onChange(of: state.showingSettings) { _, showing in if showing { refreshAgents() } }
         .alert(item: $agentChange, content: agentAlert)
@@ -171,9 +185,49 @@ struct SettingsPage: View {
 
     // MARK: Sections
 
+    /// The theme in use, the row people come to Appearance for. Its preview is the way in, so the whole row opens the themes beside the page.
+    private func themeRow(_ p: Palette) -> some View {
+        let theme = Theme.named(Theme.current(settings.theme, ghosttyConfig: state.ghosttyConfigPreview))
+        let lit = hoveringTheme || pickingTheme
+        return Button {
+            withAnimation(Motion.enabled ? .easeOut(duration: 0.2) : nil) { pickingTheme.toggle() }
+        } label: {
+            Row(title: "Theme", detail: theme.name, palette: p) {
+                HStack(spacing: 10) {
+                    ThemePreview(colors: theme.colors(state.ghosttyConfigPreview), hues: theme.url != nil)
+                        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(pickingTheme ? p.accent : lit ? p.muted : p.line,
+                                                                                 lineWidth: pickingTheme ? 2 : 1))
+                        .frame(width: 200)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(lit ? p.text : p.muted)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(QuietPress())
+        .onClickableHover { hoveringTheme = $0 }
+    }
+
+    /// The theme first and on its own, since it is what people come here for, then the rest of how Farol looks, then how it's laid out.
     @ViewBuilder private func appearance(_ p: Palette) -> some View {
         Heading(title: "Appearance", detail: nil, palette: p)
         Card(palette: p) {
+            themeRow(p)
+        }
+
+        GroupTitle(title: "Interface", palette: p)
+        Card(palette: p) {
+            Row(title: "Style",
+                detail: "Boxed puts each panel in a rounded card. Glass puts the side panels on Liquid Glass, with the desktop blurred through them.",
+                palette: p) {
+                Picker("", selection: $state.style) {
+                    ForEach(UIStyle.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                .labelsHidden()
+                .fixedSize()
+                .hoverRing(p)
+            }
             Row(title: "App icon", detail: "Shown in the Dock while Farol runs.", palette: p) {
                 Picker("", selection: $appIcon) {
                     ForEach(AppIcon.allCases, id: \.self) { icon in
@@ -189,70 +243,26 @@ struct SettingsPage: View {
                 .fixedSize()
                 .hoverRing(p)
             }
-        }
-
-        GroupTitle(title: "Sidebar", palette: p)
-        Card(palette: p) {
-            Row(title: "Group sessions by project",
-                detail: "Sessions in the same git repository, worktrees included, go under one header once you work in more than one.",
-                palette: p) {
-                toggle($groupByRepo)
-            }
-        }
-
-        GroupTitle(title: "Window", palette: p)
-        Card(palette: p) {
-            Row(title: "Style",
-                detail: "Boxed puts each panel in a rounded card. Glass puts the side panels on Liquid Glass, with the desktop blurred through them.",
-                palette: p) {
-                Picker("", selection: $state.style) {
-                    ForEach(UIStyle.allCases, id: \.self) { Text($0.title).tag($0) }
-                }
-                .labelsHidden()
-                .fixedSize()
-                .hoverRing(p)
-            }
-            Row(title: "Run button on panes",
-                detail: "▶ in a pane's corner, under the mouse, runs one of the project's commands, and ■ stops it with the port it listens on. ⌘P and the right-click menu run them too.",
-                palette: p) {
-                toggle($runButton)
-            }
             Row(title: "Animations",
                 detail: "Panels slide, highlights glide and tips fade in. Off, everything changes at once. Reduce Motion in macOS turns them off too.",
                 palette: p) {
                 toggle($animations)
             }
         }
-        .padding(.bottom, 32)
 
-        Heading(title: "Theme",
-                detail: "Applies to every session as soon as you pick it. To add your own, drop a Ghostty theme file in the themes folder.",
-                palette: p)
-        HStack(spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").foregroundStyle(p.muted)
-                TextField("Search \(themes.filter { $0.url != nil }.count) themes", text: $themeQuery)
-                    .textFieldStyle(.plain)
+        GroupTitle(title: "Layout", palette: p)
+        Card(palette: p) {
+            Row(title: "Group sessions by project",
+                detail: "Sessions in the same git repository, worktrees included, go under one header once you work in more than one.",
+                palette: p) {
+                toggle($groupByRepo)
             }
-            .font(.system(size: 13))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(p.surface, in: RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(p.line))
-
-            ShipButton(title: "Themes folder", busy: false, palette: p, action: openThemesFolder)
+            Row(title: "Run button on panes",
+                detail: "▶ in a pane's corner, under the mouse, runs one of the project's commands, and ■ stops it with the port it listens on. ⌘P and the right-click menu run them too.",
+                palette: p) {
+                toggle($runButton)
+            }
         }
-        .padding(.bottom, 20)
-
-        ThemeGallery(query: themeQuery, selected: $settings.theme,
-                     ghosttyConfig: state.ghosttyConfigPreview, palette: p, themes: themes)
-            // Picks up themes added while Farol runs.
-            .onAppear { themes = Theme.all() }
-    }
-
-    private func openThemesFolder() {
-        try? FileManager.default.createDirectory(at: Theme.userDirectory, withIntermediateDirectories: true)
-        NSWorkspace.shared.open(Theme.userDirectory)
     }
 
     @ViewBuilder private func terminal(_ p: Palette) -> some View {
