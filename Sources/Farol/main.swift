@@ -226,9 +226,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let left = String(Character(UnicodeScalar(NSLeftArrowFunctionKey)!))
         let right = String(Character(UnicodeScalar(NSRightArrowFunctionKey)!))
         go.addItem(withTitle: "Back", action: #selector(goBack), keyEquivalent: left)
-            .keyEquivalentModifierMask = [.command, .shift]
+            .keyEquivalentModifierMask = [.command, .control]
         go.addItem(withTitle: "Forward", action: #selector(goForward), keyEquivalent: right)
-            .keyEquivalentModifierMask = [.command, .shift]
+            .keyEquivalentModifierMask = [.command, .control]
         main.addItem(submenu: go, title: "Go")
 
         let view = NSMenu(title: "View")

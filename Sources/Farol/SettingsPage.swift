@@ -934,7 +934,7 @@ struct SettingsPage: View {
             ("Go to a line in the open file", ["⌘L"]),
             ("Go to a definition, or list references from one (with its language server on)", ["⌘ click"]),
             ("Next and previous file tab", ["⌃Tab", "⌃⇧Tab"]),
-            ("Back and forward between the files and lines you jumped to", ["⇧⌘←", "⇧⌘→"]),
+            ("Back and forward between the files and lines you jumped to", ["⌃⌘←", "⌃⌘→"]),
             ("Close find", ["esc"]),
         ]),
         ShortcutGroup(title: "Terminal", items: [

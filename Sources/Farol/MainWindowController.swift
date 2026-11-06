@@ -765,10 +765,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     var canGoBack: Bool { store.selected?.panes.canGoBack == true }
     var canGoForward: Bool { store.selected?.panes.canGoForward == true }
 
-    /// ⇧⌘←: the file and line you were at before the last jump, as after following a definition into another file.
+    /// ⌃⌘←: the file and line you were at before the last jump, as after following a definition into another file.
     func goBack() { store.selected?.panes.goBack() }
 
-    /// ⇧⌘→: back to where you were when you went back.
+    /// ⌃⌘→: back to where you were when you went back.
     func goForward() { store.selected?.panes.goForward() }
 
     /// Only in the file pane with more than one tab, so ⌃Tab reaches programs in the terminal the rest of the time.

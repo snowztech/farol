@@ -172,7 +172,7 @@ final class PaneContainer: NSView {
 
     /// Shows the file in the file pane, opening one right of the focused terminal if there is none yet.
     /// `line` scrolls to it, for opening a file at a change. Unless `keep`, it takes the preview tab, see FileTabs.
-    /// Where you were is kept, so ⇧⌘← comes back to it.
+    /// Where you were is kept, so ⌃⌘← comes back to it.
     func open(_ path: String, line: Int? = nil, keep: Bool = false) {
         if let left = place, left.path != path || line.map({ $0 != left.line }) == true {
             history.record(leaving: left)
