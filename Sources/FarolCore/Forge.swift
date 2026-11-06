@@ -483,6 +483,31 @@ public struct Forge: Equatable {
         public let state: State
         /// The step's own page, with its log.
         public let url: URL?
+        /// Nil while it waits for a runner.
+        public var started: Date?
+        /// Nil while it runs.
+        public var finished: Date?
+
+        /// After the name in the list: how long it ran or has been running, like "passed 48s" or "running 3m 10s".
+        public func timing(now: Date = Date()) -> String {
+            switch state {
+            case .skipped: return "skipped"
+            case .running: return started.map { "running " + Self.duration(now.timeIntervalSince($0)) } ?? "queued"
+            case .passed, .failed:
+                let word = state == .passed ? "passed" : "failed"
+                guard let started, let finished else { return word }
+                return "\(word) \(state == .failed ? "after " : "")\(Self.duration(finished.timeIntervalSince(started)))"
+            }
+        }
+
+        /// "48s", "3m 10s", "1h 5m": the two biggest units, which is as much as anyone reads of a build's time.
+        static func duration(_ seconds: TimeInterval) -> String {
+            let total = max(0, Int(seconds))
+            let (h, m, s) = (total / 3600, total / 60 % 60, total % 60)
+            if h > 0 { return m > 0 ? "\(h)h \(m)m" : "\(h)h" }
+            if m > 0 { return s > 0 ? "\(m)m \(s)s" : "\(m)m" }
+            return "\(s)s"
+        }
     }
 
     /// The steps that ran for `branch`'s open request. Talks to the forge, so call it off the main thread.
@@ -513,7 +538,8 @@ public struct Forge: Equatable {
             case "PENDING", "EXPECTED": .running
             default: .failed
             }
-            return Check(name: name, state: state, url: ((item["detailsUrl"] ?? item["targetUrl"]) as? String).flatMap(URL.init(string:)))
+            return Check(name: name, state: state, url: ((item["detailsUrl"] ?? item["targetUrl"]) as? String).flatMap(URL.init(string:)),
+                         started: moment(item["startedAt"] ?? item["createdAt"]), finished: moment(item["completedAt"]))
         }
         let gitlab = jobs.compactMap { job -> Check? in
             guard let name = job["name"] as? String else { return nil }
@@ -524,9 +550,15 @@ public struct Forge: Equatable {
             case "skipped", "manual": .skipped
             default: .running
             }
-            return Check(name: name, state: state, url: (job["web_url"] as? String).flatMap(URL.init(string:)))
+            return Check(name: name, state: state, url: (job["web_url"] as? String).flatMap(URL.init(string:)),
+                         started: moment(job["started_at"]), finished: moment(job["finished_at"]))
         }
         return (github + gitlab).sorted { ($0.state.rawValue, $0.name) < ($1.state.rawValue, $1.name) }
+    }
+
+    /// A time a step has reached. gh sends year 1 for one it hasn't, like the end of a check still running.
+    private static func moment(_ value: Any?) -> Date? {
+        date(value).flatMap { $0.timeIntervalSince1970 > 0 ? $0 : nil }
     }
 
     /// Whether this forge's issues can be listed at all, without asking it.
