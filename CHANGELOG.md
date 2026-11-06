@@ -20,6 +20,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Fixed
 
+- Settings pages start their first section the same distance under the title, and Integrations explains each group under its name rather than in a loose line above the list.
 - The tab in front stays fully in view when tabs fill the bar, and language marks no longer run into the file name.
 
 ### Fixed

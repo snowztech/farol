@@ -56,6 +56,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// Follows the selected session's checkout, so the title bar shows when git stops on conflicts.
     private var mergeFollow: AnyCancellable?
     private var mergeDone: AnyCancellable?
+    private var mergeSidebar: AnyCancellable?
+    /// The sidebar went away because the merge view opened, so it comes back when that closes.
+    private var sidebarHiddenForMerge = false
     private var mergeCount: AnyCancellable?
 
     let agents: AgentSettings
@@ -386,6 +389,11 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
             self?.notch.refresh()
         }
+        // Three columns need the width, so the sidebar steps aside while you resolve and returns after.
+        mergeSidebar = state.$showingMerge.dropFirst().removeDuplicates().sink { [weak self] resolving in
+            // Moved off this change, since hiding the sidebar changes the same state again.
+            DispatchQueue.main.async { self?.makeRoomForMerge(resolving) }
+        }
         // Once git goes on past the last conflict, there is nothing left to show, so the terminal comes back.
         mergeDone = merge.$operation.sink { [weak self] operation in
             guard let self, operation == nil, state.showingMerge else { return }
@@ -487,7 +495,22 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }, completionHandler: { TerminalView.releaseSize() })
     }
 
+    /// Closes the sidebar while the merge view is open, and opens it again after, unless you toggled it yourself meanwhile.
+    private func makeRoomForMerge(_ resolving: Bool) {
+        if resolving {
+            guard sidebarWidth.constant != 0 else { return }
+            toggleSidebar()
+            sidebarHiddenForMerge = true
+        } else {
+            let restore = sidebarHiddenForMerge
+            sidebarHiddenForMerge = false
+            if restore, sidebarWidth.constant == 0 { toggleSidebar() }
+        }
+    }
+
     func toggleSidebar() {
+        // Your own choice from here on, so closing the merge view no longer decides for you.
+        sidebarHiddenForMerge = false
         let open = sidebarWidth.constant == 0
         withAnimation(Self.panelMotion) { state.sidebarVisible = open }
         animatePanels { self.sidebarWidth.animator().constant = open ? self.state.sidebarWidth : 0 }

@@ -255,7 +255,7 @@ struct SettingsPage: View {
     @ViewBuilder private func terminal(_ p: Palette) -> some View {
         Heading(title: "Terminal", detail: "Applies to every session.", palette: p)
 
-        GroupTitle(title: "Font", palette: p)
+        GroupTitle(title: "Font", first: true, palette: p)
         Card(palette: p) {
             Row(title: "Family", palette: p) {
                 Picker("", selection: $settings.fontFamily) {
@@ -330,7 +330,7 @@ struct SettingsPage: View {
     @ViewBuilder private func agentsSection(_ p: Palette) -> some View {
         Heading(title: "Agents", detail: "Set up your coding agents so Farol can tell you when they need you.", palette: p)
 
-        GroupTitle(title: "Status", palette: p)
+        GroupTitle(title: "Status", first: true, palette: p)
         Card(palette: p) {
             ForEach(Array(agentSetups.enumerated()), id: \.element.id) { agentRow($0.element, in: agentFolders[$0.offset], p) }
         }
@@ -480,7 +480,7 @@ struct SettingsPage: View {
     @ViewBuilder private func worktreesSection(_ p: Palette) -> some View {
         Heading(title: "Worktrees", detail: "Applies to new tasks and worktree sessions.", palette: p)
 
-        GroupTitle(title: "Local environment", palette: p)
+        GroupTitle(title: "Local environment", first: true, palette: p)
         Card(palette: p) {
             Row(title: "Copy local environment files",
                 detail: "Copies ignored .env files into each new worktree so projects can run immediately. Agents in the worktree can read their values.",
@@ -493,20 +493,16 @@ struct SettingsPage: View {
     @ViewBuilder private func integrationsSection(_ p: Palette) -> some View {
         Heading(title: "Integrations", detail: "The services Farol works with, through their own command line tools.", palette: p)
 
-        GroupTitle(title: "Pull requests", palette: p)
-        Text("Farol creates pull requests and shows their state through these tools. Without them it opens the new request page in your browser.")
-            .font(.system(size: 12))
-            .foregroundStyle(p.muted)
-            .padding(.bottom, 4)
+        GroupTitle(title: "Pull requests",
+                   detail: "Farol creates pull requests and shows their state through these tools. Without them it opens the new request page in your browser.",
+                   first: true, palette: p)
         Card(palette: p) {
             ForEach(Forge.Kind.allCases, id: \.self) { toolRow($0, p) }
         }
 
-        GroupTitle(title: "Tickets", palette: p)
-        Text("New Task lists your open Jira tickets, next to the open issues of a repo on GitHub. Picking one names the branch after it and hands the agent the ticket in full.")
-            .font(.system(size: 12))
-            .foregroundStyle(p.muted)
-            .padding(.bottom, 4)
+        GroupTitle(title: "Tickets",
+                   detail: "New Task lists your open Jira tickets, next to the open issues of a repo on GitHub. Picking one names the branch after it and hands the agent the ticket in full.",
+                   palette: p)
         Card(palette: p) {
             Row(title: "Jira", detail: jiraDetail, icon: ToolTile(jira: 26), link: ("Jira CLI (jira)", Jira.docs), palette: p) {
                 toolControl(jira, avatar: jiraAvatar, setup: Jira.setupCommand(from:), p)
@@ -815,7 +811,7 @@ struct SettingsPage: View {
     @ViewBuilder private func shortcuts(_ p: Palette) -> some View {
         Heading(title: "Shortcuts", detail: "Standard terminal shortcuts, plus Farol's own for sessions.", palette: p)
         ForEach(Self.shortcutGroups, id: \.title) { group in
-            GroupTitle(title: group.title, palette: p)
+            GroupTitle(title: group.title, first: group.title == Self.shortcutGroups.first?.title, palette: p)
             Card(palette: p) {
                 ForEach(group.items, id: \.action) { item in
                     Row(title: item.action, palette: p) {
@@ -1133,14 +1129,20 @@ extension View {
 /// A small heading between rows. Sentence case, a step above the rows, no rule of its own.
 private struct GroupTitle: View {
     let title: String
+    /// What the group is for, under its title, when its rows don't say it.
+    var detail: String? = nil
+    /// Right under the page's heading, whose own space below is enough. Every page's first section then sits as far from it.
+    var first = false
     let palette: Palette
 
     var body: some View {
-        Text(title)
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(palette.muted)
-            .padding(.top, 22)
-            .padding(.bottom, 8)
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.system(size: 12, weight: .semibold))
+            if let detail { Text(detail).font(.system(size: 12)) }
+        }
+        .foregroundStyle(palette.muted)
+        .padding(.top, first ? 0 : 22)
+        .padding(.bottom, 8)
     }
 }
 
