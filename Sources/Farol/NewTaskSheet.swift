@@ -733,6 +733,9 @@ struct WhenChoices: View {
     /// Picking Now leaves nothing more to set.
     let done: () -> Void
 
+    @State private var pickingDay = false
+    @State private var pickingTime = false
+
     var body: some View {
         let p = palette
         VStack(alignment: .leading, spacing: 1) {
@@ -744,30 +747,39 @@ struct WhenChoices: View {
                 } label: {
                     Image(systemName: option.symbol).frame(width: 16).foregroundStyle(p.muted)
                     Text(option.title)
-                    Spacer()
-                    if option == when { Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)) }
+                    // One spacer in the row, so the check sits at the end and not halfway.
+                    if option == when {
+                        Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)).frame(maxWidth: .infinity, alignment: .trailing)
+                    }
                 }
             }
             if when != .now {
                 Rectangle().fill(p.line).frame(height: 1).padding(.vertical, 5)
                 // A day in words and a time apart, since 08/11 reads as August in one country and November in the next.
-                if when == .later {
-                    setting("Day") {
-                        Menu {
-                            ForEach(0..<14, id: \.self) { ahead in Button(Self.dayName(ahead)) { setDay(ahead) } }
-                        } label: {
-                            Text(Self.dayName(Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: .now),
-                                                                              to: Calendar.current.startOfDay(for: at)).day ?? 0))
+                HStack(spacing: 6) {
+                    if when == .later {
+                        SheetSelect(palette: p, open: $pickingDay) {
+                            Text(Self.dayName(daysAhead)).lineLimit(1)
+                        } choices: {
+                            VStack(spacing: 1) {
+                                ForEach(0..<14, id: \.self) { ahead in
+                                    SheetChoice(palette: p) {
+                                        set(day: ahead, minutes: minutes)
+                                        pickingDay = false
+                                    } label: { picked(Self.dayName(ahead), ahead == daysAhead) }
+                                }
+                            }
+                            .padding(6)
+                            .frame(width: 200)
                         }
-                        .menuStyle(.borderlessButton)
-                        .fixedSize()
                     }
+                    SheetSelect(palette: p, open: $pickingTime) {
+                        Text(Self.clock(minutes)).monospacedDigit()
+                    } choices: { timeList(p) }
+                    .frame(width: when == .later ? 96 : nil)
                 }
-                setting("Time") {
-                    DatePicker("Time", selection: $at, in: when == .later ? Date.now... : Date.distantPast..., displayedComponents: .hourAndMinute)
-                        .labelsHidden()
-                        .datePickerStyle(.stepperField)
-                }
+                .padding(.horizontal, 2)
+                .padding(.vertical, 2)
             }
         }
         .font(.system(size: 13))
@@ -777,15 +789,48 @@ struct WhenChoices: View {
         .background(p.background)
     }
 
-    private func setting(_ name: String, @ViewBuilder control: () -> some View) -> some View {
-        HStack {
-            Text(name).foregroundStyle(palette.muted)
-            Spacer()
-            control()
+    /// Every quarter of an hour, opened on the one picked. Times already gone today aren't offered for a task that runs once.
+    private func timeList(_ p: Palette) -> some View {
+        let gone = when == .later && daysAhead == 0
+        let now = Calendar.current.dateComponents([.hour, .minute], from: .now)
+        let first = gone ? ((now.hour ?? 0) * 60 + (now.minute ?? 0)) / 15 + 1 : 0
+        return ScrollViewReader { reader in
+            ScrollView {
+                LazyVStack(spacing: 1) {
+                    ForEach(first..<96, id: \.self) { quarter in
+                        SheetChoice(palette: p) {
+                            set(day: daysAhead, minutes: quarter * 15)
+                            pickingTime = false
+                        } label: { picked(Self.clock(quarter * 15), quarter * 15 == minutes).monospacedDigit() }
+                        .id(quarter)
+                    }
+                }
+                .padding(6)
+            }
+            .frame(width: 120, height: 240)
+            .onAppear { reader.scrollTo(minutes / 15, anchor: .center) }
         }
-        .padding(.horizontal, 8)
-        .frame(height: 32)
     }
+
+    private func picked(_ title: String, _ chosen: Bool) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            if chosen { Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)) }
+        }
+    }
+
+    private var minutes: Int {
+        let time = Calendar.current.dateComponents([.hour, .minute], from: at)
+        return (time.hour ?? 9) * 60 + (time.minute ?? 0)
+    }
+
+    private var daysAhead: Int {
+        let calendar = Calendar.current
+        return calendar.dateComponents([.day], from: calendar.startOfDay(for: .now), to: calendar.startOfDay(for: at)).day ?? 0
+    }
+
+    private static func clock(_ minutes: Int) -> String { Schedule.clock(hour: minutes / 60, minute: minutes % 60) }
 
     /// Today, Tomorrow, then like Sunday 8 Nov.
     private static func dayName(_ ahead: Int) -> String {
@@ -798,12 +843,14 @@ struct WhenChoices: View {
         }
     }
 
-    /// Keeps the time. Today with its time gone moves to the next hour, so a task for later is never in the past.
-    private func setDay(_ ahead: Int) {
+    /// Today with its time gone moves to the next quarter hour, so a task that runs once is never in the past.
+    private func set(day ahead: Int, minutes: Int) {
         let calendar = Calendar.current
-        let time = calendar.dateComponents([.hour, .minute], from: at)
         let day = calendar.date(byAdding: .day, value: ahead, to: calendar.startOfDay(for: .now)) ?? .now
-        let picked = calendar.date(bySettingHour: time.hour ?? 9, minute: time.minute ?? 0, second: 0, of: day) ?? day
-        at = picked > .now ? picked : calendar.nextDate(after: .now, matching: DateComponents(minute: 0), matchingPolicy: .nextTime) ?? picked
+        let picked = calendar.date(byAdding: .minute, value: minutes, to: day) ?? day
+        guard when == .later, picked <= .now else { return at = picked }
+        let now = calendar.dateComponents([.hour, .minute], from: .now)
+        let next = (((now.hour ?? 0) * 60 + (now.minute ?? 0)) / 15 + 1) * 15
+        at = calendar.date(byAdding: .minute, value: next, to: calendar.startOfDay(for: .now)) ?? picked
     }
 }
