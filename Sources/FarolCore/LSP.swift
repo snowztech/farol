@@ -14,22 +14,25 @@ public enum LSP {
         public let extensions: Set<String>
         /// How to get it, for Settings to show when it isn't on your PATH.
         public let install: String
+        /// Arguments it answers and exits on, so a stub that only forwards, like rustup's before the component is added, isn't taken for it.
+        /// Nil for one that answers nothing without a client.
+        public let check: [String]?
     }
 
     /// The servers people use for each language, the same ones other editors start.
     public static let servers: [Server] = [
         Server(name: "gopls", language: "Go", command: "gopls", arguments: [], extensions: ["go"],
-               install: "go install golang.org/x/tools/gopls@latest"),
+               install: "go install golang.org/x/tools/gopls@latest", check: ["version"]),
         Server(name: "typescript-language-server", language: "TypeScript and JavaScript", command: "typescript-language-server", arguments: ["--stdio"],
-               extensions: ["ts", "tsx", "js", "jsx", "mjs", "cjs"], install: "npm install -g typescript-language-server typescript"),
+               extensions: ["ts", "tsx", "js", "jsx", "mjs", "cjs"], install: "npm install -g typescript-language-server typescript", check: ["--version"]),
         Server(name: "pyright", language: "Python", command: "pyright-langserver", arguments: ["--stdio"], extensions: ["py"],
-               install: "npm install -g pyright"),
+               install: "npm install -g pyright", check: nil),
         Server(name: "rust-analyzer", language: "Rust", command: "rust-analyzer", arguments: [], extensions: ["rs"],
-               install: "rustup component add rust-analyzer"),
+               install: "rustup component add rust-analyzer", check: ["--version"]),
         Server(name: "sourcekit-lsp", language: "Swift", command: "sourcekit-lsp", arguments: [], extensions: ["swift"],
-               install: "Comes with Xcode"),
+               install: "xcode-select --install", check: ["--help"]),
         Server(name: "clangd", language: "C, C++ and Objective-C", command: "clangd", arguments: [], extensions: ["c", "h", "cc", "cpp", "cxx", "hpp", "m", "mm"],
-               install: "brew install llvm"),
+               install: "xcode-select --install", check: ["--version"]),
     ]
 
     public static func server(for path: String) -> Server? {
@@ -76,11 +79,67 @@ public enum LSP {
     /// Your shell's PATH, where servers are looked for, as a terminal would. Starts a shell the first time, so not on the main thread.
     public static var shellPath: String { Git.shellPath }
 
+    /// The shell's PATH with the folders installers write servers to, which a shell often lacks.
+    /// `go install` puts gopls in GOBIN or in each GOPATH's bin, and Go's docs leave adding that to your PATH to you.
+    /// Starts a shell the first time, so not on the main thread.
+    public static var searchPath: String { searchPath(shell: shellPath) }
+
+    static func searchPath(shell: String, environment: [String: String] = ProcessInfo.processInfo.environment,
+                           home: String = NSHomeDirectory()) -> String {
+        let gopath = (environment["GOPATH"] ?? "").split(separator: ":").map { String($0) + "/bin" }
+        let extra = [environment["GOBIN"] ?? ""] + gopath + [home + "/go/bin", home + "/.cargo/bin", home + "/.local/bin"]
+        var folders = shell.split(separator: ":").map(String.init)
+        for folder in extra where !folder.isEmpty && !folders.contains(folder) { folders.append(folder) }
+        return folders.joined(separator: ":")
+    }
+
     /// Where `command` is on `searchPath`, a PATH value, or nil when it isn't installed.
     public static func locate(_ command: String, in searchPath: String) -> String? {
-        searchPath.split(separator: ":").lazy
+        candidates(command, in: searchPath).first
+    }
+
+    /// The first of the server's executables on `searchPath` that runs, passing over stubs that fail its check.
+    /// Starts each one it tries, so not on the main thread.
+    public static func find(_ server: Server, in searchPath: String) -> String? {
+        candidates(server.command, in: searchPath).first { executable in
+            server.check.map { runs(executable, $0, path: searchPath) } ?? true
+        }
+    }
+
+    private static func candidates(_ command: String, in searchPath: String) -> [String] {
+        searchPath.split(separator: ":")
             .map { ($0 as NSString).appendingPathComponent(command) }
-            .first { FileManager.default.isExecutableFile(atPath: $0) }
+            .filter { FileManager.default.isExecutableFile(atPath: $0) }
+    }
+
+    /// Runs the server's install command with your shell's PATH, and returns what it printed if it failed.
+    /// Waits for it to end, so not on the main thread.
+    public static func install(_ server: Server) -> String? {
+        do {
+            try Git.run("/bin/sh", ["-c", server.install], in: NSHomeDirectory(), named: server.name + " install")
+            return nil
+        } catch {
+            return (error as? GitError)?.description ?? error.localizedDescription
+        }
+    }
+
+    /// Whether `executable` exits cleanly on `arguments`. One still going after a few seconds counts, since a stub fails at once.
+    static func runs(_ executable: String, _ arguments: [String], path: String) -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        process.environment = ProcessInfo.processInfo.environment.merging(["PATH": path]) { $1 }
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        let done = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in done.signal() }
+        guard (try? process.run()) != nil else { return false }
+        guard done.wait(timeout: .now() + 5) == .success else {
+            process.terminate()
+            return true
+        }
+        return process.terminationStatus == 0
     }
 
     /// The short version a server reports, like "v0.21.1". gopls sends a JSON object with its build in it, whose "Version" is the one.
