@@ -40,6 +40,8 @@ final class FileView: NSView {
     var onOpenAt: ((String, Int) -> Void)?
     /// The theme's colors, for the list of definitions or references to look like the rest of Farol.
     var palette: () -> Palette? = { nil }
+    /// The pane now shows another file, which the files panel follows.
+    var onPathChange: (() -> Void)?
 
     /// The file as last read or saved, to tell our own save from someone else's change.
     private var onDisk: String?
@@ -239,6 +241,7 @@ final class FileView: NSView {
         watch()
         findFolder()
         links.path = path
+        onPathChange?()
     }
 
     /// The language server's menu, the status bar's own, in the code's right-click menu too, where turning it on is a click.
