@@ -95,6 +95,45 @@ struct Theme: Hashable {
         }
         return farol.map(bundled) + user + TerminalRuntime.bundledThemes.filter { !farol.contains($0) }.map(bundled)
     }
+
+    /// Your Ghostty config's colors as a card, when it sets any. The theme in use until you pick one.
+    static let ghosttyColors = Theme(name: "Your Ghostty colors", value: "", url: nil)
+
+    /// What goes after `theme =` now: the pick, or with none, your Ghostty colors when they exist and Farol Beam otherwise.
+    static func current(_ picked: String, ghosttyConfig: ThemeColors?) -> String {
+        !picked.isEmpty ? picked : ghosttyConfig == nil ? farol[0] : ""
+    }
+
+    func colors(_ ghosttyConfig: ThemeColors?) -> ThemeColors {
+        url.map(ThemeColors.load) ?? ghosttyConfig ?? ThemeColors(background: .black, foreground: .white)
+    }
+}
+
+/// The theme in use, above the gallery, so you see what you're on before looking through the rest.
+struct CurrentTheme: View {
+    let picked: String
+    let ghosttyConfig: ThemeColors?
+    let themes: [Theme]
+    let palette: Palette
+
+    var body: some View {
+        let value = Theme.current(picked, ghosttyConfig: ghosttyConfig)
+        let theme = value.isEmpty ? Theme.ghosttyColors
+            : themes.first { $0.value == value } ?? Theme(name: (value as NSString).lastPathComponent, value: value, url: nil)
+        Card(palette: palette) {
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Current theme").font(.system(size: 12)).foregroundStyle(palette.muted)
+                    Text(theme.name).font(.system(size: 15, weight: .semibold))
+                }
+                Spacer(minLength: 16)
+                ThemePreview(colors: theme.colors(ghosttyConfig), hues: theme.url != nil)
+                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(palette.line))
+                    .frame(width: 200)
+            }
+            .padding(.vertical, 12)
+        }
+    }
 }
 
 struct ThemeGallery: View {
@@ -113,15 +152,11 @@ struct ThemeGallery: View {
         // Your Ghostty config's colors are yours too, next to the themes in your folder.
         let yours = matching.filter { $0.value.isEmpty || $0.value.hasPrefix("/") }
         let popular = Theme.popular.compactMap { name in matching.first { $0.value == name } }
-        let rest = matching.filter { !farol.contains($0) && !yours.contains($0) && !popular.contains($0) }
-        // The other sections sit near the top, but one of Ghostty's hundreds would be far down the list, so it comes up here.
-        let inUse = rest.filter { $0.value == current }
-        let more = rest.filter { $0.value != current }
+        let more = matching.filter { !farol.contains($0) && !yours.contains($0) && !popular.contains($0) }
         VStack(alignment: .leading, spacing: 0) {
             if matching.isEmpty {
                 Text("No themes match.").font(.system(size: 12)).foregroundStyle(palette.muted)
             }
-            section("In use", inUse)
             section("Farol", farol)
             section("Yours", yours)
             section("Popular", popular)
@@ -138,7 +173,7 @@ struct ThemeGallery: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 172), spacing: 14)], spacing: 18) {
                 ForEach(themes, id: \.self) { theme in
                     // Your Ghostty colors are only a background and a foreground, so no hues are made up for them.
-                    ThemeCard(name: theme.name, colors: colors(theme), hues: theme.url != nil,
+                    ThemeCard(name: theme.name, colors: theme.colors(ghosttyConfig), hues: theme.url != nil,
                               selected: theme.value == current, palette: palette)
                         .onTapGesture { selected = theme.value }
                 }
@@ -147,28 +182,18 @@ struct ThemeGallery: View {
         }
     }
 
-    private func colors(_ theme: Theme) -> ThemeColors {
-        theme.url.map(ThemeColors.load) ?? ghosttyConfig ?? ThemeColors(background: .black, foreground: .white)
-    }
-
     private func matches(_ theme: Theme) -> Bool {
         guard query.isEmpty || theme.name.localizedCaseInsensitiveContains(query) else { return false }
         return switch tone {
         case .all: true
-        case .dark: !colors(theme).isLight
-        case .light: colors(theme).isLight
+        case .dark: !theme.colors(ghosttyConfig).isLight
+        case .light: theme.colors(ghosttyConfig).isLight
         }
     }
 
-    private var current: String { selected.isEmpty ? fallback : selected }
+    private var current: String { Theme.current(selected, ghosttyConfig: ghosttyConfig) }
 
-    /// Your Ghostty config's colors when it sets any, the theme in use until you pick one.
-    private var cards: [Theme] {
-        (ghosttyConfig == nil ? [] : [Theme(name: "Your Ghostty colors", value: "", url: nil)]) + themes
-    }
-
-    /// What is in use with nothing picked: your Ghostty config when it sets colors, Farol Beam otherwise.
-    private var fallback: String { ghosttyConfig == nil ? Theme.farol[0] : "" }
+    private var cards: [Theme] { (ghosttyConfig == nil ? [] : [Theme.ghosttyColors]) + themes }
 }
 
 /// The gallery's filter, since people browse for a dark theme or a light one.
@@ -225,41 +250,12 @@ private struct ThemeCard: View {
     @State private var hovering = false
 
     var body: some View {
-        let t = colors
         VStack(alignment: .leading, spacing: 7) {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 0) {
-                    Text("~/farol ").foregroundStyle(t.ansi[4])
-                    Text("❯ ").foregroundStyle(t.ansi[2])
-                    Text("ls").foregroundStyle(t.foreground)
-                }
-                HStack(spacing: 8) {
-                    Text("src").foregroundStyle(t.ansi[4])
-                    Text("build.sh").foregroundStyle(t.ansi[2])
-                    Text("TODO").foregroundStyle(t.ansi[1])
-                }
-                HStack(spacing: 0) {
-                    Text("❯ ").foregroundStyle(t.ansi[2])
-                    Rectangle().fill(t.cursor).frame(width: 6, height: 11)
-                    Spacer(minLength: 8)
-                    // The six hues side by side, since the sample above shows only three and many dark themes look alike by it.
-                    if hues {
-                        HStack(spacing: 3) {
-                            ForEach(1..<7, id: \.self) { i in
-                                Circle().fill(t.ansi[i]).frame(width: 8, height: 8)
-                            }
-                        }
-                    }
-                }
-            }
-            .font(.system(size: 10, design: .monospaced))
-            .padding(10)
-            .frame(maxWidth: .infinity, minHeight: 70, alignment: .topLeading)
-            .background(t.background, in: RoundedRectangle(cornerRadius: 8))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(selected ? palette.accent : hovering ? palette.muted : palette.line,
-                                  lineWidth: selected ? 2 : 1))
+            ThemePreview(colors: colors, hues: hues)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(selected ? palette.accent : hovering ? palette.muted : palette.line,
+                                      lineWidth: selected ? 2 : 1))
 
             Text(name)
                 .font(.system(size: 12, weight: selected ? .semibold : .regular))
@@ -268,6 +264,46 @@ private struct ThemeCard: View {
         }
         .contentShape(Rectangle())
         .onClickableHover { hovering = $0 }
+    }
+}
+
+/// A few lines of a terminal in a theme's colors, with its six hues.
+struct ThemePreview: View {
+    let colors: ThemeColors
+    /// Off for your Ghostty colors, which are only a background and a foreground, so none are made up.
+    let hues: Bool
+
+    var body: some View {
+        let t = colors
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 0) {
+                Text("~/farol ").foregroundStyle(t.ansi[4])
+                Text("❯ ").foregroundStyle(t.ansi[2])
+                Text("ls").foregroundStyle(t.foreground)
+            }
+            HStack(spacing: 8) {
+                Text("src").foregroundStyle(t.ansi[4])
+                Text("build.sh").foregroundStyle(t.ansi[2])
+                Text("TODO").foregroundStyle(t.ansi[1])
+            }
+            HStack(spacing: 0) {
+                Text("❯ ").foregroundStyle(t.ansi[2])
+                Rectangle().fill(t.cursor).frame(width: 6, height: 11)
+                Spacer(minLength: 8)
+                // The six hues side by side, since the sample above shows only three and many dark themes look alike by it.
+                if hues {
+                    HStack(spacing: 3) {
+                        ForEach(1..<7, id: \.self) { i in
+                            Circle().fill(t.ansi[i]).frame(width: 8, height: 8)
+                        }
+                    }
+                }
+            }
+        }
+        .font(.system(size: 10, design: .monospaced))
+        .padding(10)
+        .frame(maxWidth: .infinity, minHeight: 70, alignment: .topLeading)
+        .background(t.background, in: RoundedRectangle(cornerRadius: 8))
     }
 }
 

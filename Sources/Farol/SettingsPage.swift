@@ -235,6 +235,8 @@ struct SettingsPage: View {
         Heading(title: "Themes",
                 detail: "Applies to every session as soon as you pick it. To add your own, drop a Ghostty theme file in the themes folder.",
                 palette: p)
+        CurrentTheme(picked: settings.theme, ghosttyConfig: state.ghosttyConfigPreview, themes: themes, palette: p)
+            .padding(.bottom, 24)
         HStack(spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(p.muted)
