@@ -19,7 +19,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.2/dist/snowztech-ui.min.css">
   <link rel="stylesheet" href="/footer.css">
   <script>
-    if (matchMedia("(prefers-color-scheme: light)").matches) document.documentElement.dataset.theme = "light";
+    (function () { var light = matchMedia("(prefers-color-scheme: light)"), root = document.documentElement; function follow() { if (light.matches) root.dataset.theme = "light"; else delete root.dataset.theme; } follow(); light.addEventListener("change", follow); })();
   </script>
   <style>
     html { scroll-behavior: smooth; }
@@ -111,6 +111,10 @@
     .dot-working { color: #67e8f9; box-shadow: 0 0 8px currentColor; }
     .dot-waiting { color: #fde68a; box-shadow: 0 0 8px currentColor; }
     .dot-done { color: #86efac; }
+    /* The lamps' colors in Farol Light, since the dark page's pastels fade on a light one, and a glow there only muddies them. */
+    [data-theme=light] .dot-working { color: #0d7584; box-shadow: none; }
+    [data-theme=light] .dot-waiting { color: #8f5a00; box-shadow: none; }
+    [data-theme=light] .dot-done { color: #1a7a44; }
     .doc-shot {
       display: block; width: 100%; height: auto; margin: 24px 0 0;
       border: 1px solid var(--sn-border-strong); border-radius: 10px;
