@@ -17,6 +17,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - Settings → Editor offered to install a language server again after it was installed. Farol looked only on the PATH of your shell, and `go install` puts gopls in `~/go/bin` (or GOBIN, or each GOPATH's `bin`), which a shell doesn't have by default. It now looks there too, and in `~/.cargo/bin` and `~/.local/bin`, and starts the server with them on its PATH.
 - A language server that is there but can't run, like the rust-analyzer rustup adds before `rustup component add rust-analyzer`, no longer counts as installed. Farol asks each server for its version first and passes over one that fails.
 - clangd and sourcekit-lsp install with `xcode-select --install`, which brings both. clangd's `brew install llvm` left it where no PATH looks.
+- ⌥⌘ with an arrow moves between panes from an open file too, as it does from a terminal. It only worked one way: you could go from a terminal to a file and not back.
 
 ## [0.61.0] - 2026-11-06
 

@@ -1,5 +1,6 @@
 import AppKit
 import FarolCore
+import GhosttyTerminal
 
 /// A file's text with line numbers, in a tab of the file pane, which shows its name and actions.
 /// Edits are saved with ⌘S. When an agent changes the file on disk, it reloads, or asks if you have unsaved edits.
@@ -38,6 +39,8 @@ final class FileView: NSView {
     var onShowCommit: ((String) -> Void)?
     /// Opens a file at a line, from a ⌘-click on a name the language server placed there.
     var onOpenAt: ((String, Int) -> Void)?
+    /// ⌥⌘ with an arrow while the text has the keyboard: go to the pane that way, as in a terminal.
+    var onMovePane: ((TerminalRequest.Direction) -> Void)?
     /// The theme's colors, for the list of definitions or references to look like the rest of Farol.
     var palette: () -> Palette? = { nil }
     /// The pane now shows another file, which the files panel follows.
@@ -179,6 +182,28 @@ final class FileView: NSView {
     deinit { watcher?.cancel() }
 
     override var isFlipped: Bool { true }
+
+    /// The pane an arrow with ⌥⌘ points to. Ghostty reads the same keys while a terminal has the keyboard.
+    /// Text has no use for them, so here they only move between panes. The arrow keys add the numeric pad and function flags to the event.
+    /// Caps Lock is left out, as a terminal leaves it out.
+    static func paneDirection(of event: NSEvent) -> TerminalRequest.Direction? {
+        guard event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.numericPad, .function, .capsLock]) == [.command, .option] else { return nil }
+        switch event.keyCode {
+        case 123: return .left
+        case 124: return .right
+        case 125: return .down
+        case 126: return .up
+        default: return nil
+        }
+    }
+
+    /// Only when the keyboard is in this file, since a terminal beside it has the same keys and handles them itself.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard let direction = Self.paneDirection(of: event), let responder = window?.firstResponder as? NSView,
+              responder.isDescendant(of: self) else { return super.performKeyEquivalent(with: event) }
+        onMovePane?(direction)
+        return true
+    }
 
     /// The text that takes the keyboard: the preview while it shows, else the source.
     var textView: NSTextView { showsPreview ? preview.text : text }
