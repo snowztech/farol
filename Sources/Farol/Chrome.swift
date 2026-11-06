@@ -273,6 +273,8 @@ private struct SessionMenu: View {
     let commands: Commands
 
     @State private var hovering = false
+    /// Where the title sits across the window. It is centered between the open panels, so the list is centered under it rather than on the window.
+    @State private var titleMidX: CGFloat = 0
     /// A click on the title closes the list before the button sees it, which would open it again, so a close just before counts.
     @State private var closedAt = Date.distantPast
 
@@ -298,14 +300,16 @@ private struct SessionMenu: View {
         .fixedSize()
         .onClickableHover { hovering = $0 }
         .hoverTip("Switch session (⌘P)")
+        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).midX } action: { titleMidX = $0 }
         .onChange(of: state.switchingSession) { _, open in if open { present() } else { FloatingPanel.dismiss() } }
     }
 
     private func present() {
         guard let window = NSApp.mainWindow ?? NSApp.keyWindow else { return state.switchingSession = false }
-        // Centered on the window, as Spotlight and other palettes are, wherever open panels push the title.
+        // Dropping from the title, the only centered thing in the bar and the one the eye lines it up with.
+        let midX = titleMidX
         FloatingPanel.show(palette: state.palette, over: window, place: { size, _ in
-            NSPoint(x: window.frame.midX - size.width / 2,
+            NSPoint(x: window.frame.minX + midX - size.width / 2,
                     y: window.frame.maxY - MainWindowController.topBarHeight - 6 - size.height)
         }, dismissed: {
             closedAt = Date()
