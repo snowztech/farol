@@ -57,3 +57,11 @@ private let home = "/Users/me"
     let task = Schedule(name: "", task: "", repos: [], branch: "feat/article", agent: "", weekdays: [], hour: 9, minute: 0, since: .now)
     #expect(ScheduleFile.name(for: task) { $0 == "feat-article" } == "feat-article-2")
 }
+
+/// A second config folder is saved as its path, written short and read back in full.
+@Test func keepsAnAgentFolderShort() throws {
+    let text = "---\nname: Bump\nwhen: every day 9:00\nrepos: ~/dev/app\nbranch: bump\nagent: ~/.claude-work\n---\nBump the deps.\n"
+    let task = try ScheduleFile.parse(text, id: "bump", home: home)
+    #expect(task.agent == "/Users/me/.claude-work")
+    #expect(ScheduleFile.text(for: task, home: home) == text)
+}

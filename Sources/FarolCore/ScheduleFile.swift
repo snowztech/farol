@@ -36,15 +36,16 @@ public enum ScheduleFile {
         let prompt = lines[(end + 1)...].joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !prompt.isEmpty else { throw Problem.missing("prompt under the front matter") }
         guard let when = fields["when"], !when.isEmpty else { throw Problem.missing("when") }
+        let expand = { (path: String) in path.hasPrefix("~/") ? home + path.dropFirst() : path }
         let repos = (fields["repos"] ?? fields["repo"] ?? "").split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
-            .map { $0.hasPrefix("~/") ? home + $0.dropFirst() : $0 }
+            .map(expand)
         guard !repos.isEmpty else { throw Problem.missing("repos") }
         guard let rule = Self.when(when) else { throw Problem.unreadable("when", when) }
         let branch = fields["branch"].flatMap { $0.isEmpty ? nil : $0 } ?? id
         var schedule = Schedule(name: fields["name"].flatMap { $0.isEmpty ? nil : $0 } ?? prompt.components(separatedBy: "\n")[0],
-                                task: prompt, repos: repos, branch: branch, agent: fields["agent"] ?? "",
+                                task: prompt, repos: repos, branch: branch, agent: expand(fields["agent"] ?? ""),
                                 weekdays: rule.weekdays, hour: rule.minutes / 60, minute: rule.minutes % 60, since: .distantPast)
         schedule.id = id
         schedule.once = rule.once
@@ -53,14 +54,15 @@ public enum ScheduleFile {
 
     /// The file for `schedule`, in the shape `parse` reads.
     public static func text(for schedule: Schedule, home: String = NSHomeDirectory(), calendar: Calendar = .current) -> String {
-        let repos = schedule.repos.map { $0.hasPrefix(home + "/") ? "~" + $0.dropFirst(home.count) : $0 }
+        let tilde = { (path: String) in path.hasPrefix(home + "/") ? "~" + path.dropFirst(home.count) : path }
+        let repos = schedule.repos.map(tilde)
         return """
         ---
         name: \(schedule.name)
         when: \(when(of: schedule, calendar: calendar))
         repos: \(repos.joined(separator: ", "))
         branch: \(schedule.branch)
-        agent: \(schedule.agent)
+        agent: \(tilde(schedule.agent))
         ---
         \(schedule.task)
 

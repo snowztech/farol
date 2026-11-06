@@ -540,7 +540,7 @@ struct NewTaskSheet: View {
             let title = picked?.summary ?? text.components(separatedBy: .newlines).first ?? name
             // The repo itself, not a worktree you happen to be in, which may be gone by the next run.
             var task = Schedule(name: String(title.prefix(48)), task: prompt, repos: sources.map { $0 == directory ? root ?? $0 : $0 },
-                                branch: name, agent: choice.id,
+                                branch: name, agent: choice.isDefault ? choice.kind.rawValue : choice.id,
                                 weekdays: starts == .repeats ? weekdays : Schedule.everyDay, hour: hour, minute: minute, since: .now)
             if starts == .later { task.once = at }
             close()
