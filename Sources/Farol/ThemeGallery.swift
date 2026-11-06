@@ -74,7 +74,8 @@ struct Theme: Hashable {
     /// Farol's own. The first is in use until a theme is picked, unless your Ghostty config sets its own colors.
     static let farol = ["Farol Beam", "Farol Dark", "Farol Navy", "Farol Dusk", "Farol Light"]
 
-    /// Well known themes from Ghostty's set, shown before the rest. One missing from a later Ghostty is left out.
+    /// A hand pick of well known themes from Ghostty's set, not a count of anything, with light ones so the Light filter keeps some.
+    /// One missing from a later Ghostty is left out.
     static let popular = [
         "Catppuccin Mocha", "TokyoNight", "Dracula", "Gruvbox Dark", "Nord", "Rose Pine",
         "Kanagawa Wave", "Atom One Dark", "Catppuccin Latte", "Rose Pine Dawn", "GitHub Light Default", "Everforest Light Med",
@@ -108,8 +109,9 @@ struct ThemeGallery: View {
 
     var body: some View {
         let matching = cards.filter(matches)
-        let farol = matching.filter { Theme.farol.contains($0.value) || $0.value.isEmpty }
-        let yours = matching.filter { $0.value.hasPrefix("/") }
+        let farol = matching.filter { Theme.farol.contains($0.value) }
+        // Your Ghostty config's colors are yours too, next to the themes in your folder.
+        let yours = matching.filter { $0.value.isEmpty || $0.value.hasPrefix("/") }
         let popular = Theme.popular.compactMap { name in matching.first { $0.value == name } }
         let more = matching.filter { !farol.contains($0) && !yours.contains($0) && !popular.contains($0) }
         VStack(alignment: .leading, spacing: 0) {
@@ -155,7 +157,7 @@ struct ThemeGallery: View {
 
     private var current: String { selected.isEmpty ? fallback : selected }
 
-    /// Your Ghostty config's colors come first when it sets any, as the theme in use until you pick one.
+    /// Your Ghostty config's colors when it sets any, the theme in use until you pick one.
     private var cards: [Theme] {
         (ghosttyConfig == nil ? [] : [Theme(name: "Ghostty config", value: "", url: nil)]) + themes
     }
@@ -194,6 +196,13 @@ private struct ThemeCard: View {
                 HStack(spacing: 0) {
                     Text("❯ ").foregroundStyle(t.ansi[2])
                     Rectangle().fill(t.cursor).frame(width: 6, height: 11)
+                    Spacer(minLength: 8)
+                    // The six hues side by side, since the sample above shows only three and many dark themes look alike by it.
+                    HStack(spacing: 3) {
+                        ForEach(1..<7, id: \.self) { i in
+                            RoundedRectangle(cornerRadius: 1.5).fill(t.ansi[i]).frame(width: 9, height: 9)
+                        }
+                    }
                 }
             }
             .font(.system(size: 10, design: .monospaced))
