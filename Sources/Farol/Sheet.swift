@@ -68,6 +68,8 @@ struct SheetOption: View {
 struct SheetSelect<Label: View, Choices: View>: View {
     let palette: Palette
     @Binding var open: Bool
+    /// Small, to sit in a list of choices rather than in a sheet.
+    var compact = false
     @ViewBuilder let label: Label
     @ViewBuilder let choices: Choices
 
@@ -85,7 +87,7 @@ struct SheetSelect<Label: View, Choices: View>: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .sheetField(palette, focused: open || hovering)
+        .sheetField(palette, focused: open || hovering, padding: compact ? 6 : 10)
         .onClickableHover { hovering = $0 }
         .popover(isPresented: $open, arrowEdge: .bottom) {
             choices
@@ -122,9 +124,10 @@ struct SheetChoice<Label: View>: View {
 
 extension View {
     /// The box around a plain text field, with a brighter edge while you type in it.
-    func sheetField(_ palette: Palette, focused: Bool) -> some View {
+    func sheetField(_ palette: Palette, focused: Bool, padding: CGFloat = 10) -> some View {
         tint(palette.text)
-            .padding(10)
+            .padding(.horizontal, 10)
+            .padding(.vertical, padding)
             .background(RoundedRectangle(cornerRadius: 8).fill(palette.surface))
             .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(focused ? palette.muted : palette.line))
     }

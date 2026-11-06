@@ -758,7 +758,7 @@ struct WhenChoices: View {
                 // A day in words and a time apart, since 08/11 reads as August in one country and November in the next.
                 HStack(spacing: 6) {
                     if when == .later {
-                        SheetSelect(palette: p, open: $pickingDay) {
+                        SheetSelect(palette: p, open: $pickingDay, compact: true) {
                             Text(Self.dayName(daysAhead)).lineLimit(1)
                         } choices: {
                             VStack(spacing: 1) {
@@ -773,13 +773,19 @@ struct WhenChoices: View {
                             .frame(width: 200)
                         }
                     }
-                    SheetSelect(palette: p, open: $pickingTime) {
+                    SheetSelect(palette: p, open: $pickingTime, compact: true) {
                         Text(Self.clock(minutes)).monospacedDigit()
                     } choices: { timeList(p) }
                     .frame(width: when == .later ? 96 : nil)
                 }
                 .padding(.horizontal, 2)
                 .padding(.vertical, 2)
+                Text(firstRun)
+                    .font(.system(size: 11))
+                    .foregroundStyle(p.muted)
+                    .padding(.horizontal, 8)
+                    .padding(.top, 6)
+                    .padding(.bottom, 2)
             }
         }
         .font(.system(size: 13))
@@ -818,6 +824,17 @@ struct WhenChoices: View {
             Spacer()
             if chosen { Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)) }
         }
+    }
+
+    /// When it really starts, worked out for you: weekdays picked on a Friday evening start on Monday.
+    private var firstRun: String {
+        let days: Schedule.Days = when == .weekdays ? .weekdays : .everyDay
+        let rule = Schedule(name: "", task: "", repo: "", branch: "", agent: "", days: days, hour: minutes / 60, minute: minutes % 60, since: .now)
+        let next = when == .later ? at : rule.next(after: .now)
+        let calendar = Calendar.current
+        let day = calendar.isDateInToday(next) ? "today" : calendar.isDateInTomorrow(next) ? "tomorrow"
+            : next.formatted(.dateTime.weekday(.wide).day().month(.abbreviated))
+        return "\(when == .later ? "Runs" : "First run") \(day) at \(Self.clock(minutes))"
     }
 
     private var minutes: Int {
