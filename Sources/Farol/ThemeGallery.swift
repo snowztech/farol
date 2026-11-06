@@ -95,9 +95,9 @@ struct ThemeGallery: View {
 
     let themes: [Theme]
 
-    /// Ghostty's themes are hundreds, so a row of them shows until you ask for the rest. A search looks through all of them.
+    /// Ghostty's themes are hundreds, so they fold under their title, as a project's sessions do in the sidebar. A search looks through all of them.
     @State private var showAll = false
-    private static let ghosttyPreview = 4
+    @State private var hoveringTitle = false
 
     var body: some View {
         if !query.isEmpty {
@@ -112,13 +112,9 @@ struct ThemeGallery: View {
                     title("Yours")
                     grid(yours)
                 }
-                title("Ghostty")
-                grid(showAll ? ghostty : preview(of: ghostty))
-                Button(showAll ? "Show fewer" : "Show all \(ghostty.count) themes") { showAll.toggle() }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(palette.accent)
-                    .padding(.top, 14)
+                disclosure(count: ghostty.count)
+                // Folded, the one in use still shows, so you can see what you're on.
+                grid(showAll ? ghostty : ghostty.filter { $0.value == current })
             }
         }
     }
@@ -142,10 +138,24 @@ struct ThemeGallery: View {
             .padding(.bottom, 8)
     }
 
-    /// The first few, with the one in use first when it is further down, so folding the list never hides it.
-    private func preview(of ghostty: [Theme]) -> [Theme] {
-        let picked = ghostty.filter { $0.value == current }
-        return picked + ghostty.filter { $0.value != current }.prefix(Self.ghosttyPreview - picked.count)
+    private func disclosure(count: Int) -> some View {
+        Button {
+            withAnimation(Motion.enabled ? .easeOut(duration: 0.15) : nil) { showAll.toggle() }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .bold))
+                    .rotationEffect(.degrees(showAll ? 90 : 0))
+                Text("Ghostty").font(.system(size: 12, weight: .semibold))
+                Text("\(count) themes").font(.system(size: 12))
+            }
+            .foregroundStyle(hoveringTitle ? palette.text : palette.muted)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(QuietPress())
+        .onClickableHover { hoveringTitle = $0 }
+        .padding(.top, 22)
+        .padding(.bottom, 8)
     }
 
     /// What is in use with nothing picked: your Ghostty config when it sets colors, Farol Beam otherwise.
