@@ -185,8 +185,9 @@ final class FileView: NSView {
 
     /// The pane an arrow with ⌥⌘ points to. Ghostty reads the same keys while a terminal has the keyboard.
     /// Text has no use for them, so here they only move between panes. The arrow keys add the numeric pad and function flags to the event.
+    /// Caps Lock is left out, as a terminal leaves it out.
     static func paneDirection(of event: NSEvent) -> TerminalRequest.Direction? {
-        guard event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.numericPad, .function]) == [.command, .option] else { return nil }
+        guard event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.numericPad, .function, .capsLock]) == [.command, .option] else { return nil }
         switch event.keyCode {
         case 123: return .left
         case 124: return .right
