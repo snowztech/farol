@@ -35,6 +35,7 @@ public enum Syntax {
     public static func language(for path: String) -> Language? {
         let name = (path as NSString).lastPathComponent
         if ["Makefile", "Dockerfile", "Gemfile", "Rakefile"].contains(name) { return name == "Gemfile" || name == "Rakefile" ? ruby : shell }
+        if name == "go.mod" || name == "go.work" { return goModule }
         switch (name as NSString).pathExtension.lowercased() {
         case "swift": return swift
         case "go": return go
@@ -110,7 +111,8 @@ public enum Syntax {
                 if end < chars.count, chars[end] == c { end += 1 }
                 add(i, end, .string)
                 i = end
-            } else if isDigit(c), i == 0 || !isWord(chars[i - 1]) {
+            // A digit after `name.` goes on the name, like `v1.2.3` or Rust's `t.0`. CSS's `.5` is still a number.
+            } else if isDigit(c), i == 0 || !(isWord(chars[i - 1]) || chars[i - 1] == code(".") && i > 1 && isWord(chars[i - 2])) {
                 var end = i
                 while end < chars.count, isWord(chars[end]) || chars[end] == code(".") { end += 1 }
                 add(i, end, .number)
@@ -246,6 +248,10 @@ public enum Syntax {
     static let ruby = Language(lineComments: ["#"], blockComments: [], quotes: ["\"", "'"], keywords: words(
         "def end class module if elsif else unless while until for in do return yield begin rescue ensure raise self nil true false and or not then case when require require_relative attr_reader attr_accessor private"),
         names: true)
+
+    /// go.mod and go.work. A version like v1.2.3 starts with a letter, so only `go 1.22` gets a number.
+    static let goModule = Language(lineComments: ["//"], blockComments: [], quotes: ["\"", "`"], keywords: words(
+        "module go toolchain godebug require replace exclude retract tool use"))
 
     static let shell = Language(lineComments: ["#"], blockComments: [], quotes: ["\"", "'"], keywords: words(
         "if then else elif fi for while until do done case esac in function return local export readonly set unset exit true false source"))

@@ -240,3 +240,11 @@ private func tokens(_ text: String, _ path: String) -> [String] {
         "Card:tag", "client:load:keyword", "length:property",
     ])
 }
+
+@Test func goModColorsItsDirectivesAndComments() {
+    let code = "module example.com/app\n\ngo 1.22\n\nrequire (\n\tgithub.com/a/b v1.2.3 // indirect\n)\nreplace example.com/x => ../x"
+    #expect(tokens(code, "go.mod") == ["module:keyword", "go:keyword", "1.22:number", "require:keyword", "// indirect:comment", "replace:keyword"])
+    #expect(Syntax.language(for: "go.work") != nil)
+    #expect(Syntax.language(for: "go.sum") == nil)
+    #expect(tokens("a { opacity: .5 }", "a.css") == ["5:number"])
+}
