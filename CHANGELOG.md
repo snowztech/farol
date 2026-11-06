@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.63.0] - 2026-11-06
+
+Four new Farol themes, a theme for Light Mode and one for Dark Mode, Vue in the editor, and a wider ⌘P list.
+
 ### Added
 
 - Match system appearance, in Settings → Appearance: your light theme in Light Mode and your dark theme in Dark Mode, switching when macOS does. Turning it on keeps your theme and pairs it with Farol's closest, like Farol Dawn with Farol Dusk, and each side opens the themes already filtered to light or dark. It writes `theme = light:A,dark:B`, which also works by hand.
@@ -1286,7 +1290,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.62.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.63.0...HEAD
+[0.63.0]: https://github.com/snowztech/farol/releases/tag/v0.63.0
 [0.62.0]: https://github.com/snowztech/farol/releases/tag/v0.62.0
 [0.61.0]: https://github.com/snowztech/farol/releases/tag/v0.61.0
 [0.60.0]: https://github.com/snowztech/farol/releases/tag/v0.60.0
