@@ -17,6 +17,21 @@ public enum LSP {
         /// Arguments it answers and exits on, so a stub that only forwards, like rustup's before the component is added, isn't taken for it.
         /// Nil for one that answers nothing without a client.
         public let check: [String]?
+        /// Set for a server that needs a plugin, so Farol installs it in a folder of its own with the plugin and its own TypeScript.
+        public var bundle: Bundle?
+
+        /// What names it in Settings and its saved choice. The command, except for a bundle, which shares one with the server it wraps.
+        public var id: String { bundle?.folder ?? command }
+    }
+
+    /// A server and the plugin it needs, installed together under `~/.farol/language-servers/<folder>`.
+    /// Vue's TypeScript plugin only works with a TypeScript 5, and a global install may hold a newer one, so nothing is shared.
+    public struct Bundle: Equatable, Sendable {
+        public let folder: String
+        /// The npm package of the plugin, like `@vue/typescript-plugin`.
+        public let plugin: String
+        /// The languages the plugin teaches the server, as the server knows them.
+        public let languages: [String]
     }
 
     /// The servers people use for each language, the same ones other editors start.
@@ -25,6 +40,10 @@ public enum LSP {
                install: "go install golang.org/x/tools/gopls@latest", check: ["version"]),
         Server(name: "typescript-language-server", language: "TypeScript and JavaScript", command: "typescript-language-server", arguments: ["--stdio"],
                extensions: ["ts", "tsx", "js", "jsx", "mjs", "cjs"], install: "npm install -g typescript-language-server typescript", check: ["--version"]),
+        Server(name: "typescript-language-server and Vue plugin", language: "Vue", command: "typescript-language-server", arguments: ["--stdio"],
+               extensions: ["vue"],
+               install: #"npm install --prefix "$HOME/.farol/language-servers/vue" typescript@5 typescript-language-server @vue/typescript-plugin"#,
+               check: ["--version"], bundle: Bundle(folder: "vue", plugin: "@vue/typescript-plugin", languages: ["vue"])),
         Server(name: "pyright", language: "Python", command: "pyright-langserver", arguments: ["--stdio"], extensions: ["py"],
                install: "npm install -g pyright", check: nil),
         Server(name: "rust-analyzer", language: "Rust", command: "rust-analyzer", arguments: [], extensions: ["rs"],
@@ -49,6 +68,7 @@ public enum LSP {
         case "js", "mjs", "cjs": "JavaScript"
         case "jsx": "JSX"
         case "py": "Python"
+        case "vue": "Vue"
         case "rs": "Rust"
         case "swift": "Swift"
         case "c", "h": "C"
@@ -100,10 +120,36 @@ public enum LSP {
 
     /// The first of the server's executables on `searchPath` that runs, passing over stubs that fail its check.
     /// Starts each one it tries, so not on the main thread.
-    public static func find(_ server: Server, in searchPath: String) -> String? {
-        candidates(server.command, in: searchPath).first { executable in
+    public static func find(_ server: Server, in searchPath: String, home: String = NSHomeDirectory()) -> String? {
+        // A bundle is only its own copy, installed with the plugin. The same command on your PATH is the plain server, which doesn't know Vue.
+        var folders = searchPath
+        if let bundle = server.bundle {
+            guard hasPlugin(bundle, home: home) else { return nil }
+            folders = bundleRoot(bundle, home: home) + "/node_modules/.bin"
+        }
+        return candidates(server.command, in: folders).first { executable in
             server.check.map { runs(executable, $0, path: searchPath) } ?? true
         }
+    }
+
+    /// Where a bundle is installed.
+    public static func bundleRoot(_ bundle: Bundle, home: String = NSHomeDirectory()) -> String {
+        home + "/.farol/language-servers/" + bundle.folder
+    }
+
+    private static func hasPlugin(_ bundle: Bundle, home: String) -> Bool {
+        FileManager.default.fileExists(atPath: bundleRoot(bundle, home: home) + "/node_modules/" + bundle.plugin + "/package.json")
+    }
+
+    /// What the server is told at start so it loads the plugin, or nil for one without, or before the plugin is installed.
+    /// The TypeScript is the bundle's own, which the plugin is made for.
+    public static func initializationOptions(for server: Server, home: String = NSHomeDirectory()) -> [String: Any]? {
+        guard let bundle = server.bundle, hasPlugin(bundle, home: home) else { return nil }
+        let root = bundleRoot(bundle, home: home) + "/node_modules"
+        return [
+            "tsserver": ["path": root + "/typescript/lib"],
+            "plugins": [["name": bundle.plugin, "location": root + "/" + bundle.plugin, "languages": bundle.languages]],
+        ]
     }
 
     private static func candidates(_ command: String, in searchPath: String) -> [String] {

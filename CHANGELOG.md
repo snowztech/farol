@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Go to definition and references in Vue files, with a language server for Vue in Settings → Editor. Install sets up `typescript-language-server`, its Vue plugin and TypeScript 5 in a folder of Farol's own, `~/.farol/language-servers/vue`, so it doesn't touch your global tools or need a Vue project to hold them. It reads the `<script>` of a component, and its imports of other components and scripts. Names used in the template aren't covered yet.
+
 ## [0.62.0] - 2026-11-06
 
 Go back after a jump, install language servers in one click, and a smoother terminal on the phone.

@@ -6,7 +6,7 @@ import FarolCore
 @MainActor
 final class LanguageServers {
     static let shared = LanguageServers()
-    static func enabledKey(_ server: LSP.Server) -> String { "code.languageServers." + server.command }
+    static func enabledKey(_ server: LSP.Server) -> String { "code.languageServers." + server.id }
     /// A server started, stopped or changed state, for the file pane and Settings.
     static let didChange = Notification.Name("FarolLanguageServersDidChange")
     /// A language was turned on, so the file in front can start its server without waiting to be opened again.
@@ -34,23 +34,23 @@ final class LanguageServers {
     private var installing: Set<String> = []
     private var installErrors: [String: String] = [:]
 
-    func isInstalling(_ server: LSP.Server) -> Bool { installing.contains(server.command) }
-    func installError(_ server: LSP.Server) -> String? { installErrors[server.command] }
+    func isInstalling(_ server: LSP.Server) -> Bool { installing.contains(server.id) }
+    func installError(_ server: LSP.Server) -> String? { installErrors[server.id] }
 
     /// Installs it in the background and turns it on once it runs, since asking to install it is asking to use it.
     func install(_ server: LSP.Server) {
-        guard installing.insert(server.command).inserted else { return }
-        installErrors[server.command] = nil
+        guard installing.insert(server.id).inserted else { return }
+        installErrors[server.id] = nil
         changed()
         DispatchQueue.global(qos: .userInitiated).async {
             let failure = LSP.install(server)
             let found = LSP.find(server, in: LSP.searchPath)
             DispatchQueue.main.async {
-                self.installing.remove(server.command)
-                self.executables[server.command] = found
+                self.installing.remove(server.id)
+                self.executables[server.id] = found
                 if found != nil { return self.setEnabled(true, for: server) }
                 // xcode-select only opens Apple's installer, which finishes after it returns.
-                self.installErrors[server.command] = failure ?? (server.install.hasPrefix("xcode-select")
+                self.installErrors[server.id] = failure ?? (server.install.hasPrefix("xcode-select")
                     ? "Finish installing in Apple's window, then try again."
                     : "It installed, but \(server.command) isn't on your PATH.")
                 self.changed()
@@ -60,7 +60,7 @@ final class LanguageServers {
 
     /// The failed install's output as a file, for the file pane to open.
     func installLog(of server: LSP.Server) -> (path: String, lines: Int) {
-        let text = "$ \(server.install)\n\n" + (installErrors[server.command] ?? "") + "\n"
+        let text = "$ \(server.install)\n\n" + (installErrors[server.id] ?? "") + "\n"
         let file = logFolder().appendingPathComponent("\(server.name) install.log")
         try? text.write(to: file, atomically: true, encoding: .utf8)
         return (file.path, text.split(separator: "\n", omittingEmptySubsequences: false).count)
@@ -85,16 +85,16 @@ final class LanguageServers {
     func server(for path: String, then done: @escaping (LanguageServer?) -> Void) {
         guard let server = LSP.server(for: path), isEnabled(server) else { return done(nil) }
         let directory = (path as NSString).deletingLastPathComponent
-        if let root = tops[directory], let executable = executables[server.command] {
+        if let root = tops[directory], let executable = executables[server.id] {
             return done(running(server, root: root, executable: executable))
         }
-        let known = executables[server.command]
+        let known = executables[server.id]
         DispatchQueue.global(qos: .userInitiated).async {
             let root = Git.topLevel(of: directory) ?? directory
             let executable = known ?? LSP.find(server, in: LSP.searchPath)
             DispatchQueue.main.async {
                 self.tops[directory] = root
-                self.executables[server.command] = executable
+                self.executables[server.id] = executable
                 done(self.running(server, root: root, executable: executable))
             }
         }
@@ -108,7 +108,7 @@ final class LanguageServers {
 
     /// Where a server's command was found, or nil when it wasn't, or before anyone looked.
     func location(of server: LSP.Server) -> String? {
-        executables[server.command] ?? nil
+        executables[server.id] ?? nil
     }
 
     /// The servers running for a checkout, by name, for the status bar's menu.
@@ -128,7 +128,7 @@ final class LanguageServers {
 
     /// Whether a server's command was found, or nil before anyone looked.
     func isInstalled(_ server: LSP.Server) -> Bool? {
-        executables[server.command].map { $0 != nil }
+        executables[server.id].map { $0 != nil }
     }
 
     /// Looks again for a server that wasn't found, at most every few seconds, so one installed from Farol is noticed without a restart.
@@ -142,7 +142,7 @@ final class LanguageServers {
     /// Looks for every server again, as after installing one from Settings.
     func locateAll(then done: @escaping () -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
-            let found = LSP.servers.map { ($0.command, LSP.find($0, in: LSP.searchPath)) }
+            let found = LSP.servers.map { ($0.id, LSP.find($0, in: LSP.searchPath)) }
             DispatchQueue.main.async {
                 for (command, path) in found { self.executables[command] = path }
                 done()
@@ -154,7 +154,7 @@ final class LanguageServers {
     func restart(_ server: LanguageServer) {
         server.stop()
         running[key(server.server, server.root)] = nil
-        _ = running(server.server, root: server.root, executable: executables[server.server.command] ?? nil)
+        _ = running(server.server, root: server.root, executable: executables[server.server.id] ?? nil)
         changed()
     }
 
@@ -208,7 +208,7 @@ final class LanguageServers {
         changed()
     }
 
-    private func key(_ server: LSP.Server, _ root: String) -> String { server.command + "\0" + root }
+    private func key(_ server: LSP.Server, _ root: String) -> String { server.id + "\0" + root }
 
     private func changed() {
         NotificationCenter.default.post(name: Self.didChange, object: nil)
