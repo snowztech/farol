@@ -17,6 +17,20 @@ public enum LSP {
         /// Arguments it answers and exits on, so a stub that only forwards, like rustup's before the component is added, isn't taken for it.
         /// Nil for one that answers nothing without a client.
         public let check: [String]?
+        /// Set for a language served by a plugin in another server, like Vue's in the TypeScript one. Both share one process.
+        public var plugin: Plugin?
+
+        /// What names it in Settings and its saved choice. The command, except for a plugin, which shares one with its server.
+        public var id: String { plugin?.folder ?? command }
+    }
+
+    /// A plugin Farol installs under `~/.farol/language-servers/<folder>` and loads into its server at start.
+    public struct Plugin: Equatable, Sendable {
+        public let folder: String
+        /// The npm package, like `@vue/typescript-plugin`.
+        public let package: String
+        /// The languages it teaches the server, as the server knows them.
+        public let languages: [String]
     }
 
     /// The servers people use for each language, the same ones other editors start.
@@ -25,6 +39,13 @@ public enum LSP {
                install: "go install golang.org/x/tools/gopls@latest", check: ["version"]),
         Server(name: "typescript-language-server", language: "TypeScript and JavaScript", command: "typescript-language-server", arguments: ["--stdio"],
                extensions: ["ts", "tsx", "js", "jsx", "mjs", "cjs"], install: "npm install -g typescript-language-server typescript", check: ["--version"]),
+        // Stopgap until TypeScript 7.1 and Vue Language Tools 4 are stable. Vue then comes from the project's tsconfig.
+        // So .vue joins the TypeScript server's extensions and this plugin goes away.
+        // typescript@5 is a fallback for a project without its own, since the plugin can't run in TypeScript 7.
+        Server(name: "@vue/typescript-plugin", language: "Vue", command: "typescript-language-server", arguments: ["--stdio"],
+               extensions: ["vue"],
+               install: #"npm install --prefix "$HOME/.farol/language-servers/vue" @vue/typescript-plugin@3 typescript@5"#,
+               check: ["--version"], plugin: Plugin(folder: "vue", package: "@vue/typescript-plugin", languages: ["vue"])),
         Server(name: "pyright", language: "Python", command: "pyright-langserver", arguments: ["--stdio"], extensions: ["py"],
                install: "npm install -g pyright", check: nil),
         Server(name: "rust-analyzer", language: "Rust", command: "rust-analyzer", arguments: [], extensions: ["rs"],
@@ -49,6 +70,7 @@ public enum LSP {
         case "js", "mjs", "cjs": "JavaScript"
         case "jsx": "JSX"
         case "py": "Python"
+        case "vue": "Vue"
         case "rs": "Rust"
         case "swift": "Swift"
         case "c", "h": "C"
@@ -98,12 +120,38 @@ public enum LSP {
         candidates(command, in: searchPath).first
     }
 
+    /// The server a plugin loads into, or the server itself.
+    public static func host(of server: Server) -> Server {
+        guard server.plugin != nil else { return server }
+        return servers.first { $0.command == server.command && $0.plugin == nil } ?? server
+    }
+
     /// The first of the server's executables on `searchPath` that runs, passing over stubs that fail its check.
-    /// Starts each one it tries, so not on the main thread.
-    public static func find(_ server: Server, in searchPath: String) -> String? {
-        candidates(server.command, in: searchPath).first { executable in
+    /// A plugin counts as found once it is installed and its server is. Starts each one it tries, so not on the main thread.
+    public static func find(_ server: Server, in searchPath: String, home: String = NSHomeDirectory()) -> String? {
+        if let plugin = server.plugin, !isInstalled(plugin, home: home) { return nil }
+        return candidates(server.command, in: searchPath).first { executable in
             server.check.map { runs(executable, $0, path: searchPath) } ?? true
         }
+    }
+
+    public static func isInstalled(_ plugin: Plugin, home: String = NSHomeDirectory()) -> Bool {
+        FileManager.default.fileExists(atPath: modules(plugin, home: home) + "/" + plugin.package + "/package.json")
+    }
+
+    private static func modules(_ plugin: Plugin, home: String) -> String {
+        home + "/.farol/language-servers/" + plugin.folder + "/node_modules"
+    }
+
+    /// What a server is told at start so it loads these plugins, or nil when none is installed.
+    /// TypeScript is the project's own when it has one, and the plugin's copy otherwise, which `fallbackPath` means.
+    public static func initializationOptions(loading plugins: [Plugin], home: String = NSHomeDirectory()) -> [String: Any]? {
+        let installed = plugins.filter { isInstalled($0, home: home) }
+        guard let first = installed.first else { return nil }
+        return [
+            "tsserver": ["fallbackPath": modules(first, home: home) + "/typescript/lib"],
+            "plugins": installed.map { ["name": $0.package, "location": modules($0, home: home) + "/" + $0.package, "languages": $0.languages] },
+        ]
     }
 
     private static func candidates(_ command: String, in searchPath: String) -> [String] {
