@@ -18,7 +18,7 @@
     <a href="https://discord.gg/XGY4jHU29d"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=flat&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
-<p align="center"><img src="site/screenshot-review.png" width="800" alt="Farol with sessions grouped by project in the sidebar, one working, one waiting for you and a second project folded, Claude Code reviewing the branch in the terminal and the review panel showing its changes since main"></p>
+<p align="center"><img src="site/screenshot-review.png" width="800" alt="Farol with two plain sessions at the top of the sidebar, a folded project still showing its status, and an open project with sessions working and waiting for you, Claude Code reviewing the branch in the terminal and the review panel showing its changes since main"></p>
 
 Run several coding agents side by side, each in its own session, and Farol shows you which one is working, which one is done and which one needs you. Farol is Portuguese for lighthouse.
 
