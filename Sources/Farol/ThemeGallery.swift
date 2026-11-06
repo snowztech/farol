@@ -133,7 +133,8 @@ struct ThemeGallery: View {
                 .padding(.bottom, 8)
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 172), spacing: 14)], spacing: 18) {
                 ForEach(themes, id: \.self) { theme in
-                    ThemeCard(name: theme.value == fallback ? "\(theme.name) (default)" : theme.name, colors: colors(theme),
+                    // Your Ghostty colors are only a background and a foreground, so no hues are made up for them.
+                    ThemeCard(name: theme.name, colors: colors(theme), hues: theme.url != nil,
                               selected: theme.value == current, palette: palette)
                         .onTapGesture { selected = theme.value }
                 }
@@ -159,7 +160,7 @@ struct ThemeGallery: View {
 
     /// Your Ghostty config's colors when it sets any, the theme in use until you pick one.
     private var cards: [Theme] {
-        (ghosttyConfig == nil ? [] : [Theme(name: "Ghostty config", value: "", url: nil)]) + themes
+        (ghosttyConfig == nil ? [] : [Theme(name: "Your Ghostty colors", value: "", url: nil)]) + themes
     }
 
     /// What is in use with nothing picked: your Ghostty config when it sets colors, Farol Beam otherwise.
@@ -174,6 +175,7 @@ enum ThemeTone: String, CaseIterable {
 private struct ThemeCard: View {
     let name: String
     let colors: ThemeColors
+    let hues: Bool
     let selected: Bool
     let palette: Palette
 
@@ -198,9 +200,11 @@ private struct ThemeCard: View {
                     Rectangle().fill(t.cursor).frame(width: 6, height: 11)
                     Spacer(minLength: 8)
                     // The six hues side by side, since the sample above shows only three and many dark themes look alike by it.
-                    HStack(spacing: 3) {
-                        ForEach(1..<7, id: \.self) { i in
-                            Circle().fill(t.ansi[i]).frame(width: 8, height: 8)
+                    if hues {
+                        HStack(spacing: 3) {
+                            ForEach(1..<7, id: \.self) { i in
+                                Circle().fill(t.ansi[i]).frame(width: 8, height: 8)
+                            }
                         }
                     }
                 }

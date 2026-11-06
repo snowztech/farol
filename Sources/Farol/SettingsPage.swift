@@ -67,6 +67,7 @@ struct SettingsPage: View {
     enum Section: String, CaseIterable {
         case terminal = "Terminal"
         case appearance = "Appearance"
+        case themes = "Themes"
         case agents = "Agents"
         case worktrees = "Worktrees"
         case integrations = "Integrations"
@@ -79,6 +80,7 @@ struct SettingsPage: View {
             switch self {
             case .terminal: "apple.terminal.fill"
             case .appearance: "paintpalette.fill"
+            case .themes: "swatchpalette.fill"
 
             case .agents: "sparkles"
             case .worktrees: "arrow.triangle.branch"
@@ -96,6 +98,7 @@ struct SettingsPage: View {
             let hue: NSColor? = switch self {
             case .terminal: NSColor(p.done)
             case .appearance: p.code.keyword
+            case .themes: p.code.type
 
             case .agents: NSColor(p.waiting)
             case .worktrees: NSColor(p.working)
@@ -140,6 +143,7 @@ struct SettingsPage: View {
                     VStack(alignment: .leading, spacing: 0) {
                         switch section {
                         case .appearance: appearance(p)
+                        case .themes: themesSection(p)
                         case .terminal: terminal(p)
                         case .agents: agentsSection(p)
                         case .worktrees: worktreesSection(p)
@@ -224,9 +228,11 @@ struct SettingsPage: View {
                 toggle($animations)
             }
         }
-        .padding(.bottom, 32)
+    }
 
-        Heading(title: "Theme",
+    /// A page of its own, since the themes are hundreds and a page above or below them would be scrolled past.
+    @ViewBuilder private func themesSection(_ p: Palette) -> some View {
+        Heading(title: "Themes",
                 detail: "Applies to every session as soon as you pick it. To add your own, drop a Ghostty theme file in the themes folder.",
                 palette: p)
         HStack(spacing: 12) {
@@ -247,6 +253,7 @@ struct SettingsPage: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .fixedSize()
+            .hoverRing(p)
 
             ShipButton(title: "Themes folder", busy: false, palette: p, action: openThemesFolder)
         }
