@@ -59,6 +59,7 @@ struct SettingsPage: View {
         nonmutating set { state.settingsSection = newValue }
     }
     @State private var themeQuery = ""
+    @State private var themeTone = ThemeTone.all
     @Namespace private var navHighlight
     @AppStorage(Motion.key) private var animations = true
     @State private var themes = Theme.all()
@@ -240,12 +241,19 @@ struct SettingsPage: View {
             .background(p.surface, in: RoundedRectangle(cornerRadius: 8))
             .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(p.line))
 
+            Picker("", selection: $themeTone) {
+                ForEach(ThemeTone.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+
             ShipButton(title: "Themes folder", busy: false, palette: p, action: openThemesFolder)
         }
         .padding(.bottom, 20)
 
         ThemeGallery(query: themeQuery, selected: $settings.theme,
-                     ghosttyConfig: state.ghosttyConfigPreview, palette: p, themes: themes)
+                     ghosttyConfig: state.ghosttyConfigPreview, palette: p, themes: themes, tone: themeTone)
             // Picks up themes added while Farol runs.
             .onAppear { themes = Theme.all() }
     }

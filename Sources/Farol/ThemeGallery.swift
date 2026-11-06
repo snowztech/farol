@@ -7,6 +7,8 @@ struct ThemeColors {
     let foreground: Color
     let cursor: Color
     let ansi: [Color]
+    /// A light background, for the gallery's Dark and Light filter.
+    var isLight = false
 
     /// Ghostty's default ANSI colors, for themes that leave some out.
     private static let defaultANSI = ["1d1f21", "cc6666", "b5bd68", "f0c674", "81a2be", "b294bb", "8abeb7", "c5c8c6"]
@@ -18,6 +20,7 @@ struct ThemeColors {
         self.foreground = Color(nsColor: foreground)
         cursor = self.foreground
         ansi = Self.defaultANSI
+        isLight = (background.usingColorSpace(.sRGB)?.brightnessComponent ?? 0) > 0.5
     }
 
     init(background: Color, foreground: Color, cursor: Color, ansi: [Color]) {
@@ -49,11 +52,12 @@ struct ThemeColors {
 
         let bg = values["background"].flatMap(Color.init(hex:)) ?? .black
         let fg = values["foreground"].flatMap(Color.init(hex:)) ?? .white
-        let colors = ThemeColors(
+        var colors = ThemeColors(
             background: bg,
             foreground: fg,
             cursor: values["cursor-color"].flatMap(Color.init(hex:)) ?? fg,
             ansi: (0..<8).map { palette[$0] ?? defaultANSI[$0] })
+        colors.isLight = values["background"].flatMap { NSColor(Color(hex: $0) ?? .black).usingColorSpace(.sRGB)?.brightnessComponent }.map { $0 > 0.5 } ?? false
         cache[url.path] = colors
         return colors
     }
@@ -69,6 +73,12 @@ struct Theme: Hashable {
 
     /// Farol's own. The first is in use until a theme is picked, unless your Ghostty config sets its own colors.
     static let farol = ["Farol Beam", "Farol Dark", "Farol Navy", "Farol Dusk", "Farol Light"]
+
+    /// Well known themes from Ghostty's set, shown before the rest. One missing from a later Ghostty is left out.
+    static let popular = [
+        "Catppuccin Mocha", "TokyoNight", "Dracula", "Gruvbox Dark", "Nord", "Rose Pine",
+        "Kanagawa Wave", "Atom One Dark", "Catppuccin Latte", "Rose Pine Dawn", "GitHub Light Default", "Everforest Light Med",
+    ]
 
     /// Farol's themes, then yours, then Ghostty's. Yours are set by full path, since Ghostty only looks for names in its own folders.
     static func all() -> [Theme] {
@@ -94,72 +104,54 @@ struct ThemeGallery: View {
     let palette: Palette
 
     let themes: [Theme]
-
-    /// Ghostty's themes are hundreds, so they fold under their title, as a project's sessions do in the sidebar. A search looks through all of them.
-    @State private var showAll = false
-    @State private var hoveringTitle = false
+    let tone: ThemeTone
 
     var body: some View {
-        if !query.isEmpty {
-            grid(cards.filter { $0.name.localizedCaseInsensitiveContains(query) })
-        } else {
-            let ghostty = cards.filter { !Theme.farol.contains($0.value) && !$0.value.hasPrefix("/") && !$0.value.isEmpty }
-            VStack(alignment: .leading, spacing: 0) {
-                title("Farol", first: true)
-                grid(cards.filter { Theme.farol.contains($0.value) || $0.value.isEmpty })
-                let yours = cards.filter { $0.value.hasPrefix("/") }
-                if !yours.isEmpty {
-                    title("Yours")
-                    grid(yours)
+        let matching = cards.filter(matches)
+        let farol = matching.filter { Theme.farol.contains($0.value) || $0.value.isEmpty }
+        let yours = matching.filter { $0.value.hasPrefix("/") }
+        let popular = Theme.popular.compactMap { name in matching.first { $0.value == name } }
+        let more = matching.filter { !farol.contains($0) && !yours.contains($0) && !popular.contains($0) }
+        VStack(alignment: .leading, spacing: 0) {
+            if matching.isEmpty {
+                Text("No themes match.").font(.system(size: 12)).foregroundStyle(palette.muted)
+            }
+            section("Farol", farol)
+            section("Yours", yours)
+            section("Popular", popular)
+            section("More themes", more)
+        }
+    }
+
+    @ViewBuilder private func section(_ title: String, _ themes: [Theme]) -> some View {
+        if !themes.isEmpty {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(palette.muted)
+                .padding(.bottom, 8)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 172), spacing: 14)], spacing: 18) {
+                ForEach(themes, id: \.self) { theme in
+                    ThemeCard(name: theme.value == fallback ? "\(theme.name) (default)" : theme.name, colors: colors(theme),
+                              selected: theme.value == current, palette: palette)
+                        .onTapGesture { selected = theme.value }
                 }
-                disclosure(count: ghostty.count)
-                // Folded, the one in use still shows, so you can see what you're on.
-                grid(showAll ? ghostty : ghostty.filter { $0.value == current })
             }
+            .padding(.bottom, 26)
         }
     }
 
-    private func grid(_ themes: [Theme]) -> some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 172), spacing: 14)], spacing: 18) {
-            ForEach(themes, id: \.self) { theme in
-                ThemeCard(name: theme.value == fallback ? "\(theme.name) (default)" : theme.name,
-                          colors: theme.url.map(ThemeColors.load) ?? ghosttyConfig ?? ThemeColors(background: .black, foreground: .white),
-                          selected: theme.value == current, palette: palette)
-                    .onTapGesture { selected = theme.value }
-            }
+    private func colors(_ theme: Theme) -> ThemeColors {
+        theme.url.map(ThemeColors.load) ?? ghosttyConfig ?? ThemeColors(background: .black, foreground: .white)
+    }
+
+    private func matches(_ theme: Theme) -> Bool {
+        guard query.isEmpty || theme.name.localizedCaseInsensitiveContains(query) else { return false }
+        return switch tone {
+        case .all: true
+        case .dark: !colors(theme).isLight
+        case .light: colors(theme).isLight
         }
     }
-
-    private func title(_ text: String, first: Bool = false) -> some View {
-        Text(text)
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(palette.muted)
-            .padding(.top, first ? 0 : 22)
-            .padding(.bottom, 8)
-    }
-
-    private func disclosure(count: Int) -> some View {
-        Button {
-            withAnimation(Motion.enabled ? .easeOut(duration: 0.15) : nil) { showAll.toggle() }
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .bold))
-                    .rotationEffect(.degrees(showAll ? 90 : 0))
-                Text("Ghostty").font(.system(size: 12, weight: .semibold))
-                Text("\(count) themes").font(.system(size: 12))
-            }
-            .foregroundStyle(hoveringTitle ? palette.text : palette.muted)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(QuietPress())
-        .onClickableHover { hoveringTitle = $0 }
-        .padding(.top, 22)
-        .padding(.bottom, 8)
-    }
-
-    /// What is in use with nothing picked: your Ghostty config when it sets colors, Farol Beam otherwise.
-    private var fallback: String { ghosttyConfig == nil ? Theme.farol[0] : "" }
 
     private var current: String { selected.isEmpty ? fallback : selected }
 
@@ -167,6 +159,14 @@ struct ThemeGallery: View {
     private var cards: [Theme] {
         (ghosttyConfig == nil ? [] : [Theme(name: "Ghostty config", value: "", url: nil)]) + themes
     }
+
+    /// What is in use with nothing picked: your Ghostty config when it sets colors, Farol Beam otherwise.
+    private var fallback: String { ghosttyConfig == nil ? Theme.farol[0] : "" }
+}
+
+/// The gallery's filter, since people browse for a dark theme or a light one.
+enum ThemeTone: String, CaseIterable {
+    case all = "All", dark = "Dark", light = "Light"
 }
 
 private struct ThemeCard: View {
