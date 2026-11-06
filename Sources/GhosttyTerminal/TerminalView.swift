@@ -266,20 +266,30 @@ public final class TerminalView: NSView {
         resize()
     }
 
-    /// The size in cells a phone gave the pane while it shows it and acted after the Mac did, so programs draw for the phone.
+    /// The size in cells a phone gave the pane while it shows it, so programs draw for the phone.
     /// Ghostty draws the smaller grid in the pane's top left. Nil when the pane fills its view.
     public private(set) var phoneGrid: (cols: Int, rows: Int)?
+
+    /// When someone on the Mac took the pane back from the phone. The phone has it again once it acts after this.
+    public private(set) var tookBack = Date.distantPast
 
     public func fit(cols: Int, rows: Int) {
         guard phoneGrid?.cols != cols || phoneGrid?.rows != rows else { return }
         phoneGrid = (cols, rows)
         resize()
+        superview?.needsLayout = true
     }
 
     public func unfit() {
         guard phoneGrid != nil else { return }
         phoneGrid = nil
         resize()
+        superview?.needsLayout = true
+    }
+
+    public func takeBack() {
+        tookBack = .now
+        unfit()
     }
 
     private func resize() {

@@ -76,6 +76,8 @@ final class PaneContainer: NSView {
     private var runTokens: [UUID: UUID] = [:]
     private var listening: [UUID: [Int]] = [:]
     private var chips: [UUID: RunChip] = [:]
+    /// On a pane a phone sized, so whoever sits at the Mac sees why it is small and can have it back.
+    private var phoneTags: [UUID: NSButton] = [:]
     private var hovered: TerminalView?
     private var hoverArea: NSTrackingArea?
     /// Settings → Appearance. On unless turned off.
@@ -418,6 +420,7 @@ final class PaneContainer: NSView {
         placeLabels()
         placeSearchBar()
         placeChips()
+        placePhoneTags()
         window?.invalidateCursorRects(for: self)
         needsDisplay = true
     }
@@ -705,6 +708,32 @@ final class PaneContainer: NSView {
             let width = chip.fittingWidth
             chip.frame = NSRect(x: terminal.frame.maxX - 10 - occupied - width, y: terminal.frame.minY + 8, width: width, height: 20)
         }
+    }
+
+    /// Bottom right of a pane a phone sized, out of the way of the grid Ghostty draws top left.
+    private func placePhoneTags() {
+        for terminal in terminals {
+            guard terminal.phoneGrid != nil, !terminal.isHidden else {
+                phoneTags.removeValue(forKey: terminal.id)?.removeFromSuperview()
+                continue
+            }
+            let tag = phoneTags[terminal.id] ?? {
+                let tag = NSButton(title: "Sized for iPhone · Take back", target: self, action: #selector(takeBack(_:)))
+                tag.bezelStyle = .accessoryBarAction
+                tag.controlSize = .small
+                tag.font = .systemFont(ofSize: 11)
+                phoneTags[terminal.id] = tag
+                addSubview(tag, positioned: .above, relativeTo: nil)
+                return tag
+            }()
+            let size = tag.fittingSize
+            tag.frame = NSRect(x: terminal.frame.maxX - size.width - 10, y: terminal.frame.maxY - size.height - 8, width: size.width, height: size.height)
+        }
+    }
+
+    @objc private func takeBack(_ tag: NSButton) {
+        guard let id = phoneTags.first(where: { $0.value === tag })?.key else { return }
+        terminals.first { $0.id == id }?.takeBack()
     }
 
     /// The commands as menu items, the same for ▶ and the right-click menu: the name, then what it types in the muted color, like ⌘P.
