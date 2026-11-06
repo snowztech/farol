@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.61.0] - 2026-11-06
+
+Files open in tabs, with richer colors, a status bar and optional language servers for go to definition.
+
 ### Added
 
 - New File and New Folder in the files panel's right-click menu, on a row or on the space below the files for the top of the project. The name is typed in a row where it will appear, can hold folders like `api/handler.go`, and a new file opens in a tab.
@@ -17,14 +21,13 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - The tab in front reads at a glance: its name in medium weight, the other tabs a step dimmer.
 - The file pane marks the line the cursor is on, with a faint band and its number in full color in the gutter.
 - Git blame left the tab bar. Show it by right-clicking the code or the line numbers, or from View → Show Git Blame.
+- The sidebar steps aside while you resolve merge conflicts, so the three columns get the width, and comes back when you are done unless you toggled it yourself.
+- A pane shown on the phone takes the size of whoever acted last. Opening or typing in the terminal on the phone fits it to the phone, and touching the Mac's keyboard or mouse gives it back at once, instead of after a wait.
 
 ### Fixed
 
 - Settings pages start their first section the same distance under the title, and Integrations explains each group under its name rather than in a loose line above the list.
 - The tab in front stays fully in view when tabs fill the bar, and language marks no longer run into the file name.
-
-### Fixed
-
 - The files panel highlights the file you are looking at. It followed only the last file you clicked in the panel, so a file opened from a search result or the blame was never lit. It now follows the file pane, opens the folders on the way to the file and scrolls to it.
 
 ## [0.60.0] - 2026-11-04
@@ -1239,7 +1242,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.60.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.61.0...HEAD
+[0.61.0]: https://github.com/snowztech/farol/releases/tag/v0.61.0
 [0.60.0]: https://github.com/snowztech/farol/releases/tag/v0.60.0
 [0.59.1]: https://github.com/snowztech/farol/releases/tag/v0.59.1
 [0.59.0]: https://github.com/snowztech/farol/releases/tag/v0.59.0
