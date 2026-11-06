@@ -6,6 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
+- Match system appearance, in Settings → Appearance: your light theme in Light Mode and your dark theme in Dark Mode, switching when macOS does. Turning it on keeps your theme and pairs it with Farol's closest, like Farol Dawn with Farol Dusk, and each side opens the themes already filtered to light or dark. It writes `theme = light:A,dark:B`, which also works by hand.
 - Go to definition and references in Vue files. The Vue row in Settings → Editor installs the Vue plugin for the TypeScript server, which then serves `.ts` and `.vue` files in one process. It works in the `<script>` and in the `<template>` of a component: variables and functions used in `{{ }}`, `:prop` and `@event`, a component used as a tag, a prop, and the imports of other components and scripts.
 - HTML, Vue, Svelte and Astro files are colored like the code they hold. `<script>` reads as JavaScript or TypeScript, `<style>` as CSS, and Astro's frontmatter as TypeScript. Expressions read as JavaScript too: Vue's `{{ }}` and directive values like `:class` and `@click`, and Svelte's and Astro's `{ }`. Directives like `v-if`, `on:click` and `client:load` stand out, and tags like `<my-button>` are colored whole. Text between tags stays plain.
 - `go.mod` and `go.work` files are colored: their directives, comments and the Go version.
@@ -20,6 +21,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - Farol Navy has colors of its own instead of Farol Beam's on a blue background: lavender text and bright blues, violets and a yellow green, like a city at night.
 - Settings → Appearance starts with your theme: its name and a preview. Click it and every theme opens beside the page, with search, a Dark and Light switch, and Farol's themes, yours, a Popular row of well known ones and the rest. A theme applies as you click it, and the page shows how it looks. Each card shows the theme's six hues, so dark themes are easier to tell apart, and your Ghostty config's colors show as Your Ghostty colors.
 - Appearance is regrouped: the theme on its own at the top, then style, app icon and animations under Interface, and grouping sessions and the run button under Layout.
+
+### Fixed
+
+- The Farol skill for coding agents knows Settings as it is now: the Editor's language servers and everything in Appearance. It was missing them, so an agent couldn't say where they live.
 
 ## [0.62.0] - 2026-11-06
 

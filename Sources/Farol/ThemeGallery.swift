@@ -1,4 +1,5 @@
 import SwiftUI
+import FarolCore
 import GhosttyTerminal
 
 /// The colors a preview card needs, read straight from a Ghostty theme file.
@@ -117,6 +118,16 @@ extension Theme {
         return Theme(name: value, value: value, url: TerminalRuntime.themesDirectory?.appendingPathComponent(value))
     }
 
+    /// For turning on Match system appearance: the theme you have stays on its side, and Farol's closest fills the other.
+    /// Your Ghostty colors can't be half a pair, so they start from Farol Beam.
+    static func pair(for value: String) -> ThemePair {
+        let theme = value.isEmpty ? farol[0] : value
+        if named(theme).colors(nil).isLight {
+            return ThemePair(light: theme, dark: theme == "Farol Dawn" ? "Farol Dusk" : "Farol Beam")
+        }
+        return ThemePair(light: ["Farol Dusk", "Farol Ember"].contains(theme) ? "Farol Dawn" : "Farol Light", dark: theme)
+    }
+
     static func openFolder() {
         try? FileManager.default.createDirectory(at: userDirectory, withIntermediateDirectories: true)
         NSWorkspace.shared.open(userDirectory)
@@ -128,6 +139,9 @@ struct ThemePanel: View {
     @Binding var selected: String
     let ghosttyConfig: ThemeColors?
     let palette: Palette
+    var title = "Themes"
+    /// Picking the light side starts on light themes, and the dark side on dark ones.
+    var startTone = ThemeTone.all
     let close: () -> Void
 
     @State private var query = ""
@@ -140,7 +154,7 @@ struct ThemePanel: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Text("Themes").font(.system(size: 15, weight: .semibold))
+                    Text(title).font(.system(size: 15, weight: .semibold))
                     Spacer()
                     CloseButton(help: "Close", palette: p, action: close)
                         .keyboardShortcut(.cancelAction)
@@ -175,6 +189,7 @@ struct ThemePanel: View {
         .onAppear {
             // Picks up themes added to your folder since the last time.
             themes = Theme.all()
+            tone = startTone
             searching = true
         }
     }
@@ -238,6 +253,27 @@ struct ThemeGallery: View {
     private var current: String { Theme.current(selected, ghosttyConfig: ghosttyConfig) }
 
     private var cards: [Theme] { (ghosttyConfig == nil ? [] : [Theme.ghosttyColors]) + themes }
+}
+
+/// The one theme, or a side of the pair while matching the system appearance.
+enum ThemeSlot: Hashable {
+    case single, light, dark
+
+    var title: String {
+        switch self {
+        case .single: "Theme"
+        case .light: "Light theme"
+        case .dark: "Dark theme"
+        }
+    }
+
+    var tone: ThemeTone {
+        switch self {
+        case .single: .all
+        case .light: .light
+        case .dark: .dark
+        }
+    }
 }
 
 /// The gallery's filter, since people browse for a dark theme or a light one.

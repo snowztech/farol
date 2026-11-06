@@ -11,11 +11,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// Folders handed over by Finder or `open`, kept until restore has run.
     private var pendingOpenURLs: [URL] = []
     private var restored = false
+    private var appearanceObserver: NSKeyValueObservation?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // First, so hangs are counted from the moment launch is done.
         Perf.shared.watchMainThread()
         let runtime = TerminalRuntime(overrideFiles: [Settings.fileURL])
+        // A `light:A,dark:B` theme switches with macOS, so Ghostty is told which one it shows, now and on each change.
+        // The app's appearance, not a window's: Farol sets each window's to match its theme.
+        appearanceObserver = NSApp.observe(\.effectiveAppearance, options: [.initial, .new]) { app, _ in
+            runtime.follow(dark: app.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua)
+        }
         settings = Settings()
         let agents = AgentSettings()
         settings.onChange = { runtime.reloadConfig() }

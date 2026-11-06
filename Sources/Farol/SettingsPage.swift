@@ -58,8 +58,9 @@ struct SettingsPage: View {
         get { state.settingsSection }
         nonmutating set { state.settingsSection = newValue }
     }
-    @State private var pickingTheme = false
-    @State private var hoveringTheme = false
+    /// Which theme the panel beside the page is picking, or nil while it is closed.
+    @State private var themeSlot: ThemeSlot?
+    @State private var hoveringTheme: ThemeSlot?
     @Namespace private var navHighlight
     @AppStorage(Motion.key) private var animations = true
 
@@ -158,12 +159,16 @@ struct SettingsPage: View {
                 }
             }
             // Beside the page rather than over it, so the page recolors as you click through themes.
-            if pickingTheme, section == .appearance {
+            if let slot = themeSlot, section == .appearance {
                 HStack(spacing: 0) {
                     Rectangle().fill(p.line).frame(width: 1)
-                    ThemePanel(selected: $settings.theme, ghosttyConfig: state.ghosttyConfigPreview, palette: p) {
-                        withAnimation(Motion.enabled ? .easeOut(duration: 0.2) : nil) { pickingTheme = false }
+                    // Your Ghostty colors can't be one side of a pair, so only the single theme offers them.
+                    ThemePanel(selected: themeBinding(slot), ghosttyConfig: slot == .single ? state.ghosttyConfigPreview : nil,
+                               palette: p, title: slot.title, startTone: slot.tone) {
+                        withAnimation(Motion.enabled ? .easeOut(duration: 0.2) : nil) { themeSlot = nil }
                     }
+                    // A fresh panel for each side, so it opens on that side's filter.
+                    .id(slot)
                     .frame(width: 400)
                 }
                 .transition(.move(edge: .trailing))
@@ -175,7 +180,7 @@ struct SettingsPage: View {
         .onAppear(perform: refreshAgents)
         .onChange(of: section) { _, _ in
             refreshAgents()
-            pickingTheme = false
+            themeSlot = nil
         }
         // The page stays alive while hidden, so coming back from a login in the terminal has to ask again.
         .onChange(of: state.showingSettings) { _, showing in if showing { refreshAgents() } }
@@ -185,18 +190,36 @@ struct SettingsPage: View {
 
     // MARK: Sections
 
-    /// The theme in use, the row people come to Appearance for. Its preview is the way in, so the whole row opens the themes beside the page.
-    private func themeRow(_ p: Palette) -> some View {
-        let theme = Theme.named(Theme.current(settings.theme, ghosttyConfig: state.ghosttyConfigPreview))
-        let lit = hoveringTheme || pickingTheme
+    /// The theme in use, or one row for each appearance while matching the system, then the switch between the two.
+    @ViewBuilder private func themeCard(_ p: Palette) -> some View {
+        Card(palette: p) {
+            if let pair = ThemePair(settings.theme) {
+                let dark = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+                themeRow(.light, Theme.named(pair.light), showing: !dark, p)
+                themeRow(.dark, Theme.named(pair.dark), showing: dark, p)
+            } else {
+                themeRow(.single, Theme.named(Theme.current(settings.theme, ghosttyConfig: state.ghosttyConfigPreview)), showing: false, p)
+            }
+            Row(title: "Match system appearance",
+                detail: "Uses your light theme in Light Mode and your dark theme in Dark Mode.",
+                palette: p) {
+                toggle(followsMacOS)
+            }
+        }
+    }
+
+    /// Its preview is the way in, so the whole row opens the themes beside the page.
+    private func themeRow(_ slot: ThemeSlot, _ theme: Theme, showing: Bool, _ p: Palette) -> some View {
+        let open = themeSlot == slot
+        let lit = hoveringTheme == slot || open
         return Button {
-            withAnimation(Motion.enabled ? .easeOut(duration: 0.2) : nil) { pickingTheme.toggle() }
+            withAnimation(Motion.enabled ? .easeOut(duration: 0.2) : nil) { themeSlot = open ? nil : slot }
         } label: {
-            Row(title: "Theme", detail: theme.name, palette: p) {
+            Row(title: slot.title, detail: showing ? "\(theme.name) · now" : theme.name, palette: p) {
                 HStack(spacing: 10) {
                     ThemePreview(colors: theme.colors(state.ghosttyConfigPreview), hues: theme.url != nil)
-                        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(pickingTheme ? p.accent : lit ? p.muted : p.line,
-                                                                                 lineWidth: pickingTheme ? 2 : 1))
+                        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(open ? p.accent : lit ? p.muted : p.line,
+                                                                                 lineWidth: open ? 2 : 1))
                         .frame(width: 200)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .semibold))
@@ -206,15 +229,36 @@ struct SettingsPage: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(QuietPress())
-        .onClickableHover { hoveringTheme = $0 }
+        .onClickableHover { hoveringTheme = $0 ? slot : (hoveringTheme == slot ? nil : hoveringTheme) }
+    }
+
+    /// Turning it on keeps the theme you have on its side and fills the other with Farol's closest.
+    /// Turning it off keeps the one macOS shows now.
+    private var followsMacOS: Binding<Bool> {
+        Binding(get: { ThemePair(settings.theme) != nil }, set: { on in
+            themeSlot = nil
+            if on {
+                settings.theme = Theme.pair(for: Theme.current(settings.theme, ghosttyConfig: state.ghosttyConfigPreview)).value
+            } else if let pair = ThemePair(settings.theme) {
+                settings.theme = pair.theme(dark: NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua)
+            }
+        })
+    }
+
+    /// The whole setting for a single theme, or one side of the pair.
+    private func themeBinding(_ slot: ThemeSlot) -> Binding<String> {
+        guard slot != .single else { return $settings.theme }
+        return Binding(get: { ThemePair(settings.theme).map { slot == .light ? $0.light : $0.dark } ?? "" }, set: { value in
+            guard var pair = ThemePair(settings.theme) else { return }
+            if slot == .light { pair.light = value } else { pair.dark = value }
+            settings.theme = pair.value
+        })
     }
 
     /// The theme first and on its own, since it is what people come here for, then the rest of how Farol looks, then how it's laid out.
     @ViewBuilder private func appearance(_ p: Palette) -> some View {
         Heading(title: "Appearance", detail: nil, palette: p)
-        Card(palette: p) {
-            themeRow(p)
-        }
+        themeCard(p)
 
         GroupTitle(title: "Interface", palette: p)
         Card(palette: p) {
