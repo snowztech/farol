@@ -10,6 +10,8 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - HTML, Vue, Svelte and Astro files are colored like the code they hold. `<script>` reads as JavaScript or TypeScript, `<style>` as CSS, and Astro's frontmatter as TypeScript. Expressions read as JavaScript too: Vue's `{{ }}` and directive values like `:class` and `@click`, and Svelte's and Astro's `{ }`. Directives like `v-if`, `on:click` and `client:load` stand out, and tags like `<my-button>` are colored whole. Text between tags stays plain.
 - `go.mod` and `go.work` files are colored: their directives, comments and the Go version.
 - Farol Dusk, a warm theme for the evening: soft pastels on a dusky violet, with an amber cursor like a lighthouse lamp.
+- Farol Dawn, its morning side: warm paper, ink dark text and the same amber cursor, for working in light mode without a cold white.
+- Farol Fog, a dimmed theme: a soft slate gray with quieter text and muted colors, for long sessions or a dim room.
 
 ### Changed
 

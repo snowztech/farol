@@ -72,7 +72,7 @@ struct Theme: Hashable {
     static let userDirectory = Settings.fileURL.deletingLastPathComponent().appendingPathComponent("themes")
 
     /// Farol's own. The first is in use until a theme is picked, unless your Ghostty config sets its own colors.
-    static let farol = ["Farol Beam", "Farol Dark", "Farol Navy", "Farol Dusk", "Farol Light"]
+    static let farol = ["Farol Beam", "Farol Dark", "Farol Fog", "Farol Navy", "Farol Dusk", "Farol Dawn", "Farol Light"]
 
     /// A hand pick of well known themes from Ghostty's set, not a count of anything, with light ones so the Light filter keeps some.
     /// One missing from a later Ghostty is left out.
