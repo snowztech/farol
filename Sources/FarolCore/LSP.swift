@@ -76,6 +76,20 @@ public enum LSP {
     /// Your shell's PATH, where servers are looked for, as a terminal would. Starts a shell the first time, so not on the main thread.
     public static var shellPath: String { Git.shellPath }
 
+    /// The shell's PATH with the folders installers write servers to, which a shell often lacks.
+    /// `go install` puts gopls in GOBIN or in each GOPATH's bin, and Go's docs leave adding that to your PATH to you.
+    /// Starts a shell the first time, so not on the main thread.
+    public static var searchPath: String { searchPath(shell: shellPath) }
+
+    static func searchPath(shell: String, environment: [String: String] = ProcessInfo.processInfo.environment,
+                           home: String = NSHomeDirectory()) -> String {
+        let gopath = (environment["GOPATH"] ?? "").split(separator: ":").map { String($0) + "/bin" }
+        let extra = [environment["GOBIN"] ?? ""] + gopath + [home + "/go/bin", home + "/.cargo/bin", home + "/.local/bin"]
+        var folders = shell.split(separator: ":").map(String.init)
+        for folder in extra where !folder.isEmpty && !folders.contains(folder) { folders.append(folder) }
+        return folders.joined(separator: ":")
+    }
+
     /// Where `command` is on `searchPath`, a PATH value, or nil when it isn't installed.
     public static func locate(_ command: String, in searchPath: String) -> String? {
         searchPath.split(separator: ":").lazy
