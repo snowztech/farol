@@ -155,17 +155,23 @@ EOF
 shell() {
   cat > "$dir/zsh/.zshrc" <<'EOF'
 export GIT_PAGER=cat PAGER=cat
+# Set by the agent that started the stage, and Claude Code in the scene would inherit them.
+for v in ${(k)parameters[(I)CLAUDE*]}; do unset $v; done
 autoload -Uz vcs_info
 zstyle ':vcs_info:git:*' formats ' %F{blue}git:(%F{red}%b%F{blue})%f'
 precmd() { vcs_info }
 setopt prompt_subst
 PROMPT='%F{green}➜%f  %F{cyan}%1~%f${vcs_info_msg_0_} '
-show() { print -P "$PROMPT$*"; eval "$@" }
 [[ -f $SHOTS/status/${PWD:t} ]] && eval "\"\$FAROL_CLI\" status $(<$SHOTS/status/${PWD:t})"
 # Cleared first, so the login line and its date stay out of the shot.
 [[ -f $SHOTS/run/${PWD:t} ]] && { print -n '\e[2J\e[H'; source $SHOTS/run/${PWD:t} }
 EOF
-  echo 'show git status -sb; show git diff --stat main' > "$dir/run/shelf"
+  # The main session is a real Claude Code, so the shot shows a real conversation and its own status.
+  # The scene's zsh doesn't load your PATH, so it gets claude's full path.
+  local claude
+  claude=$(command -v claude) || { echo "shots: claude isn't on your PATH" >&2; exit 1; }
+  # A blank status line, so your own one, like plan usage, stays out of the shot.
+  printf '%q --settings %q %q\n' "$claude" '{"statusLine":{"type":"command","command":"true"}}' "Review src/queue.ts. What goes wrong if the network drops halfway through a flush? Keep it short." > "$dir/run/shelf"
   echo 'working' > "$dir/status/shelf-search"
   echo 'waiting --asking "The fix is in. What should I do with it?"' > "$dir/status/shelf-flaky-tests"
   echo 'done' > "$dir/status/shelf-api"
@@ -211,7 +217,20 @@ stage() {
   shell
   scene "$name"
   open -n --env FAROL_HOME="$dir/home" --env ZDOTDIR="$dir/zsh" --env SHOTS="$dir" "$app"
-  echo "Farol Shots is open on the $name scene. Set up anything else by hand, then: scripts/shots.sh shoot <name>"
+  echo "Farol Shots is open on the $name scene. Claude Code is reviewing the queue in Offline sync."
+  echo "The first time, it asks to trust the demo folder: say yes in Farol Shots."
+  local cli="$app/Contents/Resources/bin/farol" socket="$HOME/Library/Application Support/Farol/$id.sock"
+  # wait returns at once while the agent is still starting, so this polls until it has worked and stopped.
+  local status worked="" tries=0
+  while [ $tries -lt 150 ]; do
+    sleep 2; tries=$((tries + 1))
+    status=$(FAROL_SOCKET="$socket" "$cli" sessions --json 2>/dev/null | python3 -I -c 'import json, sys
+print(next((s["status"] for s in json.load(sys.stdin)["sessions"] if s["name"] == "Offline sync"), ""))' || true)
+    [ "$status" = working ] && worked=1
+    [ -n "$worked" ] && [ "$status" != working ] && break
+  done
+  [ -n "$worked" ] || echo "shots: Claude Code never started. Is it waiting on a prompt in Farol Shots?" >&2
+  echo "Done. Set up anything else by hand, then: scripts/shots.sh shoot <name>"
 }
 
 shoot() {
@@ -230,6 +249,8 @@ shoot() {
       return y.Width.js * y.Height.js - x.Width.js * x.Height.js; });
     mine.length ? mine[0].kCGWindowNumber.js : ''")
   [ -n "$window" ] || { echo "shots: no Farol Shots window on screen" >&2; exit 1; }
+  # In front, so the window has its colored traffic lights.
+  open -a "$app"; sleep 1
   local out="$root/site/features/$name.png"
   screencapture -x -o -l "$window" "$out"
   local size
