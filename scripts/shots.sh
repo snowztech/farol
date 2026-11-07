@@ -15,8 +15,9 @@ Shooting needs Screen Recording for your terminal app."
 root="$(cd "$(dirname "$0")/.." && pwd)"
 app="$root/build/Farol Shots.app"
 id="dev.farol.Farol.shots"
-# The resolved path, the one git reports, so folded projects match by it.
-dir="$(cd "${TMPDIR%/}" && pwd -P)/farol-shots"
+# Outside your home and TMPDIR, so Claude Code's banner shows a plain path and not your Mac's temp folder.
+# No symlink in it, so it's the path git reports and folded projects match by it.
+dir="/Users/Shared/dev"
 # 2540x1520 pixels on a Retina screen, the size of every image in site/features.
 width=1270 height=760
 
@@ -25,9 +26,17 @@ quit() {
   while pgrep -f "$app/Contents/MacOS/Farol" >/dev/null; do sleep 0.2; done
 }
 
-repo() {
+# Removes the scene, and only one this script made: a folder without its mark is left alone.
+forget() {
+  [ -e "$dir" ] || return 0
+  [ -e "$dir/.farol-shots" ] || { echo "shots: $dir isn't a shots scene, so it stays. Move it away to shoot." >&2; exit 1; }
   rm -rf "$dir" 2>/dev/null || { sleep 1; rm -rf "$dir"; }
+}
+
+repo() {
+  forget
   mkdir -p "$dir/home" "$dir/zsh" "$dir/status" "$dir/run"
+  touch "$dir/.farol-shots"
   local shelf="$dir/shelf"
   git init -q -b main "$shelf"
   cd "$shelf"
@@ -389,7 +398,7 @@ stage() {
   scene "$name"
   open -n --env FAROL_HOME="$dir/home" --env ZDOTDIR="$dir/zsh" --env SHOTS="$dir" "$app"
   echo "Farol Shots is open on the $name scene. Claude Code is reviewing the queue in Offline sync."
-  echo "The first time, it asks to trust the demo folder: say yes in Farol Shots."
+  echo "Claude Code asks to trust the demo folder the first time. The script answers yes for it."
   local cli="$app/Contents/Resources/bin/farol" socket="$HOME/Library/Application Support/Farol/$id.sock"
   # wait returns at once while the agent is still starting, so this polls until it has worked and stopped.
   local status worked="" tries=0
@@ -398,6 +407,8 @@ stage() {
     status=$(FAROL_SOCKET="$socket" "$cli" sessions --json 2>/dev/null | python3 -I -c 'import json, sys
 print(next((s["status"] for s in json.load(sys.stdin)["sessions"] if s["name"] == "Offline sync"), ""))' || true)
     [ "$status" = working ] && worked=1
+    # Still idle after a while: Claude Code is asking to trust the demo folder, and Return picks yes.
+    if [ -z "$worked" ] && [ $tries = 6 ]; then open -a "$app"; sleep 1; osascript -e 'tell application "System Events" to key code 36' >/dev/null || true; fi
     [ -n "$worked" ] && [ "$status" != working ] && break
   done
   [ -n "$worked" ] || echo "shots: Claude Code never started. Is it waiting on a prompt in Farol Shots?" >&2
@@ -523,7 +534,7 @@ case "${1:-}" in
   shoot) shoot "${2:-}" ;;
   library) library ;;
   themes) themes ;;
-  reset) quit; defaults delete "$id" >/dev/null 2>&1 || true; rm -rf "$dir" 2>/dev/null || { sleep 1; rm -rf "$dir"; }
+  reset) quit; defaults delete "$id" >/dev/null 2>&1 || true; forget
          docker rm -f farol-shots-build-box farol-shots-gpu-box >/dev/null 2>&1 || true; echo "Farol Shots reset" ;;
   *) echo "$usage"; exit 64 ;;
 esac
