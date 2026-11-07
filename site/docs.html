@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.6/dist/snowztech-ui.min.css">
   <link rel="stylesheet" href="/footer.css">
   <script>
+    document.documentElement.classList.add("js");
     (function () { var light = matchMedia("(prefers-color-scheme: light)"), root = document.documentElement; function follow() { if (light.matches) root.dataset.theme = "light"; else delete root.dataset.theme; } follow(); light.addEventListener("change", follow); })();
   </script>
   <style>
@@ -45,7 +46,7 @@
     .download { color: var(--sn-fg-muted); font-size: var(--sn-text-sm); text-decoration: none; }
     .download:hover { color: var(--sn-fg); }
 
-    .docs-hero { position: relative; padding: 48px 0 64px; overflow: hidden; }
+    .docs-hero { position: relative; padding: 48px 20px 64px; overflow: hidden; }
     .docs-hero::before {
       content: ""; position: absolute; inset: -80% 5% auto; height: 180%; z-index: 0;
       background: radial-gradient(ellipse at center, var(--sn-accent-soft), transparent 68%);
@@ -59,27 +60,45 @@
     .docs-layout { display: grid; grid-template-columns: 210px minmax(0, 720px); gap: 64px; align-items: start; }
     .toc { position: sticky; top: 28px; }
     .toc b { display: block; margin-bottom: 12px; font-size: var(--sn-text-sm); font-weight: 500; }
-    .toc ul { list-style: none; margin: 0; padding: 0; }
+    /* The marker slides to the section being read, as the sidebar's selection slides in Farol. */
+    .toc ul { position: relative; list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 1px solid var(--sn-border-subtle); }
     .toc li + li { margin-top: 8px; }
-    .toc a { color: var(--sn-fg-subtle); font-size: var(--sn-text-sm); text-decoration: none; }
-    .toc a:hover { color: var(--sn-fg); }
+    .toc a { color: var(--sn-fg-subtle); font-size: var(--sn-text-sm); text-decoration: none; transition: color 0.15s var(--sn-ease); }
+    .toc a:hover, .toc a[aria-current] { color: var(--sn-fg); }
+    .toc-marker {
+      position: absolute; left: -1px; top: 0; width: 2px; height: 0; border-radius: 1px; background: var(--sn-accent);
+      transition: transform 0.25s var(--sn-ease), height 0.25s var(--sn-ease);
+    }
 
-    .content section { scroll-margin-top: 28px; }
+    .content section, .content h3[id] { scroll-margin-top: 28px; }
     .content section + section { margin-top: 72px; padding-top: 72px; border-top: 1px solid var(--sn-border-subtle); }
     h2 { margin: 0 0 18px; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+    .anchor { margin-left: 8px; color: var(--sn-fg-faint); font-weight: 400; text-decoration: none; opacity: 0; transition: opacity 0.15s var(--sn-ease); }
+    :is(h2, h3):hover .anchor, .anchor:focus-visible { opacity: 1; }
+    .anchor:hover { color: var(--sn-accent); }
     h3 { margin: 32px 0 10px; font-size: 16px; font-weight: 600; }
     p { margin: 0 0 16px; }
     .content p, .content li { color: var(--sn-fg-muted); }
     .content strong { color: var(--sn-fg); font-weight: 500; }
     .content ol, .content ul { margin: 0 0 20px; padding-left: 22px; }
     .content li + li { margin-top: 8px; }
+    .content ol.steps { padding: 0; list-style: none; counter-reset: step; }
+    .steps li { position: relative; padding-left: 36px; counter-increment: step; }
+    .steps li::before {
+      content: counter(step); position: absolute; left: 0; top: 0; width: 22px; height: 22px; display: grid; place-items: center;
+      border: 1px solid var(--sn-border-strong); border-radius: 50%; color: var(--sn-fg); font-size: var(--sn-text-xs);
+    }
     .content a { color: var(--sn-fg); text-underline-offset: 3px; }
     code, kbd {
       border: 1px solid var(--sn-border-subtle); border-radius: 4px;
       background: var(--sn-bg-elev-1); color: var(--sn-fg); font: inherit;
     }
     code { padding: 1px 5px; }
-    kbd { display: inline-block; min-width: 1.3em; padding: 0 5px; text-align: center; box-shadow: 0 1px 0 var(--sn-border-strong); }
+    kbd {
+      display: inline-block; min-width: 1.3em; padding: 0 5px; text-align: center; box-shadow: 0 1px 0 var(--sn-border-strong);
+      transition: transform 0.1s var(--sn-ease), box-shadow 0.1s var(--sn-ease);
+    }
+    kbd:hover { transform: translateY(1px); box-shadow: 0 0 0 var(--sn-border-strong); }
     pre {
       margin: 18px 0; padding: 16px 18px; overflow-x: auto;
       border: 1px solid var(--sn-border-subtle); border-radius: 8px;
@@ -95,22 +114,24 @@
       color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); font-weight: 500; letter-spacing: 0;
     }
     pre.command { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 10px 10px 18px; color: var(--sn-fg); }
-    .note {
-      margin: 22px 0; padding: 15px 17px; border: 1px solid var(--sn-border-subtle);
-      border-left: 3px solid var(--sn-accent); border-radius: 8px; background: var(--sn-bg-elev-1);
-    }
-    .note p { margin: 0; }
+    .content .sn-callout { margin: 22px 0; font-size: inherit; }
     .status-table, .shortcuts { width: 100%; border-collapse: collapse; margin-top: 20px; }
     .status-table th, .status-table td, .shortcuts th, .shortcuts td {
       padding: 11px 12px; border-bottom: 1px solid var(--sn-border-subtle); text-align: left;
       color: var(--sn-fg-muted); font-size: var(--sn-text-sm); vertical-align: top;
     }
     .status-table th, .shortcuts th { color: var(--sn-fg); font-weight: 500; }
+    .status-table td:first-child { white-space: nowrap; }
     .dot { display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: currentColor; }
     .dot-idle { border: 1px solid var(--sn-fg-subtle); background: transparent; color: var(--sn-fg-subtle); }
     .dot-working { color: #67e8f9; box-shadow: 0 0 8px currentColor; }
     .dot-waiting { color: #fde68a; box-shadow: 0 0 8px currentColor; }
     .dot-done { color: #86efac; }
+    /* Like the sidebar's lamps: working breathes, waiting ripples. */
+    .dot-working { animation: breathe 1.8s ease-in-out infinite; }
+    .dot-waiting { animation: ripple 1.6s ease-out infinite; }
+    @keyframes breathe { 50% { opacity: 0.45; transform: scale(0.8); } }
+    @keyframes ripple { from { box-shadow: 0 0 0 0 currentColor; } to { box-shadow: 0 0 0 7px transparent; } }
     /* The lamps' colors in Farol Light, since the dark page's pastels fade on a light one, and a glow there only muddies them. */
     [data-theme=light] .dot-working { color: #0d7584; box-shadow: none; }
     [data-theme=light] .dot-waiting { color: #8f5a00; box-shadow: none; }
@@ -121,14 +142,25 @@
       box-shadow: 0 18px 48px rgba(0, 0, 0, 0.3);
     }
     .phone-shot { width: 300px; max-width: 100%; border-radius: 28px; }
+    .narrow-shot { width: 268px; max-width: 100%; }
+    picture { display: block; }
+    /* Screenshots and examples rise into place once, as they scroll in. */
+    .js .reveal { opacity: 0; transform: translateY(8px); transition: opacity 0.5s var(--sn-ease), transform 0.5s var(--sn-ease); }
+    .js .reveal.in { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      .js .reveal { opacity: 1; transform: none; }
+    }
 
 
     @media (max-width: 760px) {
-      .docs-hero { padding: 36px 0 44px; }
+      .docs-hero { padding: 36px 20px 44px; }
       h1 { font-size: 29px; }
       .docs-layout { display: block; }
       .toc { position: static; margin-bottom: 56px; padding-bottom: 24px; border-bottom: 1px solid var(--sn-border-subtle); }
-      .toc ul { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+      .toc ul { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 0; border: 0; }
+      .toc-marker { display: none; }
       .toc li + li { margin-top: 0; }
       .content section + section { margin-top: 56px; padding-top: 56px; }
       .status-table, .shortcuts { display: block; overflow-x: auto; }
@@ -172,16 +204,16 @@
       <article class="content" id="content">
         <section id="install">
           <h2>Install</h2>
-          <ol>
+          <ol class="steps">
             <li>Download the latest <a href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Farol.dmg</a>.</li>
             <li>Open it and drag Farol to Applications.</li>
             <li>Open Farol from Applications or Spotlight.</li>
           </ol>
           <p>Or with Homebrew:</p>
-          <pre class="command"><code>brew install --cask snowztech/tap/farol</code><button class="sn-copy-btn" type="button" aria-label="Copy the command"><svg class="sn-icon sn-copy-btn__idle" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><svg class="sn-icon sn-copy-btn__copied" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg></button></pre>
+          <pre class="command"><code>brew install --cask snowztech/tap/farol</code><button class="sn-copy-btn" type="button" aria-label="Copy the command"></button></pre>
           <p>Farol needs Apple Silicon and macOS 14 or later. Releases are signed and notarized.</p>
           <p>When a new version is out, an Update button shows in the title bar. Click it and Farol installs the update and relaunches, with your sessions and agents back. <code>brew upgrade --cask farol</code> works too.</p>
-          <div class="note"><p><strong>Already use Ghostty?</strong> Farol reads your Ghostty configuration first, then applies anything in its own configuration file.</p></div>
+          <aside class="sn-callout sn-callout--tip"><strong class="sn-callout__title">Already use Ghostty?</strong><p>Farol reads your Ghostty configuration first, then applies anything in its own configuration file.</p></aside>
         </section>
 
         <section id="agents">
@@ -211,9 +243,9 @@
           <h2>Tasks and worktrees</h2>
           <p>Press <kbd>⇧⌘N</kbd> to start a task. Describe the work, choose an agent and account, then pick a branch name. Farol creates a git worktree and sends the task as the agent's first prompt.</p>
           <p>You can start from one of your open Jira tickets or the repository's GitHub issues. Farol names the branch from the ticket and gives the agent its full description.</p>
-          <div class="note"><p><strong>Why worktrees?</strong> Each task gets its own checkout, so agents on different branches never write to the same files. <a href="/blog/parallel-claude-code-agents-git-worktrees">More on running agents in parallel</a>.</p></div>
+          <aside class="sn-callout sn-callout--note"><strong class="sn-callout__title">Why worktrees?</strong><p>Each task gets its own checkout, so agents on different branches never write to the same files. <a href="/blog/parallel-claude-code-agents-git-worktrees">More on running agents in parallel</a>.</p></aside>
           <p>Press <kbd>⇧⌘T</kbd> when you want a worktree session without starting an agent. Closing a worktree session offers to remove the checkout and always keeps its branch.</p>
-          <img class="doc-shot" src="features/new-task.png" width="2540" height="1520" alt="The New Task sheet over a Claude Code session: the task typed in, a branch name made from it, Claude Code picked as the agent, and Now beside Start for when it runs">
+          <picture><source type="image/avif" srcset="features/new-task-half.avif 1270w, features/new-task.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot reveal" src="features/new-task.png" width="2540" height="1520" alt="The New Task sheet over a Claude Code session: the task typed in, a branch name made from it, Claude Code picked as the agent, and Now beside Start for when it runs" loading="lazy" decoding="async"></picture>
 
           <h3 id="later">Tasks for later</h3>
           <p>The button beside <strong>Start</strong> picks when a task runs: now, once on a day you pick, or again on the days of the week you choose. Each run gets its own worktree, and a repeat's branch ends with the day, like <code>triage-2026-11-09</code>. Tasks wait in the Tasks pane under the sessions, which shows when each one runs next.</p>
@@ -223,18 +255,18 @@
           <h3>Run project commands</h3>
           <p>Press <kbd>⌘P</kbd> to find commands from the project's Makefile, package.json or justfile. Return runs a command in the current pane, or in a new pane below when an agent is working there. You can also add and manage commands from the pane's Run menu.</p>
           <p>Save a script in <code>.farol/commands/</code> to share it with a project, or in <code>~/.farol/commands/</code> to use it everywhere. Commit project commands to Git and they appear in new worktrees automatically. Farol does not copy untracked commands from another checkout.</p>
-          <img class="doc-shot" src="features/palette.png" width="2400" height="1520" alt="The ⌘P list searching for test: a session, the project's test command and the test files, with a footer saying what Return does">
+          <picture><source type="image/avif" srcset="features/palette-half.avif 1270w, features/palette.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot reveal" src="features/palette.png" width="2540" height="1520" alt="The ⌘P list searching for test: a session, the project's test command and the test files, with a footer saying what Return does" loading="lazy" decoding="async"></picture>
 
           <h3 id="worktree-setup">Prepare each worktree</h3>
           <p>Commit an executable script named exactly <code>.farol/setup</code> to your repo, with no extension. Its first line chooses the interpreter, such as <code>#!/bin/sh</code> or <code>#!/usr/bin/env python3</code>. Farol runs it in the new worktree's terminal before starting the agent or chosen command. If <strong>Settings → Worktrees → Copy local environment files</strong> is on, ignored <code>.env</code> files are copied first. Agents in that worktree can read their values. For a task across repos, each repo's setup runs before the agent starts.</p>
-          <figure class="code-example">
+          <figure class="code-example reveal">
             <figcaption>Example <code>.farol/setup</code> for a Node project</figcaption>
             <pre><code>#!/bin/sh
 set -e
 npm ci</code></pre>
           </figure>
           <p>Setup can also copy files that aren't in Git, like local config, from the main checkout:</p>
-          <figure class="code-example">
+          <figure class="code-example reveal">
             <figcaption>Copy local config into each worktree</figcaption>
             <pre><code>#!/bin/sh
 set -e
@@ -259,7 +291,7 @@ cp "$main/.claude/settings.local.json" .claude/ 2&gt;/dev/null || true</code></p
             </tbody>
           </table>
           <p>Use <kbd>⌘P</kbd> to search and switch sessions. Settings can also group sessions under each project's name.</p>
-          <img class="doc-shot" src="features/agent-status.png" width="2540" height="1520" alt="The sidebar grouped by project, with sessions working, waiting for you with the agent's question, and done, a folded project showing its loudest dot, and the Tasks pane below">
+          <picture><source type="image/avif" media="(prefers-color-scheme: light)" srcset="features/agent-status-light-half.avif 1270w, features/agent-status-light.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><source type="image/avif" srcset="features/agent-status-half.avif 1270w, features/agent-status.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot reveal" src="features/agent-status.png" width="2540" height="1520" alt="The sidebar grouped by project, with sessions working, waiting for you with the agent's question, and done, a folded project showing its loudest dot, agents on two servers, and the Tasks pane below" loading="lazy" decoding="async"></picture>
         </section>
 
         <section id="review">
@@ -272,7 +304,7 @@ cp "$main/.claude/settings.local.json" .claude/ 2&gt;/dev/null || true</code></p
             <li><strong>Git graph:</strong> Press <kbd>⌥⌘G</kbd> to inspect branches and commits, then check out, create, rebase, delete, cherry-pick or revert.</li>
             <li><strong>Ship:</strong> Commit, push and open a pull request on GitHub or GitLab from the review panel. Untick a file in the panel or in the commit sheet to leave it out of the commit.</li>
           </ul>
-          <img class="doc-shot" src="features/git-graph.png" width="2400" height="1520" alt="The git graph panel with the branches above and the history below, two merged branches drawn as colored lanes">
+          <picture><source type="image/avif" media="(prefers-color-scheme: light)" srcset="features/review-notes-light-half.avif 1270w, features/review-notes-light.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><source type="image/avif" srcset="features/review-notes-half.avif 1270w, features/review-notes.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot reveal" src="features/review-notes.png" width="2540" height="1520" alt="The review panel on the agent's changes, with a draft note under two README lines and Send 2 notes in its header, beside Claude Code's review in the terminal" loading="lazy" decoding="async"></picture>
 
           <h3>Resolve conflicts</h3>
           <p>When a merge, rebase, cherry-pick or revert stops on conflicts, the title bar and the session's row show how many, even when an agent started it in the background. Press <kbd>⌥⌘M</kbd> to see the files in three columns: your version, the result and the incoming one.</p>
@@ -285,14 +317,14 @@ cp "$main/.claude/settings.local.json" .claude/ 2&gt;/dev/null || true</code></p
             <li><strong>Whole files:</strong> <kbd>⌃⌘←</kbd> fills the result with your side and <kbd>⌃⌘→</kbd> with the incoming one, which you can still edit or undo before <strong>Mark Resolved</strong>. For a file deleted on one side, that means keeping or deleting it, and each option shows the file it leaves before you apply it.</li>
             <li><strong>Finish:</strong> <kbd>⌘S</kbd> marks the file resolved, and <strong>Reopen</strong> puts it back in conflict until you continue. Once every file is, run the tests or ask the agent to check, then continue, skip or abort. Continuing a merge, cherry-pick or revert asks for the commit message, starting from the one git prepared. A rebase keeps each commit's message unless you choose <strong>Edit Message</strong>. <kbd>Esc</kbd> goes back to the terminal.</li>
           </ul>
-          <img class="doc-shot" src="screenshot-review.png" width="2540" height="1520" alt="Farol with a project open in the sidebar, its sessions working, waiting for you and done, a folded second project and tasks for later below, Claude Code reviewing the change in the terminal, and the review panel with a note for the agent">
+          <picture><source type="image/avif" srcset="features/conflicts-half.avif 1270w, features/conflicts.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot reveal" src="features/conflicts.png" width="2540" height="1520" alt="Merging main into a branch, stopped on a conflict in main.go: your version, the editable result and the incoming one in three columns, with one change left to decide" loading="lazy" decoding="async"></picture>
         </section>
 
         <section id="outside">
           <h2>From any app</h2>
           <p>In <strong>Settings → Agents → Outside Farol</strong>, turn on the menu bar lighthouse or the small status panel. The panel can sit at the notch or on a screen edge, and you can drag it along that edge.</p>
           <p>Both show which sessions are working, waiting or done. Open a session directly from either one. When an agent waits or finishes in the background, Farol sends a notification and counts waiting sessions on the Dock icon.</p>
-          <img class="doc-shot" src="features/menu-bar.png" width="620" height="410" alt="Farol's menu bar lighthouse listing sessions and their current status">
+          <picture><source type="image/avif" srcset="features/menu-bar.avif"><img class="doc-shot reveal" src="features/menu-bar.png" width="620" height="410" alt="Farol's menu bar lighthouse listing sessions and their current status" loading="lazy" decoding="async"></picture>
         </section>
 
         <section id="remote">
@@ -300,17 +332,18 @@ cp "$main/.claude/settings.local.json" .claude/ 2&gt;/dev/null || true</code></p
           <p>Remote lets you answer your agents when you are away from the Mac. Install <a href="iphone">Farol for iPhone</a>, in beta on TestFlight for now. Then turn Remote on in <strong>Settings → Remote</strong>, press <strong>Show code</strong> and scan it from the app. The <a href="remote">Remote page</a> has an overview.</p>
           <p>The phone lists your sessions with their status and opens each as its agent's conversation, with the terminal one tap away. Approve or answer an agent with a tap, reply with a slash command or a picture, open a new session, and look over what changed. It notifies you when an agent waits or finishes, and a Live Activity keeps count while the app is closed. Everything between the Mac and the phone is encrypted end to end, so the relay that joins them cannot read it.</p>
           <p>The agents run on the Mac, so it has to stay on. <strong>Keep the Mac awake for agents</strong> stops it from sleeping by itself while an agent works or waits for you. It is on unless you turn it off. Using Farol from your phone counts as using the Mac, so it sleeps after its usual time once you put the phone away.</p>
-          <img class="doc-shot phone-shot" src="features/phone-session.png" width="600" height="1304" alt="Farol for iPhone showing a Claude Code session waiting for you, with its question and two answers to pick with a tap">
+          <picture><source type="image/avif" srcset="features/phone-session.avif"><img class="doc-shot reveal phone-shot" src="features/phone-session.png" width="600" height="1304" alt="Farol for iPhone showing a Claude Code session waiting for you, with its question and two answers to pick with a tap" loading="lazy" decoding="async"></picture>
 
           <h3>On a server</h3>
           <p>To keep agents going with the Mac closed, run them on a machine that stays on, with tmux. <a href="https://github.com/snowztech/farol-remote/tree/main/host"><code>farol-host</code></a> lets the phone see and answer every tmux window there. It is still experimental: <a href="https://github.com/snowztech/farol-remote/blob/main/ROADMAP.md#not-done-yet">here is what is left</a>.</p>
           <pre><code>curl -fsSL https://farol.sh/host.sh | sh
 farol-host setup</code></pre>
           <p>Setup connects Claude Code and Codex, keeps <code>farol-host</code> running, and shows a code to scan from the app. Start agents in tmux, like <code>tmux new -s api</code> then <code>claude</code>. The server shows next to your Mac on the phone.</p>
-          <img class="doc-shot phone-shot" src="features/phone-hosts.png" width="600" height="1304" alt="Farol for iPhone listing sessions from a MacBook Pro and a server, each row naming the machine it runs on">
+          <picture><source type="image/avif" srcset="features/phone-hosts.avif"><img class="doc-shot reveal phone-shot" src="features/phone-hosts.png" width="600" height="1304" alt="Farol for iPhone listing sessions from a MacBook Pro and a server, each row naming the machine it runs on" loading="lazy" decoding="async"></picture>
 
           <h3 id="servers">Servers in the sidebar</h3>
           <p>Your Mac can show a server's agents too. Click the server button beside <strong>New task</strong>, or <strong>Settings → Remote → Add Server</strong>, and pick a host from <code>~/.ssh/config</code> or type <code>user@host</code>. Farol installs or updates <code>farol-host</code> there over ssh and lets this Mac in, in a terminal under the server that closes once it is done. A password or sudo prompt can be answered there. A server you set up by hand is added the same way. ssh already proves it is you, so there is no code to scan.</p>
+          <picture><source type="image/avif" srcset="features/servers.avif"><img class="doc-shot reveal narrow-shot" src="features/servers.png" width="536" height="1010" alt="The sidebar with a project's sessions, then a server named build-box listing three agents working, waiting and done, and a second server folded with its count" loading="lazy" decoding="async"></picture>
           <p>The server's agents show after your own sessions, under its name, with the same status dots. Farol notifies you when one waits or finishes and counts it on the Dock. Click one to open its tmux window over ssh. The + on the server's name starts a new tmux session there, and the ✕ on a row ends one. A pane you split off opens on the server too. Right-click the name to rename or remove the server. The Mac and your phone are let in separately, so the phone keeps seeing the server with the Mac off. <strong>Pair a Phone…</strong> in the same menu, or in <strong>Settings → Remote → Servers</strong>, shows the server's code to scan from the app.</p>
         </section>
 
@@ -323,10 +356,11 @@ font-size = 14</code></pre>
           <p>The file uses Ghostty's configuration format, so options from the <a href="https://ghostty.org/docs/config">Ghostty documentation</a> work in Farol.</p>
           <p>To use one theme in Light Mode and another in Dark Mode, turn on <strong>Match system appearance</strong> in Settings → Appearance, or name one for each:</p>
           <pre><code>theme = light:Farol Dawn,dark:Farol Dusk</code></pre>
+          <picture><source type="image/avif" srcset="features/themes-all.avif"><img class="doc-shot reveal" src="features/themes-all.png" width="1600" height="1915" alt="The same Farol window in each of its eight themes: Beam, Dark, Fog, Navy, Dusk, Ember, Dawn and Light" loading="lazy" decoding="async"></picture>
 
           <h3>Custom themes</h3>
           <p>Put Ghostty theme files in <code>~/.config/farol/themes</code>. They appear in Settings → Appearance → Theme after Farol's built-in themes. The <strong>Themes folder</strong> button opens the right location.</p>
-          <img class="doc-shot" src="features/themes.png" width="2400" height="1520" alt="Settings → Appearance with the Theme row open and the themes panel beside it, listing Farol's eight themes">
+          <picture><source type="image/avif" srcset="features/themes-half.avif 1270w, features/themes.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot reveal" src="features/themes.png" width="2540" height="1520" alt="Settings → Appearance with the Theme row open and the themes panel beside it, listing Farol's eight themes" loading="lazy" decoding="async"></picture>
         </section>
 
         <section id="shortcuts">
@@ -412,6 +446,44 @@ font-size = 14</code></pre>
     </div>
   </footer>
   <script>
+    // A # link on each heading, to share a part of the page.
+    for (const heading of document.querySelectorAll(".content h2, .content h3")) {
+      // A section's h2 goes by the section's id. An h3 keeps its own, or gets one from its text.
+      if (heading.tagName === "H3" && !heading.id) {
+        heading.id = heading.textContent.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      }
+      const id = heading.tagName === "H2" ? heading.closest("section").id : heading.id;
+      const anchor = Object.assign(document.createElement("a"), { className: "anchor", href: "#" + id, textContent: "#" });
+      anchor.setAttribute("aria-label", "Link to " + heading.textContent);
+      heading.append(anchor);
+    }
+
+    // The contents follow the section being read: the last one whose top has passed a quarter of the way down,
+    // or the last of all once the page can't scroll further, since a short final section never reaches that line.
+    const sections = [...document.querySelectorAll(".content section")];
+    const links = new Map([...document.querySelectorAll(".toc a")].map(link => [link.hash.slice(1), link]));
+    const marker = document.querySelector(".toc ul").appendChild(Object.assign(document.createElement("span"), { className: "toc-marker" }));
+    let current, queued = false;
+    const mark = () => {
+      queued = false;
+      const atEnd = innerHeight + scrollY >= document.documentElement.scrollHeight - 2;
+      const section = atEnd ? sections.at(-1) : sections.findLast(s => s.getBoundingClientRect().top <= innerHeight / 4) ?? sections[0];
+      if (section === current) return;
+      current = section;
+      for (const link of links.values()) link.removeAttribute("aria-current");
+      const link = links.get(section.id);
+      link.setAttribute("aria-current", "true");
+      marker.style.transform = `translateY(${link.offsetTop}px)`;
+      marker.style.height = link.offsetHeight + "px";
+    };
+    addEventListener("scroll", () => { if (!queued) { queued = true; requestAnimationFrame(mark); } }, { passive: true });
+    mark();
+
+    const reveal = new IntersectionObserver(entries => {
+      for (const entry of entries) if (entry.isIntersecting) { entry.target.classList.add("in"); reveal.unobserve(entry.target); }
+    }, { rootMargin: "0px 0px -8% 0px" });
+    document.querySelectorAll(".reveal").forEach(element => reveal.observe(element));
+
     for (const button of document.querySelectorAll(".sn-copy-btn")) {
       button.addEventListener("click", async () => {
         await navigator.clipboard.writeText(button.previousElementSibling.textContent);
