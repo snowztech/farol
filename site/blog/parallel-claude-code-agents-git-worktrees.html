@@ -32,8 +32,9 @@
     "publisher": { "@type": "Organization", "name": "Farol", "url": "https://farol.sh/" }
   }
   </script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.6/dist/snowztech-ui.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.7/dist/snowztech-ui.min.css">
   <link rel="stylesheet" href="/footer.css">
+  <link rel="stylesheet" href="/topbar.css">
   <script>
     if (matchMedia("(prefers-color-scheme: light)").matches) document.documentElement.dataset.theme = "light";
   </script>
@@ -46,29 +47,35 @@
     a { color: inherit; }
     .wide { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
 
-    .topbar { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-    .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; text-decoration: none; }
-    .brand img { width: 30px; height: 30px; }
-    .topbar nav { display: flex; gap: 18px; font-size: var(--sn-text-sm); }
-    .topbar nav a { color: var(--sn-fg-muted); text-decoration: none; }
-    .topbar nav a:hover { color: var(--sn-fg); }
 
     /* Text, contents and code blocks come from snowztech's sn-prose, sn-toc and sn-code. */
     html { scroll-behavior: smooth; }
     .post { max-width: 1080px; margin: 0 auto; padding: 48px 20px 0; }
     .post > * { min-width: 0; }
     .head .meta { margin: 0 0 12px; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); }
-    .try { margin-top: 48px; padding: 20px; border: 1px solid var(--sn-border-subtle); border-radius: 10px; }
-    .try p:last-child { margin: 0; }
+    /* The end of a post: what to do next, like the landing's closing. */
+    .try { display: flex; gap: 20px; align-items: flex-start; margin-top: 56px; padding: 24px; border: 1px solid var(--sn-border-subtle); border-radius: 12px; background: var(--sn-bg-elev-1); }
+    .try img { flex-shrink: 0; width: 44px; height: 44px; margin: 0; border: 0; border-radius: 10px; }
+    .try p { margin: 0; }
+    .try .try-title { margin-bottom: 4px; color: var(--sn-fg); font-weight: 600; }
+    .try .try-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+    .try .sn-btn { text-decoration: none; }
+    /* The article colors its links, which would paint over the buttons' own text. */
+    .try a.sn-btn--primary { color: var(--sn-fg-inverse); }
+    .try a.sn-btn--secondary { color: var(--sn-fg); }
+    /* ui-css colors every a:hover with the accent, which wins over the button's own text color. */
+    .try a.sn-btn--primary:hover { color: var(--sn-fg-inverse); }
+    .try a.sn-btn--secondary:hover { color: var(--sn-fg); }
+    @media (max-width: 600px) { .try { flex-direction: column; gap: 14px; } }
     .sources { font-size: var(--sn-text-sm); }
 
     .wideshot { display: block; width: 100%; height: auto; margin: 8px 0 24px; border: 1px solid var(--sn-border-strong); border-radius: 10px; }
   </style>
 </head>
 <body>
-  <header class="topbar wide">
+  <header class="topbar">
     <a class="brand" href="/"><img src="/icon.png" alt="">Farol</a>
-    <nav><a href="/remote">Remote</a><a href="/docs">Docs</a><a href="/blog/">Blog</a></nav>
+    <nav aria-label="Site"><a href="/docs">Docs</a><a href="/remote">Remote</a><a href="/blog/" aria-current="page">Blog</a><a class="get" href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Download</a></nav>
   </header>
 
   <main class="post sn-toc-layout">
@@ -76,7 +83,7 @@
       <p class="meta"><time datetime="2026-11-06">November 6, 2026</time> · Lucas Neves Pereira</p>
       <h1>How to Run Several Claude Code Agents in Parallel with Git Worktrees</h1>
     </header>
-    <nav class="sn-toc" aria-label="On this page">
+    <nav class="sn-toc" data-sn-toc aria-label="On this page">
       <details>
         <summary>On this page</summary>
         <ul>
@@ -222,15 +229,17 @@ npm ci</code></pre>
       <p class="sources">Checked on November 6, 2026, and updated for Farol 0.66 on November 7. Spotted something out of date? <a href="https://github.com/snowztech/farol/issues/new?title=Blog%3A%20parallel%20agents%20with%20worktrees">Open an issue</a>.</p>
 
       <div class="try">
-        <p><a href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Download Farol</a> · <a href="/docs#tasks">Tasks and worktrees docs</a> · <a href="/blog/best-terminal-for-claude-code">Best terminal for Claude Code</a></p>
+        <img src="/icon.png" alt="">
+        <div>
+          <p class="try-title">Let Farol make the worktrees</p>
+          <p>Press ⇧⌘N, describe the task, and Farol makes the worktree and starts the agent there. Free and open source.</p>
+          <p class="try-actions"><a class="sn-btn sn-btn--primary" href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Download for Mac</a><a class="sn-btn sn-btn--secondary" href="/docs#tasks">Read the task docs</a></p>
+        </div>
       </div>
     </article>
   </main>
 
-  <script>
-    if (matchMedia("(min-width: 1000px)").matches) document.querySelector(".sn-toc details").open = true;
-  </script>
-  <script type="module" src="https://cdn.jsdelivr.net/npm/@snowztech/ui-js@0.3/dist/snowztech-ui.esm.js"></script>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@snowztech/ui-js@0.4/dist/snowztech-ui.esm.js"></script>
 
   <footer>
     <div class="top">

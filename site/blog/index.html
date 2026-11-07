@@ -16,8 +16,9 @@
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="/icon.png">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.6/dist/snowztech-ui.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.7/dist/snowztech-ui.min.css">
   <link rel="stylesheet" href="/footer.css">
+  <link rel="stylesheet" href="/topbar.css">
   <script>
     (function () { var light = matchMedia("(prefers-color-scheme: light)"), root = document.documentElement; function follow() { if (light.matches) root.dataset.theme = "light"; else delete root.dataset.theme; } follow(); light.addEventListener("change", follow); })();
   </script>
@@ -31,12 +32,6 @@
     .column { max-width: 680px; margin: 0 auto; padding: 0 20px; }
     .wide { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
 
-    .topbar { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-    .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; text-decoration: none; }
-    .brand img { width: 30px; height: 30px; }
-    .topbar nav { display: flex; gap: 18px; font-size: var(--sn-text-sm); }
-    .topbar nav a { color: var(--sn-fg-muted); text-decoration: none; }
-    .topbar nav a:hover { color: var(--sn-fg); }
 
     main { padding-top: 48px; }
     h1 { margin: 0 0 8px; font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }
@@ -52,9 +47,9 @@
   </style>
 </head>
 <body>
-  <header class="topbar wide">
+  <header class="topbar">
     <a class="brand" href="/"><img src="/icon.png" alt="">Farol</a>
-    <nav><a href="/remote">Remote</a><a href="/docs">Docs</a></nav>
+    <nav aria-label="Site"><a href="/docs">Docs</a><a href="/remote">Remote</a><a href="/blog/" aria-current="page">Blog</a><a class="get" href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Download</a></nav>
   </header>
 
   <main class="column">

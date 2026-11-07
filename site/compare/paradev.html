@@ -36,8 +36,9 @@
     ]
   }
   </script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.6/dist/snowztech-ui.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.7/dist/snowztech-ui.min.css">
   <link rel="stylesheet" href="/footer.css">
+  <link rel="stylesheet" href="/topbar.css">
   <script>
     (function () { var light = matchMedia("(prefers-color-scheme: light)"), root = document.documentElement; function follow() { if (light.matches) root.dataset.theme = "light"; else delete root.dataset.theme; } follow(); light.addEventListener("change", follow); })();
   </script>
@@ -50,90 +51,47 @@
     a { color: inherit; }
     .wide { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
 
-    .topbar { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-    .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; text-decoration: none; }
-    .brand img { width: 30px; height: 30px; }
-    .topbar nav { display: flex; gap: 18px; font-size: var(--sn-text-sm); }
-    .topbar nav a { color: var(--sn-fg-muted); text-decoration: none; }
-    .topbar nav a:hover { color: var(--sn-fg); }
 
+    /* Text, contents and code blocks come from snowztech's sn-prose, sn-toc and sn-code. */
     html { scroll-behavior: smooth; }
-    .post { max-width: 1080px; margin: 0 auto; padding: 48px 20px 0; display: grid; gap: 0 64px; }
-    article { min-width: 0; max-width: 680px; }
-    article h2 { scroll-margin-top: 24px; }
-
-    .toc { margin-bottom: 32px; font-size: var(--sn-text-sm); }
-    .toc details { border: 1px solid var(--sn-border-subtle); border-radius: 8px; padding: 12px 16px; }
-    .toc summary { cursor: pointer; font-weight: 500; }
-    .toc ul { list-style: none; margin: 12px 0 0; padding: 0; }
-    .toc li + li { margin-top: 8px; }
-    .toc a { color: var(--sn-fg-muted); text-decoration: none; }
-    .toc a:hover { color: var(--sn-fg); }
-    /* Wide screens: the contents sit beside the page and stay in view. */
-    @media (min-width: 1000px) {
-      .post { grid-template-columns: minmax(0, 680px) 220px; grid-template-areas: "head toc" "body toc"; justify-content: center; }
-      .head { grid-area: head; }
-      article { grid-area: body; }
-      .toc { grid-area: toc; align-self: start; position: sticky; top: 24px; margin: 0; padding-top: 8px; }
-      .toc details { border: 0; padding: 0; }
-      .toc summary { list-style: none; pointer-events: none; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); text-transform: uppercase; letter-spacing: 0.12em; }
-      .toc summary::-webkit-details-marker { display: none; }
-    }
-    .meta { margin: 0 0 12px; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); }
-    h1 { margin: 0 0 24px; font-size: 28px; font-weight: 600; line-height: 1.25; letter-spacing: -0.02em; }
-    h2 { margin: 48px 0 16px; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
-    h3 { margin: 28px 0 8px; font-size: inherit; font-weight: 600; }
-    p, li { color: var(--sn-fg-muted); }
-    p { margin: 0 0 16px; }
-    ul.list { margin: 0 0 16px; padding-left: 20px; }
-    ul.list li + li { margin-top: 8px; }
-    article a { color: var(--sn-fg); text-underline-offset: 3px; }
-    strong { color: var(--sn-fg); font-weight: 600; }
-    code {
-      padding: 1px 5px; border: 1px solid var(--sn-border-subtle); border-radius: 4px;
-      background: var(--sn-bg-elev-1); color: var(--sn-fg); font: inherit;
-    }
-    pre {
-      margin: 0 0 20px; padding: 16px 18px; overflow-x: auto;
-      border: 1px solid var(--sn-border-subtle); border-radius: 8px;
-      background: var(--sn-bg-elev-1); color: var(--sn-fg); font-size: var(--sn-text-sm); line-height: 1.6;
-    }
-    pre code { padding: 0; border: 0; background: none; }
+    .post { max-width: 1080px; margin: 0 auto; padding: 48px 20px 0; }
+    .post > * { min-width: 0; }
+    .head .meta { margin: 0 0 12px; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); }
+    /* The end of a post: what to do next, like the landing's closing. */
+    .try { display: flex; gap: 20px; align-items: flex-start; margin-top: 56px; padding: 24px; border: 1px solid var(--sn-border-subtle); border-radius: 12px; background: var(--sn-bg-elev-1); }
+    .try img { flex-shrink: 0; width: 44px; height: 44px; margin: 0; border: 0; border-radius: 10px; }
+    .try p { margin: 0; }
+    .try .try-title { margin-bottom: 4px; color: var(--sn-fg); font-weight: 600; }
+    .try .try-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+    .try .sn-btn { text-decoration: none; }
+    /* The article colors its links, which would paint over the buttons' own text. */
+    .try a.sn-btn--primary { color: var(--sn-fg-inverse); }
+    .try a.sn-btn--secondary { color: var(--sn-fg); }
+    /* ui-css colors every a:hover with the accent, which wins over the button's own text color. */
+    .try a.sn-btn--primary:hover { color: var(--sn-fg-inverse); }
+    .try a.sn-btn--secondary:hover { color: var(--sn-fg); }
+    @media (max-width: 600px) { .try { flex-direction: column; gap: 14px; } }
+    .sources { font-size: var(--sn-text-sm); }
 
     /* A phone scrolls the table sideways rather than squeezing three columns of text. */
     .table { margin: 0 0 24px; overflow-x: auto; border: 1px solid var(--sn-border-subtle); border-radius: 8px; }
-    table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: var(--sn-text-sm); }
-    th, td { padding: 10px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--sn-border-subtle); }
-    tr:last-child th, tr:last-child td { border-bottom: 0; }
-    thead th { color: var(--sn-fg); font-weight: 600; background: var(--sn-bg-elev-1); }
-    tbody th { width: 11em; color: var(--sn-fg); font-weight: 500; }
-    td { color: var(--sn-fg-muted); }
-
+    .table table { min-width: 560px; margin: 0; }
+    .table tbody th { width: 11em; }
     .wideshot { display: block; width: 100%; height: auto; margin: 8px 0 24px; border: 1px solid var(--sn-border-strong); border-radius: 10px; }
-    .note { padding: 14px 16px; border: 1px solid var(--sn-border-subtle); border-radius: 8px; font-size: var(--sn-text-sm); }
-    .try { margin-top: 48px; padding: 20px; border: 1px solid var(--sn-border-subtle); border-radius: 10px; }
-    .try p:last-child { margin: 0; }
-    .sources { font-size: var(--sn-text-sm); }
-
-    @media (max-width: 600px) {
-      h1 { font-size: 23px; }
-      h2 { font-size: 18px; margin-top: 40px; }
-      pre { font-size: 12px; padding: 14px; }
-    }
   </style>
 </head>
 <body>
-  <header class="topbar wide">
+  <header class="topbar">
     <a class="brand" href="/"><img src="/icon.png" alt="">Farol</a>
-    <nav><a href="/remote">Remote</a><a href="/docs">Docs</a><a href="/blog/">Blog</a></nav>
+    <nav aria-label="Site"><a href="/docs">Docs</a><a href="/remote">Remote</a><a href="/blog/">Blog</a><a class="get" href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Download</a></nav>
   </header>
 
-  <main class="post">
-    <header class="head">
+  <main class="post sn-toc-layout">
+    <header class="head sn-prose">
       <p class="meta">Last checked <time datetime="2026-10-27">October 27, 2026</time>, Farol updated November 7 · Lucas Neves Pereira</p>
       <h1>Farol vs Paradev (formerly Superset)</h1>
     </header>
-    <nav class="toc" aria-label="On this page">
+    <nav class="sn-toc" data-sn-toc aria-label="On this page">
       <details>
         <summary>On this page</summary>
         <ul>
@@ -148,12 +106,12 @@
         </ul>
       </details>
     </nav>
-    <article>
+    <article class="sn-prose">
       <p>Farol and Paradev do the same job. You run several coding agents at once, like Claude Code and Codex, each in its own git worktree, and you review what they did before it ships. Paradev was called Superset until its rename, and its CLI is still named <code>superset</code>.</p>
       <p>I make Farol, so weigh what follows with that in mind. Every claim about Paradev links to its own site or docs, and the page says where Paradev is the better choice.</p>
 
       <h2 id="the-short-version">The short version</h2>
-      <ul class="list">
+      <ul>
         <li><strong>Pick Farol</strong> if you want a fast native Mac terminal, an open source license, and a phone app that costs nothing.</li>
         <li><strong>Pick Paradev</strong> if you need Linux or an Intel Mac, agents that start on an event, cloud workspaces, or Slack and Linear built in.</li>
       </ul>
@@ -191,15 +149,14 @@
       <p>Farol is MIT licensed. Paradev's code is public under the Elastic License 2.0, which its own site says is not an approved open source license. Paradev's desktop app is free, and remote access, automations and its mobile app need Pro. Farol has no paid plan.</p>
       <h3>The phone app costs nothing</h3>
       <p>Farol for iPhone lists your sessions, notifies you when an agent waits, and lets you answer Claude Code or Codex with a tap. Messages go through a relay that can't read them. It also works with agents on a server of your own. <a href="/blog/claude-code-from-your-phone">How the encryption works</a>.</p>
-      <img class="wideshot" src="/features/review.png" width="2540" height="1520" loading="lazy"
-           alt="Farol's review panel showing a branch's changes since main as one scrolling diff, next to Claude Code in the terminal">
       <h3>More of git in one window</h3>
       <p>Besides the review panel, Farol has a git graph where you check out, rebase or cherry-pick, and a three-column resolver when a merge or rebase stops on conflicts. A New task can start from a Jira ticket or a GitHub issue, and one task can span several repos, each in its own worktree on the same branch.</p>
+      <picture><source type="image/avif" srcset="/features/review-notes-half.avif 1270w, /features/review-notes.avif 2540w" sizes="(max-width: 720px) calc(100vw - 40px), 680px"><img class="wideshot" src="/features/review-notes.png" width="2540" height="1520" loading="lazy" decoding="async" alt="Farol's review panel on the agent's changes, with a note for the agent under two README lines, beside Claude Code in the terminal"></picture>
       <h3>Status from any app</h3>
       <p>A lighthouse in the menu bar, or a small panel at the notch, shows which agents work, wait or are done while you're in another app.</p>
 
       <h2 id="where-paradev-is-ahead">Where Paradev is ahead</h2>
-      <ul class="list">
+      <ul>
         <li><strong>More platforms.</strong> Intel Macs, and Linux in an experimental build. Farol needs Apple silicon.</li>
         <li><strong>Automations on events.</strong> Agents that start when something happens, like a new issue to triage. Farol's tasks for later start at a time, not on an event.</li>
         <li><strong>Cloud workspaces</strong>, so nothing has to run on your machine. Farol keeps everything on your Mac or your own server.</li>
@@ -214,7 +171,7 @@
       <h2 id="moving-from-paradev-to-farol">Moving from Paradev to Farol</h2>
       <p>Install Farol from the <a href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">download</a> or with Homebrew:</p>
       <pre><code>brew install --cask snowztech/tap/farol</code></pre>
-      <ul class="list">
+      <ul>
         <li>Connect Claude Code and Codex in Settings → Agents, one click each.</li>
         <li>Press ⇧⌘N, describe the task and pick an agent. Farol creates the worktree and starts the agent on it.</li>
         <li>Worktrees you already have are plain git worktrees. Open their folders as sessions and carry on.</li>
@@ -234,7 +191,7 @@
       <p>Yes, in both apps. In Farol, each task picks its agent, and the sidebar shows which one is working, waiting or done.</p>
 
       <h2 id="sources">Sources</h2>
-      <ul class="list sources">
+      <ul class="sources">
         <li><a href="https://paradev.com/">paradev.com</a>: features, platforms, license and supported agents</li>
         <li><a href="https://paradev.com/pricing">Paradev pricing</a>: what Free, Pro and Team include</li>
         <li><a href="https://github.com/paradevai/paradev">paradevai/paradev on GitHub</a>: the stack (Electron, React), the license and the Superset name</li>
@@ -242,17 +199,21 @@
         <li><a href="https://docs.paradev.com/setup-teardown-scripts">Paradev setup and teardown scripts</a></li>
         <li><a href="https://github.com/snowztech/farol">Farol on GitHub</a>: features, roadmap and changelog</li>
       </ul>
-      <p class="note">Something here out of date or wrong? <a href="https://github.com/snowztech/farol/issues/new?title=Compare%20page%3A%20Paradev">Open an issue</a> and I'll fix it.</p>
+      <p class="sources">Something here out of date or wrong? <a href="https://github.com/snowztech/farol/issues/new?title=Compare%20page%3A%20Paradev">Open an issue</a> and I'll fix it.</p>
 
       <div class="try">
-        <p><a href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Download Farol</a> · <a href="/docs">Read the docs</a> · <a href="/blog/best-terminal-for-claude-code">Other terminals for Claude Code</a></p>
+        <img src="/icon.png" alt="">
+        <div>
+          <p class="try-title">Try Farol</p>
+          <p>Free and open source, for Apple silicon on macOS 14+.</p>
+          <p class="try-actions"><a class="sn-btn sn-btn--primary" href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Download for Mac</a><a class="sn-btn sn-btn--secondary" href="/compare/cmux">Farol vs cmux</a></p>
+        </div>
       </div>
     </article>
   </main>
 
-  <script>
-    if (matchMedia("(min-width: 1000px)").matches) document.querySelector(".toc details").open = true;
-  </script>
+
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@snowztech/ui-js@0.4/dist/snowztech-ui.esm.js"></script>
 
   <footer>
     <div class="top">

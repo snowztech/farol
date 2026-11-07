@@ -1,0 +1,15 @@
+/* The bar across the top of every page but the landing: Farol on the left, the main pages and the download on the right. */
+.topbar {
+  box-sizing: border-box; max-width: 1080px; min-height: 64px; margin: 0 auto; padding: 0 20px;
+  display: flex; align-items: center; justify-content: space-between; gap: 24px;
+}
+.brand { display: inline-flex; align-items: center; gap: 10px; color: var(--sn-fg); font-weight: 600; text-decoration: none; }
+.brand img { width: 30px; height: 30px; }
+.topbar nav { display: flex; align-items: center; gap: 18px; font-size: var(--sn-text-sm); }
+.topbar nav a { color: var(--sn-fg-muted); text-decoration: none; transition: color 0.15s var(--sn-ease), border-color 0.15s var(--sn-ease); }
+.topbar nav a:hover, .topbar nav a[aria-current] { color: var(--sn-fg); }
+.topbar .get { padding: 5px 10px; border: 1px solid var(--sn-border-strong); border-radius: 6px; color: var(--sn-fg); }
+.topbar .get:hover { border-color: var(--sn-fg-muted); }
+@media (max-width: 420px) {
+  .topbar, .topbar nav { gap: 12px; }
+}

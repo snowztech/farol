@@ -36,8 +36,9 @@
     ]
   }
   </script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.6/dist/snowztech-ui.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.7/dist/snowztech-ui.min.css">
   <link rel="stylesheet" href="/footer.css">
+  <link rel="stylesheet" href="/topbar.css">
   <script>
     (function () { var light = matchMedia("(prefers-color-scheme: light)"), root = document.documentElement; function follow() { if (light.matches) root.dataset.theme = "light"; else delete root.dataset.theme; } follow(); light.addEventListener("change", follow); })();
   </script>
@@ -50,20 +51,26 @@
     a { color: inherit; }
     .wide { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
 
-    .topbar { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-    .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; text-decoration: none; }
-    .brand img { width: 30px; height: 30px; }
-    .topbar nav { display: flex; gap: 18px; font-size: var(--sn-text-sm); }
-    .topbar nav a { color: var(--sn-fg-muted); text-decoration: none; }
-    .topbar nav a:hover { color: var(--sn-fg); }
 
     /* Text, contents and code blocks come from snowztech's sn-prose, sn-toc and sn-code. */
     html { scroll-behavior: smooth; }
     .post { max-width: 1080px; margin: 0 auto; padding: 48px 20px 0; }
     .post > * { min-width: 0; }
     .head .meta { margin: 0 0 12px; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); }
-    .try { margin-top: 48px; padding: 20px; border: 1px solid var(--sn-border-subtle); border-radius: 10px; }
-    .try p:last-child { margin: 0; }
+    /* The end of a post: what to do next, like the landing's closing. */
+    .try { display: flex; gap: 20px; align-items: flex-start; margin-top: 56px; padding: 24px; border: 1px solid var(--sn-border-subtle); border-radius: 12px; background: var(--sn-bg-elev-1); }
+    .try img { flex-shrink: 0; width: 44px; height: 44px; margin: 0; border: 0; border-radius: 10px; }
+    .try p { margin: 0; }
+    .try .try-title { margin-bottom: 4px; color: var(--sn-fg); font-weight: 600; }
+    .try .try-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+    .try .sn-btn { text-decoration: none; }
+    /* The article colors its links, which would paint over the buttons' own text. */
+    .try a.sn-btn--primary { color: var(--sn-fg-inverse); }
+    .try a.sn-btn--secondary { color: var(--sn-fg); }
+    /* ui-css colors every a:hover with the accent, which wins over the button's own text color. */
+    .try a.sn-btn--primary:hover { color: var(--sn-fg-inverse); }
+    .try a.sn-btn--secondary:hover { color: var(--sn-fg); }
+    @media (max-width: 600px) { .try { flex-direction: column; gap: 14px; } }
     .sources { font-size: var(--sn-text-sm); }
 
     /* A phone scrolls the table sideways rather than squeezing three columns of text. */
@@ -74,9 +81,9 @@
   </style>
 </head>
 <body>
-  <header class="topbar wide">
+  <header class="topbar">
     <a class="brand" href="/"><img src="/icon.png" alt="">Farol</a>
-    <nav><a href="/remote">Remote</a><a href="/docs">Docs</a><a href="/blog/">Blog</a></nav>
+    <nav aria-label="Site"><a href="/docs">Docs</a><a href="/remote">Remote</a><a href="/blog/">Blog</a><a class="get" href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Download</a></nav>
   </header>
 
   <main class="post sn-toc-layout">
@@ -84,7 +91,7 @@
       <p class="meta">Last checked <time datetime="2026-11-07">November 7, 2026</time> · Lucas Neves Pereira</p>
       <h1>Farol vs cmux</h1>
     </header>
-    <nav class="sn-toc" aria-label="On this page">
+    <nav class="sn-toc" data-sn-toc aria-label="On this page">
       <details>
         <summary>On this page</summary>
         <ul>
@@ -141,8 +148,7 @@
       <p>Press ⇧⌘N, describe the task and pick an agent. Farol fetches the default branch, creates a worktree on a new branch and starts the agent there. A committed <code>.farol/setup</code> prepares each new worktree, and a task can span several repos. In cmux, as in any terminal, you'd run <code>git worktree add</code> yourself. I wrote up <a href="/blog/parallel-claude-code-agents-git-worktrees">how that works by hand</a>.</p>
       <h3>Review that talks back to the agent</h3>
       <p>When an agent is done, the review panel shows its changes as one diff. Leave notes on lines and send them all to the agent in one message, or commit, push and open the pull request from there. A git graph and a three-column conflict resolver sit next to it. cmux has a diff viewer and shows a workspace's linked PR, but its site doesn't describe opening a PR from the app.</p>
-      <img class="wideshot" src="/features/review.png" width="2540" height="1520" loading="lazy"
-           alt="Farol's review panel showing a branch's changes since main as one scrolling diff, next to Claude Code in the terminal">
+      <picture><source type="image/avif" srcset="/features/review-notes-half.avif 1270w, /features/review-notes.avif 2540w" sizes="(max-width: 720px) calc(100vw - 40px), 680px"><img class="wideshot" src="/features/review-notes.png" width="2540" height="1520" loading="lazy" decoding="async" alt="Farol's review panel on the agent's changes, with a note for the agent under two README lines, beside Claude Code in the terminal"></picture>
       <h3>Tasks that start themselves</h3>
       <p>A task can wait for later: once at a set time, or again on the days you pick, each run in a fresh worktree. Each one is a Markdown file in <code>~/.farol/schedules/</code>, so an agent can write one too. cmux's Task Manager is a resource monitor, not a scheduler.</p>
       <h3>The phone app is free</h3>
@@ -197,15 +203,17 @@
       <p class="sources">All checked on November 7, 2026. Something here out of date or wrong? <a href="https://github.com/snowztech/farol/issues/new?title=Compare%20page%3A%20cmux">Open an issue</a> and I'll fix it.</p>
 
       <div class="try">
-        <p><a href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Download Farol</a> · <a href="/compare/paradev">Farol vs Paradev</a> · <a href="/blog/best-terminal-for-claude-code">Other terminals for Claude Code</a></p>
+        <img src="/icon.png" alt="">
+        <div>
+          <p class="try-title">Try Farol</p>
+          <p>Free and open source, for Apple silicon on macOS 14+.</p>
+          <p class="try-actions"><a class="sn-btn sn-btn--primary" href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Download for Mac</a><a class="sn-btn sn-btn--secondary" href="/compare/paradev">Farol vs Paradev</a></p>
+        </div>
       </div>
     </article>
   </main>
 
-  <script>
-    if (matchMedia("(min-width: 1000px)").matches) document.querySelector(".sn-toc details").open = true;
-  </script>
-  <script type="module" src="https://cdn.jsdelivr.net/npm/@snowztech/ui-js@0.3/dist/snowztech-ui.esm.js"></script>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@snowztech/ui-js@0.4/dist/snowztech-ui.esm.js"></script>
 
   <footer>
     <div class="top">
