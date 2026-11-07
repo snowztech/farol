@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- The Allow button on a task waiting for your OK is smaller, so it matches the task's name instead of towering over the row.
+
 ## [0.65.0] - 2026-11-07
 
 Notes for the agent in review, and new tasks that start from the latest default branch.
