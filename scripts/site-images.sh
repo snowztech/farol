@@ -5,7 +5,7 @@ set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 even="$(mktemp -d)/even.png"
-for png in "$root"/site/features/*.png "$root"/site/screenshot-review.png; do
+for png in "$root"/site/features/*.png "$root"/site/features/themes/*.png "$root"/site/screenshot-review.png; do
   base="${png%.png}"
   width=$(sips -g pixelWidth "$png" | awk '/pixelWidth/ { print $2 }')
   height=$(sips -g pixelHeight "$png" | awk '/pixelHeight/ { print $2 }')
