@@ -25,7 +25,7 @@ quit() {
 }
 
 repo() {
-  rm -rf "$dir"
+  rm -rf "$dir" 2>/dev/null || { sleep 1; rm -rf "$dir"; }
   mkdir -p "$dir/home" "$dir/zsh" "$dir/status" "$dir/run"
   local shelf="$dir/shelf"
   git init -q -b main "$shelf"
@@ -207,6 +207,68 @@ EOF
   echo 'done' > "$dir/status/harbor-go"
 }
 
+# Two servers in containers, set up the way Add Server does it over ssh, so the sidebar shows agents on other machines.
+# Each gets its own ssh key and config in the scene, so nothing is added to ~/.ssh. Skipped when Docker isn't running.
+servers() {
+  docker info >/dev/null 2>&1 || { echo "shots: Docker isn't running, so the scene has no servers" >&2; return 0; }
+  docker image inspect farol-shots-server:2 >/dev/null 2>&1 || docker build -q -t farol-shots-server:2 - >/dev/null <<'EOF'
+FROM debian:bookworm-slim
+# Without a UTF-8 locale tmux prints tabs as underscores, and farol-host then reads no sessions.
+ENV LANG=C.UTF-8
+RUN apt-get update && apt-get install -y --no-install-recommends openssh-server tmux curl ca-certificates git procps \
+ && rm -rf /var/lib/apt/lists/* && mkdir -p /run/sshd /root/.ssh
+RUN curl -fsSL https://farol.sh/host.sh | sh
+CMD ["/usr/sbin/sshd", "-D", "-e"]
+EOF
+  mkdir -p "$dir/keys"
+  ssh-keygen -q -t ed25519 -N "" -f "$dir/keys/id_ed25519"
+  # Farol Shots' own key for servers, where a debug build keeps it, so the scene can let it in before it opens.
+  local farol_key="$HOME/Library/Application Support/Farol/$id.server-key" public
+  cat > "$dir/keys/key.swift" <<'EOF'
+import CryptoKit
+import Foundation
+let file = URL(fileURLWithPath: CommandLine.arguments[1])
+let key = (try? Data(contentsOf: file)).flatMap { try? Curve25519.KeyAgreement.PrivateKey(rawRepresentation: $0) } ?? Curve25519.KeyAgreement.PrivateKey()
+try key.rawRepresentation.write(to: file, options: .atomic)
+try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+print(key.publicKey.rawRepresentation.base64EncodedString())
+EOF
+  public=$(swift "$dir/keys/key.swift" "$farol_key")
+  : > "$dir/home/ssh_config"
+  local list="[]" port=2201 name
+  for name in build-box gpu-box; do
+    docker rm -f "farol-shots-$name" >/dev/null 2>&1 || true
+    docker run -d -q --name "farol-shots-$name" --hostname "$name" -p "127.0.0.1:$port:22" farol-shots-server:2 >/dev/null
+    docker exec -i "farol-shots-$name" sh -c 'cat > /root/.ssh/authorized_keys; chmod 600 /root/.ssh/authorized_keys' < "$dir/keys/id_ed25519.pub"
+    cat >> "$dir/home/ssh_config" <<EOF
+Host $name
+  HostName 127.0.0.1
+  Port $port
+  User root
+  IdentityFile $dir/keys/id_ed25519
+  IdentitiesOnly yes
+  UserKnownHostsFile $dir/keys/known_hosts
+  StrictHostKeyChecking accept-new
+EOF
+    local link
+    link=$(docker exec "farol-shots-$name" sh -c "fh=/root/.local/bin/farol-host; \$fh setup --no-pair >/dev/null 2>&1; \$fh trust $public 'Farol Shots'" | tail -1)
+    docker exec -d "farol-shots-$name" /root/.local/bin/farol-host run
+    list=$(python3 -I -c 'import json, sys, uuid
+servers = json.loads(sys.argv[1]); servers.append({"id": str(uuid.uuid4()).upper(), "name": sys.argv[2], "ssh": sys.argv[2], "link": sys.argv[3]})
+print(json.dumps(servers))' "$list" "$name" "$link")
+    port=$((port + 1))
+  done
+  # Agents on the servers, each its own tmux session so the sidebar shows its name alone.
+  # Each reports its status the way an agent's hook would.
+  agent() { docker exec "farol-shots-$1" tmux new-session -d -s "$2" -c /root "/root/.local/bin/farol-host status $3; clear; exec bash"; }
+  agent build-box "Add rate limits" working
+  agent build-box "Fix the deploy script" waiting
+  agent build-box "Nightly backups" done
+  agent gpu-box "Train the ranker" working
+  agent gpu-box "Evaluate on the test set" done
+  echo "$list" > "$dir/home/servers.json"
+}
+
 # Sessions, the selected one, and the window's size, written where Farol restores them from.
 scene() {
   local review=false
@@ -233,6 +295,9 @@ EOF
   defaults write "$id" sidebar.width -float 268
   defaults write "$id" sidebar.groupByRepo -bool true
   defaults write "$id" sidebar.folded "$dir/harbor"
+  # gpu-box folds, so the sidebar shows both an open server and a folded one.
+  [ -f "$dir/home/servers.json" ] && defaults write "$id" sidebar.foldedServers "$(python3 -I -c 'import json, sys
+print(next((s["id"] for s in json.load(open(sys.argv[1])) if s["name"] == "gpu-box"), ""))' "$dir/home/servers.json")"
   defaults write "$id" review.width -float 560
   tasks
   case "$1" in review|library) notes ;; esac
@@ -319,6 +384,7 @@ stage() {
   quit
   repo
   shell
+  servers
   scene "$name"
   open -n --env FAROL_HOME="$dir/home" --env ZDOTDIR="$dir/zsh" --env SHOTS="$dir" "$app"
   echo "Farol Shots is open on the $name scene. Claude Code is reviewing the queue in Offline sync."
@@ -376,12 +442,20 @@ press() { osascript -e "tell application \"System Events\" to keystroke \"$1\" u
 typed() { osascript -e "tell application \"System Events\" to keystroke \"$1\""; sleep 1; }
 escape() { osascript -e 'tell application "System Events" to key code 53'; sleep 1; }
 enter() { osascript -e 'tell application "System Events" to key code 36'; sleep "${1:-2}"; }
+# A click at x, y points from the window's top left, for what has no shortcut, like a page of Settings.
+click() {
+  local origin
+  origin=$(osascript -e "tell application \"System Events\" to tell (first process whose unix id is $(pgrep -f "$app/Contents/MacOS/Farol" | head -1)) to get position of window 1")
+  osascript -e "tell application \"System Events\" to click at {$((${origin%%,*} + $1)), $((${origin##*, } + $2))}" >/dev/null; sleep "${3:-2}"
+}
 
 # Quits and reopens Farol Shots from the layout saved after staging, with the main session's panels and the selected session set.
 # Each shot starts the same, with no pane or file left from the one before. Farol resumes the Claude Code conversation on its own.
 relaunch() {
   local panels="$1" selected="${2:-0}"
   quit
+  # A light theme for the shots that ask for one, Farol's defaults for the rest.
+  if [ "${theme:-}" = light ]; then echo "theme = Farol Light" > "$dir/home/config"; else rm -f "$dir/home/config"; fi
   python3 -I - "$dir/base.plist" "$dir/defaults.plist" "$panels" "$selected" <<'EOF'
 import json, plistlib, sys
 base, path, panels, selected = sys.argv[1], sys.argv[2], sys.argv[3].split(","), int(sys.argv[4])
@@ -413,6 +487,10 @@ library() {
   relaunch review; press c "option down, command down" 2; typed "docs: say what the offline queue does"; shoot "$out/commit"
   relaunch none; press n "shift down, command down"; typed "Add tags to saved links, with a --tag filter on shelf list"; shoot "$out/new-task"
   relaunch none; press "," "command down" 2; shoot "$out/settings"
+  # Appearance, then the theme browser that opens beside it.
+  relaunch none; press "," "command down" 2; click 350 103; click 860 148 3; shoot "$out/themes"
+  theme=light relaunch review; shoot "$out/review-notes-light"
+  theme=light relaunch none; shoot "$out/sidebar-light"
   relaunch none; press d "command down" 2; typed "git log --oneline"; enter; shoot "$out/split"
   # The sixth session is harbor's Go upgrade, stopped on a merge conflict.
   relaunch none 5; press m "option down, command down" 3; shoot "$out/conflicts"
@@ -423,6 +501,7 @@ case "${1:-}" in
   stage) stage "${2:-}" ;;
   shoot) shoot "${2:-}" ;;
   library) library ;;
-  reset) quit; defaults delete "$id" >/dev/null 2>&1 || true; rm -rf "$dir"; echo "Farol Shots reset" ;;
+  reset) quit; defaults delete "$id" >/dev/null 2>&1 || true; rm -rf "$dir" 2>/dev/null || { sleep 1; rm -rf "$dir"; }
+         docker rm -f farol-shots-build-box farol-shots-gpu-box >/dev/null 2>&1 || true; echo "Farol Shots reset" ;;
   *) echo "$usage"; exit 64 ;;
 esac

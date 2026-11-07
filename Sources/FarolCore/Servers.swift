@@ -68,7 +68,13 @@ public enum ServerSetup {
     /// A click then opens at once, and a password typed in setup isn't asked again.
     public static let connectionFolder = FarolHome.url.appendingPathComponent("ssh")
     public static var sshOptions: [String] {
-        ["-o", "ControlMaster=auto", "-o", "ControlPath=\(connectionFolder.path)/%C", "-o", "ControlPersist=10m"]
+        ["-o", "ControlMaster=auto", "-o", "ControlPath=\(connectionFolder.path)/%C", "-o", "ControlPersist=10m"] + sceneConfig
+    }
+
+    /// A staged scene's own ssh config in FAROL_HOME, so its servers never need a line in yours.
+    private static var sceneConfig: [String] {
+        let file = FarolHome.url.appendingPathComponent("ssh_config").path
+        return FarolHome.isMoved && FileManager.default.fileExists(atPath: file) ? ["-F", file] : []
     }
     private static var ssh: String { "ssh " + sshOptions.map(NewTask.shellQuoted).joined(separator: " ") }
 
