@@ -32,7 +32,7 @@
     "publisher": { "@type": "Organization", "name": "Farol", "url": "https://farol.sh/" }
   }
   </script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.5/dist/snowztech-ui.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.6/dist/snowztech-ui.min.css">
   <link rel="stylesheet" href="/footer.css">
   <script>
     if (matchMedia("(prefers-color-scheme: light)").matches) document.documentElement.dataset.theme = "light";
@@ -111,23 +111,35 @@
 
       <h2 id="set-it-up-by-hand">Set it up by hand</h2>
       <p>Let's say your repo is <code>~/code/shop</code> and you have two tasks. Create a worktree for each, on a new branch, next to the repo:</p>
-      <pre data-name="shell"><code>cd ~/code/shop
+      <figure class="sn-code">
+        <figcaption class="sn-code__bar"><span class="sn-code__name">shell</span><button class="sn-copy-btn" data-sn-copy aria-label="Copy"></button></figcaption>
+        <pre><code>cd ~/code/shop
 git worktree add -b search-box ../shop-search-box
 git worktree add -b fix-checkout ../shop-fix-checkout</code></pre>
+      </figure>
       <p>Each command makes a folder and a branch that starts from where you are. <code>git worktree list</code> shows them all:</p>
-      <pre data-name="shell"><code>git worktree list
+      <figure class="sn-code">
+        <figcaption class="sn-code__bar"><span class="sn-code__name">shell</span><button class="sn-copy-btn" data-sn-copy aria-label="Copy"></button></figcaption>
+        <pre><code>git worktree list
 # ~/code/shop               4e9c711 [main]
 # ~/code/shop-search-box    4e9c711 [search-box]
 # ~/code/shop-fix-checkout  4e9c711 [fix-checkout]</code></pre>
+      </figure>
       <aside class="sn-callout sn-callout--tip">
         <strong class="sn-callout__title">Tip</strong>
         <p>If your checkout isn't on an up to date <code>main</code>, start each branch from the remote's instead, so the agent doesn't build on old or unrelated work: <code>git fetch origin</code>, then <code>git worktree add --no-track -b search-box ../shop-search-box origin/main</code>. <code>--no-track</code> keeps the new branch from tracking <code>main</code>.</p>
       </aside>
       <p>Now start an agent in each one, in its own terminal tab. Both Claude Code and Codex take the task as their first argument:</p>
-      <pre data-name="shell"><code>cd ~/code/shop-search-box
+      <figure class="sn-code">
+        <figcaption class="sn-code__bar"><span class="sn-code__name">shell</span><button class="sn-copy-btn" data-sn-copy aria-label="Copy"></button></figcaption>
+        <pre><code>cd ~/code/shop-search-box
 claude "add a search box to the products page"</code></pre>
-      <pre data-name="shell"><code>cd ~/code/shop-fix-checkout
+      </figure>
+      <figure class="sn-code">
+        <figcaption class="sn-code__bar"><span class="sn-code__name">shell</span><button class="sn-copy-btn" data-sn-copy aria-label="Copy"></button></figcaption>
+        <pre><code>cd ~/code/shop-fix-checkout
 codex "the checkout total is off by one cent, find out why"</code></pre>
+      </figure>
       <p>Two agents, two folders, two branches. They can't step on each other anymore.</p>
 
       <h2 id="what-doesnt-come-along">What doesn't come along</h2>
@@ -139,8 +151,11 @@ codex "the checkout total is off by one cent, find out why"</code></pre>
         <li><strong>One branch, one worktree.</strong> Git won't check out the same branch in two places. That's a feature: it's what stops two agents from sharing a branch.</li>
       </ul>
       <p>So in practice, every new worktree starts with the same few lines:</p>
-      <pre data-name="shell"><code>cp ../shop/.env .
+      <figure class="sn-code">
+        <figcaption class="sn-code__bar"><span class="sn-code__name">shell</span><button class="sn-copy-btn" data-sn-copy aria-label="Copy"></button></figcaption>
+        <pre><code>cp ../shop/.env .
 npm ci</code></pre>
+      </figure>
       <p>That's worth a small script in the repo. More on that below.</p>
 
       <h2 id="claude-codes-own-worktree-flag">Claude Code's own --worktree flag</h2>
@@ -154,18 +169,27 @@ npm ci</code></pre>
 
       <h2 id="review-and-merge">Review and merge</h2>
       <p>When an agent says it's done, read the diff before anything else. Three dots compare the branch with where it left <code>main</code>:</p>
-      <pre data-name="shell"><code>git diff main...search-box</code></pre>
+      <figure class="sn-code">
+        <figcaption class="sn-code__bar"><span class="sn-code__name">shell</span><button class="sn-copy-btn" data-sn-copy aria-label="Copy"></button></figcaption>
+        <pre><code>git diff main...search-box</code></pre>
+      </figure>
       <p>Then merge it locally, or push it and open a pull request:</p>
-      <pre data-name="shell"><code>cd ~/code/shop-search-box
+      <figure class="sn-code">
+        <figcaption class="sn-code__bar"><span class="sn-code__name">shell</span><button class="sn-copy-btn" data-sn-copy aria-label="Copy"></button></figcaption>
+        <pre><code>cd ~/code/shop-search-box
 git push -u origin search-box
 gh pr create --fill</code></pre>
+      </figure>
       <p>If two agents touched the same lines, you'll get a merge conflict here, like with any two branches. Worktrees keep agents out of each other's way while they work. They don't make overlapping tasks merge cleanly. Pick tasks that don't share files and this rarely happens.</p>
 
       <h2 id="clean-up">Clean up</h2>
       <p>Once a branch is merged, remove its worktree and the branch:</p>
-      <pre data-name="shell"><code>cd ~/code/shop
+      <figure class="sn-code">
+        <figcaption class="sn-code__bar"><span class="sn-code__name">shell</span><button class="sn-copy-btn" data-sn-copy aria-label="Copy"></button></figcaption>
+        <pre><code>cd ~/code/shop
 git worktree remove ../shop-search-box
 git branch -d search-box</code></pre>
+      </figure>
       <p><code>git worktree remove</code> refuses when there are uncommitted changes, which has saved me more than once. If you deleted a worktree folder by hand instead, <code>git worktree prune</code> tells Git to forget it.</p>
 
       <h2 id="the-same-thing-in-farol">The same thing in Farol</h2>
@@ -174,9 +198,12 @@ git branch -d search-box</code></pre>
       <img class="wideshot" src="/features/new-task.png" width="2540" height="1520" loading="lazy"
            alt="Farol's new task window over a terminal: a task description, a branch name made from it, and Claude Code picked as the agent">
       <p>For the files that don't come along, commit an executable <code>.farol/setup</code> to the repo. Farol runs it in each new worktree before the agent starts, and it can copy your ignored <code>.env</code> files first. A <code>.farol/teardown</code> runs when you remove the worktree, to stop a server or drop a database:</p>
-      <pre data-name=".farol/setup"><code>#!/bin/sh
+      <figure class="sn-code">
+        <figcaption class="sn-code__bar"><span class="sn-code__name">.farol/setup</span><button class="sn-copy-btn" data-sn-copy aria-label="Copy"></button></figcaption>
+        <pre><code>#!/bin/sh
 set -e
 npm ci</code></pre>
+      </figure>
       <p>Every session has a dot in the sidebar that says working, waiting or done, with no hooks to set up. The menu bar and the notch show the same from any app. When an agent finishes, the review panel shows its whole diff. Leave a note on any line and send them all back to the agent in one message, or commit, push and open the pull request from there.</p>
       <img class="wideshot" src="/features/agent-status.png" width="2540" height="1520" loading="lazy"
            alt="Farol's sidebar with several Claude Code and Codex sessions, each on its own branch, with a dot showing whether it is working, waiting or done">
@@ -203,7 +230,7 @@ npm ci</code></pre>
   <script>
     if (matchMedia("(min-width: 1000px)").matches) document.querySelector(".sn-toc details").open = true;
   </script>
-  <script type="module" src="/blog/code.js"></script>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@snowztech/ui-js@0.3/dist/snowztech-ui.esm.js"></script>
 
   <footer>
     <div class="top">

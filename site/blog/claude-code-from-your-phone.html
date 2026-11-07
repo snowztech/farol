@@ -32,7 +32,7 @@
     "publisher": { "@type": "Organization", "name": "Farol", "url": "https://farol.sh/" }
   }
   </script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.5/dist/snowztech-ui.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.6/dist/snowztech-ui.min.css">
   <link rel="stylesheet" href="/footer.css">
   <script>
     (function () { var light = matchMedia("(prefers-color-scheme: light)"), root = document.documentElement; function follow() { if (light.matches) root.dataset.theme = "light"; else delete root.dataset.theme; } follow(); light.addEventListener("change", follow); })();
@@ -123,17 +123,22 @@
       <h2 id="pairing-once">Pairing, once</h2>
       <p>It all starts with a QR code. On the Mac you turn on Remote in Settings and press Show code. On the phone you scan it.</p>
       <p>The code carries three things: the relay's address, the Mac's public key, and a secret made just for that code. It's a link, and everything rides after the <code>#</code>.</p>
-      <pre data-name="go"><code>func (o offer) link() string {
+      <figure class="sn-code">
+        <figcaption class="sn-code__bar"><span class="sn-code__name">go</span><button class="sn-copy-btn" data-sn-copy aria-label="Copy"></button></figcaption>
+        <pre><code>func (o offer) link() string {
 	text, _ := json.Marshal(o)
 	return "https://farol.sh/pair#" + base64.RawURLEncoding.EncodeToString(text)
 }</code></pre>
+      </figure>
       <p>The part after the <code>#</code> is never sent to a server. So the secret never reaches the relay, which means the relay can't pair a device of its own.</p>
       <p>The phone answers with one sealed message that proves two things at once: it holds the key it claims, and it saw the secret. A code works once and lasts two minutes. After that, the Mac knows the phone's key and the phone knows the Mac's.</p>
 
       <h2 id="every-connection">Every connection</h2>
       <p>Each time they connect, both sides say hello in the clear with their public key and a random number made for this connection.</p>
       <p>Then each direction becomes its own HPKE stream, sealed to the other side's key and signed with ours. I used CryptoKit's <code>Curve25519_SHA256_ChachaPoly</code> suite. Here's the sending side on the Mac and the phone:</p>
-      <pre data-name="swift"><code>public mutating func connect(to peer: ChannelHello, trusting trusted: [Data]) throws -&gt; Data {
+      <figure class="sn-code">
+        <figcaption class="sn-code__bar"><span class="sn-code__name">swift</span><button class="sn-copy-btn" data-sn-copy aria-label="Copy"></button></figcaption>
+        <pre><code>public mutating func connect(to peer: ChannelHello, trusting trusted: [Data]) throws -&gt; Data {
     guard trusted.contains(peer.key) else { throw RemoteError.unknownDevice }
     let sender = try HPKE.Sender(
         recipientKey: Curve25519.KeyAgreement.PublicKey(rawRepresentation: peer.key), ciphersuite: Pairing.suite,
@@ -142,15 +147,19 @@
     self.sender = sender
     return sender.encapsulatedKey
 }</code></pre>
+      </figure>
       <p>The <code>info</code> includes both hello numbers. So a recording of an older connection doesn't open on a new one, and messages only open in the order they were sealed. If one fails to open, the connection ends.</p>
 
       <h2 id="what-the-relay-actually-sees">What the relay actually sees</h2>
       <p>Mostly bytes.</p>
       <p>It sees a public key, and a room name that's the hash of the host's key. That's how a Mac and its phones find each other without the relay learning who they are.</p>
-      <pre data-name="go"><code>func room(public []byte) string {
+      <figure class="sn-code">
+        <figcaption class="sn-code__bar"><span class="sn-code__name">go</span><button class="sn-copy-btn" data-sn-copy aria-label="Copy"></button></figcaption>
+        <pre><code>func room(public []byte) string {
 	sum := sha256.Sum256(public)
 	return hex.EncodeToString(sum[:])
 }</code></pre>
+      </figure>
       <p>Then it sees encrypted messages and how big they are. It stores none of it, and its log holds totals only.</p>
 
       <h2 id="notifications-without-reading-anything">Notifications without reading anything</h2>
@@ -160,11 +169,17 @@
 
       <h2 id="running-claude-code-on-a-server-with-tmux">Running Claude Code on a server with tmux</h2>
       <p>Some people run their agents on a machine that stays on, so they can close the laptop. For them there's <code>farol-host</code>, a small Go CLI.</p>
-      <pre data-name="shell"><code>curl -fsSL https://farol.sh/host.sh | sh
+      <figure class="sn-code">
+        <figcaption class="sn-code__bar"><span class="sn-code__name">shell</span><button class="sn-copy-btn" data-sn-copy aria-label="Copy"></button></figcaption>
+        <pre><code>curl -fsSL https://farol.sh/host.sh | sh
 farol-host setup</code></pre>
+      </figure>
       <p>Setup connects the hooks for Claude Code and Codex, keeps <code>farol-host</code> running with systemd, and shows a QR code to scan. Then every tmux window on that machine is a session on your phone, like a tab in Farol on the Mac.</p>
-      <pre data-name="shell"><code>tmux new -s api -c ~/code/api
+      <figure class="sn-code">
+        <figcaption class="sn-code__bar"><span class="sn-code__name">shell</span><button class="sn-copy-btn" data-sn-copy aria-label="Copy"></button></figcaption>
+        <pre><code>tmux new -s api -c ~/code/api
 claude</code></pre>
+      </figure>
       <aside class="sn-callout sn-callout--note">
         <strong class="sn-callout__title">Update, November 7</strong>
         <p>Since Farol 0.66 the Mac can do this setup for you. Use the server button beside New task, pick a host from <code>~/.ssh/config</code>, and Farol installs <code>farol-host</code> over ssh and lets the Mac in, with no code to scan. The server's agents show in the sidebar next to your own. Pair a Phone… on the server shows the code for the app.</p>
@@ -174,7 +189,10 @@ claude</code></pre>
       <p>The Mac and the iPhone share a Swift package. The server speaks the same protocol, written again in Go.</p>
       <p>Two implementations of the same crypto and messages is a great way to have bugs that only show up on a real phone. So they check each other.</p>
       <p>The Swift tests write sample messages and a sealed conversation to JSON files. The Go tests open those files and must read them exactly. When a message changes, I regenerate them:</p>
-      <pre data-name="shell"><code>FAROL_WRITE_WIRE=1 swift test</code></pre>
+      <figure class="sn-code">
+        <figcaption class="sn-code__bar"><span class="sn-code__name">shell</span><button class="sn-copy-btn" data-sn-copy aria-label="Copy"></button></figcaption>
+        <pre><code>FAROL_WRITE_WIRE=1 swift test</code></pre>
+      </figure>
       <p>If Go and Swift disagree on a single field, a test fails before any phone sees it.</p>
 
       <h2 id="what-s-not-covered-yet">What's not covered yet</h2>
@@ -196,7 +214,7 @@ claude</code></pre>
   <script>
     if (matchMedia("(min-width: 1000px)").matches) document.querySelector(".sn-toc details").open = true;
   </script>
-  <script type="module" src="/blog/code.js"></script>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@snowztech/ui-js@0.3/dist/snowztech-ui.esm.js"></script>
 
   <footer>
     <div class="top">
