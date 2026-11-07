@@ -382,6 +382,10 @@ private struct TaskRow: View {
                     .foregroundStyle(task.paused ? p.muted : p.text.opacity(0.85))
                     .truncationMode(.tail)
                 HStack(spacing: 4) {
+                    // Which agent will run it, which the name and time alone don't say.
+                    if let kind = AgentFolder.kind(of: task.agent) {
+                        ToolTile(agent: kind, size: 13).opacity(task.paused ? 0.5 : 1)
+                    }
                     if task.once == nil, run == nil, task.failure == nil, task.allowed {
                         Image(systemName: "repeat").font(.system(size: 9, weight: .semibold))
                     }

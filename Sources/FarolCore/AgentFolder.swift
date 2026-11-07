@@ -199,6 +199,19 @@ public struct AgentFolder: Equatable, Hashable {
         return (id, folder)
     }
 
+    /// The kind of agent a saved choice stands for, read from its path alone, so a list can show the agent without looking on disk.
+    public static func kind(of saved: String) -> Kind? {
+        if let kind = Kind(rawValue: saved) { return kind }
+        let folder = URL(fileURLWithPath: (saved as NSString).expandingTildeInPath).standardizedFileURL
+        return Kind.allCases.first { kind in
+            let base = URL(fileURLWithPath: kind.defaultFolder)
+            let name = base.lastPathComponent
+            let parent = base.deletingLastPathComponent().relativePath
+            let named = folder.lastPathComponent == name || folder.lastPathComponent.hasPrefix(name + "-")
+            return named && (parent == "." || folder.deletingLastPathComponent().path.hasSuffix("/" + parent))
+        }
+    }
+
     /// The folder saved as the last choice. Older versions saved just "claude" or "codex".
     public static func choice(_ saved: String, in folders: [AgentFolder]) -> AgentFolder? {
         folders.first { $0.id == saved } ?? folders.first { $0.isDefault && $0.kind.rawValue == saved } ?? folders.first

@@ -35,6 +35,12 @@ Build from what exists, so a change to one shape reaches every screen:
 - The terminal and code stay solid. Glass goes on side panels only, as in Apple's own apps.
 - Native macOS controls, given a hover where macOS leaves them without one.
 
+## Menus and popovers
+
+- **Commands go in a native menu.** A right-click, an "Open in…" or a list of actions you pick one of and that closes. macOS gives it the keyboard, VoiceOver and the look people expect.
+- **A popover is for something to read or fill in.** Checks with their times, a date, a short form, or a select inside a sheet, where the system menu would break the sheet's look.
+- **Popovers look alike.** A muted sentence-case line on top, rows from `SheetChoice`, and the row's main text takes the free width so anything after it lines up on the right.
+
 ## Motion
 
 Motion is short and says what changed: a selection slides, a panel opens, a tip fades in. It goes through `Motion.enabled`, so the Animations setting and Reduce Motion turn it off. The lamps keep moving either way, since their motion is how a waiting agent asks for you. A terminal takes its new size once a panel stops, so a program redraws once.

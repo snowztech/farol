@@ -16,6 +16,7 @@ struct EditTaskSheet: View {
 
     let schedule: Schedule
     let agent: String
+    let kind: AgentFolder.Kind?
     let palette: Palette
     let save: (Edit) -> Void
     let close: () -> Void
@@ -30,9 +31,11 @@ struct EditTaskSheet: View {
     @State private var taskFocused = false
     @FocusState private var nameFocused: Bool
 
-    init(schedule: Schedule, agent: String, palette: Palette, save: @escaping (Edit) -> Void, close: @escaping () -> Void) {
+    init(schedule: Schedule, agent: String, kind: AgentFolder.Kind?, palette: Palette, save: @escaping (Edit) -> Void,
+         close: @escaping () -> Void) {
         self.schedule = schedule
         self.agent = agent
+        self.kind = kind
         self.palette = palette
         self.save = save
         self.close = close
@@ -46,9 +49,10 @@ struct EditTaskSheet: View {
 
     static func present(_ schedule: Schedule, in window: NSWindow?, palette: Palette, save: @escaping (Edit) -> Void) {
         guard let window, window.attachedSheet == nil else { return }
-        let agent = AgentFolder.choice(schedule.agent, in: AgentFolder.find())?.label ?? schedule.agent
+        let folder = AgentFolder.choice(schedule.agent, in: AgentFolder.find())
         let sheet = NSWindow(contentRect: .zero, styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: true)
-        let view = EditTaskSheet(schedule: schedule, agent: agent, palette: palette, save: save,
+        let view = EditTaskSheet(schedule: schedule, agent: folder?.label ?? schedule.agent,
+                                 kind: folder?.kind ?? AgentFolder.kind(of: schedule.agent), palette: palette, save: save,
                                  close: { [weak window, weak sheet] in sheet.map { window?.endSheet($0) } })
         let host = NSHostingController(rootView: view)
         host.sizingOptions = [.preferredContentSize]
@@ -88,6 +92,11 @@ struct EditTaskSheet: View {
                     .popover(isPresented: $pickingWhen, arrowEdge: .top) {
                         WhenChoices(when: $when, at: $at, weekdays: $weekdays, offersNow: false, palette: p) {}
                     }
+                // Who runs it, beside when, where the New Task sheet has its agent. Fixed once the task exists.
+                HStack(spacing: 6) {
+                    if let kind { ToolTile(agent: kind, size: 16) }
+                    Text(agent).font(.system(size: 12)).foregroundStyle(p.muted).lineLimit(1)
+                }
                 Spacer()
                 Button("Cancel", action: close)
                     .buttonStyle(SheetButton(palette: p, primary: false))

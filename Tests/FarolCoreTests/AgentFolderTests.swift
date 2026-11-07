@@ -122,3 +122,13 @@ private func home(_ folders: [String: [String]]) throws -> URL {
     #expect(pi.resume("019d") == "pi --session '019d'")
     #expect(AgentFolder(log: "/h/.pi/agent/sessions/--h-app--/2026-05-03_019d.jsonl") == pi)
 }
+
+@Test func readsTheKindFromASavedChoice() {
+    #expect(AgentFolder.kind(of: "codex") == .codex)
+    #expect(AgentFolder.kind(of: "/Users/me/.claude") == .claude)
+    #expect(AgentFolder.kind(of: "~/.claude-work") == .claude)
+    #expect(AgentFolder.kind(of: "/Users/me/.config/opencode") == .opencode)
+    #expect(AgentFolder.kind(of: "/Users/me/.pi/agent") == .pi)
+    #expect(AgentFolder.kind(of: "/Users/me/agent") == nil)
+    #expect(AgentFolder.kind(of: "/Users/me/.claudette") == nil)
+}

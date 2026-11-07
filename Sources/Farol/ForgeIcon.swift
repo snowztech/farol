@@ -123,6 +123,13 @@ struct ToolTile: View {
 }
 
 extension ToolTile {
+    /// The tile drawn as an image, for a native menu, which shows images but not SwiftUI views.
+    @MainActor static func menuImage(agent: AgentFolder.Kind) -> NSImage? {
+        let renderer = ImageRenderer(content: ToolTile(agent: agent, size: 16))
+        renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
+        return renderer.nsImage
+    }
+
     /// Where a ticket comes from, on the same tile as the tool in Settings.
     init(source: Ticket.Source, size: CGFloat = 20) {
         switch source {

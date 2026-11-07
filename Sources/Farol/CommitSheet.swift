@@ -154,8 +154,8 @@ private struct ChecksButton: View {
                             open = false
                         } label: {
                             CheckMark(state: check.state, palette: palette)
-                            Text(check.name).lineLimit(1)
-                            Spacer(minLength: 16)
+                            // Takes the free width, so the times line up on the right instead of sharing it with SheetChoice's spacer.
+                            Text(check.name).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
                             Text(check.timing(now: context.date)).foregroundStyle(palette.muted).monospacedDigit()
                             // A row opens the step's log on the forge, which nothing else in it says.
                             if check.url != nil {
@@ -347,8 +347,11 @@ struct GenerateButton: View {
             if agents.count > 1, !running {
                 Menu {
                     ForEach(agents, id: \.id) { folder in
-                        Button { pick(folder) } label: {
-                            if folder == agent { Label(folder.label, systemImage: "checkmark") } else { Text(folder.label) }
+                        // A toggle keeps the menu's checkmark on the current agent, with its tile beside the name.
+                        Toggle(isOn: Binding(get: { folder == agent }, set: { _ in pick(folder) })) {
+                            Label { Text(folder.label) } icon: {
+                                if let image = ToolTile.menuImage(agent: folder.kind) { Image(nsImage: image) }
+                            }
                         }
                     }
                 } label: {
