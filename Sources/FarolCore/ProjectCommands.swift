@@ -49,7 +49,7 @@ public enum ProjectCommands {
     }
 
     public static var globalDirectory: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".farol/commands", isDirectory: true)
+        FarolHome.url.appendingPathComponent("commands", isDirectory: true)
     }
 
     /// One editable shell script per command, in the folder shared with the project.

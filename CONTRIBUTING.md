@@ -24,6 +24,7 @@ make lint
 - Commits are one line in the Conventional Commits style: `fix(sidebar): keep the selected session in view`.
 - If users would notice the change, add a line under **Unreleased** in `CHANGELOG.md`.
 - For UI changes, add a screenshot.
+- Screenshots for the site come from Farol Shots, so they look the same on any Mac: `make shots SCENE=review` opens a staged demo, set up anything else by hand, then `make shot NAME=review` saves `site/features/review.png`. Your terminal app needs Screen Recording.
 - If your change runs git or touches the main thread, press ⌥⌘I in Farol for the Farol Inspector. It shows the programs Farol starts, like git, freezes since launch and any process that blocks the window, memory and CPU. Click any reading to see what it means. Copy Report gives a before and after to paste in the PR.
 
 ## Writing

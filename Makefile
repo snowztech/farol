@@ -1,7 +1,7 @@
 APP := build/Farol.app
 GHOSTTY := vendor/GhosttyKit.xcframework
 
-.PHONY: help build release run install uninstall dist test lint icon clean
+.PHONY: help build release run install uninstall dist test lint icon clean shots shot
 
 help:
 	@echo "make build      debug build into $(APP)"
@@ -14,6 +14,8 @@ help:
 	@echo "make lint       style check for comments and docs"
 	@echo "make icon       regenerate the app icon from assets/icon-source.png"
 	@echo "make clean      remove build output (keeps libghostty)"
+	@echo "make shots      open Farol Shots on a staged scene, SCENE=sidebar or review"
+	@echo "make shot       save its window as site/features/NAME.png, NAME=review"
 
 # Built once, then reused. Delete vendor/ to rebuild it.
 $(GHOSTTY):
@@ -49,6 +51,13 @@ lint:
 
 icon:
 	swift scripts/make-icon.swift
+
+shots: $(GHOSTTY)
+	./scripts/bundle.sh shots
+	./scripts/shots.sh stage $(SCENE)
+
+shot:
+	./scripts/shots.sh shoot $(NAME)
 
 clean:
 	rm -rf .build build

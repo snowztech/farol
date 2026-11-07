@@ -6,7 +6,7 @@ public struct TaskFolders {
     public let base: URL
 
     public static let `default` = TaskFolders(
-        base: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".farol/tasks"))
+        base: FarolHome.url.appendingPathComponent("tasks"))
 
     public init(base: URL) {
         self.base = base

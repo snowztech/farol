@@ -1,10 +1,10 @@
 import AppKit
+import FarolCore
 
 /// The settings page edits a few keys in ~/.config/farol/config (Ghostty config syntax).
 /// Any other line in that file is kept as is, so power users can add anything Ghostty supports.
 final class Settings: ObservableObject {
-    static let fileURL = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".config/farol/config")
+    static let fileURL = FarolHome.config
 
     @Published var theme = "" { didSet { write("theme", theme) } }
     @Published var fontFamily = "" { didSet { write("font-family", fontFamily) } }

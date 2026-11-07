@@ -3,7 +3,7 @@ import Foundation
 /// A task as a Markdown file in `~/.farol/schedules`, so you, your editor or an agent can read and write one.
 /// The front matter says when and where, the body is the prompt, as the Farol skill shows. What Farol learns as it runs stays out of the file.
 public enum ScheduleFile {
-    public static let folder = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".farol/schedules")
+    public static let folder = FarolHome.url.appendingPathComponent("schedules")
 
     /// English day names, the same on every Mac, so a file reads the same wherever it's synced.
     private static let dayNames = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]

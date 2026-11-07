@@ -28,7 +28,7 @@ public struct ServerList {
     public let file: URL
 
     public static let `default` = ServerList(
-        file: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".farol/servers.json"))
+        file: FarolHome.url.appendingPathComponent("servers.json"))
 
     public init(file: URL) {
         self.file = file
@@ -66,7 +66,7 @@ public enum ServerSetup {
 
     /// Every ssh Farol runs shares one connection per server, kept ten minutes after the last one closes.
     /// A click then opens at once, and a password typed in setup isn't asked again.
-    public static let connectionFolder = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".farol/ssh")
+    public static let connectionFolder = FarolHome.url.appendingPathComponent("ssh")
     public static var sshOptions: [String] {
         ["-o", "ControlMaster=auto", "-o", "ControlPath=\(connectionFolder.path)/%C", "-o", "ControlPersist=10m"]
     }

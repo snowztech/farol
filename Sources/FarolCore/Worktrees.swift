@@ -5,7 +5,7 @@ public struct Worktrees {
     public let base: URL
 
     public static let `default` = Worktrees(
-        base: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".farol/worktrees"))
+        base: FarolHome.url.appendingPathComponent("worktrees"))
 
     public init(base: URL) {
         self.base = base
