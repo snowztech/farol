@@ -4,7 +4,7 @@
 
 <h1 align="center">Farol</h1>
 
-<p align="center">A fast macOS terminal for working with coding agents.</p>
+<p align="center">A fast macOS terminal for working with coding agents.<br><a href="https://farol.sh">farol.sh</a></p>
 
 <p align="center">
     <a href="https://github.com/snowztech/farol/releases/latest"><img src="https://img.shields.io/github/v/release/snowztech/farol?style=flat&logo=github&label=release" alt="Latest release"></a>
