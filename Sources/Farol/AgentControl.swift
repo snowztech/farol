@@ -105,12 +105,11 @@ final class AgentControl {
             if let refusal = now.typingRefusal(of: text, answering: asking) {
                 return connection.reply(ControlReply.failed(refusal))
             }
-            terminal.pasteText(text)
             if submit {
                 told[terminal.id] = .now
-                DispatchQueue.main.asyncAfter(deadline: .now() + RemoteTyping.returnDelay(afterPasteOf: text, elapsed: 0)) { [weak terminal] in
-                    terminal?.press(.enter)
-                }
+                terminal.submit(text)
+            } else {
+                terminal.pasteText(text)
             }
             connection.reply(ControlReply(session: now))
         }
@@ -241,11 +240,8 @@ final class AgentControl {
             guard session.status(of: terminal) != .waiting else {
                 return connection.reply(ControlReply.failed("\(session.label(of: terminal)) is waiting for someone to answer it. Ask the user, or wait for it."))
             }
-            terminal.pasteText(text)
             told[terminal.id] = .now
-            DispatchQueue.main.asyncAfter(deadline: .now() + RemoteTyping.returnDelay(afterPasteOf: text, elapsed: 0)) { [weak terminal] in
-                terminal?.press(.enter)
-            }
+            terminal.submit(text)
             connection.reply(ControlReply(session: info(session, terminal, caller: caller)))
         }
     }
@@ -316,6 +312,17 @@ final class AgentControl {
                 }
                 connection.reply(ControlReply(text: last.text))
             }
+        }
+    }
+}
+
+extension TerminalView {
+    /// Types `text` to the agent and sends it, as if you had pasted it and pressed Return.
+    /// Return waits for the agent to take the paste in, or it is lost and the message stays unsent.
+    func submit(_ text: String) {
+        pasteText(text)
+        DispatchQueue.main.asyncAfter(deadline: .now() + RemoteTyping.returnDelay(afterPasteOf: text, elapsed: 0)) { [weak self] in
+            self?.press(.enter)
         }
     }
 }
