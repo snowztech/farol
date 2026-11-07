@@ -27,7 +27,9 @@ final class RemoteBridge: ObservableObject {
     /// Why Remote is on and not working, in words for the settings page.
     @Published private(set) var problem: String?
     /// The paired phones that are connected right now, by their key.
-    @Published private(set) var connected: Set<Data> = []
+    @Published private(set) var connected: Set<Data> = [] {
+        didSet { refreshAwake() }
+    }
     /// A relay of your own, as you typed it. Nil for Farol's.
     @Published private(set) var ownRelay = UserDefaults.standard.string(forKey: RemoteBridge.relayKey)
 
@@ -193,11 +195,14 @@ final class RemoteBridge: ObservableObject {
         SCDynamicStoreCopyComputerName(nil, nil) as String?
     }
 
-    /// The Mac stays awake only while Remote is on and a session needs it. The screen may still sleep, and closing the lid still sleeps the Mac.
+    /// The Mac stays awake only while Remote is on and a session needs it, or a paired phone is connected.
+    /// Sleeping as soon as the agents were done cut the phone off while you read or typed.
+    /// The screen may still sleep, and closing the lid still sleeps the Mac.
     func refreshAwake() {
-        let needed = keepAwake && connection != nil && store.sessions.contains { $0.activity == .working || $0.activity == .waiting }
+        let busy = store.sessions.contains { $0.activity == .working || $0.activity == .waiting }
+        let needed = keepAwake && connection != nil && (busy || !connected.isEmpty)
         if needed, awake == nil {
-            awake = ProcessInfo.processInfo.beginActivity(options: .idleSystemSleepDisabled, reason: "An agent is working, and a paired phone may answer it.")
+            awake = ProcessInfo.processInfo.beginActivity(options: .idleSystemSleepDisabled, reason: "An agent is working, or a paired phone is using Farol.")
         } else if !needed, let held = awake {
             ProcessInfo.processInfo.endActivity(held)
             awake = nil

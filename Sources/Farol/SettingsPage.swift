@@ -782,7 +782,7 @@ struct SettingsPage: View {
             }
             if agents.remote {
                 Row(title: "Keep the Mac awake for agents",
-                    detail: "While an agent works or waits for you, the Mac does not go to sleep by itself. Closing the lid still puts it to sleep.",
+                    detail: "While an agent works or waits for you, or your phone is connected, the Mac does not go to sleep by itself. Closing the lid still puts it to sleep.",
                     palette: p) {
                     toggle($agents.remoteKeepAwake)
                 }
