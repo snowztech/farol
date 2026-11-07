@@ -270,7 +270,7 @@ struct SettingsPage: View {
                 }
                 .labelsHidden()
                 .fixedSize()
-                .hoverRing(p)
+                .hoverLift()
             }
             Row(title: "App icon", detail: "Shown in the Dock while Farol runs.", palette: p) {
                 Picker("", selection: $appIcon) {
@@ -285,7 +285,7 @@ struct SettingsPage: View {
                 }
                 .labelsHidden()
                 .fixedSize()
-                .hoverRing(p)
+                .hoverLift()
             }
             Row(title: "Animations",
                 detail: "Panels slide, highlights glide and tips fade in. Off, everything changes at once. Reduce Motion in macOS turns them off too.",
@@ -321,10 +321,10 @@ struct SettingsPage: View {
                 }
                 .labelsHidden()
                 .fixedSize()
-                .hoverRing(p)
+                .hoverLift()
             }
             Row(title: "Size", palette: p) {
-                Stepper("\(settings.fontSize) pt", value: $settings.fontSize, in: 8...32).hoverRing(p)
+                Stepper("\(settings.fontSize) pt", value: $settings.fontSize, in: 8...32).hoverLift()
             }
         }
 
@@ -339,7 +339,7 @@ struct SettingsPage: View {
                 .labelsHidden()
                 .pickerStyle(.segmented)
                 .fixedSize()
-                .hoverRing(p)
+                .hoverLift()
             }
             Row(title: "Blink", palette: p) {
                 toggle($settings.cursorBlink)
@@ -360,7 +360,7 @@ struct SettingsPage: View {
                 .labelsHidden()
                 .pickerStyle(.segmented)
                 .fixedSize()
-                .hoverRing(p)
+                .hoverLift()
             }
             Row(title: "Copy on select", detail: "Selecting text copies it to the clipboard.", palette: p) {
                 toggle($settings.copyOnSelect)
@@ -443,7 +443,7 @@ struct SettingsPage: View {
                 }
                 .labelsHidden()
                 .fixedSize()
-                .hoverRing(p)
+                .hoverLift()
             }
         }
 
@@ -457,7 +457,7 @@ struct SettingsPage: View {
                 }
                 .labelsHidden()
                 .fixedSize()
-                .hoverRing(p)
+                .hoverLift()
             }
             if isCustomStart {
                 Row(title: "Command", palette: p) {
@@ -548,7 +548,23 @@ struct SettingsPage: View {
     @ViewBuilder private func worktreesSection(_ p: Palette) -> some View {
         Heading(title: "Worktrees", detail: "Applies to new tasks and worktree sessions.", palette: p)
 
-        GroupTitle(title: "Local environment", first: true, palette: p)
+        GroupTitle(title: "New branches", first: true, palette: p)
+        Card(palette: p) {
+            Row(title: "Start from",
+                detail: "Default branch fetches the remote's latest first, so a task doesn't build on whatever branch the repo is on. Without a remote, Farol uses the current branch.",
+                palette: p) {
+                Picker("", selection: $worktrees.startFromDefaultBranch) {
+                    Text("Current branch").tag(false)
+                    Text("Default branch").tag(true)
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .fixedSize()
+                .hoverLift()
+            }
+        }
+
+        GroupTitle(title: "Local environment", palette: p)
         Card(palette: p) {
             Row(title: "Copy local environment files",
                 detail: "Copies ignored .env files into each new worktree so projects can run immediately. Agents in the worktree can read their values.",
@@ -591,7 +607,7 @@ struct SettingsPage: View {
                     // The menu would grow as wide as the longest board's name and squeeze the words beside it.
                     .frame(width: 220)
                     .disabled(jira == nil)
-                    .hoverRing(p)
+                    .hoverLift()
                 }
             }
         }
@@ -1178,24 +1194,20 @@ private struct SettingsSwitch: View {
     }
 }
 
-/// macOS menus and steppers have no hover of their own, so a soft ring says the mouse is on one, like the buttons beside them.
-private struct HoverRing: ViewModifier {
-    let palette: Palette
-
+/// macOS menus and steppers have no hover of their own, so a slight lift says the mouse is on one. A border around them looked boxed in.
+private struct HoverLift: ViewModifier {
     @State private var hovering = false
 
     func body(content: Content) -> some View {
         content
-            .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .strokeBorder(palette.muted.opacity(hovering ? 0.55 : 0))
-                .padding(-2)
-                .allowsHitTesting(false))
+            .brightness(hovering ? 0.06 : 0)
+            .animation(.easeOut(duration: 0.12), value: hovering)
             .onClickableHover { hovering = $0 }
     }
 }
 
 extension View {
-    fileprivate func hoverRing(_ palette: Palette) -> some View { modifier(HoverRing(palette: palette)) }
+    fileprivate func hoverLift() -> some View { modifier(HoverLift()) }
 }
 
 /// A small heading between rows. Sentence case, a step above the rows, no rule of its own.

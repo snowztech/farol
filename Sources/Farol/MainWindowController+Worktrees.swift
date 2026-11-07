@@ -104,7 +104,8 @@ extension MainWindowController {
     /// One repo gets a plain worktree. Several get a task folder with a worktree of each.
     private func startWorktreeSession(branch: String, from repos: [String], run command: String?, environment: [String: String] = [:]) {
         store.createWorktreeSession(branch: branch, from: repos, run: command, environment: environment,
-                                    copyEnvironmentFiles: worktreeSettings.copyEnvironmentFiles) { [weak self] result in
+                                    copyEnvironmentFiles: worktreeSettings.copyEnvironmentFiles,
+                                    fromDefaultBranch: worktreeSettings.startFromDefaultBranch) { [weak self] result in
             if case .failure(let error) = result { self?.showError("Couldn't create the worktree", "\(error)") }
         }
     }

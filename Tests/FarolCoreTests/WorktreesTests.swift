@@ -100,6 +100,31 @@ struct Sandbox {
     #expect(throws: GitError.self) { try box.worktrees.create(branch: "twice", from: box.repo) }
 }
 
+@Test func startsFromTheRemotesLatestMain() throws {
+    let box = try Sandbox()
+    let commit = ["-c", "user.name=Farol", "-c", "user.email=farol@example.com", "commit", "--quiet", "--allow-empty", "-m"]
+    let remote = box.repo + "-remote.git", other = box.repo + "-other"
+    try Git.run(["init", "--quiet", "--bare", remote], in: box.repo)
+    try Git.run(["remote", "add", "origin", remote], in: box.repo)
+    try Git.run(["push", "--quiet", "origin", "main"], in: box.repo)
+    try Git.run(["clone", "--quiet", remote, other], in: box.repo)
+    try Git.run(commit + ["newer on main"], in: other)
+    try Git.run(["push", "--quiet", "origin", "main"], in: other)
+    try Git.run(["switch", "--quiet", "-c", "side"], in: box.repo)
+    try Git.run(commit + ["only on side"], in: box.repo)
+
+    let path = try box.worktrees.create(branch: "fresh", from: box.repo, fromDefaultBranch: true)
+    #expect(try Git.run(["rev-parse", "HEAD"], in: path) == Git.run(["rev-parse", "HEAD"], in: other))
+    #expect((try? Git.run(["rev-parse", "--abbrev-ref", "fresh@{upstream}"], in: box.repo)) == nil)
+}
+
+@Test func startsFromTheCurrentBranchWithoutARemote() throws {
+    let box = try Sandbox()
+    try Git.run(["switch", "--quiet", "-c", "side"], in: box.repo)
+    let path = try box.worktrees.create(branch: "fresh", from: box.repo, fromDefaultBranch: true)
+    #expect(try Git.run(["rev-parse", "HEAD"], in: path) == Git.run(["rev-parse", "side"], in: box.repo))
+}
+
 @Test func reusesBranchOfWorktreeDeletedOutsideGit() throws {
     let box = try Sandbox()
     let path = try box.worktrees.create(branch: "gone", from: box.repo)
