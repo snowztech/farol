@@ -6,6 +6,7 @@ set -euo pipefail
 usage="usage: scripts/shots.sh stage [sidebar|review|new-task]   build the shelf demo repo and open Farol Shots on it
        scripts/shots.sh shoot <name>              save the Farol Shots window as site/features/<name>.png
        scripts/shots.sh library                   stage once and shoot every feature into assets/screenshots
+       scripts/shots.sh themes                    the review in each of Farol's themes, into assets/screenshots/themes
        scripts/shots.sh reset                     quit Farol Shots and forget the scene
 
 make shots SCENE=review builds Farol Shots and stages a scene, and make shot NAME=review shoots it.
@@ -454,8 +455,8 @@ click() {
 relaunch() {
   local panels="$1" selected="${2:-0}"
   quit
-  # A light theme for the shots that ask for one, Farol's defaults for the rest.
-  if [ "${theme:-}" = light ]; then echo "theme = Farol Light" > "$dir/home/config"; else rm -f "$dir/home/config"; fi
+  # The theme a shot asks for, like theme="Farol Dusk", or Farol's default.
+  if [ -n "${theme:-}" ]; then echo "theme = $theme" > "$dir/home/config"; else rm -f "$dir/home/config"; fi
   python3 -I - "$dir/base.plist" "$dir/defaults.plist" "$panels" "$selected" <<'EOF'
 import json, plistlib, sys
 base, path, panels, selected = sys.argv[1], sys.argv[2], sys.argv[3].split(","), int(sys.argv[4])
@@ -469,6 +470,25 @@ EOF
   defaults import "$id" "$dir/defaults.plist"
   open -n --env FAROL_HOME="$dir/home" --env ZDOTDIR="$dir/zsh" --env SHOTS="$dir" "$app"
   sleep 6
+}
+
+# The same moment in each of Farol's themes, and all of them in one image to show them side by side.
+shoot_themes() {
+  local out="assets/screenshots/themes" name
+  mkdir -p "$root/$out"
+  for name in Beam Dark Fog Navy Dusk Ember Dawn Light; do
+    theme="Farol $name" relaunch review; shoot "$out/$(echo "$name" | tr '[:upper:]' '[:lower:]')"
+  done
+  ( cd "$root/$out" && ffmpeg -loglevel error -y -i beam.png -i dark.png -i fog.png -i navy.png -i dusk.png -i ember.png -i dawn.png -i light.png \
+      -filter_complex "$(for i in 0 1 2 3 4 5 6 7; do printf '[%d]scale=1270:-1[v%d];' $i $i; done)[v0][v1][v2][v3][v4][v5][v6][v7]xstack=inputs=8:layout=0_0|w0_0|0_h0|w0_h0|0_h0+h2|w0_h0+h2|0_h0+h2+h4|w0_h0+h2+h4" \
+      -frames:v 1 all.png ) && echo "saved $out/all.png"
+}
+
+# Only the themes, from one stage.
+themes() {
+  stage library
+  quit; defaults export "$id" "$dir/base.plist"
+  shoot_themes
 }
 
 # A shot of each feature, from one stage, into assets/screenshots.
@@ -489,8 +509,9 @@ library() {
   relaunch none; press "," "command down" 2; shoot "$out/settings"
   # Appearance, then the theme browser that opens beside it.
   relaunch none; press "," "command down" 2; click 350 103; click 860 148 3; shoot "$out/themes"
-  theme=light relaunch review; shoot "$out/review-notes-light"
-  theme=light relaunch none; shoot "$out/sidebar-light"
+  theme="Farol Light" relaunch review; shoot "$out/review-notes-light"
+  theme="Farol Light" relaunch none; shoot "$out/sidebar-light"
+  shoot_themes
   relaunch none; press d "command down" 2; typed "git log --oneline"; enter; shoot "$out/split"
   # The sixth session is harbor's Go upgrade, stopped on a merge conflict.
   relaunch none 5; press m "option down, command down" 3; shoot "$out/conflicts"
@@ -501,6 +522,7 @@ case "${1:-}" in
   stage) stage "${2:-}" ;;
   shoot) shoot "${2:-}" ;;
   library) library ;;
+  themes) themes ;;
   reset) quit; defaults delete "$id" >/dev/null 2>&1 || true; rm -rf "$dir" 2>/dev/null || { sleep 1; rm -rf "$dir"; }
          docker rm -f farol-shots-build-box farol-shots-gpu-box >/dev/null 2>&1 || true; echo "Farol Shots reset" ;;
   *) echo "$usage"; exit 64 ;;

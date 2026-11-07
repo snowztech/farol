@@ -21,4 +21,6 @@ Retake them all with `./scripts/shots.sh library` after `make shots`. It stages 
 | `split.png` | Claude Code with a pane split beside it, checking the branch's history |
 | `conflicts.png` | Merging main into a branch stopped on a conflict, in the three-column resolver |
 
+`themes/` holds the review above in each of Farol's themes, `beam.png` through `light.png`, and `all.png` with all eight side by side. Retake only those with `./scripts/shots.sh themes`.
+
 Not here yet: the menu bar and notch panels and the task editor. The iPhone app's shots live in the farol-ios repo.
