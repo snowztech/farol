@@ -3,7 +3,7 @@
 # Farol Shots is a debug build with its own identity and FAROL_HOME, so it never sees your sessions, tasks, servers, theme or Ghostty config.
 set -euo pipefail
 
-usage="usage: scripts/shots.sh stage [sidebar|review]   build the shelf demo repo and open Farol Shots on it
+usage="usage: scripts/shots.sh stage [sidebar|review|new-task]   build the shelf demo repo and open Farol Shots on it
        scripts/shots.sh shoot <name>              save the Farol Shots window as site/features/<name>.png
        scripts/shots.sh reset                     quit Farol Shots and forget the scene
 
@@ -97,6 +97,8 @@ test("lists links in the order they were saved", () => {
 EOF
   git add . && git commit -qm "docs: explain sync"
 
+  # A local origin, so New Task starts from origin/main as it does on a real repo, with no network.
+  git init -q --bare "$dir/origin/shelf.git" && git remote add origin "$dir/origin/shelf.git" && git push -q -u origin main
   git worktree add -q -b feat/search ../shelf-search
   git worktree add -q -b fix/flaky-tests ../shelf-flaky-tests
   git worktree add -q -b docs/api ../shelf-api
@@ -146,6 +148,7 @@ EOF
   printf 'module example.com/harbor\n\ngo 1.24\n' > go.mod
   printf 'package main\n\nfunc main() {}\n' > main.go
   git add . && git commit -qm "feat: start the server"
+  git init -q --bare "$dir/origin/harbor.git" && git remote add origin "$dir/origin/harbor.git" && git push -q -u origin main
   git worktree add -q -b feat/rate-limit ../harbor-rate-limit
   git worktree add -q -b chore/go-1.25 ../harbor-go
 }
@@ -206,11 +209,87 @@ EOF
   defaults write "$id" sidebar.groupByRepo -bool true
   defaults write "$id" sidebar.folded "$dir/harbor"
   defaults write "$id" review.width -float 560
+  tasks
+  [ "$1" = review ] && notes
+  return 0
+}
+
+# Tasks for later, so the sidebar's Tasks pane shows. Their times are days away, so none comes due while a scene is open.
+tasks() {
+  mkdir -p "$dir/home/schedules"
+  local once
+  once=$(date -v+5d '+%Y-%m-%d')
+  cat > "$dir/home/schedules/triage-issues.md" <<EOF
+---
+name: Triage new issues
+when: weekdays 9:00
+repos: $dir/shelf
+branch: triage
+agent: claude
+---
+Read the issues opened since yesterday, label them, and draft a reply for each bug report.
+EOF
+  cat > "$dir/home/schedules/bump-dependencies.md" <<EOF
+---
+name: Bump dependencies
+when: mon 8:30
+repos: $dir/harbor
+branch: bump-deps
+agent: codex
+---
+Update the Go modules, run the tests, and open a pull request if they pass.
+EOF
+  cat > "$dir/home/schedules/release-notes.md" <<EOF
+---
+name: Write the release notes
+when: once $once 17:00
+repos: $dir/shelf
+branch: release-notes
+agent: claude
+---
+Write the release notes for 0.4 from the merged pull requests.
+EOF
+  # Farol's own record of each task: allowed, as if you had written it in New Task, and with a few past runs.
+  local states
+  states=$(python3 -I - <<'EOF'
+import json, time
+ref = 978307200  # Foundation dates count seconds from 2001.
+now = time.time() - ref
+day = 86400
+# Since now, so Farol counts no run as missed and starts none. The past runs are only history to show.
+state = lambda runs: {"paused": False, "since": now, "lastDue": now, "allowed": True,
+                      "runs": [{"started": now - d * day, "branch": b} for d, b in runs]}
+print(json.dumps({
+    "triage-issues": state([(1, "triage-2026-11-06"), (2, "triage-2026-11-05")]),
+    "bump-dependencies": state([(5, "bump-deps-2026-11-02")]),
+    "release-notes": state([]),
+}).encode().hex())
+EOF
+)
+  defaults write "$id" schedules.state -data "$states"
+}
+
+# Two notes for the agent under lines of the change, waiting to be sent.
+notes() {
+  local json
+  json=$(python3 -I - "$dir/shelf" <<'EOF'
+import json, sys, uuid
+root = sys.argv[1]
+note = lambda path, line, end, text: {
+    "id": str(uuid.uuid4()).upper(), "path": path, "line": line, "end": end, "old": False, "lost": False,
+    "quote": open(f"{root}/{path}").read().splitlines()[line - 1:end], "text": text}
+print(json.dumps({root: [
+    note("src/queue.ts", 20, 21, "Keep the change when this throws, so the next flush retries it instead of losing it."),
+    note("README.md", 10, 11, "Say what happens to changes made while shelf is closed."),
+]}).encode().hex())
+EOF
+)
+  defaults write "$id" review.notes -data "$json"
 }
 
 stage() {
   local name="${1:-sidebar}"
-  case "$name" in sidebar|review) ;; *) echo "shots: unknown scene $name (sidebar, review)" >&2; exit 64 ;; esac
+  case "$name" in sidebar|review|new-task) ;; *) echo "shots: unknown scene $name (sidebar, review, new-task)" >&2; exit 64 ;; esac
   [ -d "$app" ] || { echo "shots: build it first with make shots" >&2; exit 1; }
   quit
   repo
@@ -230,6 +309,13 @@ print(next((s["status"] for s in json.load(sys.stdin)["sessions"] if s["name"] =
     [ -n "$worked" ] && [ "$status" != working ] && break
   done
   [ -n "$worked" ] || echo "shots: Claude Code never started. Is it waiting on a prompt in Farol Shots?" >&2
+  # Opened the way you would, so the sheet shows what it does today. Typing needs Accessibility for your terminal app.
+  if [ "$name" = new-task ]; then
+    open -a "$app"; sleep 1
+    osascript -e 'tell application "System Events" to keystroke "n" using {shift down, command down}' \
+      -e 'delay 1' -e 'tell application "System Events" to keystroke "Add tags to saved links, with a --tag filter on shelf list"' \
+      || echo "shots: couldn't type into Farol Shots. Give your terminal app Accessibility, or press ⇧⌘N yourself." >&2
+  fi
   echo "Done. Set up anything else by hand, then: scripts/shots.sh shoot <name>"
 }
 
