@@ -994,11 +994,13 @@ final class RemoteBridge: ObservableObject {
     @discardableResult
     private static func pushed(_ branch: String, message: String?, in directory: String) throws -> String {
         let message = message?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if !message.isEmpty {
+        // The phone sends its message either way, so a branch with everything committed just goes up.
+        let uncommitted = (try? Diff.files(in: directory, .uncommitted))?.isEmpty == false
+        if !message.isEmpty, uncommitted {
             do { try History.commitAll(message, in: directory) } catch { throw ShipFailure(description: "Couldn't commit: \(error)") }
         }
         do { try History.push(in: directory) } catch {
-            throw ShipFailure(description: (message.isEmpty ? "Couldn't push: " : "Committed, but couldn't push: ") + "\(error)")
+            throw ShipFailure(description: (message.isEmpty || !uncommitted ? "Couldn't push: " : "Committed, but couldn't push: ") + "\(error)")
         }
         return branch
     }
