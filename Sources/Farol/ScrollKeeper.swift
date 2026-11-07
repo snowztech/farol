@@ -110,6 +110,8 @@ final class DiffAnchors {
 struct DiffScrollKeeper: NSViewRepresentable {
     let key: String?
     let anchors: DiffAnchors
+    /// Changes when rows come or go above where you are, like notes, so the place is put back without a reload.
+    var change = 0
     let jump: (String) -> Void
 
     func makeNSView(context: Context) -> NSView { NSView() }
@@ -117,6 +119,7 @@ struct DiffScrollKeeper: NSViewRepresentable {
     func updateNSView(_ view: NSView, context: Context) {
         context.coordinator.jump = jump
         context.coordinator.follow(key, anchors, in: view)
+        context.coordinator.keep(change, in: view)
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -129,8 +132,30 @@ struct DiffScrollKeeper: NSViewRepresentable {
         private var observer: NSObjectProtocol?
         private var restoring = false
         private var attempt = 0
+        private var change = 0
 
         deinit { observer.map(NotificationCenter.default.removeObserver) }
+
+        /// Puts you back on the same lines once the list is laid out again.
+        /// When that part is gone and the list got shorter than where you were, it rests at the new end rather than past it on nothing.
+        func keep(_ change: Int, in view: NSView) {
+            guard change != self.change else { return }
+            self.change = change
+            let anchor = key.flatMap { anchors?.saved[$0] }
+            for delay in [0.0, 0.08] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self, weak view] in
+                    guard let self, let scroll = view?.enclosingScrollView, let document = scroll.documentView else { return }
+                    let clip = scroll.contentView
+                    if let anchor, Self.views(in: document).contains(where: { $0.rowID == anchor.row }) {
+                        return place(anchor, in: scroll, step: 0)
+                    }
+                    let room = max(document.frame.height - clip.bounds.height, 0)
+                    guard clip.bounds.origin.y > room else { return }
+                    clip.scroll(to: NSPoint(x: clip.bounds.origin.x, y: room))
+                    scroll.reflectScrolledClipView(clip)
+                }
+            }
+        }
 
         func follow(_ key: String?, _ anchors: DiffAnchors, in view: NSView) {
             self.anchors = anchors

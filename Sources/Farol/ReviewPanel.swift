@@ -14,6 +14,10 @@ final class ReviewModel: ObservableObject {
         case thread(LineRef, [Forge.Discussion.Comment])
         /// The field for a new comment on a line.
         case composer(LineRef)
+        /// Your notes for the agent on one line, or on lines ending at it.
+        case notes(LineRef, [ReviewNote])
+        /// Notes whose lines the diff no longer shows, above the files.
+        case lostNotes([ReviewNote])
 
         var id: String {
             switch self {
@@ -22,6 +26,8 @@ final class ReviewModel: ObservableObject {
             case .note(let file, _): "\(file)#note"
             case .thread(let line, _): "\(line.path)#thread\(line.old ? "-" : "")\(line.line)"
             case .composer(let line): "\(line.path)#composer"
+            case .notes(let line, _): "\(line.path)#notes\(line.old ? "-" : "")\(line.line)"
+            case .lostNotes: "#lost-notes"
             }
         }
     }
@@ -31,6 +37,8 @@ final class ReviewModel: ObservableObject {
         let path: String
         let line: Int
         let old: Bool
+        /// The first line, for a note on several. The composer and the note go under `line`, the last.
+        var first: Int? = nil
     }
 
     @Published private(set) var root: String?
@@ -480,14 +488,155 @@ final class ReviewModel: ObservableObject {
     func startComment(on line: LineRef) {
         if composing != line { draft = "" }
         composing = line
+        editingNote = nil
         sendError = nil
         rebuild()
     }
 
     func cancelComment() {
         composing = nil
+        editingNote = nil
         sendError = nil
         rebuild()
+    }
+
+    // MARK: Notes for the agent
+
+    /// The agent of the session on screen, to send notes to. Set by the window, which knows the sessions.
+    var agent: () -> ReviewAgent? = { nil }
+    /// Your notes on your own changes, per checkout. Kept across launches, since a review can take a while.
+    @Published private var allNotes: [String: [ReviewNote]] = ReviewModel.savedNotes() {
+        didSet { UserDefaults.standard.set(try? JSONEncoder().encode(allNotes), forKey: Self.notesKey) }
+    }
+    var notes: [ReviewNote] { root.flatMap { allNotes[$0] } ?? [] }
+    /// Changes whenever a note comes, goes or is sent, which moves the rows below it.
+    var notesShape: Int { notes.map { "\($0.id)\($0.sent)\($0.lost)\($0.text.count)" }.joined().hashValue }
+    var unsentNotes: [ReviewNote] { notes.filter { !$0.sent } }
+    /// The note being changed in the composer, rather than a new one.
+    @Published private(set) var editingNote: UUID?
+    /// The note under the mouse, whose lines the diff tints.
+    @Published var hoveredNote: UUID?
+
+    /// The dots and tint for your notes in one file.
+    func noteLines(in path: String, color: NSColor) -> DiffNotes? {
+        let here = canNote ? notes.filter { $0.path == path && !$0.lost } : []
+        guard !here.isEmpty else { return nil }
+        var marks = DiffNotes(color: color)
+        for note in here {
+            if note.old { marks.oldLines.formUnion(note.line...note.end) } else { marks.lines.formUnion(note.line...note.end) }
+            if note.id == hoveredNote { (marks.lit, marks.litOld) = (note.line...note.end, note.old) }
+        }
+        return marks
+    }
+    /// Said once notes went, or why they couldn't.
+    @Published private(set) var noteStatus: (text: String, failed: Bool)?
+    private static let notesKey = "review.notes"
+
+    private static func savedNotes() -> [String: [ReviewNote]] {
+        UserDefaults.standard.data(forKey: notesKey).flatMap { try? JSONDecoder().decode([String: [ReviewNote]].self, from: $0) } ?? [:]
+    }
+
+    /// Your own changes take notes for the agent. A request's lines take comments for its forge instead.
+    var canNote: Bool { scope.isYours && root != nil }
+
+    /// Saves the composer's text as a note, or sends it at once with `now`.
+    func saveNote(sendingNow now: Bool = false) {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let root, let line = composing, !text.isEmpty, let file = files.first(where: { $0.path == line.path }) else { return NSSound.beep() }
+        let first = line.first ?? line.line
+        var list = allNotes[root] ?? []
+        var note: ReviewNote
+        if let id = editingNote, let index = list.firstIndex(where: { $0.id == id }) {
+            list[index].text = text
+            list[index].sentAt = nil
+            note = list[index]
+        } else {
+            note = ReviewNote(path: line.path, line: first, end: line.line, old: line.old,
+                              quote: ReviewNotes.quote(in: file, line: first, end: line.line, old: line.old) ?? [], text: text)
+            list.append(note)
+        }
+        allNotes[root] = list
+        draft = ""
+        composing = nil
+        editingNote = nil
+        if now { send([note]) } else { rebuild() }
+    }
+
+    func editNote(_ note: ReviewNote) {
+        composing = LineRef(path: note.path, line: note.end, old: note.old, first: note.line == note.end ? nil : note.line)
+        draft = note.text
+        editingNote = note.id
+        rebuild()
+    }
+
+    /// Ticking a sent note off and deleting one are the same: it's gone.
+    func removeNote(_ id: UUID) {
+        guard let root else { return }
+        allNotes[root]?.removeAll { $0.id == id }
+        rebuild()
+    }
+
+    func clearSentNotes() {
+        guard let root else { return }
+        allNotes[root]?.removeAll(where: \.sent)
+        rebuild()
+    }
+
+    /// The notes not sent yet, in one prompt, with `also` for the change as a whole.
+    func sendNotes(also: String? = nil) {
+        send(unsentNotes, also: also)
+    }
+
+    private func send(_ list: [ReviewNote], also: String? = nil) {
+        guard let root, !list.isEmpty else { return }
+        let prompt = ReviewNotes.prompt(list.map(ReviewNotes.Item.init), also: also)
+        guard deliver(prompt) else { return }
+        let ids = Set(list.map(\.id))
+        allNotes[root] = allNotes[root]?.map { note in
+            var note = note
+            if ids.contains(note.id) { note.sentAt = .now }
+            return note
+        }
+        rebuild()
+    }
+
+    /// A reviewer's comments on a line of the request, for the agent to address.
+    func sendComments(_ comments: [Forge.Discussion.Comment], on line: LineRef) {
+        let quote = files.first { $0.path == line.path }.flatMap { ReviewNotes.quote(in: $0, line: line.line, end: line.line, old: line.old) } ?? []
+        let items = comments.map {
+            ReviewNotes.Item(path: line.path, line: line.line, end: line.line, old: line.old, quote: quote, text: $0.text, author: $0.author)
+        }
+        _ = deliver(ReviewNotes.prompt(items, header: ReviewNotes.reviewerComments))
+    }
+
+    /// Reviewers' comments reach the agent working on that request's branch, so only on a request of the session's own branch.
+    var canSendComments: Bool {
+        guard let shown = shownRequest, case .open(let number, _) = request else { return false }
+        return shown.number == number && agent() != nil
+    }
+
+    private func deliver(_ prompt: String) -> Bool {
+        guard let agent = agent() else {
+            noteStatus = ("No agent is running in this session. Start one, then send again.", true)
+            return false
+        }
+        if let refusal = agent.refusal {
+            noteStatus = (refusal, true)
+            return false
+        }
+        agent.send(prompt)
+        noteStatus = ("Sent to \(agent.name).", false)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
+            if self?.noteStatus?.failed == false { self?.noteStatus = nil }
+        }
+        return true
+    }
+
+    /// Moves each note to where its lines are now, after the agent or you changed the file.
+    private func anchorNotes() {
+        guard let root, scope.isYours, let list = allNotes[root], !list.isEmpty else { return }
+        let anchored = list.map { ReviewNotes.anchor($0, in: files) }
+        if anchored != list { allNotes[root] = anchored }
     }
 
     /// Sends the draft, then reads the conversation again so the comment shows under its line.
@@ -890,16 +1039,23 @@ final class ReviewModel: ObservableObject {
             }
         }
         self.conversation = conversation
-        let composing = showsRequest ? composing : nil
+        let composing = showsRequest || canNote ? composing : nil
+        anchorNotes()
+        var noted: [LineRef: [ReviewNote]] = [:]
+        for note in canNote ? notes : [] where !note.lost {
+            noted[LineRef(path: note.path, line: note.end, old: note.old), default: []].append(note)
+        }
 
         var rows: [Row] = []
+        let lost = canNote ? notes.filter(\.lost) : []
+        if !lost.isEmpty { rows.append(.lostNotes(lost)) }
         for file in files {
             let folded = collapsed.contains(file.path)
             rows.append(.header(file, collapsed: folded))
             if folded { continue }
             if file.isBinary { rows.append(.note(file: file.path, "Binary file")) }
             if file.hunks.isEmpty { continue }
-            var lines = Set(threads.keys.filter { $0.path == file.path })
+            var lines = Set(threads.keys.filter { $0.path == file.path }).union(noted.keys.filter { $0.path == file.path })
             if let composing, composing.path == file.path { lines.insert(composing) }
             let placed = lines.compactMap { line in DiffTextView.row(of: line.line, old: line.old, in: file).map { (row: $0, line: line) } }
             // The diff is cut after each line with comments, so they show right under it.
@@ -909,6 +1065,7 @@ final class ReviewModel: ObservableObject {
                 start = row + 1
                 for line in here.map(\.line) {
                     if let comments = threads[line] { rows.append(.thread(line, comments)) }
+                    if let mine = noted[line] { rows.append(.notes(line, mine)) }
                 }
                 if let composing, here.contains(where: { $0.line == composing }) { rows.append(.composer(composing)) }
             }
@@ -951,6 +1108,7 @@ struct ReviewPanel: View {
                                    busy: false, icon: forge.kind, palette: p) { NSWorkspace.shared.open(request.url) }
                         if forge.takesLineComments { SubmitReviewButton(review: review, forge: forge, palette: p) }
                     }
+                    if review.canNote, !review.notes.isEmpty { NotesButton(review: review, palette: p) }
                     if !isCommit {
                         RequestBadge(review: review, palette: p)
                         if review.uncommitted > 0 {
@@ -964,6 +1122,14 @@ struct ReviewPanel: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.bottom, 8)
+            }
+            if let status = review.noteStatus {
+                Text(status.text)
+                    .font(.system(size: 11))
+                    .foregroundStyle(status.failed ? p.waiting : p.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 8)
             }
             Rectangle().fill(p.line).frame(height: 1)
             if review.findOpen { findBar(p) }
@@ -995,7 +1161,7 @@ struct ReviewPanel: View {
                         }
                         .padding(.bottom, 12)
                         .background(RevealKeeper(request: review.reveal))
-                        .background(DiffScrollKeeper(key: review.root, anchors: review.anchors,
+                        .background(DiffScrollKeeper(key: review.root, anchors: review.anchors, change: review.notesShape,
                                                      jump: { proxy.scrollTo($0, anchor: .top) }))
                     }
                     .onChange(of: review.reveal) {
@@ -1087,19 +1253,43 @@ struct ReviewPanel: View {
                        open: review.scope.isRequest ? nil : { review.root.map { open(($0 as NSString).appendingPathComponent(file.path), file.firstChange) } })
         case .body(let file, let rows):
             DiffText(file: file, rows: rows, colors: p.diff, syntax: p.code,
-                     comment: review.canComment ? { review.startComment(on: .init(path: file.path, line: $0, old: $1)) } : nil,
+                     comment: review.canComment || review.canNote ? { review.startComment(on: .init(path: file.path, line: $0, old: $1)) } : nil,
+                     noteLines: review.canNote ? { review.startComment(on: .init(path: file.path, line: $1, old: $2, first: $0)) } : nil,
                      expand: { review.expand(file.path, gap: $0, fromTop: $1) },
                      loading: review.expanding.contains(file.path),
-                     marks: review.marks[file.path])
+                     marks: review.marks[file.path],
+                     notes: review.noteLines(in: file.path, color: NSColor(p.accent)))
                 .padding(.horizontal, 8)
-        case .thread(_, let comments):
+        case .thread(let line, let comments):
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(comments.enumerated()), id: \.offset) { _, comment in
                     CommentView(comment: comment, empty: "", palette: p, reveal: nil)
                 }
+                if review.canSendComments {
+                    HStack {
+                        Spacer(minLength: 0)
+                        let agent = review.agent()
+                        ShipButton(title: "Send to \(agent?.name ?? "agent")", help: "Ask the agent to address this comment",
+                                   busy: false, agent: agent?.kind, palette: p) { review.sendComments(comments, on: line) }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.top, 4)
+                }
             }
             .padding(.leading, 24)
             .padding(.bottom, 6)
+        case .notes(_, let notes):
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(notes) { NoteView(note: $0, review: review, palette: p) }
+            }
+            .padding(.leading, 24)
+            .padding(.bottom, 6)
+        case .lostNotes(let notes):
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Their lines changed since").font(.system(size: 11)).foregroundStyle(p.muted).padding(.leading, 8)
+                ForEach(notes) { NoteView(note: $0, review: review, showsPlace: true, palette: p) }
+            }
+            .padding(.vertical, 8)
         case .composer(let line):
             LineComposer(review: review, line: line, palette: p).padding(.leading, 24).padding(.bottom, 6)
         case .note(_, let text):
@@ -1721,6 +1911,16 @@ private struct LineComposer: View {
 
     @FocusState private var focused: Bool
 
+    private var place: String {
+        let lines = line.first.map { "lines \($0)–\(line.line)" } ?? "line \(line.line)"
+        return line.old ? "On removed \(lines)" : "On \(lines)"
+    }
+
+    private var placeholder: String {
+        guard review.canNote else { return "Comment…" }
+        return "Note for \(review.agent()?.name ?? "the agent")…"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             TextEditor(text: $review.draft)
@@ -1728,19 +1928,38 @@ private struct LineComposer: View {
                 .foregroundStyle(palette.text)
                 .scrollContentBackground(.hidden)
                 .focused($focused)
-                .frame(minHeight: 56, maxHeight: 160)
+                .frame(minHeight: 36, maxHeight: 160)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(6)
+                .background(alignment: .topLeading) {
+                    if review.draft.isEmpty {
+                        Text(placeholder).font(.system(size: 12)).foregroundStyle(palette.muted).padding(.horizontal, 11).padding(.vertical, 6)
+                    }
+                }
                 .background(RoundedRectangle(cornerRadius: 6).fill(palette.background))
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(palette.line))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(focused ? palette.muted : palette.line))
             if let error = review.sendError {
                 Text(error).font(.system(size: 11)).foregroundStyle(palette.removed).fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 8) {
-                Text(line.old ? "On removed line \(line.line)" : "On line \(line.line)").font(.system(size: 11)).foregroundStyle(palette.muted)
+                Text(place).font(.system(size: 11)).foregroundStyle(palette.muted)
                 Spacer(minLength: 8)
-                ShipButton(title: "Cancel", busy: false, palette: palette) { review.cancelComment() }
-                ShipButton(title: "Comment", busy: review.isSending, keys: "⌘↩", palette: palette) { review.sendComment() }
-                    .keyboardShortcut(.return, modifiers: .command)
+                NoteAction(title: "Cancel", help: "Close without saving · Esc", palette: palette) { review.cancelComment() }
+                if review.canNote {
+                    // Saved by default, like a review you send once it's done. Send now is for one quick fix, with an agent to take it.
+                    if let agent = review.agent() {
+                        ShipButton(title: "Send now", help: "Send just this note to \(agent.name)", busy: false, keys: "⇧⌘↩", palette: palette) {
+                            review.saveNote(sendingNow: true)
+                        }
+                        .keyboardShortcut(.return, modifiers: [.command, .shift])
+                    }
+                    ShipButton(title: review.editingNote == nil ? "Add note" : "Save note", help: "Keep it to send with your other notes",
+                               busy: false, primary: true, keys: "⌘↩", palette: palette) { review.saveNote() }
+                        .keyboardShortcut(.return, modifiers: .command)
+                } else {
+                    ShipButton(title: "Comment", busy: review.isSending, keys: "⌘↩", palette: palette) { review.sendComment() }
+                        .keyboardShortcut(.return, modifiers: .command)
+                }
             }
         }
         .padding(10)
@@ -1760,5 +1979,134 @@ private extension Markdown.Block {
         case .heading, .paragraph: true
         default: false
         }
+    }
+}
+
+/// The agent in the session the review shows, as the review panel sends to it.
+struct ReviewAgent {
+    let name: String
+    /// For its tile on the buttons that send to it. Nil for a program Farol doesn't know.
+    let kind: AgentFolder.Kind?
+    /// Why it can't take a message now, like waiting on a question. Nil when it can.
+    let refusal: String?
+    let send: (String) -> Void
+}
+
+/// One of your notes for the agent, under its line. A bar in the margin rather than a box, so the diff stays what you read.
+/// A draft until sent, then faded with when it went, until you resolve it.
+private struct NoteView: View {
+    let note: ReviewNote
+    @ObservedObject var review: ReviewModel
+    /// For a note shown apart from its lines, which says where it was.
+    var showsPlace = false
+    let palette: Palette
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 0) {
+            Rectangle().fill(palette.accent.opacity(note.sent ? 0.4 : 1)).frame(width: 2)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    if let kind = review.agent()?.kind { ToolTile(agent: kind, size: 14).opacity(note.sent ? 0.6 : 1) }
+                    Text(status).font(.system(size: 11, weight: .medium)).foregroundStyle(palette.muted)
+                    if showsPlace || note.line != note.end {
+                        Text(place).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1)
+                    }
+                    Spacer(minLength: 8)
+                    // Words, not icons: each says what it does, at the size of the text around it.
+                    if note.sent {
+                        NoteAction(title: "Resolve", help: "Remove it, once the agent has dealt with it", palette: palette) { review.removeNote(note.id) }
+                    } else {
+                        NoteAction(title: "Edit", help: "Change the note", palette: palette) { review.editNote(note) }
+                        NoteAction(title: "Delete", help: "Delete the note", palette: palette) { review.removeNote(note.id) }
+                    }
+                }
+                Text(note.text)
+                    .font(.system(size: 12))
+                    .foregroundStyle(palette.text.opacity(note.sent ? 0.6 : 1))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            }
+            .padding(.leading, 10)
+            .padding(.trailing, 6)
+            .padding(.vertical, 8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(palette.surface.opacity(0.6))
+        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .padding(.horizontal, 8)
+        // Its lines light up in the diff while you point at it, so a note on several lines shows which.
+        .onHover { inside in
+            if inside { review.hoveredNote = note.id } else if review.hoveredNote == note.id { review.hoveredNote = nil }
+        }
+    }
+
+    private var status: String {
+        guard let sent = note.sentAt else { return "Draft" }
+        return "Sent \(Self.age.localizedString(for: sent, relativeTo: .now))"
+    }
+
+    private var place: String {
+        let lines = note.line == note.end ? "\(note.line)" : "\(note.line)–\(note.end)"
+        return showsPlace ? (note.path as NSString).lastPathComponent + ":" + lines : "lines " + lines
+    }
+
+    private static let age: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter
+    }()
+}
+
+/// Sends your notes to the session's agent in one prompt, in one click. Anything more you'd tell the agent in its terminal as usual.
+/// It shows the agent's tile, so you know where they go before you click.
+private struct NotesButton: View {
+    @ObservedObject var review: ReviewModel
+    let palette: Palette
+
+    var body: some View {
+        let unsent = review.unsentNotes.count
+        let notes = "\(unsent) \(unsent == 1 ? "note" : "notes")"
+        if unsent == 0 {
+            // Named for what it removes, so it can't read as accepting the changes next to Commit.
+            let sent = review.notes.count
+            ShipButton(title: "Resolve \(sent) \(sent == 1 ? "note" : "notes")",
+                       help: "Remove the notes you sent, once the agent has dealt with them. Your changes stay as they are.", busy: false,
+                       palette: palette) { review.clearSentNotes() }
+        } else if let agent = review.agent() {
+            // The next step while notes wait, ahead of committing work the agent is about to change.
+            ShipButton(title: "Send \(notes)", help: "Send them to \(agent.name) in one message", busy: false, agent: agent.kind,
+                       primary: true, palette: palette) { review.sendNotes() }
+        } else {
+            // Nothing to send to, so a count rather than a button that would only say no.
+            Text(notes)
+                .font(.system(size: 12))
+                .foregroundStyle(palette.muted)
+                .hoverTip("Start an agent in this session to send your notes to it")
+        }
+    }
+}
+
+/// A note's action as a word in the note's own size, lit under the mouse.
+private struct NoteAction: View {
+    let title: String
+    let help: String
+    let palette: Palette
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(hovering ? palette.text : palette.muted)
+                .padding(.horizontal, 6)
+                .frame(height: 20)
+                .background(RoundedRectangle(cornerRadius: 4).fill(hovering ? palette.raised : .clear))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onClickableHover { hovering = $0 }
+        .hoverTip(help)
     }
 }
