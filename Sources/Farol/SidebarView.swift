@@ -9,6 +9,8 @@ struct SidebarView: View {
     @ObservedObject var state: WindowState
     @ObservedObject var scheduler: Scheduler
     let commands: Commands
+    let servers: ServerLinks
+    let serverCommands: ServerCommands
     let resize: (CGFloat) -> Void
 
     @State private var dragging: Session?
@@ -54,6 +56,7 @@ struct SidebarView: View {
                             .onDrop(of: [.text], delegate: Reorder(target: session, store: store, dragging: $dragging))
                         }
                     }
+                    ServerGroups(servers: servers, store: store, palette: p, highlight: selection, commands: serverCommands)
                 }
                 .padding(8)
                 .animation(Motion.enabled ? .spring(response: 0.32, dampingFraction: 0.86) : nil, value: store.selectedID)
@@ -63,8 +66,12 @@ struct SidebarView: View {
                 TasksPane(scheduler: scheduler, store: store, palette: p)
             }
             // Pinned below the list, so it stays in the same place however many sessions there are.
-            NewTaskRow(palette: p, action: commands.newTask)
-                .padding(8)
+            HStack(spacing: 4) {
+                NewTaskRow(palette: p, action: commands.newTask)
+                // Beside New task, small: a server is added once, a task every day.
+                CloseButton(symbol: "server.rack", help: "Add a server", palette: p, action: serverCommands.add)
+            }
+            .padding(8)
         }
         // Reaching a session in a folded project, with ⌘1 to ⌘9, a notification or a new session, opens the project so the row is there.
         // A new session's repo is found a moment after it's selected, so the repo is watched too.

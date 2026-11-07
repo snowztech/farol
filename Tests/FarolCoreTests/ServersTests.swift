@@ -77,3 +77,25 @@ private func runSetup(pairedAlready: Bool) throws -> [String] {
     #expect(command.hasPrefix("ssh -t 'hetzner' "))
     #expect(command.contains("farol.sh/host.sh"))
 }
+
+@Test func attachingNamesTheWindowForTheServersShell() throws {
+    let command = ServerSetup.attach(ssh: "hetzner", window: "@3")
+    #expect(command.hasPrefix("ssh -t 'hetzner' "))
+    // What the server's shell gets once this Mac's shell has taken its quotes off, then what tmux gets from that.
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/sh")
+    let remote = command.replacingOccurrences(of: "ssh -t 'hetzner' ", with: "")
+    process.arguments = ["-c", "sh -c \"printf '%s|' $(printf '%s' \(remote))\""]
+    let output = Pipe()
+    process.standardOutput = output
+    try process.run()
+    process.waitUntilExit()
+    let words = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    #expect(words == "tmux|attach-session|-t|@3|")
+}
+
+@Test func tellsAWindowIDFromOtherOutput() {
+    #expect(ServerSetup.isWindow("@12"))
+    #expect(!ServerSetup.isWindow("@"))
+    #expect(!ServerSetup.isWindow("no server running"))
+}

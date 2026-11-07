@@ -84,6 +84,26 @@ public enum ServerSetup {
         "ssh -t \(NewTask.shellQuoted(ssh)) \(NewTask.shellQuoted("sh -c " + NewTask.shellQuoted(script(deviceName: deviceName))))"
     }
 
+    /// Opens a server's tmux window in this terminal. Attaching to a window makes it the one on screen.
+    public static func attach(ssh: String, window: String) -> String {
+        "ssh -t \(NewTask.shellQuoted(ssh)) " + NewTask.shellQuoted("tmux attach-session -t " + NewTask.shellQuoted(window))
+    }
+
+    /// Makes a tmux session on the server and prints its window, with no terminal, so the session opened next knows which it is.
+    public static func newWindowArguments(ssh: String) -> [String] {
+        ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", ssh, "tmux new-session -d -P -F '#{window_id}'"]
+    }
+
+    /// A new tmux session on the server in this terminal, for when ssh can't run without one, like a host that asks for a password.
+    public static func newSession(ssh: String) -> String {
+        "ssh -t \(NewTask.shellQuoted(ssh)) tmux new-session"
+    }
+
+    /// Whether what tmux printed is a window id, like "@3".
+    public static func isWindow(_ text: String) -> Bool {
+        text.count > 1 && text.hasPrefix("@") && text.dropFirst().allSatisfy(\.isNumber)
+    }
+
     /// The last pairing link farol-host printed, found on screen. A link wider than the terminal wraps onto lines that hold nothing else.
     public static func pairingLink(in screen: String) -> URL? {
         let prefix = "https://farol.sh/pair#"

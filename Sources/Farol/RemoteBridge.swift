@@ -1167,8 +1167,8 @@ final class RemoteBridge: ObservableObject {
     }
 }
 
-/// The Mac's own remote key, in the login Keychain.
-private enum Keychain {
+/// The Mac's own remote key, in the login Keychain. The servers you add know this Mac by it too.
+enum Keychain {
     private static var query: [CFString: Any] {
         [kSecClass: kSecClassGenericPassword, kSecAttrService: "Farol Remote", kSecAttrAccount: Bundle.main.bundleIdentifier ?? "farol"]
     }

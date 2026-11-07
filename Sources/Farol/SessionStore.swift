@@ -16,6 +16,8 @@ final class Session: ObservableObject, Identifiable {
     var panels = Panels()
     /// The schedule this session is a run of. One run is open at a time, so the next waits until this one closes.
     var schedule: String?
+    /// The server and tmux window this session shows over ssh, as `ServerLinks.key`. It sits under its server in the sidebar and is never saved.
+    var serverWindow: String?
     @Published var directory: String
     /// Reported per pane by agent hooks or interactive terminal titles.
     @Published private(set) var agents: [UUID: AgentActivity] = [:]
@@ -507,10 +509,11 @@ final class SessionStore: ObservableObject {
 
     /// The sidebar's sections: one per repo once sessions span several, else a single unnamed one.
     var groups: [Grouping.Group<Session>] {
+        let local = sessions.filter { $0.serverWindow == nil }
         guard UserDefaults.standard.bool(forKey: Self.groupByRepoKey) else {
-            return [Grouping.Group(key: nil, items: sessions)]
+            return [Grouping.Group(key: nil, items: local)]
         }
-        return Grouping.group(sessions, by: \.repoRoot)
+        return Grouping.group(local, by: \.repoRoot)
     }
 
     /// Sessions in the order the sidebar shows them, which ⌘1 to ⌘9 and next or previous follow.
@@ -521,9 +524,9 @@ final class SessionStore: ObservableObject {
     /// `select` false opens it in the sidebar without leaving the session on screen, as a task an agent starts does.
     @discardableResult
     func create(directory: String = NSHomeDirectory(), run: String? = nil, environment: [String: String] = [:], select: Bool = true,
-                repo: String? = nil) -> Session {
+                repo: String? = nil, serverWindow: String? = nil) -> Session {
         create(PaneContainer(makeTerminal(in: directory, run: run, environment: environment)), directory: directory, select: select,
-               repo: repo)
+               repo: repo, serverWindow: serverWindow)
     }
 
     /// An agent on `task` in a new worktree of the repository each of `directories` is in, on a branch no other has, with the task as its first prompt.
@@ -591,8 +594,10 @@ final class SessionStore: ObservableObject {
         save()
     }
 
-    private func create(_ panes: PaneContainer, directory: String, select: Bool = true, repo: String? = nil) -> Session {
+    private func create(_ panes: PaneContainer, directory: String, select: Bool = true, repo: String? = nil,
+                        serverWindow: String? = nil) -> Session {
         let session = Session(panes: panes, directory: directory)
+        session.serverWindow = serverWindow
         let known = knownCheckout(of: directory)
         session.assume(repo: repo ?? known?.repoRoot, branch: repo == nil ? known?.branch : nil)
         remember(session)
@@ -735,14 +740,15 @@ final class SessionStore: ObservableObject {
     /// Saved on every change rather than at quit, so a crash keeps the sessions too.
     private func save() {
         let defaults = UserDefaults.standard
-        let saved = sessions.map {
+        let kept = sessions.filter { $0.serverWindow == nil }
+        let saved = kept.map {
             SavedSession(layout: $0.panes.layoutSnapshot(conversations: $0.conversations), name: $0.customName, panels: $0.panels,
                          schedule: $0.schedule)
         }
         defaults.set(try? JSONEncoder().encode(saved), forKey: Self.savedSessions)
         defaults.removeObject(forKey: Self.savedLayouts)
         defaults.removeObject(forKey: Self.savedDirectories)
-        defaults.set(sessions.firstIndex { $0.id == selectedID } ?? 0, forKey: Self.savedSelection)
+        defaults.set(kept.firstIndex { $0.id == selectedID } ?? 0, forKey: Self.savedSelection)
     }
 
     /// Remembers which panels the session has open, so coming back to it brings them back.
