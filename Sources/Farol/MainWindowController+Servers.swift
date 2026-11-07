@@ -37,7 +37,8 @@ extension MainWindowController {
         let key = ServerLinks.key(server, window)
         if let open = store.sessions.first(where: { $0.serverWindow == key }) { return store.select(open) }
         // exec, so leaving tmux closes the session instead of dropping back to a shell on this Mac.
-        let session = store.create(run: "exec " + ServerSetup.attach(ssh: server.ssh, window: window), serverWindow: key)
+        let attach = SessionStore.hidden("exec " + ServerSetup.attach(ssh: server.ssh, window: window))
+        let session = store.create(run: attach.run, environment: attach.environment, serverWindow: key)
         // Named here, since the title the shell gives it is the ssh command.
         session.customName = [name, server.name].compactMap { $0 }.joined(separator: " · ")
         session.serverShell = ServerSetup.shell(ssh: server.ssh)
@@ -97,7 +98,8 @@ extension MainWindowController {
             DispatchQueue.main.async {
                 guard let self else { return }
                 if let window = made, ServerSetup.isWindow(window) { return self.openServerWindow(server, window, named: name) }
-                self.store.create(run: ServerSetup.newSession(ssh: server.ssh, name: name))
+                let fallback = SessionStore.hidden(ServerSetup.newSession(ssh: server.ssh, name: name))
+                self.store.create(run: fallback.run, environment: fallback.environment)
             }
         }
     }
@@ -125,7 +127,8 @@ extension MainWindowController {
             return showError("Farol couldn't read its key", "Allow Farol to use the Keychain when macOS asks, then add the server again.")
         }
         store.sessions.filter { $0.serverWindow == Self.setupKey(ssh) }.forEach { store.close($0) }
-        let session = store.create(run: ServerSetup.command(ssh: ssh, deviceKey: key, deviceName: ServerLinks.deviceName),
+        let setup = SessionStore.hidden(ServerSetup.command(ssh: ssh, deviceKey: key, deviceName: ServerLinks.deviceName))
+        let session = store.create(run: setup.run, environment: setup.environment,
                                    serverWindow: Self.setupKey(ssh))
         servers.watchSetup(ssh: ssh) { [weak self, weak session] in
             guard let self, let session, store.sessions.contains(where: { $0 === session }) else { return nil }
@@ -160,7 +163,8 @@ extension MainWindowController {
             sheet.map { window?.endSheet($0) }
         }
         let view = PairPhoneSheet(server: server, pairing: pairing, palette: state.palette, openTerminal: { [weak self] in
-            self?.store.create(run: ServerSetup.pairInTerminal(ssh: server.ssh))
+            let pair = SessionStore.hidden(ServerSetup.pairInTerminal(ssh: server.ssh))
+            self?.store.create(run: pair.run, environment: pair.environment)
         }, close: { close() })
         let host = NSHostingController(rootView: view)
         host.sizingOptions = [.preferredContentSize]

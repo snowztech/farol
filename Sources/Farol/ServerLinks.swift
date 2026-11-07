@@ -24,6 +24,10 @@ final class ServerLinks: ObservableObject {
     private let list: ServerList
     private var links: [UUID: Link] = [:]
     private var watching: [String: Timer] = [:]
+    /// A server that just dropped away, by id, before it counts as offline.
+    private var dropping: [UUID: DispatchWorkItem] = [:]
+    /// Long enough for farol-host to restart, as setup and upgrade make it, without the group flashing offline.
+    private static let offlineAfter: TimeInterval = 10
 
     /// The name the servers list this Mac by, as `farol-host devices` prints it.
     static var deviceName: String { Host.current().localizedName ?? "Mac" }
@@ -53,6 +57,7 @@ final class ServerLinks: ObservableObject {
 
     /// Forgets the server here and tells it to forget this Mac: through the relay as a phone does, and over ssh for when it's offline.
     func remove(_ server: Server) {
+        dropping.removeValue(forKey: server.id)?.cancel()
         links.removeValue(forKey: server.id)?.forget()
         let forget = ServerSetup.forgetArguments(ssh: server.ssh, deviceName: Self.deviceName)
         DispatchQueue.global(qos: .utility).async {
@@ -120,10 +125,26 @@ final class ServerLinks: ObservableObject {
     private func start(_ server: Server, key: DeviceKey, offer: PairingOffer) {
         states[server.id] = State(connection: .connecting, sessions: states[server.id]?.sessions ?? [])
         let link = Link(key: key, offer: offer)
-        link.onConnection = { [weak self] connection in self?.states[server.id, default: State()].connection = connection }
+        link.onConnection = { [weak self] connection in self?.connectionChanged(server.id, to: connection) }
         link.onSessions = { [weak self] sessions in self?.update(server.id, sessions) }
         links[server.id] = link
         link.start()
+    }
+
+    private func connectionChanged(_ id: UUID, to connection: Connection) {
+        dropping.removeValue(forKey: id)?.cancel()
+        guard connection == .offline else {
+            states[id, default: State()].connection = connection
+            return
+        }
+        // Breathing as it reconnects, and offline only if it stays away.
+        states[id, default: State()].connection = .connecting
+        let later = DispatchWorkItem { [weak self] in
+            self?.dropping[id] = nil
+            self?.states[id, default: State()].connection = .offline
+        }
+        dropping[id] = later
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.offlineAfter, execute: later)
     }
 
     private func update(_ id: UUID, _ sessions: [RemoteSession]) {

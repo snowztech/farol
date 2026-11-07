@@ -523,6 +523,12 @@ final class SessionStore: ObservableObject {
     /// Sessions in the order the sidebar shows them, which ⌘1 to ⌘9 and next or previous follow.
     var ordered: [Session] { groups.flatMap(\.items) }
 
+    /// A long command, like ssh with its options, typed as a few words so the shell's echo of it doesn't fill the screen.
+    static let commandVariable = "FAROL_SSH"
+    static func hidden(_ command: String) -> (run: String, environment: [String: String]) {
+        ("eval \"$\(commandVariable)\"", [commandVariable: command])
+    }
+
     /// `run` is typed into the new shell, for example "claude" to start an agent right away.
     /// `environment` holds what is too long to type, which `run` can name as a variable.
     /// `select` false opens it in the sidebar without leaving the session on screen, as a task an agent starts does.
@@ -646,7 +652,9 @@ final class SessionStore: ObservableObject {
     /// Splits the focused pane. The new one opens in the same folder, and runs `run` when given.
     @discardableResult
     func split(_ session: Session, _ direction: TerminalRequest.Direction, run: String? = nil) -> TerminalView {
-        let terminal = makeTerminal(in: session.panes.focused.workingDirectory, run: run ?? session.serverShell)
+        let hidden = run == nil ? session.serverShell.map(Self.hidden) : nil
+        let terminal = makeTerminal(in: session.panes.focused.workingDirectory, run: run ?? hidden?.run,
+                                    environment: hidden?.environment ?? [:])
         wire(terminal, to: session)
         session.panes.split(direction, with: terminal)
         return terminal
