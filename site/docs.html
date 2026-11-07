@@ -219,13 +219,22 @@
           <p>Save a script in <code>.farol/commands/</code> to share it with a project, or in <code>~/.farol/commands/</code> to use it everywhere. Commit project commands to Git and they appear in new worktrees automatically. Farol does not copy untracked commands from another checkout.</p>
           <img class="doc-shot" src="features/palette.png" width="2400" height="1520" alt="The ⌘P list searching for test: a session, the project's test command and the test files, with a footer saying what Return does">
 
-          <h3>Prepare each worktree</h3>
+          <h3 id="worktree-setup">Prepare each worktree</h3>
           <p>Commit an executable script named exactly <code>.farol/setup</code> to your repo, with no extension. Its first line chooses the interpreter, such as <code>#!/bin/sh</code> or <code>#!/usr/bin/env python3</code>. Farol runs it in the new worktree's terminal before starting the agent or chosen command. If <strong>Settings → Worktrees → Copy local environment files</strong> is on, ignored <code>.env</code> files are copied first. Agents in that worktree can read their values. For a task across repos, each repo's setup runs before the agent starts.</p>
           <figure class="code-example">
             <figcaption>Example <code>.farol/setup</code> for a Node project</figcaption>
             <pre><code>#!/bin/sh
 set -e
 npm ci</code></pre>
+          </figure>
+          <p>Setup can also copy files that aren't in Git, like local config, from the main checkout:</p>
+          <figure class="code-example">
+            <figcaption>Copy local config into each worktree</figcaption>
+            <pre><code>#!/bin/sh
+set -e
+main="$(git rev-parse --path-format=absolute --git-common-dir)/.."
+mkdir -p .claude
+cp "$main/.claude/settings.local.json" .claude/ 2&gt;/dev/null || true</code></pre>
           </figure>
           <p>Run <code>chmod +x .farol/setup</code> before committing it. The script must exit when setup is ready. If it fails, Farol keeps the worktree and terminal open without starting the agent. Fix the script, then press Up and Return in that terminal to retry.</p>
           <p>You can also commit an executable <code>.farol/teardown</code> to stop services when you choose to remove a worktree. Farol keeps the worktree if teardown fails. Keep both scripts safe to run again after a partial failure.</p>

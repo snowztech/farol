@@ -28,7 +28,7 @@ public struct AgentSkill {
     static let text = """
     ---
     name: farol
-    description: Farol terminal settings and sessions. Use when the user asks to change a terminal setting such as the theme, the font or a shortcut, to add a theme, where a Farol setting lives, or how Farol works, like tasks, worktrees, agent status, review or answering agents from the phone. Also use to make a task that runs later, once or on set days, to see Farol's other sessions, to hand part of the work to another agent in its own worktree, to message another agent, or to wait for one.
+    description: Farol terminal settings and sessions. Use when the user asks to change a terminal setting such as the theme, the font or a shortcut, to add a theme, where a Farol setting lives, or how Farol works, like tasks, worktrees, agent status, review or answering agents from the phone. Also use to make a task that runs later, once or on set days, to see Farol's other sessions, to hand part of the work to another agent in its own worktree, to message another agent, or to wait for one. Also use to write a repo's `.farol/setup` or `.farol/teardown` script.
     ---
 
     # Farol
@@ -105,6 +105,25 @@ public struct AgentSkill {
     - `branch`: each run of a repeat gets the day after it, like `write-article-2026-11-06`. `agent`: `claude`, `codex`, `opencode` or `pi`, or one of their config folders like `~/.claude-work`, as in Settings → Agents.
     - The file name is the task's id. A file Farol can't read shows in the Tasks pane with why. Farol keeps when it last ran and its past runs itself, so leave those out.
     - A file you write waits in the Tasks pane until the user allows it, so tell them to click Allow there.
+
+    ## Worktree setup
+
+    A repo can commit two scripts that Farol runs for the worktrees it makes. Write them when the user asks to prepare new worktrees, like installing dependencies or copying local config:
+
+    - `.farol/setup` runs in the new worktree's terminal, from its root, before the agent or command starts. It must exit once the worktree is ready, so start no server that keeps running. If it fails, the agent does not start and the user retries from that terminal.
+    - `.farol/teardown` runs when the user removes the worktree, to stop what setup started. If it fails, Farol keeps the worktree.
+
+    Both are files with no extension, a shebang like `#!/bin/sh` on the first line, and the executable bit: run `chmod +x` on them. Keep them safe to run again after a partial failure. Read the repo first and use what it already uses, like its package manager's lockfile install or its Makefile. With Settings → Worktrees → Copy local environment files on, ignored `.env` files are already copied before setup runs. Other files Git ignores, like local config, can be copied from the main checkout:
+
+    ```
+    #!/bin/sh
+    set -e
+    main="$(git rev-parse --path-format=absolute --git-common-dir)/.."
+    mkdir -p .claude
+    cp "$main/.claude/settings.local.json" .claude/ 2>/dev/null || true
+    ```
+
+    Tell the user to commit the scripts so every new worktree gets them.
 
     ## Shortcuts
 
