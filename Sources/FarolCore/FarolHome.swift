@@ -6,6 +6,9 @@ public enum FarolHome {
     private static let moved = ProcessInfo.processInfo.environment["FAROL_HOME"].flatMap { $0.isEmpty ? nil : $0 }
     private static let home = FileManager.default.homeDirectoryForCurrentUser
 
+    /// True when `FAROL_HOME` is set, for a staged scene that should leave nothing behind that runs later.
+    public static var isMoved: Bool { moved != nil }
+
     public static let url = moved.map { URL(fileURLWithPath: $0, isDirectory: true) }
         ?? home.appendingPathComponent(".farol", isDirectory: true)
 

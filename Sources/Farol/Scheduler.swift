@@ -207,6 +207,8 @@ final class Scheduler: ObservableObject {
     }
 
     private func syncLaunchAgent() {
+        // launchd would open the app without FAROL_HOME, on your own tasks, so a staged scene never asks it to.
+        guard !FarolHome.isMoved else { return }
         if let bundle = Bundle.main.bundleIdentifier { LaunchAgent.sync(schedules, bundle: bundle) }
     }
 }
