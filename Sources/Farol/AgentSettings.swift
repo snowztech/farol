@@ -40,7 +40,8 @@ final class AgentSettings: ObservableObject {
         startCommand = Self.defaults.string(forKey: "agents.startCommand") ?? ""
         resume = Self.defaults.bool(forKey: Self.resumeKey)
         remote = Self.defaults.bool(forKey: RemoteBridge.enabledKey)
-        remoteKeepAwake = Self.defaults.bool(forKey: "remote.keepAwake")
+        // On unless turned off: with Remote on, a Mac that sleeps under an agent leaves the phone with nothing to answer.
+        remoteKeepAwake = Self.defaults.object(forKey: "remote.keepAwake") as? Bool ?? true
         agentControl = Self.defaults.bool(forKey: "agents.control")
         voiceControl = Self.defaults.bool(forKey: "agents.voiceControl")
     }

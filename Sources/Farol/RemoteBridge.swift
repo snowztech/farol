@@ -2,6 +2,7 @@ import AppKit
 import FarolCore
 import FarolRemote
 import GhosttyTerminal
+import IOKit.pwr_mgt
 import SystemConfiguration
 import UserNotifications
 
@@ -52,6 +53,9 @@ final class RemoteBridge: ObservableObject {
     private var wake: NSObjectProtocol?
     /// Held while the Mac is kept awake, and nil the rest of the time.
     private var awake: NSObjectProtocol?
+    /// Someone using the Mac from the phone, as macOS counts a keystroke. Refreshed at most every half minute.
+    private var used: IOPMAssertionID = 0
+    private var usedAt = Date.distantPast
     /// Keeps the Mac from sleeping by itself while an agent works or waits for an answer, so a phone can still reach it.
     var keepAwake = false { didSet { refreshAwake() } }
 
@@ -201,7 +205,18 @@ final class RemoteBridge: ObservableObject {
         } else if !needed, let held = awake {
             ProcessInfo.processInfo.endActivity(held)
             awake = nil
+            // The Mac may be long past its sleep time, which would put it to sleep as the done notification reaches the phone.
+            usedAt = .distantPast
+            markUsed()
         }
+    }
+
+    /// Counts as someone at the Mac, from afar: its idle timer starts again, so it sleeps after its own Energy setting, with the display off.
+    /// A phone that reads or types keeps it up this way, and one put away lets it sleep as usual.
+    private func markUsed() {
+        guard keepAwake, Date.now.timeIntervalSince(usedAt) > 30 else { return }
+        usedAt = .now
+        IOPMAssertionDeclareUserActivity("A paired phone is using Farol." as CFString, kIOPMUserActiveRemote, &used)
     }
 
     /// The relay's address with its scheme. A bare host is taken as secure, since that is what a phone accepts.
@@ -442,6 +457,7 @@ final class RemoteBridge: ObservableObject {
 
     private func run(_ command: RemoteCommand, from id: UInt32) {
         guard let device = phones[id]?.device else { return }
+        markUsed()
         switch command.action {
         case .hello(let version):
             tell(.hello(version: RemoteProtocol.version, features: RemoteFeature.allCases.map(\.rawValue), name: Self.computerName), id)
