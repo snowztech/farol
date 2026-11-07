@@ -1,5 +1,6 @@
 import AppKit
 import FarolCore
+import FarolRemote
 import UserNotifications
 
 /// Notifies you when an agent needs you while Farol is in the background, and badges the Dock with the waiting count.
@@ -48,6 +49,20 @@ final class AgentNotifier: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
+    /// An agent on a server, told the same way as one here. Clicking it opens the session over ssh.
+    func serverStatusChanged(_ server: Server, _ session: RemoteSession, from before: RemoteStatus) {
+        guard !NSApp.isActive else { return }
+        let name = "\(session.name) on \(server.name)"
+        switch session.status {
+        case .waiting where settings.notifyWaiting:
+            post(id: session.id, title: "\(name) is waiting for you", body: session.asking ?? "Open it to see what it needs.")
+        case .done where before == .working && settings.notifyDone:
+            post(id: session.id, title: "\(name) is done", body: "Check the result or send the next prompt.")
+        default:
+            break
+        }
+    }
+
     /// Replaces the notification for a waiting agent with one that carries the question, and its options as buttons.
     func asked(_ session: Session, _ ask: PendingAsk) {
         guard !NSApp.isActive, settings.notifyWaiting, let question = ask.questions.first else { return }
@@ -83,7 +98,10 @@ final class AgentNotifier: NSObject, UNUserNotificationCenterDelegate {
     }
 
     private func post(_ session: Session, title: String, body: String, category: String? = nil, sound: Bool = true) {
-        let id = session.id
+        post(id: session.id, title: title, body: body, category: category, sound: sound)
+    }
+
+    private func post(id: UUID, title: String, body: String, category: String? = nil, sound: Bool = true) {
         // macOS asks the first time only. After that this returns the saved answer right away.
         center.requestAuthorization(options: [.alert, .sound]) { [center] granted, _ in
             guard granted else { return }

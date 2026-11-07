@@ -47,6 +47,7 @@ When a new version is out, an Update button shows in the title bar. Click it and
 - **New task.** ⇧⌘N asks what to do, then starts Claude Code or Codex on it in a new worktree, with the task as its first prompt. Or pick one of your open Jira tickets or the repo's GitHub issues, and the branch is named after it and the agent gets the ticket in full. With more than one Claude Code or Codex account, each one is a choice. From a folder of repos, or with Add repositories from inside one, tick the repos the task touches. Choose repository… adds a Git repo from anywhere on the Mac. Each selected repo gets a worktree on the same branch, side by side in one folder, and the agent starts there. The review and graph panels get a tab per repo with its changes, and the title bar counts them all.
 - **Agent status.** Each session shows whether its agent is working, waiting for you or done, with a notification when it waits in the background. Claude Code, Codex, OpenCode and Pi connect in one click, and any other agent can report with `farol status`. See [Agent status](#agent-status).
 - **Agents from any app.** Farol's lighthouse in the menu bar lights up while agents work, wait or finish, and its menu opens any session. Or pick a small status panel at the notch or on the screen edge, which you can drag anywhere along the side.
+- **Servers in the sidebar.** Add a VPS from your ssh config and its agents show after your own, with the same status dots, notifications and Dock count. Farol installs `farol-host` there over ssh, and a click opens an agent in its tmux window. See [On a server](#on-a-server).
 - **From your phone.** Farol for iPhone lists your sessions and opens each one as its agent's conversation. Approve or answer with a tap, get a notification when an agent waits, and keep count on the lock screen. End-to-end encrypted. See [From your phone](#from-your-phone).
 - **Worktree sessions.** ⇧⌘T asks for a branch and opens a session in its own git worktree, so parallel agents never touch each other's files. Closing it offers to remove the worktree and always keeps the branch.
 
@@ -207,7 +208,11 @@ Everything between the Mac and the phone is encrypted end to end, so the relay t
   <img src="site/features/phone-session.png" width="260" alt="Farol for iPhone showing a Claude Code session waiting for you, with its question and two answers to pick with a tap">
 </p>
 
-The agents run on the Mac, so it has to stay on. To close the laptop, run them in tmux on a server with [`farol-host`](https://github.com/snowztech/farol-remote/tree/main/host):
+### On a server
+
+The agents run on the Mac, so it has to stay on. To close the laptop, run them in tmux on a server with [`farol-host`](https://github.com/snowztech/farol-remote/tree/main/host).
+
+From Farol, click the server button beside New task, or go to Settings → Remote → Add Server, and pick a host from `~/.ssh/config`. Farol installs `farol-host` over ssh and lets the Mac in. The server's agents then show in the sidebar under its name, a click opens one in its tmux window, and Pair a Phone… on the server shows a code for the phone. Or set it up by hand after you ssh in:
 
 ```sh
 curl -fsSL https://farol.sh/host.sh | sh

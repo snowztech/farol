@@ -1167,19 +1167,20 @@ final class RemoteBridge: ObservableObject {
     }
 }
 
-/// The Mac's own remote key, in the login Keychain.
-private enum Keychain {
-    private static var query: [CFString: Any] {
-        [kSecClass: kSecClassGenericPassword, kSecAttrService: "Farol Remote", kSecAttrAccount: Bundle.main.bundleIdentifier ?? "farol"]
-    }
+/// The Mac's own keys, in the login Keychain: one for phones that pair with it, one for the servers it adds.
+/// Apart, so turning Remote off and on again never locks the Mac out of its servers.
+enum Keychain {
+    static func deviceKey() throws -> DeviceKey { try key(service: "Farol Remote", file: "remote-key") }
+    static func serverKey() throws -> DeviceKey { try key(service: "Farol Servers", file: "server-key") }
 
-    /// Made the first time Remote is turned on, and the same from then on.
-    static func deviceKey() throws -> DeviceKey {
+    /// Made the first time it's asked for, and the same from then on.
+    private static func key(service: String, file name: String) throws -> DeviceKey {
+        let id = Bundle.main.bundleIdentifier ?? "farol"
         #if DEBUG
         // Each build of Farol Dev is signed anew, and the Keychain treats it as another app that may not read the key.
-        // A file only you can read keeps the key, and the phones paired with it, across builds.
+        // A file only you can read keeps the key, and what paired with it, across builds.
         let file = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Farol/\(Bundle.main.bundleIdentifier ?? "farol").remote-key")
+            .appendingPathComponent("Farol/\(id).\(name)")
         if let stored = try? Data(contentsOf: file) { return try DeviceKey(stored: stored) }
         let key = DeviceKey()
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -1187,6 +1188,7 @@ private enum Keychain {
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
         return key
         #else
+        let query: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: id]
         var found: CFTypeRef?
         if SecItemCopyMatching(query.merging([kSecReturnData: true]) { $1 } as CFDictionary, &found) == errSecSuccess,
            let stored = found as? Data {

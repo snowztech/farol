@@ -78,6 +78,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var sessionsChange: AnyCancellable?
     private(set) lazy var remote = RemoteBridge(store: store, worktrees: worktreeSettings)
     private(set) lazy var scheduler = Scheduler(store: store, worktrees: worktreeSettings)
+    private(set) lazy var servers = ServerLinks()
+    /// Servers whose setup you watched finish, by ssh name, waiting on their first list to land you on one of their sessions.
+    var landing: Set<String> = []
     private lazy var control = AgentControl(store: store, agents: agents, worktrees: worktreeSettings)
     private var remoteSwitch: AnyCancellable?
     private var awakeSwitch: AnyCancellable?
@@ -123,6 +126,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let root = NSView()
         let topBar = hosting(TopBar(state: state, store: store, updates: updates, review: review, merge: merge, commands: commands))
         let sidebar = hosting(SidebarView(store: store, state: state, scheduler: scheduler, commands: commands,
+                                          servers: servers, serverCommands: serverCommands,
                                           resize: { [weak self] in self?.setSidebarWidth($0) }))
         sidebar.clipsToBounds = true
         let filesPanel = hosting(FilesPanel(
@@ -150,6 +154,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         review.agent = { [weak self] in self?.reviewAgent() }
         settingsView = hosting(SettingsPage(
             settings: settings, agents: agents, worktrees: worktrees, state: state, updates: updates, remote: remote,
+            remoteServers: servers, serverCommands: serverCommands,
             runInTerminal: { [weak self] command in
                 guard let self else { return }
                 if state.showingSettings { toggleSettings() }
@@ -352,8 +357,16 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         // @Published reports the new value before the property changes, so pass it along.
         badgeSwitch = agents.$dockBadge.dropFirst().sink { [weak self] in self?.refreshBadge(enabled: $0) }
         notifier.onOpen = { [weak self] id in
-            guard let self, let session = self.store.sessions.first(where: { $0.id == id }) else { return }
-            self.store.select(session)
+            guard let self else { return }
+            if let session = self.store.sessions.first(where: { $0.id == id }) { return self.store.select(session) }
+            self.openServerSession(id: id)
+        }
+        servers.onSetUp = { [weak self] in self?.setUpFinished($0) }
+        servers.onSessions = { [weak self] in self?.land(on: $0, $1) }
+        servers.onStatusChange = { [weak self] server, session, before in
+            guard let self else { return }
+            notifier.serverStatusChanged(server, session, from: before)
+            refreshBadge(enabled: agents.dockBadge)
         }
         store.onSelectionChange = { [weak self] in
             self?.state.showingSettings = false
@@ -901,7 +914,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var theme: (background: NSColor, foreground: NSColor) { (runtime.backgroundColor, runtime.foregroundColor) }
 
     private func refreshBadge(enabled: Bool) {
-        notifier.updateBadge(waiting: enabled ? store.sessions.filter { [.waiting, .stopped].contains($0.activity) }.count : 0)
+        let local = store.sessions.filter { $0.serverWindow == nil && [.waiting, .stopped].contains($0.activity) }.count
+        notifier.updateBadge(waiting: enabled ? local + servers.waiting : 0)
     }
 
     // MARK: Find

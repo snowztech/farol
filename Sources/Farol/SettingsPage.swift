@@ -13,6 +13,8 @@ struct SettingsPage: View {
     @ObservedObject var state: WindowState
     @ObservedObject var updates: UpdateChecker
     @ObservedObject var remote: RemoteBridge
+    @ObservedObject var remoteServers: ServerLinks
+    let serverCommands: ServerCommands
     /// Opens a session with a command typed in, for setting up a tool that asks questions.
     let runInTerminal: (String) -> Void
 
@@ -799,6 +801,16 @@ struct SettingsPage: View {
         refreshAgents()
     }
 
+    private func serverDetail(_ server: Server) -> String {
+        let state = remoteServers.state(of: server)
+        let agents = state.sessions.count
+        switch state.connection {
+        case .connected: return "\(server.ssh) · \(agents == 1 ? "1 session" : "\(agents) sessions")"
+        case .connecting: return "\(server.ssh) · connecting"
+        case .offline: return "\(server.ssh) · can't be reached"
+        }
+    }
+
     @ViewBuilder private func remoteSection(_ p: Palette) -> some View {
         Heading(title: "Remote", detail: "Answer your agents from your phone when you are away from the Mac.", palette: p, beta: true)
         Card(palette: p) {
@@ -817,6 +829,29 @@ struct SettingsPage: View {
         }
         if let problem = remote.problem {
             Text(problem).font(.system(size: 12)).foregroundStyle(p.waiting).padding(.top, 6)
+        }
+        // Not under the switch above: a server is reached from this Mac, whether or not a phone may come in.
+        GroupTitle(title: "Servers", detail: "Machines running farol-host. Their agents show in the sidebar with their status.", palette: p)
+        Card(palette: p) {
+            ForEach(remoteServers.servers) { server in
+                Row(title: server.name, detail: serverDetail(server), palette: p) {
+                    HStack(spacing: 8) {
+                        if remoteServers.state(of: server).connection == .offline {
+                            ShipButton(title: "Retry", busy: false, palette: p) { serverCommands.retry(server) }
+                        }
+                        ShipButton(title: "Pair a phone", help: "Shows a code to scan from Farol on your phone, so it sees this server's agents too.",
+                                   busy: false, palette: p) { serverCommands.pairPhone(server) }
+                        ShipButton(title: "Remove", help: "The server stops letting this Mac in. Its agents keep running.", busy: false, palette: p) {
+                            serverCommands.remove(server)
+                        }
+                    }
+                }
+            }
+            Row(title: remoteServers.servers.isEmpty ? "Add a server" : "Add another server",
+                detail: "Pick a host from your ssh config. Farol installs or updates farol-host there and lets this Mac in, in a terminal you can see.",
+                palette: p) {
+                ShipButton(title: "Add Server…", busy: false, palette: p, action: serverCommands.add)
+            }
         }
         if agents.remote {
             GroupTitle(title: "Phones", palette: p)
@@ -895,7 +930,7 @@ struct SettingsPage: View {
     }
 
     /// Black on white whatever the theme, since that is what a camera reads best.
-    private static func qrCode(_ text: String) -> NSImage? {
+    static func qrCode(_ text: String) -> NSImage? {
         let filter = CIFilter.qrCodeGenerator()
         filter.message = Data(text.utf8)
         guard let output = filter.outputImage,

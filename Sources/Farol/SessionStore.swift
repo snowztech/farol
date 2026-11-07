@@ -16,6 +16,10 @@ final class Session: ObservableObject, Identifiable {
     var panels = Panels()
     /// The schedule this session is a run of. One run is open at a time, so the next waits until this one closes.
     var schedule: String?
+    /// The server and tmux window this session shows over ssh, as `ServerLinks.key`. It sits under its server in the sidebar and is never saved.
+    var serverWindow: String?
+    /// What a pane split off a server session runs, so it opens on the server too.
+    var serverShell: String?
     @Published var directory: String
     /// Reported per pane by agent hooks or interactive terminal titles.
     @Published private(set) var agents: [UUID: AgentActivity] = [:]
@@ -340,6 +344,8 @@ final class Session: ObservableObject, Identifiable {
 final class SessionStore: ObservableObject {
     @Published private(set) var sessions: [Session] = []
     @Published private(set) var selectedID: UUID?
+    /// The one on screen before this one, to go back to when a session outside the list closes, like a server setup.
+    private var previousID: UUID?
 
     private let runtime: TerminalRuntime
     /// Called when a session's terminal view is created, so the window can host it.
@@ -507,23 +513,30 @@ final class SessionStore: ObservableObject {
 
     /// The sidebar's sections: one per repo once sessions span several, else a single unnamed one.
     var groups: [Grouping.Group<Session>] {
+        let local = sessions.filter { $0.serverWindow == nil }
         guard UserDefaults.standard.bool(forKey: Self.groupByRepoKey) else {
-            return [Grouping.Group(key: nil, items: sessions)]
+            return [Grouping.Group(key: nil, items: local)]
         }
-        return Grouping.group(sessions, by: \.repoRoot)
+        return Grouping.group(local, by: \.repoRoot)
     }
 
     /// Sessions in the order the sidebar shows them, which ⌘1 to ⌘9 and next or previous follow.
     var ordered: [Session] { groups.flatMap(\.items) }
+
+    /// A long command, like ssh with its options, typed as a few words so the shell's echo of it doesn't fill the screen.
+    static let commandVariable = "FAROL_SSH"
+    static func hidden(_ command: String) -> (run: String, environment: [String: String]) {
+        ("eval \"$\(commandVariable)\"", [commandVariable: command])
+    }
 
     /// `run` is typed into the new shell, for example "claude" to start an agent right away.
     /// `environment` holds what is too long to type, which `run` can name as a variable.
     /// `select` false opens it in the sidebar without leaving the session on screen, as a task an agent starts does.
     @discardableResult
     func create(directory: String = NSHomeDirectory(), run: String? = nil, environment: [String: String] = [:], select: Bool = true,
-                repo: String? = nil) -> Session {
+                repo: String? = nil, serverWindow: String? = nil) -> Session {
         create(PaneContainer(makeTerminal(in: directory, run: run, environment: environment)), directory: directory, select: select,
-               repo: repo)
+               repo: repo, serverWindow: serverWindow)
     }
 
     /// An agent on `task` in a new worktree of the repository each of `directories` is in, on a branch no other has, with the task as its first prompt.
@@ -591,8 +604,10 @@ final class SessionStore: ObservableObject {
         save()
     }
 
-    private func create(_ panes: PaneContainer, directory: String, select: Bool = true, repo: String? = nil) -> Session {
+    private func create(_ panes: PaneContainer, directory: String, select: Bool = true, repo: String? = nil,
+                        serverWindow: String? = nil) -> Session {
         let session = Session(panes: panes, directory: directory)
+        session.serverWindow = serverWindow
         let known = knownCheckout(of: directory)
         session.assume(repo: repo ?? known?.repoRoot, branch: repo == nil ? known?.branch : nil)
         remember(session)
@@ -637,7 +652,9 @@ final class SessionStore: ObservableObject {
     /// Splits the focused pane. The new one opens in the same folder, and runs `run` when given.
     @discardableResult
     func split(_ session: Session, _ direction: TerminalRequest.Direction, run: String? = nil) -> TerminalView {
-        let terminal = makeTerminal(in: session.panes.focused.workingDirectory, run: run)
+        let hidden = run == nil ? session.serverShell.map(Self.hidden) : nil
+        let terminal = makeTerminal(in: session.panes.focused.workingDirectory, run: run ?? hidden?.run,
+                                    environment: hidden?.environment ?? [:])
         wire(terminal, to: session)
         session.panes.split(direction, with: terminal)
         return terminal
@@ -735,14 +752,15 @@ final class SessionStore: ObservableObject {
     /// Saved on every change rather than at quit, so a crash keeps the sessions too.
     private func save() {
         let defaults = UserDefaults.standard
-        let saved = sessions.map {
+        let kept = sessions.filter { $0.serverWindow == nil }
+        let saved = kept.map {
             SavedSession(layout: $0.panes.layoutSnapshot(conversations: $0.conversations), name: $0.customName, panels: $0.panels,
                          schedule: $0.schedule)
         }
         defaults.set(try? JSONEncoder().encode(saved), forKey: Self.savedSessions)
         defaults.removeObject(forKey: Self.savedLayouts)
         defaults.removeObject(forKey: Self.savedDirectories)
-        defaults.set(sessions.firstIndex { $0.id == selectedID } ?? 0, forKey: Self.savedSelection)
+        defaults.set(kept.firstIndex { $0.id == selectedID } ?? 0, forKey: Self.savedSelection)
     }
 
     /// Remembers which panels the session has open, so coming back to it brings them back.
@@ -758,6 +776,7 @@ final class SessionStore: ObservableObject {
         let before = session.activity
         session.acknowledge()
         report(session, from: before)
+        if selectedID != session.id { previousID = selectedID }
         selectedID = session.id
         onSelectionChange?(session)
         save()
@@ -798,11 +817,16 @@ final class SessionStore: ObservableObject {
             return
         }
         // Where it sat on screen, so the session that takes its place is the one shown next to it.
-        let shown = ordered.firstIndex { $0.id == session.id } ?? 0
+        let listed = ordered.firstIndex { $0.id == session.id }
+        let shown = listed ?? 0
         session.panes.removeFromSuperview()
         sessions.remove(at: index)
         if session.id == selectedID {
             let ordered = ordered
+            // A server's session sits outside the list, so the one beside it there means nothing: go back to where you were.
+            if listed == nil, let back = sessions.first(where: { $0.id == previousID }) {
+                return select(back)
+            }
             select(ordered[min(shown, ordered.count - 1)])
         } else {
             save()
