@@ -80,7 +80,8 @@ extension MainWindowController {
 
     /// A new tmux session on the server, made first without a terminal so the one opened next knows its window.
     /// ssh that needs a password can't answer without one, so that case opens a plain ssh session instead.
-    private func newServerSession(on server: Server) {
+    /// `opened` runs once a session is on screen, or ssh gave up.
+    private func newServerSession(on server: Server, opened: (() -> Void)? = nil) {
         let name = ServerSetup.sessionName(taken: servers.state(of: server).sessions.map(\.name))
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let ssh = Process()
@@ -97,6 +98,7 @@ extension MainWindowController {
                 ? String(decoding: printed, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines) : nil
             DispatchQueue.main.async {
                 guard let self else { return }
+                defer { opened?() }
                 if let window = made, ServerSetup.isWindow(window) { return self.openServerWindow(server, window, named: name) }
                 let fallback = SessionStore.hidden(ServerSetup.newSession(ssh: server.ssh, name: name))
                 self.store.create(run: fallback.run, environment: fallback.environment)
@@ -136,7 +138,28 @@ extension MainWindowController {
         }
     }
 
+    /// Watched to the end, setup hands over to a session on the server once its list arrives. Left in the background, it just closes.
     func setUpFinished(_ ssh: String) {
+        guard store.selected?.serverWindow == Self.setupKey(ssh) else { return closeSetup(ssh) }
+        landing.insert(ssh)
+        // A list that never comes doesn't keep the setup terminal open for good.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 15) { [weak self] in
+            guard let self, landing.remove(ssh) != nil else { return }
+            closeSetup(ssh)
+        }
+    }
+
+    /// The new session is selected first, so closing setup after it never moves the selection elsewhere.
+    func land(on server: Server, _ sessions: [RemoteSession]) {
+        guard landing.remove(server.ssh) != nil else { return }
+        guard let first = sessions.first else {
+            return newServerSession(on: server) { [weak self] in self?.closeSetup(server.ssh) }
+        }
+        openServerSession(server, first)
+        closeSetup(server.ssh)
+    }
+
+    private func closeSetup(_ ssh: String) {
         store.sessions.filter { $0.serverWindow == Self.setupKey(ssh) }.forEach { store.close($0) }
     }
 

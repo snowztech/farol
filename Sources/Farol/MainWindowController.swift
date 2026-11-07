@@ -79,6 +79,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private(set) lazy var remote = RemoteBridge(store: store, worktrees: worktreeSettings)
     private(set) lazy var scheduler = Scheduler(store: store, worktrees: worktreeSettings)
     private(set) lazy var servers = ServerLinks()
+    /// Servers whose setup you watched finish, by ssh name, waiting on their first list to land you on one of their sessions.
+    var landing: Set<String> = []
     private lazy var control = AgentControl(store: store, agents: agents, worktrees: worktreeSettings)
     private var remoteSwitch: AnyCancellable?
     private var awakeSwitch: AnyCancellable?
@@ -360,6 +362,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             self.openServerSession(id: id)
         }
         servers.onSetUp = { [weak self] in self?.setUpFinished($0) }
+        servers.onSessions = { [weak self] in self?.land(on: $0, $1) }
         servers.onStatusChange = { [weak self] server, session, before in
             guard let self else { return }
             notifier.serverStatusChanged(server, session, from: before)

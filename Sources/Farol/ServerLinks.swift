@@ -20,6 +20,8 @@ final class ServerLinks: ObservableObject {
     var onStatusChange: ((Server, RemoteSession, RemoteStatus) -> Void)?
     /// A server finished setting up and trusts this Mac.
     var onSetUp: ((String) -> Void)?
+    /// A server's sessions as they arrive, each time it sends them.
+    var onSessions: ((Server, [RemoteSession]) -> Void)?
 
     private let list: ServerList
     private var links: [UUID: Link] = [:]
@@ -151,6 +153,7 @@ final class ServerLinks: ObservableObject {
         let before = Dictionary(states[id]?.sessions.map { ($0.id, $0.status) } ?? [], uniquingKeysWith: { $1 })
         states[id, default: State()].sessions = sessions
         guard let server = servers.first(where: { $0.id == id }) else { return }
+        onSessions?(server, sessions)
         for session in sessions where before[session.id].map({ $0 != session.status }) ?? false {
             onStatusChange?(server, session, before[session.id]!)
         }
