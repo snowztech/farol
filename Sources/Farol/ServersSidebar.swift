@@ -8,6 +8,8 @@ struct ServerCommands {
     let open: (Server, RemoteSession) -> Void
     let newSession: (Server) -> Void
     let add: () -> Void
+    /// The terminal a server is setting up in, by its ssh name.
+    let showSetup: (String) -> Void
     let retry: (Server) -> Void
     let rename: (Server) -> Void
     let remove: (Server) -> Void
@@ -58,11 +60,22 @@ struct ServerGroups: View {
         // A server being set up has no list yet, so its name holds its place while setup runs in its terminal.
         ForEach(servers.settingUp.filter { ssh in !servers.servers.contains { $0.ssh == ssh } }.sorted(), id: \.self) { ssh in
             ServerHeader(name: Server.name(for: ssh), state: ServerLinks.State(), settingUp: true, folded: false, palette: palette,
-                         onToggle: {}, onNew: nil)
+                         onToggle: { commands.showSetup(ssh) }, onNew: nil)
+            setupRow(ssh)
         }
     }
 
+    /// The terminal setup runs in, so you can watch it or answer a password without hunting for it.
+    private func setupRow(_ ssh: String) -> some View {
+        ServerSessionRow(session: RemoteSession(id: UUID(), name: "Setting up farol-host", branch: nil, status: .working, asking: nil),
+                         detail: ssh,
+                         selected: store.selected?.serverWindow == MainWindowController.setupKey(ssh),
+                         palette: palette, highlight: highlight) { commands.showSetup(ssh) }
+    }
+
     @ViewBuilder private func rows(_ server: Server, _ state: ServerLinks.State) -> some View {
+        // Setting up again, to update farol-host, shows its terminal here too.
+        if servers.settingUp.contains(server.ssh) { setupRow(server.ssh) }
         if state.connection == .offline {
             QuietRow(symbol: "arrow.clockwise", text: "Can't reach \(server.name) · Retry", palette: palette) { commands.retry(server) }
         } else if state.connection == .connected && state.sessions.isEmpty {
@@ -168,6 +181,8 @@ private struct ServerIcon: View {
 /// An agent on a server, drawn as your own sessions are, so the lamps read the same wherever they run.
 private struct ServerSessionRow: View {
     let session: RemoteSession
+    /// A second line of its own, where a session would show its branch.
+    var detail: String? = nil
     let selected: Bool
     let palette: Palette
     let highlight: Namespace.ID
@@ -183,7 +198,9 @@ private struct ServerSessionRow: View {
                     .font(.system(size: 13, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? palette.text : palette.text.opacity(0.8))
                     .truncationMode(.tail)
-                if let asking = session.asking, session.status == .waiting {
+                if let detail {
+                    Text(detail).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted)
+                } else if let asking = session.asking, session.status == .waiting {
                     Text(asking).font(.system(size: 11)).foregroundStyle(palette.muted).truncationMode(.tail).hoverTip(asking)
                 } else if let branch = session.branch {
                     HStack(spacing: 4) {
@@ -256,7 +273,7 @@ struct AddServerSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 16) {
                 SheetHeader(title: "Add a server", palette: p) {
-                    Text("Its agents show in the sidebar with their status. Farol installs farol-host there over ssh and pairs this Mac with it.")
+                    Text("Its agents show in the sidebar with their status. Farol installs or updates farol-host there over ssh and lets this Mac in.")
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if !hosts.isEmpty {

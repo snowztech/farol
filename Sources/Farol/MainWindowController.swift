@@ -359,6 +359,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             if let session = self.store.sessions.first(where: { $0.id == id }) { return self.store.select(session) }
             self.openServerSession(id: id)
         }
+        servers.onSetUp = { [weak self] in self?.setUpFinished($0) }
         servers.onStatusChange = { [weak self] server, session, before in
             guard let self else { return }
             notifier.serverStatusChanged(server, session, from: before)

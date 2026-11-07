@@ -9,6 +9,10 @@ extension MainWindowController {
             open: { [weak self] in self?.openServerSession($0, $1) },
             newSession: { [weak self] in self?.newServerSession(on: $0) },
             add: { [weak self] in self?.addServer() },
+            showSetup: { [weak self] ssh in
+                guard let self, let setup = store.sessions.first(where: { $0.serverWindow == Self.setupKey(ssh) }) else { return }
+                store.select(setup)
+            },
             retry: { [weak self] in self?.servers.retry($0) },
             rename: { [weak self] in self?.renameServer($0) },
             remove: { [weak self] in self?.removeServer($0) })
@@ -22,10 +26,7 @@ extension MainWindowController {
     }
 
     func openServerSession(_ server: Server, _ session: RemoteSession) {
-        guard let window = session.window else {
-            return showError("Update farol-host on \(server.name)",
-                             "This server's farol-host is too old to open its sessions from the Mac. Run farol-host upgrade there.")
-        }
+        guard let window = session.window else { return askToUpdate(server) }
         openServerWindow(server, window)
     }
 
@@ -75,11 +76,37 @@ extension MainWindowController {
         window.beginSheet(sheet)
     }
 
-    /// Setup runs in a terminal you can see, and Farol pairs as soon as farol-host prints its code there.
+    static func setupKey(_ ssh: String) -> String { "setup " + ssh }
+
+    /// Setup runs in a terminal you can see, under the server in the sidebar, and closes once the server trusts this Mac.
+    /// Run again on a server already added, it upgrades farol-host there.
     private func setUpServer(_ ssh: String) {
-        let session = store.create(run: ServerSetup.command(ssh: ssh, deviceName: ServerLinks.deviceName))
-        session.customName = "Setting up \(Server.name(for: ssh))"
-        servers.watchSetup(ssh: ssh) { [weak session] in session?.panes.focused.screenText }
+        guard let key = servers.publicKey else {
+            return showError("Farol couldn't read its key", "Allow Farol to use the Keychain when macOS asks, then add the server again.")
+        }
+        store.sessions.filter { $0.serverWindow == Self.setupKey(ssh) }.forEach { store.close($0) }
+        let session = store.create(run: ServerSetup.command(ssh: ssh, deviceKey: key, deviceName: ServerLinks.deviceName),
+                                   serverWindow: Self.setupKey(ssh))
+        servers.watchSetup(ssh: ssh) { [weak self, weak session] in
+            guard let self, let session, store.sessions.contains(where: { $0 === session }) else { return nil }
+            return session.panes.focused.title
+        }
+    }
+
+    func setUpFinished(_ ssh: String) {
+        store.sessions.filter { $0.serverWindow == Self.setupKey(ssh) }.forEach { store.close($0) }
+    }
+
+    private func askToUpdate(_ server: Server) {
+        guard let window else { return }
+        let alert = NSAlert()
+        alert.messageText = "Update farol-host on \(server.name)"
+        alert.informativeText = "Its farol-host is too old to open sessions from the Mac. Farol can install the latest one over ssh."
+        alert.addButton(withTitle: "Update")
+        alert.addButton(withTitle: "Cancel")
+        alert.beginSheetModal(for: window) { [weak self] response in
+            if response == .alertFirstButtonReturn { self?.setUpServer(server.ssh) }
+        }
     }
 
     private func renameServer(_ server: Server) {

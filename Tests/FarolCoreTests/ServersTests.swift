@@ -27,71 +27,64 @@ import Testing
     #expect(list.load() == [server])
 }
 
-@Test func findsAWrappedPairingLinkOnScreen() {
-    let code = String(repeating: "eyJyZWxheSI6IndzczovL3JlbGF5", count: 3)
-    let screen = """
-    Scan this from Farol on your phone. It works once, for two minutes.
-    ▄▄▄▄▄▄▄ ▄ ▄▄
-    https://farol.sh/pair#\(code.prefix(40))
-    \(code.dropFirst(40))
-    Paired with Phone.
-    """
-    #expect(ServerSetup.pairingLink(in: screen)?.absoluteString == "https://farol.sh/pair#" + code)
-    #expect(ServerSetup.pairingLink(in: "no link here") == nil)
+@Test func readsTheServersLinkFromTheTitle() {
+    #expect(ServerSetup.trustedLink(inTitle: "farol-host https://farol.sh/pair#abc")?.absoluteString == "https://farol.sh/pair#abc")
+    #expect(ServerSetup.trustedLink(inTitle: "vim notes.md") == nil)
 }
 
-/// Runs the setup script against a fake farol-host that writes down how it was called.
-private func runSetup(pairedAlready: Bool) throws -> [String] {
+/// Runs the setup script with a fake curl and farol-host that write down how they were called.
+@Test func setupUpgradesSetsUpWithoutAPhoneCodeThenTrustsThisMac() throws {
     let home = FileManager.default.temporaryDirectory.appendingPathComponent("farol-host-\(UUID())")
     let bin = home.appendingPathComponent(".local/bin")
     try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
-    let fake = bin.appendingPathComponent("farol-host")
-    try """
-    #!/bin/sh
-    echo "$*" >> "$HOME/calls"
-    [ "$1" = devices ] && \(pairedAlready ? "echo \"Lucas's Mac\"" : "true")
-    exit 0
-    """.write(to: fake, atomically: true, encoding: .utf8)
-    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fake.path)
-
+    let fakes = [
+        "curl": "echo \"curl $*\" >> \"$HOME/calls\"",
+        "farol-host": "echo \"$*\" >> \"$HOME/calls\"\n[ \"$1\" = trust ] && echo https://farol.sh/pair#xyz\nexit 0",
+    ]
+    for (name, body) in fakes {
+        let file = bin.appendingPathComponent(name)
+        try "#!/bin/sh\n\(body)\n".write(to: file, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: file.path)
+    }
+    let key = Data(repeating: 7, count: 32)
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/bin/sh")
-    process.arguments = ["-c", ServerSetup.script(deviceName: "Lucas's Mac")]
-    process.environment = ["HOME": home.path, "PATH": "/usr/bin:/bin"]
+    process.arguments = ["-c", ServerSetup.script(deviceKey: key, deviceName: "Lucas's Mac").replacingOccurrences(of: "sleep 2", with: "")]
+    process.environment = ["HOME": home.path, "PATH": "\(bin.path):/usr/bin:/bin"]
+    let output = Pipe()
+    process.standardOutput = output
     try process.run()
+    let printed = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
     process.waitUntilExit()
     #expect(process.terminationStatus == 0)
-    return try String(contentsOf: home.appendingPathComponent("calls"), encoding: .utf8).split(separator: "\n").map(String.init)
+    let calls = try String(contentsOf: home.appendingPathComponent("calls"), encoding: .utf8).split(separator: "\n").map(String.init)
+    #expect(calls == ["curl -fsSL https://farol.sh/host.sh", "setup --no-pair", "trust \(key.base64EncodedString()) Lucas's Mac"])
+    #expect(printed.contains("\u{1B}]2;farol-host https://farol.sh/pair#xyz\u{07}"))
 }
 
-@Test func setupPairsThisMacWhenSetupDidNot() throws {
-    #expect(try runSetup(pairedAlready: false) == ["forget Lucas's Mac", "setup", "devices", "pair"])
-}
-
-@Test func setupSkipsPairingWhenSetupAlreadyPairedThisMac() throws {
-    #expect(try runSetup(pairedAlready: true) == ["forget Lucas's Mac", "setup", "devices"])
-}
-
-@Test func setupCommandKeepsTheScriptWholeThroughSSH() {
-    let command = ServerSetup.command(ssh: "hetzner", deviceName: "Lucas's Mac")
-    #expect(command.hasPrefix("ssh -t 'hetzner' "))
-    #expect(command.contains("farol.sh/host.sh"))
+@Test func setupCommandSendsTheScriptAsOneWord() throws {
+    let key = Data(repeating: 7, count: 32)
+    let command = ServerSetup.command(ssh: "hetzner", deviceKey: key, deviceName: "Lucas's Mac")
+    #expect(!command.contains("\n"))
+    let encoded = try #require(command.split(separator: " ").first { $0.count > 100 })
+    #expect(Data(base64Encoded: String(encoded)).map { String(decoding: $0, as: UTF8.self) }
+            == ServerSetup.script(deviceKey: key, deviceName: "Lucas's Mac"))
 }
 
 @Test func attachingNamesTheWindowForTheServersShell() throws {
     let command = ServerSetup.attach(ssh: "hetzner", window: "@3")
-    #expect(command.hasPrefix("ssh -t 'hetzner' "))
+    #expect(command.contains("ControlPersist"))
     // What the server's shell gets once this Mac's shell has taken its quotes off, then what tmux gets from that.
+    let remote = String(command[command.range(of: "'hetzner' ")!.upperBound...])
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/bin/sh")
-    let remote = command.replacingOccurrences(of: "ssh -t 'hetzner' ", with: "")
     process.arguments = ["-c", "sh -c \"printf '%s|' $(printf '%s' \(remote))\""]
     let output = Pipe()
     process.standardOutput = output
     try process.run()
     process.waitUntilExit()
     let words = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-    #expect(words == "tmux|attach-session|-t|@3|")
+    #expect(words == "TERM=xterm-256color|tmux|attach-session|-t|@3|")
 }
 
 @Test func tellsAWindowIDFromOtherOutput() {

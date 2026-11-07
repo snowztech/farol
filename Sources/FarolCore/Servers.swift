@@ -64,61 +64,69 @@ public enum ServerSetup {
         return hosts(inSSHConfig: (try? String(contentsOf: file, encoding: .utf8)) ?? "")
     }
 
+    /// Every ssh Farol runs shares one connection per server, kept ten minutes after the last one closes.
+    /// A click then opens at once, and a password typed in setup isn't asked again.
+    public static let connectionFolder = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".farol/ssh")
+    public static var sshOptions: [String] {
+        ["-o", "ControlMaster=auto", "-o", "ControlPath=\(connectionFolder.path)/%C", "-o", "ControlPersist=10m"]
+    }
+    private static var ssh: String { "ssh " + sshOptions.map(NewTask.shellQuoted).joined(separator: " ") }
+
+    /// Where the setup script hands the server's link to Farol: the terminal's title, which never wraps and isn't shown in the text.
+    static let titlePrefix = "farol-host "
+
     /// What runs on the server, in a terminal you can see, so a password, a host key or sudo can be answered there.
-    /// It installs farol-host when it's missing, runs its setup, then shows a pairing code unless setup already showed one this Mac used.
-    /// A Mac paired before is forgotten first, so adding a server again always pairs anew.
-    public static func script(deviceName: String) -> String {
-        let name = NewTask.shellQuoted(deviceName)
-        return """
+    /// It installs or upgrades farol-host, sets the machine up without a phone code, then lets this Mac in by its key.
+    public static func script(deviceKey: Data, deviceName: String) -> String {
+        """
         set -e
+        printf '\\nInstalling the latest farol-host…\\n\\n'
+        curl -fsSL https://farol.sh/host.sh | sh
         fh="$HOME/.local/bin/farol-host"
-        [ -x "$fh" ] || curl -fsSL https://farol.sh/host.sh | sh
-        "$fh" forget \(name) >/dev/null 2>&1 || true
-        "$fh" setup
-        "$fh" devices | grep -qxF \(name) || "$fh" pair
+        "$fh" setup --no-pair
+        link=$("$fh" trust \(deviceKey.base64EncodedString()) \(NewTask.shellQuoted(deviceName)))
+        printf '\\033]2;\(titlePrefix)%s\\007' "$link"
+        printf '\\nDone. This Mac can see the agents here now.\\n'
+        sleep 2
         """
     }
 
-    /// The command for the session that sets a server up.
-    public static func command(ssh: String, deviceName: String) -> String {
-        "ssh -t \(NewTask.shellQuoted(ssh)) \(NewTask.shellQuoted("sh -c " + NewTask.shellQuoted(script(deviceName: deviceName))))"
+    /// The command for the session that sets a server up. The script goes as one encoded word, so the terminal shows only what it prints.
+    public static func command(ssh server: String, deviceKey: Data, deviceName: String) -> String {
+        let encoded = Data(script(deviceKey: deviceKey, deviceName: deviceName).utf8).base64EncodedString()
+        return "clear && \(ssh) -t \(NewTask.shellQuoted(server)) 'echo \(encoded) | base64 -d | sh'"
+    }
+
+    /// The server's link, once the setup script set it as the terminal's title.
+    public static func trustedLink(inTitle title: String) -> URL? {
+        guard title.hasPrefix(titlePrefix + "https://farol.sh/pair#") else { return nil }
+        return URL(string: String(title.dropFirst(titlePrefix.count)).trimmingCharacters(in: .whitespaces))
     }
 
     /// Opens a server's tmux window in this terminal. Attaching to a window makes it the one on screen.
-    public static func attach(ssh: String, window: String) -> String {
-        "ssh -t \(NewTask.shellQuoted(ssh)) " + NewTask.shellQuoted("tmux attach-session -t " + NewTask.shellQuoted(window))
+    /// The server may not know this terminal's own TERM, so tmux is told one every server has.
+    public static func attach(ssh server: String, window: String) -> String {
+        "\(ssh) -t \(NewTask.shellQuoted(server)) " + NewTask.shellQuoted("TERM=xterm-256color tmux attach-session -t " + NewTask.shellQuoted(window))
     }
 
     /// Makes a tmux session on the server and prints its window, with no terminal, so the session opened next knows which it is.
-    public static func newWindowArguments(ssh: String) -> [String] {
-        ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", ssh, "tmux new-session -d -P -F '#{window_id}'"]
+    public static func newWindowArguments(ssh server: String) -> [String] {
+        sshOptions + ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", server, "tmux new-session -d -P -F '#{window_id}'"]
     }
 
     /// A new tmux session on the server in this terminal, for when ssh can't run without one, like a host that asks for a password.
-    public static func newSession(ssh: String) -> String {
-        "ssh -t \(NewTask.shellQuoted(ssh)) tmux new-session"
+    public static func newSession(ssh server: String) -> String {
+        "\(ssh) -t \(NewTask.shellQuoted(server)) 'TERM=xterm-256color tmux new-session'"
+    }
+
+    /// Tells a server to stop letting this Mac in, for when it's offline and can't hear it through the relay.
+    public static func forgetArguments(ssh server: String, deviceName: String) -> [String] {
+        sshOptions + ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", server,
+                      "\"$HOME/.local/bin/farol-host\" forget \(NewTask.shellQuoted(deviceName))"]
     }
 
     /// Whether what tmux printed is a window id, like "@3".
     public static func isWindow(_ text: String) -> Bool {
         text.count > 1 && text.hasPrefix("@") && text.dropFirst().allSatisfy(\.isNumber)
-    }
-
-    /// The last pairing link farol-host printed, found on screen. A link wider than the terminal wraps onto lines that hold nothing else.
-    public static func pairingLink(in screen: String) -> URL? {
-        let prefix = "https://farol.sh/pair#"
-        let lines = screen.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
-        guard let first = lines.lastIndex(where: { $0.contains(prefix) }) else { return nil }
-        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
-        let isCode = { (text: Substring) in !text.isEmpty && text.unicodeScalars.allSatisfy(allowed.contains) }
-        let start = lines[first].range(of: prefix)!.upperBound
-        let tail = lines[first][start...]
-        guard isCode(tail) else { return nil }
-        var code = String(tail)
-        for line in lines[(first + 1)...] {
-            guard isCode(Substring(line)) else { break }
-            code += line
-        }
-        return code.count > 20 ? URL(string: prefix + code) : nil
     }
 }

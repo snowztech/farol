@@ -18,6 +18,8 @@ final class ServerLinks: ObservableObject {
     @Published private(set) var settingUp: Set<String> = []
     /// A session of a server changed status, for the notifications and the Dock.
     var onStatusChange: ((Server, RemoteSession, RemoteStatus) -> Void)?
+    /// A server finished setting up and trusts this Mac.
+    var onSetUp: ((String) -> Void)?
 
     private let list: ServerList
     private var links: [UUID: Link] = [:]
@@ -29,6 +31,8 @@ final class ServerLinks: ObservableObject {
     init(list: ServerList = .default) {
         self.list = list
         servers = list.load()
+        try? FileManager.default.createDirectory(at: ServerSetup.connectionFolder, withIntermediateDirectories: true,
+                                                 attributes: [.posixPermissions: 0o700])
         servers.forEach(connect)
     }
 
@@ -47,10 +51,19 @@ final class ServerLinks: ObservableObject {
         connect(server)
     }
 
-    /// Forgets the server here and, while it is connected, tells it to forget this Mac, as a phone does.
-    /// Offline, the server keeps this Mac listed until `farol-host forget` there.
+    /// Forgets the server here and tells it to forget this Mac: through the relay as a phone does, and over ssh for when it's offline.
     func remove(_ server: Server) {
         links.removeValue(forKey: server.id)?.forget()
+        let forget = ServerSetup.forgetArguments(ssh: server.ssh, deviceName: Self.deviceName)
+        DispatchQueue.global(qos: .utility).async {
+            let ssh = Process()
+            ssh.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
+            ssh.arguments = forget
+            ssh.standardInput = FileHandle.nullDevice
+            ssh.standardOutput = FileHandle.nullDevice
+            ssh.standardError = FileHandle.nullDevice
+            try? ssh.run()
+        }
         states[server.id] = nil
         servers.removeAll { $0.id == server.id }
         try? list.save(servers)
@@ -62,19 +75,21 @@ final class ServerLinks: ObservableObject {
         try? list.save(servers)
     }
 
-    /// Watches the setup terminal for the code farol-host prints, then pairs with it.
-    /// ponytail: polls the screen twice a second while setup runs. A screen-changed callback would be lighter.
-    func watchSetup(ssh: String, screen: @escaping () -> String?) {
+    /// The key servers know this Mac by, for the setup script to hand to `farol-host trust`.
+    var publicKey: Data? { (try? Keychain.serverKey())?.publicKey }
+
+    /// Watches the setup terminal's title for the link the script sets there once the server trusts this Mac.
+    /// `title` turns nil once the terminal is closed, which ends the wait.
+    func watchSetup(ssh: String, title: @escaping () -> String?) {
         settingUp.insert(ssh)
         watching[ssh]?.invalidate()
-        let started = Date()
-        watching[ssh] = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] timer in
+        watching[ssh] = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] timer in
             guard let self else { return timer.invalidate() }
-            // The code lasts two minutes, after whatever installing took.
-            guard let text = screen(), Date().timeIntervalSince(started) < 15 * 60 else { return stopWatching(ssh) }
-            if let link = ServerSetup.pairingLink(in: text), let offer = PairingOffer(link: link), offer.expires > Date() {
+            guard let text = title() else { return stopWatching(ssh) }
+            if let link = ServerSetup.trustedLink(inTitle: text), PairingOffer(link: link) != nil {
                 stopWatching(ssh)
-                pair(ssh: ssh, link: link, offer: offer)
+                add(ssh: ssh, link: link)
+                onSetUp?(ssh)
             }
         }
     }
@@ -84,29 +99,27 @@ final class ServerLinks: ObservableObject {
         settingUp.remove(ssh)
     }
 
-    private func pair(ssh: String, link: URL, offer: PairingOffer) {
-        guard let key = try? Keychain.deviceKey(),
-              let request = try? Pairing.request(for: offer, from: key, named: Self.deviceName) else { return }
-        // Adding a server again replaces the one before, so it is never listed twice.
-        let old = servers.filter { $0.ssh == ssh }
-        let server = Server(id: old.first?.id ?? UUID(), name: old.first?.name ?? Server.name(for: ssh), ssh: ssh, link: link)
-        old.forEach { links.removeValue(forKey: $0.id)?.stop() }
+    /// Adding a server again replaces the one before, keeping its name, so it is never listed twice.
+    private func add(ssh: String, link: URL) {
+        let old = servers.first { $0.ssh == ssh }
+        if let old { links.removeValue(forKey: old.id)?.stop() }
+        let server = Server(id: old?.id ?? UUID(), name: old?.name ?? Server.name(for: ssh), ssh: ssh, link: link)
         servers = servers.filter { $0.ssh != ssh } + [server]
         try? list.save(servers)
-        start(server, key: key, offer: offer, pairing: request)
+        connect(server)
     }
 
     private func connect(_ server: Server) {
-        guard let key = try? Keychain.deviceKey(), let offer = PairingOffer(link: server.link) else {
+        guard let key = try? Keychain.serverKey(), let offer = PairingOffer(link: server.link) else {
             states[server.id] = State(connection: .offline)
             return
         }
-        start(server, key: key, offer: offer, pairing: nil)
+        start(server, key: key, offer: offer)
     }
 
-    private func start(_ server: Server, key: DeviceKey, offer: PairingOffer, pairing: PairingRequest?) {
+    private func start(_ server: Server, key: DeviceKey, offer: PairingOffer) {
         states[server.id] = State(connection: .connecting, sessions: states[server.id]?.sessions ?? [])
-        let link = Link(key: key, offer: offer, pairing: pairing)
+        let link = Link(key: key, offer: offer)
         link.onConnection = { [weak self] connection in self?.states[server.id, default: State()].connection = connection }
         link.onSessions = { [weak self] sessions in self?.update(server.id, sessions) }
         links[server.id] = link
@@ -123,21 +136,19 @@ final class ServerLinks: ObservableObject {
     }
 }
 
-/// One server's relay connection, opened as the phone opens one.
+/// One server's relay connection, opened as the phone opens one. The server already trusts this Mac's key, so it never pairs.
 private final class Link {
     var onConnection: ((ServerLinks.Connection) -> Void)?
     var onSessions: (([RemoteSession]) -> Void)?
 
     private let key: DeviceKey
     private let offer: PairingOffer
-    private var pairing: PairingRequest?
     private var link: PhoneLink
     private let relay: RelayConnection
 
-    init(key: DeviceKey, offer: PairingOffer, pairing: PairingRequest?) {
+    init(key: DeviceKey, offer: PairingOffer) {
         self.key = key
         self.offer = offer
-        self.pairing = pairing
         link = PhoneLink(phone: key, mac: offer.mac)
         relay = RelayConnection(url: offer.relay.appendingPathComponent("v1/rooms/\(RelayFrame.room(for: offer.mac))/phone"))
     }
@@ -169,7 +180,7 @@ private final class Link {
         switch RelayFrame(message, readBy: .phone) {
         case .online:
             link = PhoneLink(phone: key, mac: offer.mac)
-            send(link.start(pairing: pairing))
+            send(link.start())
         case .offline:
             onConnection?(.offline)
         case .data(_, let payload):
@@ -177,7 +188,6 @@ private final class Link {
             for output in link.receive(frame) {
                 switch output {
                 case .send(let frame): send([frame])
-                case .paired: pairing = nil
                 case .ready:
                     onConnection?(.connected)
                     if let hello = link.seal(RemoteCommand(.hello(version: RemoteProtocol.version))) { send([hello]) }

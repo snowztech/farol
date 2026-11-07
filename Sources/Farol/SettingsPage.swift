@@ -846,7 +846,7 @@ struct SettingsPage: View {
                 }
             }
             Row(title: remoteServers.servers.isEmpty ? "Add a server" : "Add another server",
-                detail: "Pick a host from your ssh config. Farol installs farol-host there and pairs this Mac in a terminal you can see.",
+                detail: "Pick a host from your ssh config. Farol installs or updates farol-host there and lets this Mac in, in a terminal you can see.",
                 palette: p) {
                 ShipButton(title: "Add Server…", busy: false, palette: p, action: serverCommands.add)
             }
