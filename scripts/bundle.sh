@@ -7,13 +7,12 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 config="${1:-release}"
 app="$root/build/Farol.app"
 # Debug builds get their own identity, so testing them never touches the installed app's sessions.
-if [ "$config" = "debug" ]; then
-  bundle_id="dev.farol.Farol.debug"
-  name="Farol Dev"
-else
-  bundle_id="dev.farol.Farol"
-  name="Farol"
-fi
+# Shots is a debug build with one more, so a staged screenshot scene can be reset without touching Farol Dev's.
+case "$config" in
+  debug) bundle_id="dev.farol.Farol.debug"; name="Farol Dev" ;;
+  shots) bundle_id="dev.farol.Farol.shots"; name="Farol Shots"; app="$root/build/Farol Shots.app"; config="debug" ;;
+  *) bundle_id="dev.farol.Farol"; name="Farol" ;;
+esac
 
 # Version from the latest v* tag. Builds after a tag read like 0.1.0-3-gabc1234, and -dirty marks uncommitted changes.
 described=$(git -C "$root" describe --tags --match 'v[0-9]*' --dirty 2>/dev/null || echo "v0.0.0-dev")

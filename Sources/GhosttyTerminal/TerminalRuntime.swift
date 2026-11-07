@@ -186,7 +186,8 @@ public final class TerminalRuntime {
         if (try? defaults.write(to: defaultsFile, atomically: true, encoding: .utf8)) != nil {
             ghostty_config_load_file(config, defaultsFile.path)
         }
-        if ghosttyFiles { ghostty_config_load_default_files(config) }
+        // A staged scene sets FAROL_HOME and leaves your Ghostty config out, so it looks the same on any Mac.
+        if ghosttyFiles, ProcessInfo.processInfo.environment["FAROL_HOME"] == nil { ghostty_config_load_default_files(config) }
         for url in overrides where FileManager.default.fileExists(atPath: url.path) {
             ghostty_config_load_file(config, url.path)
         }
