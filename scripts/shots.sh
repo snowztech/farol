@@ -5,6 +5,8 @@ set -euo pipefail
 
 usage="usage: scripts/shots.sh stage [sidebar|review|new-task]   build the shelf demo repo and open Farol Shots on it
        scripts/shots.sh shoot <name>              save the Farol Shots window as site/features/<name>.png
+       scripts/shots.sh library                   stage once and shoot every feature into assets/screenshots
+       scripts/shots.sh themes                    the review in each of Farol's themes, into assets/screenshots/themes
        scripts/shots.sh reset                     quit Farol Shots and forget the scene
 
 make shots SCENE=review builds Farol Shots and stages a scene, and make shot NAME=review shoots it.
@@ -24,7 +26,7 @@ quit() {
 }
 
 repo() {
-  rm -rf "$dir"
+  rm -rf "$dir" 2>/dev/null || { sleep 1; rm -rf "$dir"; }
   mkdir -p "$dir/home" "$dir/zsh" "$dir/status" "$dir/run"
   local shelf="$dir/shelf"
   git init -q -b main "$shelf"
@@ -146,11 +148,27 @@ EOF
   git config user.name "Ada Lovelace"
   git config user.email "ada@example.com"
   printf 'module example.com/harbor\n\ngo 1.24\n' > go.mod
-  printf 'package main\n\nfunc main() {}\n' > main.go
+  cat > main.go <<'EOF'
+package main
+
+import "net/http"
+
+func main() {
+	http.ListenAndServe(":8080", routes())
+}
+EOF
   git add . && git commit -qm "feat: start the server"
   git init -q --bare "$dir/origin/harbor.git" && git remote add origin "$dir/origin/harbor.git" && git push -q -u origin main
   git worktree add -q -b feat/rate-limit ../harbor-rate-limit
   git worktree add -q -b chore/go-1.25 ../harbor-go
+  # Both sides change the line that starts the server, so merging main stops on a conflict.
+  perl -pi -e 's/^\thttp\.ListenAndServe.*/\thttp.ListenAndServe(":8080", limit(routes()))/' main.go
+  git commit -qam "feat: rate limit every route"
+  cd ../harbor-go
+  perl -pi -e 's/^go 1\.24$/go 1.25/; ' go.mod
+  perl -pi -e 's/^\thttp\.ListenAndServe.*/\tlog.Fatal(http.ListenAndServe(addr(), routes()))/; s/^import "net\/http"$/import (\n\t"log"\n\t"net\/http"\n)/' main.go
+  git commit -qam "chore: move to Go 1.25 and read the port from the environment"
+  git merge -q main >/dev/null 2>&1 || true
 }
 
 # A plain zsh, so the prompt is the same on every Mac.
@@ -166,20 +184,90 @@ precmd() { vcs_info }
 setopt prompt_subst
 PROMPT='%F{green}➜%f  %F{cyan}%1~%f${vcs_info_msg_0_} '
 [[ -f $SHOTS/status/${PWD:t} ]] && eval "\"\$FAROL_CLI\" status $(<$SHOTS/status/${PWD:t})"
-# Cleared first, so the login line and its date stay out of the shot.
-[[ -f $SHOTS/run/${PWD:t} ]] && { print -n '\e[2J\e[H'; source $SHOTS/run/${PWD:t} }
+# Cleared, so the login line and its date stay out of the shot.
+print -n '\e[2J\e[H'
+# Once per folder, so a pane split in the same folder gets a plain prompt instead of a second agent.
+if [[ -f $SHOTS/run/${PWD:t} && ! -e $SHOTS/run/${PWD:t}.ran ]]; then
+  touch $SHOTS/run/${PWD:t}.ran; source $SHOTS/run/${PWD:t}
+fi
 EOF
   # The main session is a real Claude Code, so the shot shows a real conversation and its own status.
   # The scene's zsh doesn't load your PATH, so it gets claude's full path.
   local claude
   claude=$(command -v claude) || { echo "shots: claude isn't on your PATH" >&2; exit 1; }
   # A blank status line, so your own one, like plan usage, stays out of the shot.
-  printf '%q --settings %q %q\n' "$claude" '{"statusLine":{"type":"command","command":"true"}}' "Review src/queue.ts. What goes wrong if the network drops halfway through a flush? Keep it short." > "$dir/run/shelf"
+  # In the repo rather than a flag, so the conversation Farol resumes after a relaunch keeps it too.
+  mkdir -p "$dir/shelf/.claude"
+  echo '{"statusLine":{"type":"command","command":"true"}}' > "$dir/shelf/.claude/settings.local.json"
+  echo '.claude/' >> "$dir/shelf/.git/info/exclude"
+  printf '%q %q\n' "$claude" "Review src/queue.ts. What goes wrong if the network drops halfway through a flush? Keep it short." > "$dir/run/shelf"
   echo 'working' > "$dir/status/shelf-search"
   echo 'waiting --asking "The fix is in. What should I do with it?"' > "$dir/status/shelf-flaky-tests"
   echo 'done' > "$dir/status/shelf-api"
   echo 'working' > "$dir/status/harbor-rate-limit"
   echo 'done' > "$dir/status/harbor-go"
+}
+
+# Two servers in containers, set up the way Add Server does it over ssh, so the sidebar shows agents on other machines.
+# Each gets its own ssh key and config in the scene, so nothing is added to ~/.ssh. Skipped when Docker isn't running.
+servers() {
+  docker info >/dev/null 2>&1 || { echo "shots: Docker isn't running, so the scene has no servers" >&2; return 0; }
+  docker image inspect farol-shots-server:2 >/dev/null 2>&1 || docker build -q -t farol-shots-server:2 - >/dev/null <<'EOF'
+FROM debian:bookworm-slim
+# Without a UTF-8 locale tmux prints tabs as underscores, and farol-host then reads no sessions.
+ENV LANG=C.UTF-8
+RUN apt-get update && apt-get install -y --no-install-recommends openssh-server tmux curl ca-certificates git procps \
+ && rm -rf /var/lib/apt/lists/* && mkdir -p /run/sshd /root/.ssh
+RUN curl -fsSL https://farol.sh/host.sh | sh
+CMD ["/usr/sbin/sshd", "-D", "-e"]
+EOF
+  mkdir -p "$dir/keys"
+  ssh-keygen -q -t ed25519 -N "" -f "$dir/keys/id_ed25519"
+  # Farol Shots' own key for servers, where a debug build keeps it, so the scene can let it in before it opens.
+  local farol_key="$HOME/Library/Application Support/Farol/$id.server-key" public
+  cat > "$dir/keys/key.swift" <<'EOF'
+import CryptoKit
+import Foundation
+let file = URL(fileURLWithPath: CommandLine.arguments[1])
+let key = (try? Data(contentsOf: file)).flatMap { try? Curve25519.KeyAgreement.PrivateKey(rawRepresentation: $0) } ?? Curve25519.KeyAgreement.PrivateKey()
+try key.rawRepresentation.write(to: file, options: .atomic)
+try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+print(key.publicKey.rawRepresentation.base64EncodedString())
+EOF
+  public=$(swift "$dir/keys/key.swift" "$farol_key")
+  : > "$dir/home/ssh_config"
+  local list="[]" port=2201 name
+  for name in build-box gpu-box; do
+    docker rm -f "farol-shots-$name" >/dev/null 2>&1 || true
+    docker run -d -q --name "farol-shots-$name" --hostname "$name" -p "127.0.0.1:$port:22" farol-shots-server:2 >/dev/null
+    docker exec -i "farol-shots-$name" sh -c 'cat > /root/.ssh/authorized_keys; chmod 600 /root/.ssh/authorized_keys' < "$dir/keys/id_ed25519.pub"
+    cat >> "$dir/home/ssh_config" <<EOF
+Host $name
+  HostName 127.0.0.1
+  Port $port
+  User root
+  IdentityFile $dir/keys/id_ed25519
+  IdentitiesOnly yes
+  UserKnownHostsFile $dir/keys/known_hosts
+  StrictHostKeyChecking accept-new
+EOF
+    local link
+    link=$(docker exec "farol-shots-$name" sh -c "fh=/root/.local/bin/farol-host; \$fh setup --no-pair >/dev/null 2>&1; \$fh trust $public 'Farol Shots'" | tail -1)
+    docker exec -d "farol-shots-$name" /root/.local/bin/farol-host run
+    list=$(python3 -I -c 'import json, sys, uuid
+servers = json.loads(sys.argv[1]); servers.append({"id": str(uuid.uuid4()).upper(), "name": sys.argv[2], "ssh": sys.argv[2], "link": sys.argv[3]})
+print(json.dumps(servers))' "$list" "$name" "$link")
+    port=$((port + 1))
+  done
+  # Agents on the servers, each its own tmux session so the sidebar shows its name alone.
+  # Each reports its status the way an agent's hook would.
+  agent() { docker exec "farol-shots-$1" tmux new-session -d -s "$2" -c /root "/root/.local/bin/farol-host status $3; clear; exec bash"; }
+  agent build-box "Add rate limits" working
+  agent build-box "Fix the deploy script" waiting
+  agent build-box "Nightly backups" done
+  agent gpu-box "Train the ranker" working
+  agent gpu-box "Evaluate on the test set" done
+  echo "$list" > "$dir/home/servers.json"
 }
 
 # Sessions, the selected one, and the window's size, written where Farol restores them from.
@@ -208,9 +296,12 @@ EOF
   defaults write "$id" sidebar.width -float 268
   defaults write "$id" sidebar.groupByRepo -bool true
   defaults write "$id" sidebar.folded "$dir/harbor"
+  # gpu-box folds, so the sidebar shows both an open server and a folded one.
+  [ -f "$dir/home/servers.json" ] && defaults write "$id" sidebar.foldedServers "$(python3 -I -c 'import json, sys
+print(next((s["id"] for s in json.load(open(sys.argv[1])) if s["name"] == "gpu-box"), ""))' "$dir/home/servers.json")"
   defaults write "$id" review.width -float 560
   tasks
-  [ "$1" = review ] && notes
+  case "$1" in review|library) notes ;; esac
   return 0
 }
 
@@ -289,11 +380,12 @@ EOF
 
 stage() {
   local name="${1:-sidebar}"
-  case "$name" in sidebar|review|new-task) ;; *) echo "shots: unknown scene $name (sidebar, review, new-task)" >&2; exit 64 ;; esac
+  case "$name" in sidebar|review|new-task|library) ;; *) echo "shots: unknown scene $name (sidebar, review, new-task, library)" >&2; exit 64 ;; esac
   [ -d "$app" ] || { echo "shots: build it first with make shots" >&2; exit 1; }
   quit
   repo
   shell
+  servers
   scene "$name"
   open -n --env FAROL_HOME="$dir/home" --env ZDOTDIR="$dir/zsh" --env SHOTS="$dir" "$app"
   echo "Farol Shots is open on the $name scene. Claude Code is reviewing the queue in Offline sync."
@@ -338,16 +430,100 @@ shoot() {
   # In front, so the window has its colored traffic lights.
   open -a "$app"; sleep 1
   local out="$root/site/features/$name.png"
+  case "$name" in */*) out="$root/$name.png" ;; esac
   screencapture -x -o -l "$window" "$out"
   local size
   size=$(sips -g pixelWidth -g pixelHeight "$out" | awk '/pixel/ { printf "%s%s", sep, $2; sep = "x" }')
-  echo "saved site/features/$name.png ($size)"
+  echo "saved ${out#"$root"/} ($size)"
   [ "$size" = "$((width * 2))x$((height * 2))" ] || echo "shots: expected $((width * 2))x$((height * 2)). Was the window resized, or the screen not Retina?" >&2
+}
+
+# Keys go to the app in front, which shoot keeps Farol Shots. Needs Accessibility for your terminal app.
+press() { osascript -e "tell application \"System Events\" to keystroke \"$1\" using {${2}}"; sleep "${3:-1.5}"; }
+typed() { osascript -e "tell application \"System Events\" to keystroke \"$1\""; sleep 1; }
+escape() { osascript -e 'tell application "System Events" to key code 53'; sleep 1; }
+enter() { osascript -e 'tell application "System Events" to key code 36'; sleep "${1:-2}"; }
+# A click at x, y points from the window's top left, for what has no shortcut, like a page of Settings.
+click() {
+  local origin
+  origin=$(osascript -e "tell application \"System Events\" to tell (first process whose unix id is $(pgrep -f "$app/Contents/MacOS/Farol" | head -1)) to get position of window 1")
+  osascript -e "tell application \"System Events\" to click at {$((${origin%%,*} + $1)), $((${origin##*, } + $2))}" >/dev/null; sleep "${3:-2}"
+}
+
+# Quits and reopens Farol Shots from the layout saved after staging, with the main session's panels and the selected session set.
+# Each shot starts the same, with no pane or file left from the one before. Farol resumes the Claude Code conversation on its own.
+relaunch() {
+  local panels="$1" selected="${2:-0}"
+  quit
+  # The theme a shot asks for, like theme="Farol Dusk", or Farol's default.
+  if [ -n "${theme:-}" ]; then echo "theme = $theme" > "$dir/home/config"; else rm -f "$dir/home/config"; fi
+  python3 -I - "$dir/base.plist" "$dir/defaults.plist" "$panels" "$selected" <<'EOF'
+import json, plistlib, sys
+base, path, panels, selected = sys.argv[1], sys.argv[2], sys.argv[3].split(","), int(sys.argv[4])
+with open(base, "rb") as f: d = plistlib.load(f)
+sessions = json.loads(d["sessions.saved"])
+sessions[0]["panels"] = {name: name in panels for name in ("files", "graph", "review")}
+d["sessions.saved"] = json.dumps(sessions).encode()
+d["sessions.selected"] = selected
+with open(path, "wb") as f: plistlib.dump(d, f, fmt=plistlib.FMT_BINARY)
+EOF
+  defaults import "$id" "$dir/defaults.plist"
+  open -n --env FAROL_HOME="$dir/home" --env ZDOTDIR="$dir/zsh" --env SHOTS="$dir" "$app"
+  sleep 6
+}
+
+# The same moment in each of Farol's themes, and all of them in one image to show them side by side.
+shoot_themes() {
+  local out="assets/screenshots/themes" name
+  mkdir -p "$root/$out"
+  for name in Beam Dark Fog Navy Dusk Ember Dawn Light; do
+    theme="Farol $name" relaunch review; shoot "$out/$(echo "$name" | tr '[:upper:]' '[:lower:]')"
+  done
+  ( cd "$root/$out" && ffmpeg -loglevel error -y -i beam.png -i dark.png -i fog.png -i navy.png -i dusk.png -i ember.png -i dawn.png -i light.png \
+      -filter_complex "$(for i in 0 1 2 3 4 5 6 7; do printf '[%d]scale=1270:-1[v%d];' $i $i; done)[v0][v1][v2][v3][v4][v5][v6][v7]xstack=inputs=8:layout=0_0|w0_0|0_h0|w0_h0|0_h0+h2|w0_h0+h2|0_h0+h2+h4|w0_h0+h2+h4" \
+      -frames:v 1 all.png ) && echo "saved $out/all.png"
+}
+
+# Only the themes, from one stage.
+themes() {
+  stage library
+  quit; defaults export "$id" "$dir/base.plist"
+  shoot_themes
+}
+
+# A shot of each feature, from one stage, into assets/screenshots.
+library() {
+  stage library
+  local out="assets/screenshots"
+  # Saved once the agent is done, so it holds the conversation to resume.
+  quit; defaults export "$id" "$dir/base.plist"
+  relaunch none; shoot "$out/sidebar"
+  relaunch review; shoot "$out/review-notes"
+  relaunch graph; shoot "$out/git-graph"
+  # Each one is a moment from real use: the reviewed file open beside the agent, a search followed to its line, a commit after the diff.
+  relaunch files; press p "command down"; typed "queue.ts"; enter 3; shoot "$out/files"
+  relaunch none; press f "shift down, command down" 3; typed "pending"; enter 3; shoot "$out/find-in-files"
+  relaunch none; press p "command down"; typed "test"; shoot "$out/palette"
+  relaunch review; press c "option down, command down" 2; typed "docs: say what the offline queue does"; shoot "$out/commit"
+  relaunch none; press n "shift down, command down"; typed "Add tags to saved links, with a --tag filter on shelf list"; shoot "$out/new-task"
+  relaunch none; press "," "command down" 2; shoot "$out/settings"
+  # Appearance, then the theme browser that opens beside it.
+  relaunch none; press "," "command down" 2; click 350 103; click 860 148 3; shoot "$out/themes"
+  theme="Farol Light" relaunch review; shoot "$out/review-notes-light"
+  theme="Farol Light" relaunch none; shoot "$out/sidebar-light"
+  shoot_themes
+  relaunch none; press d "command down" 2; typed "git log --oneline"; enter; shoot "$out/split"
+  # The sixth session is harbor's Go upgrade, stopped on a merge conflict.
+  relaunch none 5; press m "option down, command down" 3; shoot "$out/conflicts"
+  echo "Library shot into $out. Farol Shots stays open for anything else."
 }
 
 case "${1:-}" in
   stage) stage "${2:-}" ;;
   shoot) shoot "${2:-}" ;;
-  reset) quit; defaults delete "$id" >/dev/null 2>&1 || true; rm -rf "$dir"; echo "Farol Shots reset" ;;
+  library) library ;;
+  themes) themes ;;
+  reset) quit; defaults delete "$id" >/dev/null 2>&1 || true; rm -rf "$dir" 2>/dev/null || { sleep 1; rm -rf "$dir"; }
+         docker rm -f farol-shots-build-box farol-shots-gpu-box >/dev/null 2>&1 || true; echo "Farol Shots reset" ;;
   *) echo "$usage"; exit 64 ;;
 esac
