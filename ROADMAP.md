@@ -112,6 +112,7 @@ A session over ssh says where you are, and shows nothing that belongs to another
 - [x] The files, review and git graph panels empty over ssh, where they showed the repo on your Mac
 - [ ] A `TERM` the server knows, so colors and keys work on hosts without Ghostty's terminfo
 - [ ] Hosts whose shell sets no title, which still look local
+- [ ] Servers in the sidebar. Add Server picks a host from `~/.ssh/config`, then installs and pairs `farol-host` over ssh, in a terminal you can see so a password or `sudo` prompt can be answered. The server's agents show as a group with their lamps, notifications and Dock count, a click opens one attached to its tmux window, and New Task can start an agent there
 
 ## From your phone
 

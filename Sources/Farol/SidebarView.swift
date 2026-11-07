@@ -19,13 +19,19 @@ struct SidebarView: View {
     @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = false
     /// The projects folded shut, by repo path, one per line.
     @AppStorage("sidebar.folded") private var folded = ""
+    @ObservedObject private var proto = ServersPrototype.shared
 
     var body: some View {
         let p = state.palette
+        let onServer = ServersPrototype.enabled && proto.variant == .machines && proto.machine != nil
         VStack(spacing: 0) {
+            if ServersPrototype.enabled && proto.variant == .machines {
+                ServersPrototypeMachines(localActivities: store.groups.flatMap(\.items).map(\.activity), palette: p)
+            }
             ScrollView {
                 LazyVStack(spacing: 2) {
-                    ForEach(store.groups, id: \.key) { group in
+                    if onServer { ServersPrototypeMachineList(palette: p) }
+                    ForEach(onServer ? [] : store.groups, id: \.key) { group in
                         let name = group.key.map { URL(fileURLWithPath: $0).lastPathComponent }
                         let shut = group.key.map(isFolded) ?? false
                         if let key = group.key, let name {
@@ -54,6 +60,8 @@ struct SidebarView: View {
                             .onDrop(of: [.text], delegate: Reorder(target: session, store: store, dragging: $dragging))
                         }
                     }
+                    if ServersPrototype.enabled && proto.variant == .group { ServersPrototypeGroups(palette: p) }
+                    if ServersPrototype.enabled && proto.variant == .mixed { ServersPrototypeMixed(palette: p) }
                 }
                 .padding(8)
                 .animation(Motion.enabled ? .spring(response: 0.32, dampingFraction: 0.86) : nil, value: store.selectedID)
@@ -63,9 +71,12 @@ struct SidebarView: View {
                 TasksPane(scheduler: scheduler, store: store, palette: p)
             }
             // Pinned below the list, so it stays in the same place however many sessions there are.
+            if ServersPrototype.enabled && proto.variant == .mixed { ServersPrototypeNewMenu(palette: p) }
             NewTaskRow(palette: p, action: commands.newTask)
                 .padding(8)
+            if ServersPrototype.enabled { ServersPrototypeSwitcher() }
         }
+        .sheet(isPresented: $proto.adding) { ServersPrototypeAddSheet(palette: p) }
         // Reaching a session in a folded project, with ⌘1 to ⌘9, a notification or a new session, opens the project so the row is there.
         // A new session's repo is found a moment after it's selected, so the repo is watched too.
         .onChange(of: store.selectedID) { revealSelected() }
