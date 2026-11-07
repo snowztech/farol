@@ -4,16 +4,27 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.65.0] - 2026-11-07
+
+Notes for the agent in review, and new tasks that start from the latest default branch.
+
 ### Added
 
 - Notes for the agent in the review panel. On your own changes, click the + beside a line, or select lines and right-click, and leave a note. Notes wait under their lines until you send them all to the session's agent in one message with one click, or send one at once with ⇧⌘↩. Each note quotes its lines, so it follows them as the agent edits the file. A sent note fades until you resolve it. The Send button shows the agent it goes to, and with no agent in the session the notes just wait. Notes are kept across launches. On a pull request of the session's own branch, a reviewer's comments go to the agent with Send to Claude Code under them.
-
 - New tasks and worktrees start from the remote's default branch, fetched first, so they no longer build on whatever branch the repo is on. Main, master or develop all work, since Farol asks the remote. The New Task sheet names the branch before you start, like origin/main. To stack on the checked out branch instead, pick Current branch in Settings → Worktrees. The branch doesn't track the default branch, so a push goes to its own branch, and a repo without a remote uses the current branch.
 - Settings → Worktrees points to project scripts: a `.farol/setup` you commit prepares each new worktree, and `.farol/teardown` runs when you remove one. The Farol skill teaches coding agents to write both, so you can ask one to set up a repo. The docs show how to copy local config into each worktree from setup.
+- Agent tiles in the Generate menu of the commit sheet, beside scheduled tasks in the sidebar and in the edit task sheet.
+
+### Changed
+
+- Keep the Mac awake for agents is on by default, and using Farol from the phone counts as using the Mac. The Mac then sleeps after its own Energy setting, which gives you time to answer from the phone, and the display stays off.
+- Settings controls brighten a little on hover instead of drawing a border around them.
 
 ### Fixed
 
 - A new task on a branch whose worktree folder was deleted by hand no longer fails with "already used by worktree". Farol clears git's record of deleted worktrees before it makes one.
+- The Mac no longer sleeps the moment the last agent finishes after you have been away, just as its done notification reaches the phone.
+- The checks popover lines each step's time up on the right.
 
 ## [0.64.0] - 2026-11-07
 
