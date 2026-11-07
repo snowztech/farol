@@ -99,3 +99,8 @@ import Testing
     #expect(ServerSetup.pairLine("Scan this from Farol on your phone. It works once, for two minutes.") == nil)
     #expect(ServerSetup.pairLine("▄▄▄ ▄ ▄▄▄") == nil)
 }
+
+@Test func endingASessionNamesItsWindow() {
+    #expect(ServerSetup.killWindowArguments(ssh: "vps", window: "@3").suffix(2) == ["vps", "tmux kill-window -t '@3'"])
+    #expect(ServerSetup.shell(ssh: "vps").hasSuffix("-t 'vps'"))
+}

@@ -18,6 +18,8 @@ final class Session: ObservableObject, Identifiable {
     var schedule: String?
     /// The server and tmux window this session shows over ssh, as `ServerLinks.key`. It sits under its server in the sidebar and is never saved.
     var serverWindow: String?
+    /// What a pane split off a server session runs, so it opens on the server too.
+    var serverShell: String?
     @Published var directory: String
     /// Reported per pane by agent hooks or interactive terminal titles.
     @Published private(set) var agents: [UUID: AgentActivity] = [:]
@@ -642,7 +644,7 @@ final class SessionStore: ObservableObject {
     /// Splits the focused pane. The new one opens in the same folder, and runs `run` when given.
     @discardableResult
     func split(_ session: Session, _ direction: TerminalRequest.Direction, run: String? = nil) -> TerminalView {
-        let terminal = makeTerminal(in: session.panes.focused.workingDirectory, run: run)
+        let terminal = makeTerminal(in: session.panes.focused.workingDirectory, run: run ?? session.serverShell)
         wire(terminal, to: session)
         session.panes.split(direction, with: terminal)
         return terminal

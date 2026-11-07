@@ -6,6 +6,8 @@ import SwiftUI
 /// What the sidebar's servers can ask the window for.
 struct ServerCommands {
     let open: (Server, RemoteSession) -> Void
+    /// Ends a session on its server, the tmux window and what runs in it.
+    let end: (Server, RemoteSession) -> Void
     let newSession: (Server) -> Void
     let add: () -> Void
     /// The terminal a server is setting up in, by its ssh name.
@@ -87,7 +89,12 @@ struct ServerGroups: View {
             let key = remote.window.map { ServerLinks.key(server, $0) }
             ServerSessionRow(session: remote,
                              selected: key != nil && store.selected?.serverWindow == key,
-                             palette: palette, highlight: highlight) { commands.open(server, remote) }
+                             palette: palette, highlight: highlight,
+                             onEnd: { commands.end(server, remote) }) { commands.open(server, remote) }
+                .contextMenu {
+                    Button("Open") { commands.open(server, remote) }
+                    Button("End Session on \(server.name)") { commands.end(server, remote) }
+                }
         }
     }
 
@@ -188,6 +195,8 @@ private struct ServerSessionRow: View {
     let selected: Bool
     let palette: Palette
     let highlight: Namespace.ID
+    /// Nil for a row that can't be ended, like setup's.
+    var onEnd: (() -> Void)? = nil
     let open: () -> Void
 
     @State private var hovering = false
@@ -215,6 +224,9 @@ private struct ServerSessionRow: View {
             }
             .lineLimit(1)
             Spacer(minLength: 0)
+            if hovering, let onEnd {
+                CloseButton(help: "End the session on the server", palette: palette, action: onEnd)
+            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)

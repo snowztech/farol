@@ -7,6 +7,7 @@ extension MainWindowController {
     var serverCommands: ServerCommands {
         ServerCommands(
             open: { [weak self] in self?.openServerSession($0, $1) },
+            end: { [weak self] in self?.endServerSession($0, $1) },
             newSession: { [weak self] in self?.newServerSession(on: $0) },
             add: { [weak self] in self?.addServer() },
             showSetup: { [weak self] ssh in
@@ -28,15 +29,52 @@ extension MainWindowController {
 
     func openServerSession(_ server: Server, _ session: RemoteSession) {
         guard let window = session.window else { return askToUpdate(server) }
-        openServerWindow(server, window)
+        openServerWindow(server, window, named: session.name)
     }
 
     /// One Farol session per tmux window: opening it again goes back to the one already open.
-    private func openServerWindow(_ server: Server, _ window: String) {
+    private func openServerWindow(_ server: Server, _ window: String, named name: String? = nil) {
         let key = ServerLinks.key(server, window)
         if let open = store.sessions.first(where: { $0.serverWindow == key }) { return store.select(open) }
         // exec, so leaving tmux closes the session instead of dropping back to a shell on this Mac.
-        store.create(run: "exec " + ServerSetup.attach(ssh: server.ssh, window: window), serverWindow: key)
+        let session = store.create(run: "exec " + ServerSetup.attach(ssh: server.ssh, window: window), serverWindow: key)
+        // Named here, since the title the shell gives it is the ssh command.
+        session.customName = [name, server.name].compactMap { $0 }.joined(separator: " · ")
+        session.serverShell = ServerSetup.shell(ssh: server.ssh)
+    }
+
+    /// Ends the session on the server, as closing one here ends its shell. Asks first while an agent is at work in it.
+    func endServerSession(_ server: Server, _ session: RemoteSession) {
+        guard let tmuxWindow = session.window else { return askToUpdate(server) }
+        let end = { [weak self] in
+            guard let self else { return }
+            let key = ServerLinks.key(server, tmuxWindow)
+            store.sessions.filter { $0.serverWindow == key }.forEach { self.store.close($0) }
+            DispatchQueue.global(qos: .userInitiated).async {
+                let ssh = Process()
+                ssh.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
+                ssh.arguments = ServerSetup.killWindowArguments(ssh: server.ssh, window: tmuxWindow)
+                ssh.standardInput = FileHandle.nullDevice
+                ssh.standardOutput = FileHandle.nullDevice
+                ssh.standardError = FileHandle.nullDevice
+                try? ssh.run()
+                ssh.waitUntilExit()
+                let failed = ssh.terminationStatus != 0
+                guard failed else { return }
+                DispatchQueue.main.async {
+                    self.showError("Couldn't end \(session.name)", "\(server.name) didn't answer over ssh. Try again, or end it in its terminal.")
+                }
+            }
+        }
+        guard session.status == .working || session.status == .waiting, let window else { return end() }
+        let alert = NSAlert()
+        alert.messageText = "End \(session.name) on \(server.name)?"
+        alert.informativeText = "Its agent is still at work. Ending the session stops it on the server."
+        alert.addButton(withTitle: "End Session")
+        alert.addButton(withTitle: "Cancel")
+        alert.beginSheetModal(for: window) { response in
+            if response == .alertFirstButtonReturn { end() }
+        }
     }
 
     /// A new tmux session on the server, made first without a terminal so the one opened next knows its window.

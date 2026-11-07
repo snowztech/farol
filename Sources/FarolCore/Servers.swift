@@ -119,6 +119,16 @@ public enum ServerSetup {
         "\(ssh) -t \(NewTask.shellQuoted(server)) 'TERM=xterm-256color tmux new-session'"
     }
 
+    /// A plain shell on the server, for a pane split off a server session. tmux isn't asked, so it adds no row to the sidebar.
+    public static func shell(ssh server: String) -> String {
+        "TERM=xterm-256color exec \(ssh) -t \(NewTask.shellQuoted(server))"
+    }
+
+    /// Ends a tmux window on the server, and what runs in it, as closing a session here ends its shell.
+    public static func killWindowArguments(ssh server: String, window: String) -> [String] {
+        sshOptions + ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", server, "tmux kill-window -t " + NewTask.shellQuoted(window)]
+    }
+
     /// Tells a server to stop letting this Mac in, for when it's offline and can't hear it through the relay.
     public static func forgetArguments(ssh server: String, deviceName: String) -> [String] {
         sshOptions + ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", server,
