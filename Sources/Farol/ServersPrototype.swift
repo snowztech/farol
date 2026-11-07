@@ -81,7 +81,9 @@ struct ServersPrototypeGroups: View {
             let shut = model.folded.contains(server.id)
             ServerHeader(server: server, folded: shut, palette: palette) { model.toggleFold(server.id) }
             if !shut {
-                if server.agents.isEmpty {
+                if !server.connected {
+                    QuietRow(symbol: "arrow.clockwise", text: "Can't reach \(server.name) · Retry", palette: palette) {}
+                } else if server.agents.isEmpty {
                     QuietRow(symbol: "plus", text: "New session on \(server.name)", palette: palette) {}
                 }
                 ForEach(server.agents) { FakeRow(agent: $0, palette: palette) }
@@ -106,7 +108,7 @@ private struct ServerHeader: View {
                     Lamp(activity: loudest, selected: false, palette: palette)
                 } else {
                     Image(systemName: "server.rack")
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(.system(size: 8, weight: .semibold))
                         .foregroundStyle(palette.muted)
                 }
             }
@@ -141,6 +143,7 @@ private struct ServerHeader: View {
         .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(hovering ? palette.hover : .clear))
         .onClickableHover { hovering = $0 }
         .hoverTip(server.connected ? "\(server.name) over ssh, status from farol-host" : "\(server.name) can't be reached")
+        .opacity(server.connected ? 1 : 0.6)
         .padding(.top, 10)
     }
 }
@@ -375,6 +378,15 @@ struct ServersPrototypeAddButton: View {
 
     var body: some View {
         CloseButton(symbol: "server.rack", help: "Add Server", palette: palette) { model.adding = true }
+            .overlay(alignment: .bottomTrailing) {
+                Image(systemName: "plus")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(palette.muted)
+                    .padding(1)
+                    .background(Circle().fill(palette.panel))
+                    .offset(x: 2, y: 2)
+                    .allowsHitTesting(false)
+            }
     }
 }
 
