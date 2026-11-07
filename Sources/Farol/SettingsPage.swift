@@ -551,14 +551,13 @@ struct SettingsPage: View {
         GroupTitle(title: "New branches", first: true, palette: p)
         Card(palette: p) {
             Row(title: "Start from",
-                detail: "Default branch fetches the remote's latest first, so a task doesn't build on whatever branch the repo is on. Without a remote, Farol uses the current branch.",
+                detail: "Default branch fetches the remote's latest, so tasks start clean. Current branch stacks on what the repo has checked out.",
                 palette: p) {
                 Picker("", selection: $worktrees.startFromDefaultBranch) {
-                    Text("Current branch").tag(false)
                     Text("Default branch").tag(true)
+                    Text("Current branch").tag(false)
                 }
                 .labelsHidden()
-                .pickerStyle(.segmented)
                 .fixedSize()
                 .hoverLift()
             }

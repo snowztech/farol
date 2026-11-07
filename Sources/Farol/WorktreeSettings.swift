@@ -15,7 +15,7 @@ final class WorktreeSettings: ObservableObject {
     }
 
     init(defaults: UserDefaults = .standard) {
-        defaults.register(defaults: [Self.copyEnvironmentFilesKey: true])
+        defaults.register(defaults: [Self.copyEnvironmentFilesKey: true, Self.startFromDefaultBranchKey: true])
         self.defaults = defaults
         copyEnvironmentFiles = defaults.bool(forKey: Self.copyEnvironmentFilesKey)
         startFromDefaultBranch = defaults.bool(forKey: Self.startFromDefaultBranchKey)

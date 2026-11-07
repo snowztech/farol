@@ -116,6 +116,8 @@ struct Sandbox {
     let path = try box.worktrees.create(branch: "fresh", from: box.repo, fromDefaultBranch: true)
     #expect(try Git.run(["rev-parse", "HEAD"], in: path) == Git.run(["rev-parse", "HEAD"], in: other))
     #expect((try? Git.run(["rev-parse", "--abbrev-ref", "fresh@{upstream}"], in: box.repo)) == nil)
+    #expect(Worktrees.startPoint(in: box.repo, fromDefaultBranch: true) == "origin/main")
+    #expect(Worktrees.startPoint(in: box.repo, fromDefaultBranch: false) == "side")
 }
 
 @Test func startsFromTheCurrentBranchWithoutARemote() throws {
@@ -123,6 +125,7 @@ struct Sandbox {
     try Git.run(["switch", "--quiet", "-c", "side"], in: box.repo)
     let path = try box.worktrees.create(branch: "fresh", from: box.repo, fromDefaultBranch: true)
     #expect(try Git.run(["rev-parse", "HEAD"], in: path) == Git.run(["rev-parse", "side"], in: box.repo))
+    #expect(Worktrees.startPoint(in: box.repo, fromDefaultBranch: true) == "side")
 }
 
 @Test func reusesBranchOfWorktreeDeletedOutsideGit() throws {

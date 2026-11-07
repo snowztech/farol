@@ -70,6 +70,15 @@ public struct Worktrees {
         branch.replacingOccurrences(of: "/", with: "-")
     }
 
+    /// What a new branch will start from, for the sheets to name before anything runs. Reads only what git already knows, without the network.
+    public static func startPoint(in directory: String, fromDefaultBranch: Bool) -> String {
+        if fromDefaultBranch {
+            if let ref = try? Git.run(["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"], in: directory) { return ref }
+            if (try? Git.run(["remote", "get-url", "origin"], in: directory)) != nil { return "origin's default branch" }
+        }
+        return Git.branch(of: directory) ?? "the current commit"
+    }
+
     /// The remote's default branch, like `origin/main`, fetched first so a new branch starts from the latest commit.
     /// Nil without an `origin` that names one. An offline fetch still returns the ref as it was last fetched.
     static func latestDefaultBranch(in directory: String) -> String? {
