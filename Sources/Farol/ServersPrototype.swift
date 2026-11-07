@@ -378,15 +378,6 @@ struct ServersPrototypeAddButton: View {
 
     var body: some View {
         CloseButton(symbol: "server.rack", help: "Add Server", palette: palette) { model.adding = true }
-            .overlay(alignment: .bottomTrailing) {
-                Image(systemName: "plus")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(palette.muted)
-                    .padding(1)
-                    .background(Circle().fill(palette.panel))
-                    .offset(x: 2, y: 2)
-                    .allowsHitTesting(false)
-            }
     }
 }
 
