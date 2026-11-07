@@ -15,6 +15,7 @@
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="article:published_time" content="2026-10-18">
+  <meta property="article:modified_time" content="2026-11-07">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="/icon.png">
   <script type="application/ld+json">
@@ -26,11 +27,12 @@
     "url": "https://farol.sh/blog/claude-code-from-your-phone",
     "image": "https://farol.sh/og-remote.png",
     "datePublished": "2026-10-18",
+    "dateModified": "2026-11-07",
     "author": { "@type": "Person", "name": "Lucas Neves Pereira", "url": "https://github.com/lucasnevespereira" },
     "publisher": { "@type": "Organization", "name": "Farol", "url": "https://farol.sh/" }
   }
   </script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.2/dist/snowztech-ui.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.5/dist/snowztech-ui.min.css">
   <link rel="stylesheet" href="/footer.css">
   <script>
     (function () { var light = matchMedia("(prefers-color-scheme: light)"), root = document.documentElement; function follow() { if (light.matches) root.dataset.theme = "light"; else delete root.dataset.theme; } follow(); light.addEventListener("change", follow); })();
@@ -42,7 +44,6 @@
       line-height: var(--sn-leading-normal);
     }
     a { color: inherit; }
-    .column { max-width: 680px; margin: 0 auto; padding: 0 20px; }
     .wide { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
 
     .topbar { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
@@ -52,57 +53,17 @@
     .topbar nav a { color: var(--sn-fg-muted); text-decoration: none; }
     .topbar nav a:hover { color: var(--sn-fg); }
 
+    /* Text, contents and code blocks come from snowztech's sn-prose, sn-toc and sn-code. */
     html { scroll-behavior: smooth; }
-    .post { max-width: 1080px; margin: 0 auto; padding: 48px 20px 0; display: grid; gap: 0 64px; }
-    .head h1 { margin-bottom: 24px; }
-    article { min-width: 0; max-width: 680px; }
-    article h2 { scroll-margin-top: 24px; }
-
-    .toc { margin-bottom: 32px; font-size: var(--sn-text-sm); }
-    .toc details { border: 1px solid var(--sn-border-subtle); border-radius: 8px; padding: 12px 16px; }
-    .toc summary { cursor: pointer; font-weight: 500; }
-    .toc ul { list-style: none; margin: 12px 0 0; padding: 0; }
-    .toc li + li { margin-top: 8px; }
-    .toc a { color: var(--sn-fg-muted); text-decoration: none; }
-    .toc a:hover { color: var(--sn-fg); }
-    /* Wide screens: the contents sit beside the post and stay in view. */
-    @media (min-width: 1000px) {
-      .post { grid-template-columns: minmax(0, 680px) 220px; grid-template-areas: "head toc" "body toc"; justify-content: center; }
-      .head { grid-area: head; }
-      article { grid-area: body; }
-      .toc { grid-area: toc; align-self: start; position: sticky; top: 24px; margin: 0; padding-top: 8px; }
-      .toc details { border: 0; padding: 0; }
-      .toc summary { list-style: none; pointer-events: none; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); text-transform: uppercase; letter-spacing: 0.12em; }
-      .toc summary::-webkit-details-marker { display: none; }
-    }
-    .meta { margin: 0 0 12px; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); }
-    h1 { margin: 0 0 32px; font-size: 28px; font-weight: 600; line-height: 1.25; letter-spacing: -0.02em; }
-    h2 { margin: 48px 0 16px; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
-    p { margin: 0 0 16px; color: var(--sn-fg-muted); }
-    article a { color: var(--sn-fg); text-underline-offset: 3px; }
-    blockquote { margin: 0 0 16px; padding-left: 16px; border-left: 2px solid var(--sn-border-strong); color: var(--sn-fg); }
-    code {
-      padding: 1px 5px; border: 1px solid var(--sn-border-subtle); border-radius: 4px;
-      background: var(--sn-bg-raised); color: var(--sn-fg); font: inherit;
-    }
-    pre {
-      margin: 0 0 20px; padding: 16px 18px; overflow-x: auto;
-      border: 1px solid var(--sn-border-subtle); border-radius: 8px;
-      background: var(--sn-bg-raised); color: var(--sn-fg); font-size: var(--sn-text-sm); line-height: 1.6;
-    }
-    p code { overflow-wrap: anywhere; }
-    pre { tab-size: 4; }
-    pre code { padding: 0; border: 0; background: none; }
-    .shot { display: block; width: 300px; max-width: 100%; height: auto; margin: 8px auto 24px; border: 1px solid var(--sn-border-strong); border-radius: 28px; }
+    .post { max-width: 1080px; margin: 0 auto; padding: 48px 20px 0; }
+    .post > * { min-width: 0; }
+    .head .meta { margin: 0 0 12px; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); }
     .try { margin-top: 48px; padding: 20px; border: 1px solid var(--sn-border-subtle); border-radius: 10px; }
     .try p:last-child { margin: 0; }
+    .sources { font-size: var(--sn-text-sm); }
 
-    @media (max-width: 600px) {
-      h1 { font-size: 23px; margin-bottom: 24px; }
-      h2 { font-size: 18px; margin-top: 40px; }
-      pre { font-size: 12px; padding: 14px; }
-      .shot { width: 240px; }
-    }
+    .shot { display: block; width: 300px; max-width: 100%; height: auto; margin: 8px auto 24px; border: 1px solid var(--sn-border-strong); border-radius: 28px; }
+    @media (max-width: 600px) { .shot { width: 240px; } }
   </style>
 </head>
 <body>
@@ -111,12 +72,12 @@
     <nav><a href="/remote">Remote</a><a href="/docs">Docs</a><a href="/blog/">Blog</a></nav>
   </header>
 
-  <main class="post">
-    <header class="head">
+  <main class="post sn-toc-layout">
+    <header class="head sn-prose">
       <p class="meta"><time datetime="2026-10-18">October 18, 2026</time> · Lucas Neves Pereira</p>
       <h1>I Built a Remote to Answer Claude Code From My Phone</h1>
     </header>
-    <nav class="toc" aria-label="On this page">
+    <nav class="sn-toc" aria-label="On this page">
       <details>
         <summary>On this page</summary>
         <ul>
@@ -134,7 +95,7 @@
         </ul>
       </details>
     </nav>
-    <article>
+    <article class="sn-prose">
       <p>Hello there!</p>
       <p>If you run Claude Code or Codex for real work, you know the moment. You start a task, it runs for a while, and you go make a coffee. When you come back, the agent has been waiting ten minutes for you to answer one question.</p>
       <blockquote>The fix is in. What should I do with it?</blockquote>
@@ -149,7 +110,7 @@
       <p>The iPhone app lists your sessions with their status and opens each one as its agent's conversation, not as a wall of terminal text.</p>
       <img class="shot" src="/features/phone-session.png" width="600" height="1304" loading="lazy"
            alt="Farol for iPhone showing a Claude Code session waiting for you, with its question and two answers to pick with a tap">
-      <p>When the agent asks for an approval or a question, the answers show up as buttons. One tap and it carries on. You can also reply with a slash command, send a screenshot for the agent to look at, review what changed file by file, and start a new session in a project.</p>
+      <p>When the agent asks for an approval or a question, the answers show up as buttons. One tap and it carries on. You can also reply with a slash command, send a screenshot for the agent to look at, review what changed file by file, and start a new session in a project, or a task on a branch of its own in a new worktree.</p>
       <p>It notifies you when an agent waits or finishes. And a Live Activity on the lock screen keeps count of the agents that work or wait, even with the app closed.</p>
       <p>One phone can know several Macs and servers at once. Your work Mac and a server you run agents on show up in the same list, each session labeled with its host.</p>
 
@@ -162,7 +123,7 @@
       <h2 id="pairing-once">Pairing, once</h2>
       <p>It all starts with a QR code. On the Mac you turn on Remote in Settings and press Show code. On the phone you scan it.</p>
       <p>The code carries three things: the relay's address, the Mac's public key, and a secret made just for that code. It's a link, and everything rides after the <code>#</code>.</p>
-      <pre><code>func (o offer) link() string {
+      <pre data-name="go"><code>func (o offer) link() string {
 	text, _ := json.Marshal(o)
 	return "https://farol.sh/pair#" + base64.RawURLEncoding.EncodeToString(text)
 }</code></pre>
@@ -172,7 +133,7 @@
       <h2 id="every-connection">Every connection</h2>
       <p>Each time they connect, both sides say hello in the clear with their public key and a random number made for this connection.</p>
       <p>Then each direction becomes its own HPKE stream, sealed to the other side's key and signed with ours. I used CryptoKit's <code>Curve25519_SHA256_ChachaPoly</code> suite. Here's the sending side on the Mac and the phone:</p>
-      <pre><code>public mutating func connect(to peer: ChannelHello, trusting trusted: [Data]) throws -&gt; Data {
+      <pre data-name="swift"><code>public mutating func connect(to peer: ChannelHello, trusting trusted: [Data]) throws -&gt; Data {
     guard trusted.contains(peer.key) else { throw RemoteError.unknownDevice }
     let sender = try HPKE.Sender(
         recipientKey: Curve25519.KeyAgreement.PublicKey(rawRepresentation: peer.key), ciphersuite: Pairing.suite,
@@ -186,7 +147,7 @@
       <h2 id="what-the-relay-actually-sees">What the relay actually sees</h2>
       <p>Mostly bytes.</p>
       <p>It sees a public key, and a room name that's the hash of the host's key. That's how a Mac and its phones find each other without the relay learning who they are.</p>
-      <pre><code>func room(public []byte) string {
+      <pre data-name="go"><code>func room(public []byte) string {
 	sum := sha256.Sum256(public)
 	return hex.EncodeToString(sum[:])
 }</code></pre>
@@ -199,17 +160,21 @@
 
       <h2 id="running-claude-code-on-a-server-with-tmux">Running Claude Code on a server with tmux</h2>
       <p>Some people run their agents on a machine that stays on, so they can close the laptop. For them there's <code>farol-host</code>, a small Go CLI.</p>
-      <pre><code>curl -fsSL https://farol.sh/host.sh | sh
+      <pre data-name="shell"><code>curl -fsSL https://farol.sh/host.sh | sh
 farol-host setup</code></pre>
       <p>Setup connects the hooks for Claude Code and Codex, keeps <code>farol-host</code> running with systemd, and shows a QR code to scan. Then every tmux window on that machine is a session on your phone, like a tab in Farol on the Mac.</p>
-      <pre><code>tmux new -s api -c ~/code/api
+      <pre data-name="shell"><code>tmux new -s api -c ~/code/api
 claude</code></pre>
+      <aside class="sn-callout sn-callout--note">
+        <strong class="sn-callout__title">Update, November 7</strong>
+        <p>Since Farol 0.66 the Mac can do this setup for you. Use the server button beside New task, pick a host from <code>~/.ssh/config</code>, and Farol installs <code>farol-host</code> over ssh and lets the Mac in, with no code to scan. The server's agents show in the sidebar next to your own. Pair a Phone… on the server shows the code for the app.</p>
+      </aside>
 
       <h2 id="one-protocol-two-languages">One protocol, two languages</h2>
       <p>The Mac and the iPhone share a Swift package. The server speaks the same protocol, written again in Go.</p>
       <p>Two implementations of the same crypto and messages is a great way to have bugs that only show up on a real phone. So they check each other.</p>
       <p>The Swift tests write sample messages and a sealed conversation to JSON files. The Go tests open those files and must read them exactly. When a message changes, I regenerate them:</p>
-      <pre><code>FAROL_WRITE_WIRE=1 swift test</code></pre>
+      <pre data-name="shell"><code>FAROL_WRITE_WIRE=1 swift test</code></pre>
       <p>If Go and Swift disagree on a single field, a test fails before any phone sees it.</p>
 
       <h2 id="what-s-not-covered-yet">What's not covered yet</h2>
@@ -229,8 +194,9 @@ claude</code></pre>
   </main>
 
   <script>
-    if (matchMedia("(min-width: 1000px)").matches) document.querySelector(".toc details").open = true;
+    if (matchMedia("(min-width: 1000px)").matches) document.querySelector(".sn-toc details").open = true;
   </script>
+  <script type="module" src="/blog/code.js"></script>
 
   <footer>
     <div class="top">

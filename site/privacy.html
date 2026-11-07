@@ -16,7 +16,7 @@
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="icon.png">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.2/dist/snowztech-ui.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.5/dist/snowztech-ui.min.css">
   <link rel="stylesheet" href="/footer.css">
   <script>
     (function () { var light = matchMedia("(prefers-color-scheme: light)"), root = document.documentElement; function follow() { if (light.matches) root.dataset.theme = "light"; else delete root.dataset.theme; } follow(); light.addEventListener("change", follow); })();
@@ -76,20 +76,20 @@
     .content a { color: var(--sn-fg); text-underline-offset: 3px; }
     code, kbd {
       border: 1px solid var(--sn-border-subtle); border-radius: 4px;
-      background: var(--sn-bg-raised); color: var(--sn-fg); font: inherit;
+      background: var(--sn-bg-elev-1); color: var(--sn-fg); font: inherit;
     }
     code { padding: 1px 5px; }
     kbd { display: inline-block; min-width: 1.3em; padding: 0 5px; text-align: center; box-shadow: 0 1px 0 var(--sn-border-strong); }
     pre {
       margin: 18px 0; padding: 16px 18px; overflow-x: auto;
       border: 1px solid var(--sn-border-subtle); border-radius: 8px;
-      background: var(--sn-bg-raised); color: var(--sn-fg-muted);
+      background: var(--sn-bg-elev-1); color: var(--sn-fg-muted);
     }
     pre code { padding: 0; border: 0; background: none; }
     pre.command { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 10px 10px 18px; color: var(--sn-fg); }
     .note {
       margin: 22px 0; padding: 15px 17px; border: 1px solid var(--sn-border-subtle);
-      border-left: 3px solid var(--sn-accent); border-radius: 8px; background: var(--sn-bg-raised);
+      border-left: 3px solid var(--sn-accent); border-radius: 8px; background: var(--sn-bg-elev-1);
     }
     .note p { margin: 0; }
     .status-table, .shortcuts { width: 100%; border-collapse: collapse; margin-top: 20px; }

@@ -15,7 +15,7 @@
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="article:published_time" content="2026-11-06">
-  <meta property="article:modified_time" content="2026-11-06">
+  <meta property="article:modified_time" content="2026-11-07">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="/icon.png">
   <script type="application/ld+json">
@@ -27,12 +27,12 @@
     "url": "https://farol.sh/blog/parallel-claude-code-agents-git-worktrees",
     "image": "https://farol.sh/og.png",
     "datePublished": "2026-11-06",
-    "dateModified": "2026-11-06",
+    "dateModified": "2026-11-07",
     "author": { "@type": "Person", "name": "Lucas Neves Pereira", "url": "https://github.com/lucasnevespereira" },
     "publisher": { "@type": "Organization", "name": "Farol", "url": "https://farol.sh/" }
   }
   </script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.2/dist/snowztech-ui.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.5/dist/snowztech-ui.min.css">
   <link rel="stylesheet" href="/footer.css">
   <script>
     if (matchMedia("(prefers-color-scheme: light)").matches) document.documentElement.dataset.theme = "light";
@@ -53,71 +53,16 @@
     .topbar nav a { color: var(--sn-fg-muted); text-decoration: none; }
     .topbar nav a:hover { color: var(--sn-fg); }
 
+    /* Text, contents and code blocks come from snowztech's sn-prose, sn-toc and sn-code. */
     html { scroll-behavior: smooth; }
-    .post { max-width: 1080px; margin: 0 auto; padding: 48px 20px 0; display: grid; gap: 0 64px; }
-    article { min-width: 0; max-width: 680px; }
-    article h2 { scroll-margin-top: 24px; }
-
-    .toc { margin-bottom: 32px; font-size: var(--sn-text-sm); }
-    .toc details { border: 1px solid var(--sn-border-subtle); border-radius: 8px; padding: 12px 16px; }
-    .toc summary { cursor: pointer; font-weight: 500; }
-    .toc ul { list-style: none; margin: 12px 0 0; padding: 0; }
-    .toc li + li { margin-top: 8px; }
-    .toc a { color: var(--sn-fg-muted); text-decoration: none; }
-    .toc a:hover { color: var(--sn-fg); }
-    /* Wide screens: the contents sit beside the post and stay in view. */
-    @media (min-width: 1000px) {
-      .post { grid-template-columns: minmax(0, 680px) 220px; grid-template-areas: "head toc" "body toc"; justify-content: center; }
-      .head { grid-area: head; }
-      article { grid-area: body; }
-      .toc { grid-area: toc; align-self: start; position: sticky; top: 24px; margin: 0; padding-top: 8px; }
-      .toc details { border: 0; padding: 0; }
-      .toc summary { list-style: none; pointer-events: none; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); text-transform: uppercase; letter-spacing: 0.12em; }
-      .toc summary::-webkit-details-marker { display: none; }
-    }
-    .meta { margin: 0 0 12px; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); }
-    h1 { margin: 0 0 24px; font-size: 28px; font-weight: 600; line-height: 1.25; letter-spacing: -0.02em; }
-    h2 { margin: 48px 0 16px; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
-    h3 { margin: 28px 0 8px; font-size: inherit; font-weight: 600; }
-    p, li { color: var(--sn-fg-muted); }
-    p { margin: 0 0 16px; }
-    ul.list { margin: 0 0 16px; padding-left: 20px; }
-    ul.list li + li { margin-top: 8px; }
-    article a { color: var(--sn-fg); text-underline-offset: 3px; }
-    strong { color: var(--sn-fg); font-weight: 600; }
-    code {
-      padding: 1px 5px; border: 1px solid var(--sn-border-subtle); border-radius: 4px;
-      background: var(--sn-bg-raised); color: var(--sn-fg); font: inherit;
-    }
-
-    /* A phone scrolls the table sideways rather than squeezing five columns of text. */
-    pre {
-      margin: 0 0 20px; padding: 16px 18px; overflow-x: auto;
-      border: 1px solid var(--sn-border-subtle); border-radius: 8px;
-      background: var(--sn-bg-raised); color: var(--sn-fg); font-size: var(--sn-text-sm); line-height: 1.6;
-    }
-    pre code { padding: 0; border: 0; background: none; }
-    p code { overflow-wrap: anywhere; }
-
-    .table { margin: 0 0 24px; overflow-x: auto; border: 1px solid var(--sn-border-subtle); border-radius: 8px; }
-    table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: var(--sn-text-sm); }
-    th, td { padding: 10px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--sn-border-subtle); }
-    tr:last-child th, tr:last-child td { border-bottom: 0; }
-    thead th { color: var(--sn-fg); font-weight: 600; background: var(--sn-bg-raised); }
-    tbody th { width: 7em; color: var(--sn-fg); font-weight: 500; }
-    td { color: var(--sn-fg-muted); }
-
-    .wideshot { display: block; width: 100%; height: auto; margin: 8px 0 24px; border: 1px solid var(--sn-border-strong); border-radius: 10px; }
-    .verdict { margin: -4px 0 16px; padding-left: 16px; border-left: 2px solid var(--sn-border-strong); font-size: var(--sn-text-sm); }
+    .post { max-width: 1080px; margin: 0 auto; padding: 48px 20px 0; }
+    .post > * { min-width: 0; }
+    .head .meta { margin: 0 0 12px; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); }
     .try { margin-top: 48px; padding: 20px; border: 1px solid var(--sn-border-subtle); border-radius: 10px; }
     .try p:last-child { margin: 0; }
     .sources { font-size: var(--sn-text-sm); }
 
-    @media (max-width: 600px) {
-      h1 { font-size: 23px; }
-      h2 { font-size: 18px; margin-top: 40px; }
-      pre { font-size: 12px; padding: 14px; }
-    }
+    .wideshot { display: block; width: 100%; height: auto; margin: 8px 0 24px; border: 1px solid var(--sn-border-strong); border-radius: 10px; }
   </style>
 </head>
 <body>
@@ -126,12 +71,12 @@
     <nav><a href="/remote">Remote</a><a href="/docs">Docs</a><a href="/blog/">Blog</a></nav>
   </header>
 
-  <main class="post">
-    <header class="head">
+  <main class="post sn-toc-layout">
+    <header class="head sn-prose">
       <p class="meta"><time datetime="2026-11-06">November 6, 2026</time> · Lucas Neves Pereira</p>
       <h1>How to Run Several Claude Code Agents in Parallel with Git Worktrees</h1>
     </header>
-    <nav class="toc" aria-label="On this page">
+    <nav class="sn-toc" aria-label="On this page">
       <details>
         <summary>On this page</summary>
         <ul>
@@ -149,7 +94,7 @@
         </ul>
       </details>
     </nav>
-    <article>
+    <article class="sn-prose">
       <p>Hello there!</p>
       <p>To run several Claude Code agents in parallel, give each one its own git worktree. A worktree is a second checkout of the same repo, in its own folder, on its own branch. Each agent edits its own files, and you merge their branches like any other.</p>
       <p>That's the whole trick. The rest of this post is the commands, the gotchas I ran into, and how I ended up building it into <a href="/">Farol</a>, the macOS terminal I make for coding agents. It all works the same for Codex.</p>
@@ -166,31 +111,35 @@
 
       <h2 id="set-it-up-by-hand">Set it up by hand</h2>
       <p>Let's say your repo is <code>~/code/shop</code> and you have two tasks. Create a worktree for each, on a new branch, next to the repo:</p>
-      <pre><code>cd ~/code/shop
+      <pre data-name="shell"><code>cd ~/code/shop
 git worktree add -b search-box ../shop-search-box
 git worktree add -b fix-checkout ../shop-fix-checkout</code></pre>
       <p>Each command makes a folder and a branch that starts from where you are. <code>git worktree list</code> shows them all:</p>
-      <pre><code>git worktree list
+      <pre data-name="shell"><code>git worktree list
 # ~/code/shop               4e9c711 [main]
 # ~/code/shop-search-box    4e9c711 [search-box]
 # ~/code/shop-fix-checkout  4e9c711 [fix-checkout]</code></pre>
+      <aside class="sn-callout sn-callout--tip">
+        <strong class="sn-callout__title">Tip</strong>
+        <p>If your checkout isn't on an up to date <code>main</code>, start each branch from the remote's instead, so the agent doesn't build on old or unrelated work: <code>git fetch origin</code>, then <code>git worktree add --no-track -b search-box ../shop-search-box origin/main</code>. <code>--no-track</code> keeps the new branch from tracking <code>main</code>.</p>
+      </aside>
       <p>Now start an agent in each one, in its own terminal tab. Both Claude Code and Codex take the task as their first argument:</p>
-      <pre><code>cd ~/code/shop-search-box
+      <pre data-name="shell"><code>cd ~/code/shop-search-box
 claude "add a search box to the products page"</code></pre>
-      <pre><code>cd ~/code/shop-fix-checkout
+      <pre data-name="shell"><code>cd ~/code/shop-fix-checkout
 codex "the checkout total is off by one cent, find out why"</code></pre>
       <p>Two agents, two folders, two branches. They can't step on each other anymore.</p>
 
       <h2 id="what-doesnt-come-along">What doesn't come along</h2>
       <p>A new worktree has the files Git tracks, and nothing else. This is where most of the friction is.</p>
-      <ul class="list">
+      <ul>
         <li><strong>Ignored files.</strong> Your <code>.env</code>, <code>node_modules</code> and build caches stay in the original folder. Copy the <code>.env</code> over and install dependencies again, or the agent's first test run fails.</li>
         <li><strong>Ports.</strong> Two dev servers both want port 3000. Start the second one on another port, like <code>PORT=3001 npm run dev</code>.</li>
         <li><strong>The database.</strong> Worktrees share whatever your app talks to. A migration on one branch hits the other. If that matters, give each worktree its own database name in its <code>.env</code>.</li>
         <li><strong>One branch, one worktree.</strong> Git won't check out the same branch in two places. That's a feature: it's what stops two agents from sharing a branch.</li>
       </ul>
       <p>So in practice, every new worktree starts with the same few lines:</p>
-      <pre><code>cp ../shop/.env .
+      <pre data-name="shell"><code>cp ../shop/.env .
 npm ci</code></pre>
       <p>That's worth a small script in the repo. More on that below.</p>
 
@@ -205,33 +154,33 @@ npm ci</code></pre>
 
       <h2 id="review-and-merge">Review and merge</h2>
       <p>When an agent says it's done, read the diff before anything else. Three dots compare the branch with where it left <code>main</code>:</p>
-      <pre><code>git diff main...search-box</code></pre>
+      <pre data-name="shell"><code>git diff main...search-box</code></pre>
       <p>Then merge it locally, or push it and open a pull request:</p>
-      <pre><code>cd ~/code/shop-search-box
+      <pre data-name="shell"><code>cd ~/code/shop-search-box
 git push -u origin search-box
 gh pr create --fill</code></pre>
       <p>If two agents touched the same lines, you'll get a merge conflict here, like with any two branches. Worktrees keep agents out of each other's way while they work. They don't make overlapping tasks merge cleanly. Pick tasks that don't share files and this rarely happens.</p>
 
       <h2 id="clean-up">Clean up</h2>
       <p>Once a branch is merged, remove its worktree and the branch:</p>
-      <pre><code>cd ~/code/shop
+      <pre data-name="shell"><code>cd ~/code/shop
 git worktree remove ../shop-search-box
 git branch -d search-box</code></pre>
       <p><code>git worktree remove</code> refuses when there are uncommitted changes, which has saved me more than once. If you deleted a worktree folder by hand instead, <code>git worktree prune</code> tells Git to forget it.</p>
 
       <h2 id="the-same-thing-in-farol">The same thing in Farol</h2>
       <p>I did all of the above by hand for a while. Then I got tired of it and built it into Farol.</p>
-      <p>Press ⇧⌘N, describe the task, pick Claude Code or Codex and a branch name. Farol creates the worktree and starts the agent there, with your task as its first prompt. You can also start from a GitHub issue or a Jira ticket, and the agent gets the whole description.</p>
+      <p>Press ⇧⌘N, describe the task, pick an agent (Claude Code, Codex, OpenCode or Pi) and a branch name. Farol fetches the remote's default branch, creates the worktree from it and starts the agent there, with your task as its first prompt. You can also start from a GitHub issue or a Jira ticket, and the agent gets the whole description.</p>
       <img class="wideshot" src="/features/new-task.png" width="2540" height="1520" loading="lazy"
            alt="Farol's new task window over a terminal: a task description, a branch name made from it, and Claude Code picked as the agent">
-      <p>For the files that don't come along, commit an executable <code>.farol/setup</code> to the repo. Farol runs it in each new worktree before the agent starts, and it can copy your ignored <code>.env</code> files first:</p>
-      <pre><code>#!/bin/sh
+      <p>For the files that don't come along, commit an executable <code>.farol/setup</code> to the repo. Farol runs it in each new worktree before the agent starts, and it can copy your ignored <code>.env</code> files first. A <code>.farol/teardown</code> runs when you remove the worktree, to stop a server or drop a database:</p>
+      <pre data-name=".farol/setup"><code>#!/bin/sh
 set -e
 npm ci</code></pre>
-      <p>Every session has a dot in the sidebar that says working, waiting or done, with no hooks to set up. The menu bar and the notch show the same from any app. When an agent finishes, the review panel shows its whole diff, and you commit, push and open the pull request from there.</p>
+      <p>Every session has a dot in the sidebar that says working, waiting or done, with no hooks to set up. The menu bar and the notch show the same from any app. When an agent finishes, the review panel shows its whole diff. Leave a note on any line and send them all back to the agent in one message, or commit, push and open the pull request from there.</p>
       <img class="wideshot" src="/features/agent-status.png" width="2540" height="1520" loading="lazy"
            alt="Farol's sidebar with several Claude Code and Codex sessions, each on its own branch, with a dot showing whether it is working, waiting or done">
-      <p>Closing the session offers to remove the worktree and always keeps the branch. A task can also span several repos, with a worktree in each on the same branch. The <a href="/docs#tasks">task docs</a> have the details.</p>
+      <p>Closing the session offers to remove the worktree and always keeps the branch. A task can also span several repos, with a worktree in each on the same branch, or wait for later: once at a set time, or again on the days you pick, each run in a fresh worktree. The <a href="/docs#tasks">task docs</a> have the details.</p>
 
       <h2 id="how-many-agents-is-too-many">How many agents is too many?</h2>
       <p>For me it's three or four. The Mac handles more without trouble. What runs out is my attention, because every agent ends with a diff I have to read.</p>
@@ -239,11 +188,11 @@ npm ci</code></pre>
       <p>Hope this helps you get more done with your agents! If you're on a Mac and want the worktrees, status and review in one place, give Farol a try. It's free and <a href="https://github.com/snowztech/farol">open source</a>. And if you're still picking a terminal, I compared the options in <a href="/blog/best-terminal-for-claude-code">the best terminal for Claude Code and Codex</a>.</p>
 
       <h2 id="sources">Sources</h2>
-      <ul class="list sources">
+      <ul class="sources">
         <li><a href="https://git-scm.com/docs/git-worktree">git-worktree in the Git docs</a></li>
         <li><a href="https://code.claude.com/docs/en/worktrees">Worktrees in the Claude Code docs</a> and <a href="https://code.claude.com/docs/en/hooks">Claude Code hooks</a></li>
       </ul>
-      <p class="sources">Checked on November 6, 2026. Spotted something out of date? <a href="https://github.com/snowztech/farol/issues/new?title=Blog%3A%20parallel%20agents%20with%20worktrees">Open an issue</a>.</p>
+      <p class="sources">Checked on November 6, 2026, and updated for Farol 0.66 on November 7. Spotted something out of date? <a href="https://github.com/snowztech/farol/issues/new?title=Blog%3A%20parallel%20agents%20with%20worktrees">Open an issue</a>.</p>
 
       <div class="try">
         <p><a href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Download Farol</a> · <a href="/docs#tasks">Tasks and worktrees docs</a> · <a href="/blog/best-terminal-for-claude-code">Best terminal for Claude Code</a></p>
@@ -252,8 +201,9 @@ npm ci</code></pre>
   </main>
 
   <script>
-    if (matchMedia("(min-width: 1000px)").matches) document.querySelector(".toc details").open = true;
+    if (matchMedia("(min-width: 1000px)").matches) document.querySelector(".sn-toc details").open = true;
   </script>
+  <script type="module" src="/blog/code.js"></script>
 
   <footer>
     <div class="top">
