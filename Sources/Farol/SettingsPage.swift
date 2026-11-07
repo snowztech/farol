@@ -571,6 +571,18 @@ struct SettingsPage: View {
                 toggle($worktrees.copyEnvironmentFiles)
             }
         }
+
+        // Most people never find .farol/setup, and it lives in each repo, so this row points to it rather than holding a switch.
+        GroupTitle(title: "Project scripts", palette: p)
+        Card(palette: p) {
+            Row(title: "Setup and teardown scripts",
+                detail: "Commit .farol/setup to a repo to prepare each new worktree before the agent starts, like installing packages, and .farol/teardown to clean up when you remove it. Your agent can write them for you.",
+                palette: p) {
+                QuietLink(words: "How to write one", url: URL(string: "https://farol.sh/docs#worktree-setup")!, palette: p)
+                    .font(.system(size: 12))
+                    .fixedSize()
+            }
+        }
     }
 
     @ViewBuilder private func integrationsSection(_ p: Palette) -> some View {
