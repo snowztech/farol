@@ -107,11 +107,6 @@
     .code-example { margin: 18px 0; border: 1px solid var(--sn-border-subtle); border-radius: 8px; overflow: hidden; background: var(--sn-bg-elev-1); }
     .code-example figcaption { padding: 9px 18px; border-bottom: 1px solid var(--sn-border-subtle); color: var(--sn-fg-subtle); font-size: var(--sn-text-sm); }
     .code-example pre { margin: 0; border: 0; border-radius: 0; }
-    .beta {
-      margin-left: 8px; padding: 1px 7px; vertical-align: middle;
-      border: 1px solid var(--sn-border-subtle); border-radius: 999px;
-      color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); font-weight: 500; letter-spacing: 0;
-    }
     pre.command { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 10px 10px 18px; color: var(--sn-fg); overflow: hidden; }
     /* A long command scrolls inside its box, so the copy button stays in view. */
     pre.command code { min-width: 0; overflow-x: auto; }
@@ -363,8 +358,8 @@ cp "$main/.claude/settings.local.json" .claude/ 2&gt;/dev/null || true</code></p
         </section>
 
         <section id="remote">
-          <h2>From your phone<span class="beta">Beta</span></h2>
-          <p>Remote lets you answer your agents when you are away from the Mac. Install <a href="iphone">Farol for iPhone</a>, in beta on TestFlight for now. Then turn Remote on in <strong>Settings → Remote</strong>, press <strong>Show code</strong> and scan it from the app. The <a href="remote">Remote page</a> has an overview.</p>
+          <h2>From your phone</h2>
+          <p>Remote lets you answer your agents when you are away from the Mac. Install <a href="iphone">Farol Remote</a> from the App Store, or try new features early on <a href="iphone-beta">TestFlight</a>. Then turn Remote on in <strong>Settings → Remote</strong>, press <strong>Show code</strong> and scan it from the app. The <a href="remote">Remote page</a> has an overview.</p>
           <p>The phone lists your sessions with their status and opens each as its agent's conversation, with the terminal one tap away. Approve or answer an agent with a tap, reply with a slash command or a picture, open a new session, and look over what changed. It notifies you when an agent waits or finishes, and a Live Activity keeps count while the app is closed. Everything between the Mac and the phone is encrypted end to end, so the relay that joins them cannot read it.</p>
           <p>The agents run on the Mac, so it has to stay on. <strong>Keep the Mac awake for agents</strong> stops it from sleeping by itself while an agent works or waits for you. It is on unless you turn it off. Using Farol from your phone counts as using the Mac, so it sleeps after its usual time once you put the phone away.</p>
           <picture><source type="image/avif" srcset="features/phone-session.avif"><img class="doc-shot reveal phone-shot" src="features/phone-session.png" width="600" height="1304" alt="Farol for iPhone showing a Claude Code session waiting for you, with its question and two answers to pick with a tap" loading="lazy" decoding="async"></picture>
