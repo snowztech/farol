@@ -7,9 +7,11 @@ import SwiftUI
 struct SheetButton: ButtonStyle {
     let palette: Palette
     let primary: Bool
+    /// Sized to sit inside a sidebar row, next to 12pt text.
+    var compact = false
 
     func makeBody(configuration: Configuration) -> some View {
-        Face(configuration: configuration, palette: palette, primary: primary)
+        Face(configuration: configuration, palette: palette, primary: primary, compact: compact)
     }
 
     /// A style can't keep state of its own, and the hover needs some.
@@ -17,19 +19,20 @@ struct SheetButton: ButtonStyle {
         let configuration: Configuration
         let palette: Palette
         let primary: Bool
+        let compact: Bool
 
         @Environment(\.isEnabled) private var enabled
         @State private var hovering = false
 
         var body: some View {
             configuration.label
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: compact ? 11 : 13, weight: .medium))
                 .foregroundStyle(primary ? palette.background : palette.text)
-                .padding(.horizontal, 14)
-                .frame(height: 28)
-                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(primary ? palette.text : palette.raised))
+                .padding(.horizontal, compact ? 8 : 14)
+                .frame(height: compact ? 20 : 28)
+                .background(RoundedRectangle(cornerRadius: compact ? 6 : 8, style: .continuous).fill(primary ? palette.text : palette.raised))
                 // A wash of the label's color, so both buttons shift the same way under the mouse.
-                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .overlay(RoundedRectangle(cornerRadius: compact ? 6 : 8, style: .continuous)
                     .fill((primary ? palette.background : palette.text).opacity(hovering && enabled ? 0.12 : 0)))
                 .opacity(!enabled ? 0.35 : configuration.isPressed ? 0.8 : 1)
                 .contentShape(Rectangle())

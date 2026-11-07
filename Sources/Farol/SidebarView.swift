@@ -430,7 +430,7 @@ private struct TaskRow: View {
             RunLamp(session: run, palette: p)
         } else if !task.allowed {
             Button("Allow") { scheduler.allow(task.id) }
-                .buttonStyle(SheetButton(palette: p, primary: false))
+                .buttonStyle(SheetButton(palette: p, primary: false, compact: true))
                 .hoverTip("Let it run at its times. Click the task to read it first.")
         } else if hovering {
             CloseButton(symbol: "play.fill", help: "Run now", palette: p) { scheduler.run(task.id) }
