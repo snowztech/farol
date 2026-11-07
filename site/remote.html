@@ -205,7 +205,10 @@
       background: var(--sn-bg-elev-1); color: var(--sn-fg); font-size: var(--sn-text-sm);
     }
     pre code { padding: 0; border: 0; background: none; }
-    pre.command { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 10px 10px 18px; }
+    pre.command { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 10px 10px 18px; overflow: hidden; }
+    /* A long command scrolls inside its box, so the copy button stays in view. */
+    pre.command code { min-width: 0; overflow-x: auto; }
+    pre.command .sn-copy-btn { flex-shrink: 0; }
     a code { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 
     .more { display: flex; gap: 20px; margin: 20px 0 0; font-size: var(--sn-text-sm); }
@@ -226,8 +229,11 @@
     .closing .fine { margin: 0 0 24px; }
 
     @media (max-width: 860px) {
-      .grid { grid-template-columns: 1fr; row-gap: 28px; }
+      .grid { grid-template-columns: minmax(0, 1fr); row-gap: 28px; }
       .feature-shot, .setup-list, .faq-list { grid-column: auto; }
+      /* The phone above the list, a little smaller, so a tap shows its change where the eye already is. */
+      .feature-shot { order: -1; }
+      .stack { width: 210px; }
       .aside { position: static; }
       .extras { row-gap: 0; margin-top: 48px; }
       .extras li { padding-bottom: 20px; }
