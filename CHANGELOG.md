@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Servers in the sidebar. Add a machine that runs `farol-host` with the server button beside New task, or in Settings → Remote. Pick a host from `~/.ssh/config` or type `user@host`, and Farol installs `farol-host` there over ssh and pairs this Mac, in a terminal you can see so a password or sudo prompt can be answered. The server's agents show after your own sessions under its name, with their status dots, notifications and the Dock count. A server folds like a project and keeps its loudest dot when folded. Click an agent to open its tmux window over ssh, or the + on the name for a new tmux session there. Right-click the name to rename or remove it, and an offline server offers Retry. Your phone keeps its own pairing, so it still sees the server with the Mac off.
+
 ### Fixed
 
 - The Allow button on a task waiting for your OK is smaller, so it matches the task's name instead of towering over the row.
