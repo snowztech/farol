@@ -20,7 +20,8 @@
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    "name": "Farol for iPhone",
+    "name": "Farol Remote",
+    "downloadUrl": "https://apps.apple.com/app/farol-remote/id6821882114",
     "description": "An iPhone app to see and answer AI coding agents like Claude Code and Codex running in Farol on a Mac or in tmux on a server. End-to-end encrypted.",
     "url": "https://farol.sh/remote",
     "image": "https://farol.sh/og-remote.png",
@@ -122,6 +123,8 @@
     .actions a.sn-btn--primary:hover { color: var(--sn-fg-inverse); background: var(--sn-fg); border-color: var(--sn-fg); opacity: 0.85; }
     .actions a.sn-btn--secondary:hover { color: var(--sn-fg); }
     .fine { margin: 16px 0 0; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); }
+    .fine a { color: var(--sn-fg-muted); text-underline-offset: 3px; }
+    .fine a:hover { color: var(--sn-fg); }
     .hero > * { animation: rise 0.7s var(--sn-ease) both; }
     .hero > :nth-child(2) { animation-delay: 0.08s; }
     .hero > :nth-child(3) { animation-delay: 0.16s; }
@@ -264,10 +267,10 @@
       <h1>Your coding agents, on your iPhone</h1>
       <p class="tagline">See which Claude Code or Codex session needs you and answer it from your phone, away from your Mac.</p>
       <div class="actions">
-        <a class="sn-btn sn-btn--primary sn-btn--lg" href="iphone">Join the iPhone beta</a>
+        <a class="sn-btn sn-btn--primary sn-btn--lg" href="iphone">Download on the App Store</a>
         <a class="sn-btn sn-btn--secondary sn-btn--lg" href="#setup">Set it up</a>
       </div>
-      <p class="fine">Free, with no account and no subscription. iOS 17+, in beta on TestFlight.</p>
+      <p class="fine">Free, with no account and no subscription. iOS 17+. New features land first on <a href="iphone-beta">TestFlight</a>.</p>
     </section>
 
     <section class="phones wide" aria-label="Farol for iPhone answering an agent">
@@ -337,7 +340,7 @@
       <div class="setup-list">
         <h3>With Farol on your Mac</h3>
         <ol class="steps">
-          <li>Install <a href="iphone">Farol for iPhone</a> from TestFlight.</li>
+          <li>Install <a href="iphone">Farol Remote</a> from the App Store.</li>
           <li>In Farol, open <strong>Settings → Remote</strong> and turn it on.</li>
           <li>Press <strong>Show code</strong> and scan it from the app.</li>
         </ol>
@@ -388,10 +391,10 @@
 
     <section class="closing column" aria-labelledby="closing-title">
       <img src="icon.png" alt="">
-      <h2 class="section-title" id="closing-title">Farol for iPhone is free</h2>
-      <p class="fine">iOS 17+, in beta on TestFlight. Works with Farol for Mac.</p>
+      <h2 class="section-title" id="closing-title">Farol Remote is free</h2>
+      <p class="fine">iOS 17+. Works with Farol for Mac and with servers.</p>
       <div class="actions">
-        <a class="sn-btn sn-btn--primary sn-btn--lg" href="iphone">Join the iPhone beta</a>
+        <a class="sn-btn sn-btn--primary sn-btn--lg" href="iphone">Download on the App Store</a>
         <a class="sn-btn sn-btn--secondary sn-btn--lg" href="./">Get Farol for Mac</a>
       </div>
     </section>
