@@ -76,6 +76,8 @@ public struct Worktrees {
         try FileManager.default.createDirectory(
             at: URL(fileURLWithPath: path).deletingLastPathComponent(), withIntermediateDirectories: true)
 
+        // A worktree folder deleted outside git still holds its branch, and add would refuse it.
+        _ = try? Git.run(["worktree", "prune"], in: directory)
         let exists = Git.hasBranch(branch, in: directory)
         if exists {
             try Git.run(["worktree", "add", path, branch], in: directory)

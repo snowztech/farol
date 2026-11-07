@@ -8,6 +8,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - Notes for the agent in the review panel. On your own changes, click the + beside a line, or select lines and right-click, and leave a note. Notes wait under their lines until you send them all to the session's agent in one message with one click, or send one at once with ⇧⌘↩. Each note quotes its lines, so it follows them as the agent edits the file. A sent note fades until you resolve it. The Send button shows the agent it goes to, and with no agent in the session the notes just wait. Notes are kept across launches. On a pull request of the session's own branch, a reviewer's comments go to the agent with Send to Claude Code under them.
 
+### Fixed
+
+- A new task on a branch whose worktree folder was deleted by hand no longer fails with "already used by worktree". Farol clears git's record of deleted worktrees before it makes one.
+
 ## [0.64.0] - 2026-11-07
 
 Tasks for later: a New Task that runs once at a set time or again on the days you pick, kept as a file you or an agent can write.

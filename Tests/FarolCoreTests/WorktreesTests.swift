@@ -100,6 +100,15 @@ struct Sandbox {
     #expect(throws: GitError.self) { try box.worktrees.create(branch: "twice", from: box.repo) }
 }
 
+@Test func reusesBranchOfWorktreeDeletedOutsideGit() throws {
+    let box = try Sandbox()
+    let path = try box.worktrees.create(branch: "gone", from: box.repo)
+    try FileManager.default.removeItem(atPath: path)
+
+    let again = try box.worktrees.create(branch: "gone", from: box.repo)
+    #expect(Git.branch(of: again) == "gone")
+}
+
 @Test func removingKeepsTheBranch() throws {
     let box = try Sandbox()
     let path = try box.worktrees.create(branch: "done", from: box.repo)
