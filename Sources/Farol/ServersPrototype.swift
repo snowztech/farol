@@ -44,6 +44,13 @@ final class ServersPrototype: ObservableObject {
     /// Variant B: nil is this Mac.
     @Published var machine: UUID?
     @Published var adding = false
+    @Published var folded: Set<UUID> = []
+
+    func toggleFold(_ id: UUID) {
+        withAnimation(.easeOut(duration: 0.15)) {
+            if folded.contains(id) { folded.remove(id) } else { folded.insert(id) }
+        }
+    }
 
     func cycle(_ step: Int) {
         let all = Variant.allCases
@@ -71,39 +78,62 @@ struct ServersPrototypeGroups: View {
 
     var body: some View {
         ForEach(model.servers) { server in
-            ServerHeader(server: server, palette: palette)
-            if server.agents.isEmpty {
-                QuietRow(symbol: "plus", text: "New session on \(server.name)", palette: palette) {}
+            let shut = model.folded.contains(server.id)
+            ServerHeader(server: server, folded: shut, palette: palette) { model.toggleFold(server.id) }
+            if !shut {
+                if server.agents.isEmpty {
+                    QuietRow(symbol: "plus", text: "New session on \(server.name)", palette: palette) {}
+                }
+                ForEach(server.agents) { FakeRow(agent: $0, palette: palette) }
             }
-            ForEach(server.agents) { FakeRow(agent: $0, palette: palette) }
         }
-        QuietRow(symbol: "server.rack", text: "Add Server…", palette: palette) { model.adding = true }
-            .padding(.top, 10)
     }
 }
 
 private struct ServerHeader: View {
     let server: ServersPrototype.Server
+    let folded: Bool
     let palette: Palette
+    let onToggle: () -> Void
     @State private var hovering = false
 
     var body: some View {
+        let activities = server.agents.map(\.activity)
+        let loudest = activities.first { $0 == .waiting } ?? activities.first { $0 == .working } ?? activities.first { $0 == .done }
         HStack(spacing: 10) {
-            Image(systemName: "server.rack")
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(palette.muted)
-                .frame(width: Lamp.size)
+            ZStack {
+                if folded, let loudest {
+                    Lamp(activity: loudest, selected: false, palette: palette)
+                } else {
+                    Image(systemName: "server.rack")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(palette.muted)
+                }
+            }
+            .frame(width: Lamp.size)
             Text(server.name)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(hovering ? palette.text : palette.muted)
             if !server.connected {
                 Text("offline").font(.system(size: 11)).foregroundStyle(palette.muted.opacity(0.7))
+            } else if folded {
+                Text(verbatim: "\(server.agents.count)")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(palette.muted.opacity(0.7))
             }
             Spacer(minLength: 0)
             if hovering {
                 CloseButton(symbol: "plus", help: "New session on \(server.name)", palette: palette) {}
             }
+            Image(systemName: "chevron.right")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(hovering ? palette.text : palette.muted)
+                .rotationEffect(.degrees(folded ? 0 : 90))
+                .frame(width: 20, height: 20)
+                .opacity(hovering || folded ? 1 : 0.35)
         }
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onToggle)
         .padding(.leading, 10)
         .padding(.trailing, 6)
         .padding(.vertical, 4)
@@ -335,6 +365,16 @@ struct ServersPrototypeAddSheet: View {
                 if index == steps.count - 1 { finished = true }
             }
         }
+    }
+}
+
+/// Variant A: Add Server sits beside New task at the foot of the sidebar, always in the same place.
+struct ServersPrototypeAddButton: View {
+    @ObservedObject var model = ServersPrototype.shared
+    let palette: Palette
+
+    var body: some View {
+        CloseButton(symbol: "server.rack", help: "Add Server", palette: palette) { model.adding = true }
     }
 }
 

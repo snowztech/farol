@@ -72,8 +72,11 @@ struct SidebarView: View {
             }
             // Pinned below the list, so it stays in the same place however many sessions there are.
             if ServersPrototype.enabled && proto.variant == .mixed { ServersPrototypeNewMenu(palette: p) }
-            NewTaskRow(palette: p, action: commands.newTask)
-                .padding(8)
+            HStack(spacing: 4) {
+                NewTaskRow(palette: p, action: commands.newTask)
+                if ServersPrototype.enabled && proto.variant == .group { ServersPrototypeAddButton(palette: p) }
+            }
+            .padding(8)
             if ServersPrototype.enabled { ServersPrototypeSwitcher() }
         }
         .sheet(isPresented: $proto.adding) { ServersPrototypeAddSheet(palette: p) }
