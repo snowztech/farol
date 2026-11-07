@@ -15,7 +15,7 @@
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="article:published_time" content="2026-10-27">
-  <meta property="article:modified_time" content="2026-10-27">
+  <meta property="article:modified_time" content="2026-11-07">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="/icon.png">
   <script type="application/ld+json">
@@ -27,7 +27,7 @@
     "url": "https://farol.sh/compare/paradev",
     "image": "https://farol.sh/og.png",
     "datePublished": "2026-10-27",
-    "dateModified": "2026-10-27",
+    "dateModified": "2026-11-07",
     "author": { "@type": "Person", "name": "Lucas Neves Pereira", "url": "https://github.com/lucasnevespereira" },
     "publisher": { "@type": "Organization", "name": "Farol", "url": "https://farol.sh/" },
     "about": [
@@ -130,7 +130,7 @@
 
   <main class="post">
     <header class="head">
-      <p class="meta">Last checked <time datetime="2026-10-27">October 27, 2026</time> · Lucas Neves Pereira</p>
+      <p class="meta">Last checked <time datetime="2026-10-27">October 27, 2026</time>, Farol updated November 7 · Lucas Neves Pereira</p>
       <h1>Farol vs Paradev (formerly Superset)</h1>
     </header>
     <nav class="toc" aria-label="On this page">
@@ -155,7 +155,7 @@
       <h2 id="the-short-version">The short version</h2>
       <ul class="list">
         <li><strong>Pick Farol</strong> if you want a fast native Mac terminal, an open source license, and a phone app that costs nothing.</li>
-        <li><strong>Pick Paradev</strong> if you need Linux or an Intel Mac, agents that start on a schedule, cloud workspaces, or Slack and Linear built in.</li>
+        <li><strong>Pick Paradev</strong> if you need Linux or an Intel Mac, agents that start on an event, cloud workspaces, or Slack and Linear built in.</li>
       </ul>
 
       <h2 id="side-by-side">Side by side</h2>
@@ -175,8 +175,8 @@
             <tr><th scope="row">Merge conflicts</th><td>Three-column resolver</td><td>Not advertised</td></tr>
             <tr><th scope="row">Tasks from tickets</th><td>Jira and GitHub issues</td><td>Linear, on Pro</td></tr>
             <tr><th scope="row">Phone</th><td>Free iPhone app, end-to-end encrypted. In beta on TestFlight</td><td>iPhone and iPad app on the App Store, on Pro</td></tr>
-            <tr><th scope="row">Agents on another machine</th><td><code>farol-host</code> on a server of your own, experimental</td><td>Remote access to another machine, on Pro</td></tr>
-            <tr><th scope="row">Scheduled agents</th><td>On the roadmap</td><td>Automations, on Pro</td></tr>
+            <tr><th scope="row">Agents on another machine</th><td>Servers in the sidebar, set up over ssh with <code>farol-host</code></td><td>Remote access to another machine, on Pro</td></tr>
+            <tr><th scope="row">Scheduled agents</th><td>Tasks for later, once or on the days you pick</td><td>Automations, on Pro</td></tr>
             <tr><th scope="row">Cloud workspaces</th><td>No</td><td>Yes, from the Team plan</td></tr>
             <tr><th scope="row">Built-in browser</th><td>No. Ports open in your browser</td><td>Yes</td></tr>
             <tr><th scope="row">Scripting</th><td><code>farol</code> CLI: sessions, tasks, wait, read and send</td><td>CLI, TypeScript SDK and MCP server</td></tr>
@@ -201,15 +201,14 @@
       <h2 id="where-paradev-is-ahead">Where Paradev is ahead</h2>
       <ul class="list">
         <li><strong>More platforms.</strong> Intel Macs, and Linux in an experimental build. Farol needs Apple silicon.</li>
-        <li><strong>Automations.</strong> Agents that start on a schedule or on an event, like triaging new issues. Farol has scheduled tasks on its roadmap.</li>
+        <li><strong>Automations on events.</strong> Agents that start when something happens, like a new issue to triage. Farol's tasks for later start at a time, not on an event.</li>
         <li><strong>Cloud workspaces</strong>, so nothing has to run on your machine. Farol keeps everything on your Mac or your own server.</li>
-        <li><strong>Setup scripts</strong> that run when a workspace is created, like <code>bun install</code>. Farol copies <code>.env</code> files into new worktrees, and its own setup scripts are on the roadmap.</li>
         <li><strong>A browser inside the app</strong>, and integrations with Slack and Linear.</li>
         <li><strong>An SDK and an MCP server</strong>, and a larger team and community behind it.</li>
       </ul>
 
       <h2 id="which-one-to-pick">Which one to pick</h2>
-      <p>If you live in the terminal on a Mac and care about speed, an open license and answering agents from your phone without a subscription, try Farol. If your team needs Linux, cloud workspaces or agents that run on their own on a schedule, Paradev covers more of that today.</p>
+      <p>If you live in the terminal on a Mac and care about speed, an open license and answering agents from your phone without a subscription, try Farol. If your team needs Linux, cloud workspaces or agents that start on events, Paradev covers more of that today.</p>
       <p>You don't have to choose blind. Both are free to try, and both work with the agents you already pay for.</p>
 
       <h2 id="moving-from-paradev-to-farol">Moving from Paradev to Farol</h2>
@@ -276,6 +275,7 @@
           <ul>
             <li><a href="/blog/">Blog</a></li>
             <li><a href="/compare/paradev">vs Paradev</a></li>
+            <li><a href="/compare/cmux">vs cmux</a></li>
           </ul>
         </div>
         <div>
