@@ -213,6 +213,12 @@
           <p>You can start from one of your open Jira tickets or the repository's GitHub issues. Farol names the branch from the ticket and gives the agent its full description.</p>
           <div class="note"><p><strong>Why worktrees?</strong> Each task gets its own checkout, so agents on different branches never write to the same files. <a href="/blog/parallel-claude-code-agents-git-worktrees">More on running agents in parallel</a>.</p></div>
           <p>Press <kbd>⇧⌘T</kbd> when you want a worktree session without starting an agent. Closing a worktree session offers to remove the checkout and always keeps its branch.</p>
+          <img class="doc-shot" src="features/new-task.png" width="2540" height="1520" alt="The New Task sheet over a Claude Code session: the task typed in, a branch name made from it, Claude Code picked as the agent, and Now beside Start for when it runs">
+
+          <h3 id="later">Tasks for later</h3>
+          <p>The button beside <strong>Start</strong> picks when a task runs: now, once on a day you pick, or again on the days of the week you choose. Each run gets its own worktree, and a repeat's branch ends with the day, like <code>triage-2026-11-09</code>. Tasks wait in the Tasks pane under the sessions, which shows when each one runs next.</p>
+          <p>Click a task to change it and see how its runs went. <strong>Run Now</strong> is on hover, and Pause and Delete are on right-click. Farol opens at a task's time even if you quit it, and a run missed while the Mac slept starts once it wakes.</p>
+          <p>Each task is a Markdown file in <code>~/.farol/schedules/</code> that you or an agent can write. A file Farol didn't write waits in the Tasks pane until you click <strong>Allow</strong>.</p>
 
           <h3>Run project commands</h3>
           <p>Press <kbd>⌘P</kbd> to find commands from the project's Makefile, package.json or justfile. Return runs a command in the current pane, or in a new pane below when an agent is working there. You can also add and manage commands from the pane's Run menu.</p>
@@ -253,6 +259,7 @@ cp "$main/.claude/settings.local.json" .claude/ 2&gt;/dev/null || true</code></p
             </tbody>
           </table>
           <p>Use <kbd>⌘P</kbd> to search and switch sessions. Settings can also group sessions under each project's name.</p>
+          <img class="doc-shot" src="features/agent-status.png" width="2540" height="1520" alt="The sidebar grouped by project, with sessions working, waiting for you with the agent's question, and done, a folded project showing its loudest dot, and the Tasks pane below">
         </section>
 
         <section id="review">
@@ -261,6 +268,7 @@ cp "$main/.claude/settings.local.json" .claude/ 2&gt;/dev/null || true</code></p
           <ul>
             <li><strong>Files:</strong> Press <kbd>⇧⌘E</kbd> to browse the project, open a file beside the terminal and save quick fixes with <kbd>⌘S</kbd>. <kbd>⌘</kbd>-click a name to go to its definition or list its references, once its language's server is on in Settings → Editor.</li>
             <li><strong>Review:</strong> Compare uncommitted work or everything since the branch left main or another branch.</li>
+            <li><strong>Notes for the agent:</strong> Click the + beside a line of your own changes, or select lines and right-click, to leave a note. Send them all to the session's agent in one message, or one at once with <kbd>⇧⌘↩</kbd>. Each note quotes its lines, so it follows them as the agent edits.</li>
             <li><strong>Git graph:</strong> Press <kbd>⌥⌘G</kbd> to inspect branches and commits, then check out, create, rebase, delete, cherry-pick or revert.</li>
             <li><strong>Ship:</strong> Commit, push and open a pull request on GitHub or GitLab from the review panel. Untick a file in the panel or in the commit sheet to leave it out of the commit.</li>
           </ul>
@@ -277,7 +285,7 @@ cp "$main/.claude/settings.local.json" .claude/ 2&gt;/dev/null || true</code></p
             <li><strong>Whole files:</strong> <kbd>⌃⌘←</kbd> fills the result with your side and <kbd>⌃⌘→</kbd> with the incoming one, which you can still edit or undo before <strong>Mark Resolved</strong>. For a file deleted on one side, that means keeping or deleting it, and each option shows the file it leaves before you apply it.</li>
             <li><strong>Finish:</strong> <kbd>⌘S</kbd> marks the file resolved, and <strong>Reopen</strong> puts it back in conflict until you continue. Once every file is, run the tests or ask the agent to check, then continue, skip or abort. Continuing a merge, cherry-pick or revert asks for the commit message, starting from the one git prepared. A rebase keeps each commit's message unless you choose <strong>Edit Message</strong>. <kbd>Esc</kbd> goes back to the terminal.</li>
           </ul>
-          <img class="doc-shot" src="screenshot-review.png" width="2400" height="1520" alt="Farol with plain sessions, a folded project and an open one in the sidebar, Claude Code reviewing the branch in the terminal and the review panel showing its changes since main">
+          <img class="doc-shot" src="screenshot-review.png" width="2540" height="1520" alt="Farol with a project open in the sidebar, its sessions working, waiting for you and done, a folded second project and tasks for later below, Claude Code reviewing the change in the terminal, and the review panel with a note for the agent">
         </section>
 
         <section id="outside">
