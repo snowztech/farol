@@ -5,6 +5,7 @@ set -euo pipefail
 
 usage="usage: scripts/shots.sh stage [sidebar|review|new-task]   build the shelf demo repo and open Farol Shots on it
        scripts/shots.sh shoot <name>              save the Farol Shots window as site/features/<name>.png
+       scripts/shots.sh library                   stage once and shoot every feature into assets/screenshots
        scripts/shots.sh reset                     quit Farol Shots and forget the scene
 
 make shots SCENE=review builds Farol Shots and stages a scene, and make shot NAME=review shoots it.
@@ -146,11 +147,27 @@ EOF
   git config user.name "Ada Lovelace"
   git config user.email "ada@example.com"
   printf 'module example.com/harbor\n\ngo 1.24\n' > go.mod
-  printf 'package main\n\nfunc main() {}\n' > main.go
+  cat > main.go <<'EOF'
+package main
+
+import "net/http"
+
+func main() {
+	http.ListenAndServe(":8080", routes())
+}
+EOF
   git add . && git commit -qm "feat: start the server"
   git init -q --bare "$dir/origin/harbor.git" && git remote add origin "$dir/origin/harbor.git" && git push -q -u origin main
   git worktree add -q -b feat/rate-limit ../harbor-rate-limit
   git worktree add -q -b chore/go-1.25 ../harbor-go
+  # Both sides change the line that starts the server, so merging main stops on a conflict.
+  perl -pi -e 's/^\thttp\.ListenAndServe.*/\thttp.ListenAndServe(":8080", limit(routes()))/' main.go
+  git commit -qam "feat: rate limit every route"
+  cd ../harbor-go
+  perl -pi -e 's/^go 1\.24$/go 1.25/; ' go.mod
+  perl -pi -e 's/^\thttp\.ListenAndServe.*/\tlog.Fatal(http.ListenAndServe(addr(), routes()))/; s/^import "net\/http"$/import (\n\t"log"\n\t"net\/http"\n)/' main.go
+  git commit -qam "chore: move to Go 1.25 and read the port from the environment"
+  git merge -q main >/dev/null 2>&1 || true
 }
 
 # A plain zsh, so the prompt is the same on every Mac.
@@ -166,15 +183,23 @@ precmd() { vcs_info }
 setopt prompt_subst
 PROMPT='%F{green}➜%f  %F{cyan}%1~%f${vcs_info_msg_0_} '
 [[ -f $SHOTS/status/${PWD:t} ]] && eval "\"\$FAROL_CLI\" status $(<$SHOTS/status/${PWD:t})"
-# Cleared first, so the login line and its date stay out of the shot.
-[[ -f $SHOTS/run/${PWD:t} ]] && { print -n '\e[2J\e[H'; source $SHOTS/run/${PWD:t} }
+# Cleared, so the login line and its date stay out of the shot.
+print -n '\e[2J\e[H'
+# Once per folder, so a pane split in the same folder gets a plain prompt instead of a second agent.
+if [[ -f $SHOTS/run/${PWD:t} && ! -e $SHOTS/run/${PWD:t}.ran ]]; then
+  touch $SHOTS/run/${PWD:t}.ran; source $SHOTS/run/${PWD:t}
+fi
 EOF
   # The main session is a real Claude Code, so the shot shows a real conversation and its own status.
   # The scene's zsh doesn't load your PATH, so it gets claude's full path.
   local claude
   claude=$(command -v claude) || { echo "shots: claude isn't on your PATH" >&2; exit 1; }
   # A blank status line, so your own one, like plan usage, stays out of the shot.
-  printf '%q --settings %q %q\n' "$claude" '{"statusLine":{"type":"command","command":"true"}}' "Review src/queue.ts. What goes wrong if the network drops halfway through a flush? Keep it short." > "$dir/run/shelf"
+  # In the repo rather than a flag, so the conversation Farol resumes after a relaunch keeps it too.
+  mkdir -p "$dir/shelf/.claude"
+  echo '{"statusLine":{"type":"command","command":"true"}}' > "$dir/shelf/.claude/settings.local.json"
+  echo '.claude/' >> "$dir/shelf/.git/info/exclude"
+  printf '%q %q\n' "$claude" "Review src/queue.ts. What goes wrong if the network drops halfway through a flush? Keep it short." > "$dir/run/shelf"
   echo 'working' > "$dir/status/shelf-search"
   echo 'waiting --asking "The fix is in. What should I do with it?"' > "$dir/status/shelf-flaky-tests"
   echo 'done' > "$dir/status/shelf-api"
@@ -210,7 +235,7 @@ EOF
   defaults write "$id" sidebar.folded "$dir/harbor"
   defaults write "$id" review.width -float 560
   tasks
-  [ "$1" = review ] && notes
+  case "$1" in review|library) notes ;; esac
   return 0
 }
 
@@ -289,7 +314,7 @@ EOF
 
 stage() {
   local name="${1:-sidebar}"
-  case "$name" in sidebar|review|new-task) ;; *) echo "shots: unknown scene $name (sidebar, review, new-task)" >&2; exit 64 ;; esac
+  case "$name" in sidebar|review|new-task|library) ;; *) echo "shots: unknown scene $name (sidebar, review, new-task, library)" >&2; exit 64 ;; esac
   [ -d "$app" ] || { echo "shots: build it first with make shots" >&2; exit 1; }
   quit
   repo
@@ -338,16 +363,66 @@ shoot() {
   # In front, so the window has its colored traffic lights.
   open -a "$app"; sleep 1
   local out="$root/site/features/$name.png"
+  case "$name" in */*) out="$root/$name.png" ;; esac
   screencapture -x -o -l "$window" "$out"
   local size
   size=$(sips -g pixelWidth -g pixelHeight "$out" | awk '/pixel/ { printf "%s%s", sep, $2; sep = "x" }')
-  echo "saved site/features/$name.png ($size)"
+  echo "saved ${out#"$root"/} ($size)"
   [ "$size" = "$((width * 2))x$((height * 2))" ] || echo "shots: expected $((width * 2))x$((height * 2)). Was the window resized, or the screen not Retina?" >&2
+}
+
+# Keys go to the app in front, which shoot keeps Farol Shots. Needs Accessibility for your terminal app.
+press() { osascript -e "tell application \"System Events\" to keystroke \"$1\" using {${2}}"; sleep "${3:-1.5}"; }
+typed() { osascript -e "tell application \"System Events\" to keystroke \"$1\""; sleep 1; }
+escape() { osascript -e 'tell application "System Events" to key code 53'; sleep 1; }
+enter() { osascript -e 'tell application "System Events" to key code 36'; sleep "${1:-2}"; }
+
+# Quits and reopens Farol Shots from the layout saved after staging, with the main session's panels and the selected session set.
+# Each shot starts the same, with no pane or file left from the one before. Farol resumes the Claude Code conversation on its own.
+relaunch() {
+  local panels="$1" selected="${2:-0}"
+  quit
+  python3 -I - "$dir/base.plist" "$dir/defaults.plist" "$panels" "$selected" <<'EOF'
+import json, plistlib, sys
+base, path, panels, selected = sys.argv[1], sys.argv[2], sys.argv[3].split(","), int(sys.argv[4])
+with open(base, "rb") as f: d = plistlib.load(f)
+sessions = json.loads(d["sessions.saved"])
+sessions[0]["panels"] = {name: name in panels for name in ("files", "graph", "review")}
+d["sessions.saved"] = json.dumps(sessions).encode()
+d["sessions.selected"] = selected
+with open(path, "wb") as f: plistlib.dump(d, f, fmt=plistlib.FMT_BINARY)
+EOF
+  defaults import "$id" "$dir/defaults.plist"
+  open -n --env FAROL_HOME="$dir/home" --env ZDOTDIR="$dir/zsh" --env SHOTS="$dir" "$app"
+  sleep 6
+}
+
+# A shot of each feature, from one stage, into assets/screenshots.
+library() {
+  stage library
+  local out="assets/screenshots"
+  # Saved once the agent is done, so it holds the conversation to resume.
+  quit; defaults export "$id" "$dir/base.plist"
+  relaunch none; shoot "$out/sidebar"
+  relaunch review; shoot "$out/review-notes"
+  relaunch graph; shoot "$out/git-graph"
+  # Each one is a moment from real use: the reviewed file open beside the agent, a search followed to its line, a commit after the diff.
+  relaunch files; press p "command down"; typed "queue.ts"; enter 3; shoot "$out/files"
+  relaunch none; press f "shift down, command down" 3; typed "pending"; enter 3; shoot "$out/find-in-files"
+  relaunch none; press p "command down"; typed "test"; shoot "$out/palette"
+  relaunch review; press c "option down, command down" 2; typed "docs: say what the offline queue does"; shoot "$out/commit"
+  relaunch none; press n "shift down, command down"; typed "Add tags to saved links, with a --tag filter on shelf list"; shoot "$out/new-task"
+  relaunch none; press "," "command down" 2; shoot "$out/settings"
+  relaunch none; press d "command down" 2; typed "git log --oneline"; enter; shoot "$out/split"
+  # The sixth session is harbor's Go upgrade, stopped on a merge conflict.
+  relaunch none 5; press m "option down, command down" 3; shoot "$out/conflicts"
+  echo "Library shot into $out. Farol Shots stays open for anything else."
 }
 
 case "${1:-}" in
   stage) stage "${2:-}" ;;
   shoot) shoot "${2:-}" ;;
+  library) library ;;
   reset) quit; defaults delete "$id" >/dev/null 2>&1 || true; rm -rf "$dir"; echo "Farol Shots reset" ;;
   *) echo "$usage"; exit 64 ;;
 esac
