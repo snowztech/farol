@@ -68,8 +68,8 @@ struct SidebarView: View {
             // Pinned below the list, so it stays in the same place however many sessions there are.
             HStack(spacing: 4) {
                 NewTaskRow(palette: p, action: commands.newTask)
-                // Beside New task, small: a server is added once, a task every day.
-                CloseButton(symbol: "server.rack", help: "Add a server", palette: p, action: serverCommands.add)
+                // Beside New task, square and as tall, so the two read as one row: a server is added once, a task every day.
+                AddServerButton(palette: p, action: serverCommands.add)
             }
             .padding(8)
         }
@@ -528,6 +528,29 @@ private struct NewTaskRow: View {
         .padding(.vertical, 8)
         .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
+    }
+}
+
+private struct AddServerButton: View {
+    let palette: Palette
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            // A size under New task's text, so it weighs what the + beside it does.
+            Image(systemName: "server.rack")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(hovering ? palette.text : palette.muted)
+                // New task's own height: 13pt text with 8pt above and below.
+                .frame(width: 34, height: 32)
+                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(hovering ? palette.hover : .clear))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(QuietPress())
+        .onClickableHover { hovering = $0 }
+        .hoverTip("Add a server")
     }
 }
 

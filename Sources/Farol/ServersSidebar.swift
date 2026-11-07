@@ -144,7 +144,7 @@ private struct ServerHeader: View {
                 .foregroundStyle(hovering ? palette.text : palette.muted)
             if let word = settingUp ? "setting up" : offline ? "offline" : nil {
                 Text(word).font(.system(size: 11)).foregroundStyle(palette.muted.opacity(0.7))
-            } else if folded {
+            } else if folded, !state.sessions.isEmpty {
                 Text(verbatim: "\(state.sessions.count)")
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(palette.muted.opacity(0.7))
