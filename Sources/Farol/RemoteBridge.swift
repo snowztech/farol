@@ -505,6 +505,8 @@ final class RemoteBridge: ObservableObject {
             act(command, by: device, on: session, from: id) { $0.pressControl(letter) }
         case .changes(let session):
             changes(command, in: session, from: id)
+        case .ship(let session, let message, let request):
+            ship(command, session: session, message: message, request: request, from: id)
         case .diff(let session, let path):
             diff(command, of: path, in: session, from: id)
         case .task(let project, let agent, let text):
@@ -934,14 +936,71 @@ final class RemoteBridge: ObservableObject {
         }
         DispatchQueue.global(qos: .userInitiated).async {
             let files = try? Diff.files(in: directory, scope)
+            let branch = Git.branch(of: directory)
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 guard let files else {
                     return tell(.refused(command: command.id, reason: "This session is not in a git repository."), id)
                 }
-                tell(.changes(session: session, scope: Self.label(scope), files: files.map(Self.change)), id)
+                tell(.changes(session: session, scope: Self.label(scope), files: files.map(Self.change), branch: branch), id)
             }
         }
+    }
+
+    /// Commits, pushes and opens the request as the review panel's Commit sheet does, with all of the uncommitted work.
+    private func ship(_ command: RemoteCommand, session: UUID, message: String?, request: Bool, from id: UInt32) {
+        guard let (directory, scope) = repository(of: session) else {
+            return tell(.refused(command: command.id, reason: "That session is closed."), id)
+        }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = Result { try Self.ship(message: message, request: request, in: directory, scope: scope) }
+            DispatchQueue.main.async { [weak self] in
+                switch result {
+                case .success(let (branch, url)): self?.tell(.shipped(command: command.id, branch: branch, request: url), id)
+                case .failure(let error): self?.tell(.refused(command: command.id, reason: String(describing: error)), id)
+                }
+            }
+        }
+    }
+
+    private struct ShipFailure: Error, CustomStringConvertible {
+        let description: String
+    }
+
+    /// The branch that went up, and its request: the one already open, the one just made, or the forge's page when its tool can't.
+    /// Runs git and the forge's tool, so off the main thread.
+    static func ship(message: String?, request: Bool, in directory: String, scope: Diff.Scope) throws -> (String, URL?) {
+        guard let branch = Git.branch(of: directory) else { throw ShipFailure(description: "This session isn't on a branch.") }
+        guard case .branch(let base) = scope else {
+            if request { throw ShipFailure(description: "\(branch) is the base branch, so there is nothing to request.") }
+            return try (pushed(branch, message: message, in: directory), nil)
+        }
+        try pushed(branch, message: message, in: directory)
+        guard request else { return (branch, nil) }
+        guard let forge = Forge.detect(in: directory) else {
+            throw ShipFailure(description: "Pushed, but this repository isn't on GitHub or GitLab.")
+        }
+        if case .open(_, let url) = forge.request(for: branch, in: directory) { return (branch, url) }
+        let into = History.requestBase(base, in: directory)
+        do { try forge.createRequest(for: branch, base: into, in: directory) } catch {
+            // Without the tool, or signed out of it, the forge's own page still makes one.
+            if let page = forge.newRequest(from: branch, base: into), forge.request(for: branch, in: directory) == .unknown { return (branch, page) }
+            throw ShipFailure(description: "Pushed, but couldn't create the \(forge.request): \(error)")
+        }
+        if case .open(_, let url) = forge.request(for: branch, in: directory) { return (branch, url) }
+        return (branch, nil)
+    }
+
+    @discardableResult
+    private static func pushed(_ branch: String, message: String?, in directory: String) throws -> String {
+        let message = message?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !message.isEmpty {
+            do { try History.commitAll(message, in: directory) } catch { throw ShipFailure(description: "Couldn't commit: \(error)") }
+        }
+        do { try History.push(in: directory) } catch {
+            throw ShipFailure(description: (message.isEmpty ? "Couldn't push: " : "Committed, but couldn't push: ") + "\(error)")
+        }
+        return branch
     }
 
     /// One file as a unified diff, cut short so a message stays under the relay's limit.
