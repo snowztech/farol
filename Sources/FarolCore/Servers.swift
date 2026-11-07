@@ -125,6 +125,31 @@ public enum ServerSetup {
                       "\"$HOME/.local/bin/farol-host\" forget \(NewTask.shellQuoted(deviceName))"]
     }
 
+    /// Shows a phone code on the server, with no terminal, so Farol can draw it in a sheet. It waits until a phone scans it.
+    public static func pairArguments(ssh server: String) -> [String] {
+        sshOptions + ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", server, "\"$HOME/.local/bin/farol-host\" pair"]
+    }
+
+    /// The phone code in a terminal, for a server whose ssh asks for a password.
+    public static func pairInTerminal(ssh server: String) -> String {
+        "\(ssh) -t \(NewTask.shellQuoted(server)) '\"$HOME/.local/bin/farol-host\" pair'"
+    }
+
+    /// What one line of `farol-host pair` says: the code to show, or the phone that scanned it.
+    public enum PairLine: Equatable {
+        case code(URL)
+        case paired(String)
+    }
+
+    public static func pairLine(_ line: String) -> PairLine? {
+        let text = line.trimmingCharacters(in: .whitespaces)
+        if text.hasPrefix("https://farol.sh/pair#"), let link = URL(string: text) { return .code(link) }
+        if text.hasPrefix("Paired with "), text.hasSuffix(".") {
+            return .paired(String(text.dropFirst("Paired with ".count).dropLast()))
+        }
+        return nil
+    }
+
     /// Whether what tmux printed is a window id, like "@3".
     public static func isWindow(_ text: String) -> Bool {
         text.count > 1 && text.hasPrefix("@") && text.dropFirst().allSatisfy(\.isNumber)

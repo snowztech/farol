@@ -15,6 +15,7 @@ extension MainWindowController {
             },
             retry: { [weak self] in self?.servers.retry($0) },
             rename: { [weak self] in self?.renameServer($0) },
+            pairPhone: { [weak self] in self?.pairPhone(with: $0) },
             remove: { [weak self] in self?.removeServer($0) })
     }
 
@@ -107,6 +108,25 @@ extension MainWindowController {
         alert.beginSheetModal(for: window) { [weak self] response in
             if response == .alertFirstButtonReturn { self?.setUpServer(server.ssh) }
         }
+    }
+
+    /// The server's phone code in a sheet. Without ssh that runs on its own, the code shows in a terminal instead.
+    private func pairPhone(with server: Server) {
+        if state.showingSettings { toggleSettings() }
+        guard let window, window.attachedSheet == nil else { return }
+        let pairing = PhonePairing(server: server)
+        let sheet = NSWindow(contentRect: .zero, styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: true)
+        let close = { [weak window, weak sheet] in
+            pairing.stop()
+            sheet.map { window?.endSheet($0) }
+        }
+        let view = PairPhoneSheet(server: server, pairing: pairing, palette: state.palette, openTerminal: { [weak self] in
+            self?.store.create(run: ServerSetup.pairInTerminal(ssh: server.ssh))
+        }, close: { close() })
+        let host = NSHostingController(rootView: view)
+        host.sizingOptions = [.preferredContentSize]
+        sheet.contentViewController = host
+        window.beginSheet(sheet)
     }
 
     private func renameServer(_ server: Server) {

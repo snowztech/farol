@@ -92,3 +92,10 @@ import Testing
     #expect(!ServerSetup.isWindow("@"))
     #expect(!ServerSetup.isWindow("no server running"))
 }
+
+@Test func readsWhatFarolHostPairSays() {
+    #expect(ServerSetup.pairLine("https://farol.sh/pair#abc") == .code(URL(string: "https://farol.sh/pair#abc")!))
+    #expect(ServerSetup.pairLine("Paired with Lucas's iPhone.") == .paired("Lucas's iPhone"))
+    #expect(ServerSetup.pairLine("Scan this from Farol on your phone. It works once, for two minutes.") == nil)
+    #expect(ServerSetup.pairLine("▄▄▄ ▄ ▄▄▄") == nil)
+}

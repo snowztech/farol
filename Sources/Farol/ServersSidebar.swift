@@ -12,6 +12,7 @@ struct ServerCommands {
     let showSetup: (String) -> Void
     let retry: (Server) -> Void
     let rename: (Server) -> Void
+    let pairPhone: (Server) -> Void
     let remove: (Server) -> Void
 }
 
@@ -52,6 +53,7 @@ struct ServerGroups: View {
                     Button("New Session") { commands.newSession(server) }
                     if state.connection != .connected { Button("Retry") { commands.retry(server) } }
                     Divider()
+                    Button("Pair a Phone…") { commands.pairPhone(server) }
                     Button("Rename…") { commands.rename(server) }
                     Button("Remove Server…") { commands.remove(server) }
                 }

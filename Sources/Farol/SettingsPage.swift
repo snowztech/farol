@@ -839,6 +839,8 @@ struct SettingsPage: View {
                         if remoteServers.state(of: server).connection == .offline {
                             ShipButton(title: "Retry", busy: false, palette: p) { serverCommands.retry(server) }
                         }
+                        ShipButton(title: "Pair a phone", help: "Shows a code to scan from Farol on your phone, so it sees this server's agents too.",
+                                   busy: false, palette: p) { serverCommands.pairPhone(server) }
                         ShipButton(title: "Remove", help: "The server stops letting this Mac in. Its agents keep running.", busy: false, palette: p) {
                             serverCommands.remove(server)
                         }
@@ -928,7 +930,7 @@ struct SettingsPage: View {
     }
 
     /// Black on white whatever the theme, since that is what a camera reads best.
-    private static func qrCode(_ text: String) -> NSImage? {
+    static func qrCode(_ text: String) -> NSImage? {
         let filter = CIFilter.qrCodeGenerator()
         filter.message = Data(text.utf8)
         guard let output = filter.outputImage,
