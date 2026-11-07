@@ -33,7 +33,7 @@
     "sameAs": ["https://github.com/snowztech/farol-remote"]
   }
   </script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.2/dist/snowztech-ui.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.6/dist/snowztech-ui.min.css">
   <link rel="stylesheet" href="/footer.css">
   <script>
     (function () { var light = matchMedia("(prefers-color-scheme: light)"), root = document.documentElement; function follow() { if (light.matches) root.dataset.theme = "light"; else delete root.dataset.theme; } follow(); light.addEventListener("change", follow); })();
@@ -96,12 +96,12 @@
     strong { color: var(--sn-fg); font-weight: 500; }
     code {
       padding: 1px 5px; border: 1px solid var(--sn-border-subtle); border-radius: 4px;
-      background: var(--sn-bg-raised); color: var(--sn-fg); font: inherit;
+      background: var(--sn-bg-elev-1); color: var(--sn-fg); font: inherit;
     }
     pre {
       margin: 14px 0; padding: 16px 18px; overflow-x: auto;
       border: 1px solid var(--sn-border-subtle); border-radius: 8px;
-      background: var(--sn-bg-raised); color: var(--sn-fg); font-size: var(--sn-text-sm);
+      background: var(--sn-bg-elev-1); color: var(--sn-fg); font-size: var(--sn-text-sm);
     }
     pre code { padding: 0; border: 0; background: none; }
     pre.command { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 10px 10px 18px; }
