@@ -211,6 +211,10 @@ struct ShipButton: View {
     let busy: Bool
     /// The forge's mark before the title, on the buttons that send you there.
     var icon: Forge.Kind? = nil
+    /// The agent's tile before the title, on the buttons that send to it.
+    var agent: AgentFolder.Kind? = nil
+    /// Lifted a little, for the one step that comes next, like sending notes that wait.
+    var primary = false
     /// The shortcut that does the same, shown after the title.
     var keys: String? = nil
     let palette: Palette
@@ -226,14 +230,16 @@ struct ShipButton: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 if let icon { ForgeIcon(kind: icon) }
+                if let agent { ToolTile(agent: agent, size: 15) }
                 Text(title).font(.system(size: 12, weight: .medium))
                 if let keys { Text(keys).font(.system(size: 11)).foregroundStyle(palette.muted) }
             }
             .foregroundStyle(busy ? palette.muted : palette.text)
             .padding(.horizontal, 10)
             .frame(height: 24)
-            .background(RoundedRectangle(cornerRadius: 6).fill(hovering ? palette.raised : palette.surface))
-            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(palette.line))
+            // Lifted, not filled: a solid button in a panel toolbar outshouts everything around it.
+            .background(RoundedRectangle(cornerRadius: 6).fill(primary || hovering ? palette.raised : palette.surface))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(primary ? palette.muted.opacity(0.6) : palette.line))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

@@ -147,6 +147,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             resize: { [weak self] in self?.setReviewWidth($0) }))
         reviewPanel.clipsToBounds = true
         reviewHost = reviewPanel
+        review.agent = { [weak self] in self?.reviewAgent() }
         settingsView = hosting(SettingsPage(
             settings: settings, agents: agents, worktrees: worktrees, state: state, updates: updates, remote: remote,
             runInTerminal: { [weak self] command in
@@ -1079,5 +1080,19 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         mergeFollow = session.$checkout.sink { [weak self] in self?.merge.follow($0) }
         // Resolving here changes what the sidebar says about the session, so it reads git again.
         mergeCount = merge.$conflicts.dropFirst().sink { [weak session] _ in session?.refreshGit() }
+    }
+}
+
+extension MainWindowController {
+    /// The agent your review notes go to: the focused pane's when it runs one, or else the session's first that does.
+    fileprivate func reviewAgent() -> ReviewAgent? {
+        guard let session = store.selected else { return nil }
+        let panes = [session.panes.focused] + session.panes.terminals
+        guard let terminal = panes.first(where: { session.agent(in: $0) != nil }), let program = session.agent(in: terminal) else { return nil }
+        let kind = AgentFolder.Kind(rawValue: program)
+        let name = kind?.title ?? program
+        // As `farol send` does: an answer to its question is yours to give, not a review to type over it.
+        let refusal = session.status(of: terminal) == .waiting ? "\(name) is waiting on a question. Answer it first, then send." : nil
+        return ReviewAgent(name: name, kind: kind, refusal: refusal) { [weak terminal] in terminal?.submit($0) }
     }
 }

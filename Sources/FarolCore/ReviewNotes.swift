@@ -11,8 +11,9 @@ public struct ReviewNote: Codable, Equatable, Identifiable, Sendable {
     public var old: Bool
     public var quote: [String]
     public var text: String
-    /// Sent to the agent and kept until you tick it off, so you can check it was dealt with.
-    public var sent = false
+    /// When it went to the agent. Kept until you resolve it, so you can check it was dealt with.
+    public var sentAt: Date?
+    public var sent: Bool { sentAt != nil }
     /// Its lines are no longer in the diff, so it shows apart, without a line.
     public var lost = false
 
@@ -63,8 +64,11 @@ public enum ReviewNotes {
             let lines = item.line == item.end ? "\(item.line)" : "\(item.line)-\(item.end)"
             let place = item.old ? "\(item.path), removed \(item.line == item.end ? "line" : "lines") \(lines)" : "\(item.path):\(lines)"
             var block = ["\(index + 1). \(place)"]
-            block += item.quote.prefix(12).map { "   > \($0)" }
-            if item.quote.count > 12 { block.append("   > …") }
+            // Blank lines at either end say nothing to the agent.
+            let quote = item.quote.drop { $0.trimmingCharacters(in: .whitespaces).isEmpty }
+                .reversed().drop { $0.trimmingCharacters(in: .whitespaces).isEmpty }.reversed()
+            block += quote.prefix(12).map { "   > \($0)" }
+            if quote.count > 12 { block.append("   > …") }
             let text = item.text.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "\n", with: "\n   ")
             block.append("   " + (item.author.map { "\($0): " } ?? "") + text)
             parts.append(block.joined(separator: "\n"))

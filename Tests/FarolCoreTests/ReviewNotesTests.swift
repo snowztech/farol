@@ -37,7 +37,7 @@ private let before = file(" let a = 1\n-let b = 2\n+let b = 3\n+let c = 4\n let 
 
 @Test func writesOneNumberedPrompt() {
     let items = [
-        ReviewNotes.Item(path: "app.swift", line: 12, end: 12, old: false, quote: ["let c = 4"], text: "Name it count"),
+        ReviewNotes.Item(path: "app.swift", line: 12, end: 12, old: false, quote: ["", "let c = 4", " "], text: "Name it count"),
         ReviewNotes.Item(path: "README.md", line: 18, end: 19, old: true, quote: ["Old", "lines"], text: "Keep these\nbut shorter",
                          author: "alice"),
     ]

@@ -7,7 +7,7 @@ public struct AgentFolder: Equatable, Hashable {
     public enum Kind: String, CaseIterable {
         case claude, codex, opencode, pi
 
-        var title: String {
+        public var title: String {
             switch self {
             case .claude: "Claude Code"
             case .codex: "Codex"

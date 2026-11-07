@@ -27,6 +27,15 @@ struct DiffColors: Equatable {
     }
 }
 
+/// Where your notes are in one file: a dot beside each line one covers, and a tint on the lines of the note under the mouse.
+struct DiffNotes: Equatable {
+    var lines: Set<Int> = []
+    var oldLines: Set<Int> = []
+    var lit: ClosedRange<Int>?
+    var litOld = false
+    let color: NSColor
+}
+
 /// The matches of the review's search in one file, by row, and the one the search is on.
 struct DiffMarks: Equatable {
     /// The characters to mark in each row's text, as the diff shows it.
@@ -44,17 +53,22 @@ struct DiffText: NSViewRepresentable {
     let syntax: SyntaxColors
     /// Called with a line's number, and whether it counts in the old file, when its "+" in the gutter is clicked. Nil offers no "+".
     var comment: ((Int, _ old: Bool) -> Void)? = nil
+    /// Called with the first and last line of a selection, from the right-click menu. Nil offers no note on several lines.
+    var noteLines: ((Int, Int, _ old: Bool) -> Void)? = nil
     /// Called with a gap's unmodified lines, by their numbers in the new file, and whether to show them from the top, next to the hunk above.
     /// Nil leaves gaps closed.
     var expand: ((Range<Int>, _ fromTop: Bool) -> Void)? = nil
     /// While the lines of a gap are being read, which takes a moment for a request. The clicked gap shows a spinner meanwhile.
     var loading = false
     var marks: DiffMarks? = nil
+    var notes: DiffNotes? = nil
 
     func makeNSView(context: Context) -> DiffScrollView { DiffScrollView() }
 
     func updateNSView(_ view: DiffScrollView, context: Context) {
         view.text.onComment = comment
+        view.text.onNoteLines = noteLines
+        view.text.notes = notes
         view.text.onExpand = expand
         view.text.loading = loading
         view.text.show(file, rows: rows, colors: colors, syntax: syntax, marks: marks)
@@ -151,6 +165,10 @@ final class DiffTextView: NSTextView {
 
     var onComment: ((Int, _ old: Bool) -> Void)? {
         didSet { if (onComment == nil) != (oldValue == nil) { hoveredRow = nil } }
+    }
+    var onNoteLines: ((Int, Int, _ old: Bool) -> Void)?
+    var notes: DiffNotes? {
+        didSet { if notes != oldValue { needsDisplay = true } }
     }
     /// The row whose gutter is under the mouse, where the "+" shows.
     private var hoveredRow: CGFloat? {
@@ -371,6 +389,18 @@ extension DiffTextView {
                 tint.withAlphaComponent(0.9).setFill()
                 NSRect(x: 0, y: row.minY, width: 3, height: row.height).fill()
             }
+            if let notes = self.notes {
+                let new = attributes[.diffNumber] as? Int
+                let old = attributes[.diffOldNumber] as? Int
+                if let lit = notes.lit, let number = notes.litOld ? old : new, lit.contains(number) {
+                    notes.color.withAlphaComponent(0.12).setFill()
+                    row.fill()
+                }
+                if new.map(notes.lines.contains) == true || old.map(notes.oldLines.contains) == true {
+                    notes.color.setFill()
+                    NSBezierPath(ovalIn: NSRect(x: 9, y: row.midY - 2.5, width: 5, height: 5)).fill()
+                }
+            }
             if self.onComment != nil, self.hoveredRow == row.minY {
                 Self.drawPlus(in: row, colors: colors)
             }
@@ -454,6 +484,24 @@ extension DiffTextView {
         if gap(at: point) != nil, point.x < Self.gutter { NSCursor.pointingHand.set() }
         // The text view has just set its I-beam. Over the gutter, where a click starts a comment, it's a hand.
         if hoveredRow != nil, point.x < Self.gutter { NSCursor.pointingHand.set() }
+    }
+
+    /// Selected lines take one note together, from the menu, with the first and last line in the new file.
+    /// A selection of only removed lines counts in the old one.
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = super.menu(for: event) ?? NSMenu()
+        guard let onNoteLines, let storage = textStorage, selectedRange().length > 0 else { return menu }
+        var new: [Int] = []
+        var old: [Int] = []
+        storage.enumerateAttributes(in: selectedRange()) { attributes, _, _ in
+            if let number = attributes[.diffNumber] as? Int { new.append(number) } else if let number = attributes[.diffOldNumber] as? Int { old.append(number) }
+        }
+        let lines = new.isEmpty ? old : new
+        guard let first = lines.min(), let last = lines.max() else { return menu }
+        let title = first == last ? "Add Note on Line \(first)" : "Add Note on Lines \(first)–\(last)"
+        menu.insertItem(ActionMenuItem(title: title) { onNoteLines(first, last, new.isEmpty) }, at: 0)
+        menu.insertItem(.separator(), at: 1)
+        return menu
     }
 
     override func mouseExited(with event: NSEvent) {
