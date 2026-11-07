@@ -4,7 +4,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-for png in "$root"/site/features/*.png "$root"/site/screenshot-review.png; do
+for png in "$root"/site/features/*.png "$root"/site/features/themes/*.png "$root"/site/screenshot-review.png; do
   base="${png%.png}"
   width=$(sips -g pixelWidth "$png" | awk '/pixelWidth/ { print $2 }')
   sips -s format avif "$png" --out "$base.avif" >/dev/null

@@ -37,109 +37,263 @@
     "sameAs": ["https://github.com/snowztech/farol"]
   }
   </script>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is Farol?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Farol is a free, open source terminal app for macOS made for agentic coding, where AI coding agents write the code and you supervise. Each agent runs in its own session, and Farol shows which one is working, which one is waiting for you and which one is done."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is an agentic terminal?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "A terminal built for AI coding agents as well as for typing commands. Agents like Claude Code and Codex already run in a terminal. An agentic terminal app such as Farol adds what you need to supervise several at once: a session per agent, live status, notifications and a review step before you ship."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I run several Claude Code agents in parallel?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Press ⇧⌘N, describe the task and pick an agent. Farol creates a git worktree on a new branch and starts Claude Code or Codex there, so each agent works on its own copy of the repo. Open as many as you like."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which coding agents does Farol work with?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Claude Code, Codex, OpenCode and Pi report their status once connected in Settings → Agents. Any other agent that runs in a terminal works too, and can report its status through Farol's CLI or the terminal bell."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is Farol a fork of Ghostty?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Farol is its own native Mac app that embeds libghostty, the engine behind Ghostty. You get the same rendering and speed, and Farol reads your Ghostty config and themes."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I know when an agent needs me?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The session's dot turns yellow, macOS sends a notification and the Dock icon counts the sessions that are waiting. The menu bar item or the notch panel shows the same from any app."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I answer my agents from my phone?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes, with Farol Remote. Farol for iPhone lists your sessions, notifies you when one waits, and lets you answer Claude Code or Codex with a tap. It's free, end-to-end encrypted and in beta on TestFlight."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I talk to my agents by voice?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "You can dictate your prompts with Farol Voice, our free app that runs on your Mac and types into any app, including Farol. Controlling Farol by voice is coming next."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is Farol free?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Farol is open source under the MIT license. It needs a Mac with Apple silicon and macOS 14 or later."
+      }
+    }
+  ]
+}
+  </script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@snowztech/ui-css@0.6/dist/snowztech-ui.min.css">
   <link rel="stylesheet" href="/footer.css">
   <script>
+    document.documentElement.classList.add("js");
     (function () { var light = matchMedia("(prefers-color-scheme: light)"), root = document.documentElement; function follow() { if (light.matches) root.dataset.theme = "light"; else delete root.dataset.theme; } follow(); light.addEventListener("change", follow); })();
   </script>
   <style>
     body {
-      margin: 0;
-      background: var(--sn-bg);
-      color: var(--sn-fg);
-      font-family: var(--sn-font-mono);
-      font-size: var(--sn-text-base);
-      line-height: var(--sn-leading-normal);
+      margin: 0; background: var(--sn-bg); color: var(--sn-fg);
+      font-family: var(--sn-font-mono); font-size: var(--sn-text-base); line-height: var(--sn-leading-normal);
     }
     a { color: inherit; }
-    .column { max-width: 640px; margin: 0 auto; padding: 0 20px; }
+    .column { max-width: 680px; margin: 0 auto; padding: 0 20px; }
     .wide { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
 
-    .hero { text-align: center; padding-top: 60px; }
-    .hero img { width: 80px; height: 80px; }
-    h1 { font-size: 30px; font-weight: 600; margin: 14px 0 6px; letter-spacing: -0.02em; }
-    .tagline { display: block; color: var(--sn-fg-muted); margin: 6px 0 30px; font-size: var(--sn-text-md); font-weight: 400; letter-spacing: 0; }
+    .hero { text-align: center; padding-top: 56px; }
+    .hero-icon { width: 72px; height: 72px; }
+    .brand { margin: 10px 0 0; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); letter-spacing: 0.14em; text-transform: uppercase; }
+    h1 { margin: 14px 0 12px; font-size: 34px; font-weight: 600; line-height: 1.2; letter-spacing: -0.03em; }
+    .tagline { margin: 0 auto 28px; max-width: 560px; color: var(--sn-fg-muted); font-size: var(--sn-text-md); }
     .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
     .actions .sn-btn { text-decoration: none; transition: opacity var(--sn-base) var(--sn-ease), border-color var(--sn-base) var(--sn-ease); }
     /* ui-css colors every a:hover with the accent, which wins over the button's own text color. */
     .actions a.sn-btn--primary:hover { color: var(--sn-fg-inverse); background: var(--sn-fg); border-color: var(--sn-fg); opacity: 0.85; }
     .actions a.sn-btn--secondary:hover { color: var(--sn-fg); }
-    .fine { color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); margin: 14px 0 0; }
-    .docs-link { margin: 7px 0 0; font-size: var(--sn-text-xs); }
-    .docs-link a { color: var(--sn-fg); cursor: pointer; font-weight: 500; text-decoration-thickness: 1px; text-underline-offset: 3px; }
-    .docs-link a:hover { color: var(--sn-fg-muted); }
+    /* The way most people here install things, ready to copy. */
+    .install {
+      display: inline-flex; align-items: center; gap: 12px; margin: 18px auto 0; padding: 6px 6px 6px 16px; max-width: 100%;
+      border: 1px solid var(--sn-border-subtle); border-radius: 8px; background: var(--sn-bg-elev-1); font-size: var(--sn-text-sm);
+    }
+    .install code { overflow-x: auto; white-space: nowrap; }
+    .install .prompt { color: var(--sn-fg-faint); user-select: none; }
+    .fine { margin: 14px 0 0; color: var(--sn-fg-subtle); font-size: var(--sn-text-xs); }
+    .fine a { color: var(--sn-fg-muted); text-underline-offset: 3px; }
+    .fine a:hover { color: var(--sn-fg); }
 
     /* A faint beam of light behind the window, the lighthouse without saying it. */
-    .showcase { position: relative; margin: 44px auto 88px; }
+    .tour { margin-top: 40px; }
+    .tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-bottom: 20px; }
+    .tab {
+      padding: 7px 14px; border: 1px solid var(--sn-border-subtle); border-radius: 999px; background: transparent;
+      color: var(--sn-fg-muted); font: inherit; font-size: var(--sn-text-sm); cursor: pointer;
+      transition: color 0.15s var(--sn-ease), border-color 0.15s var(--sn-ease), background 0.15s var(--sn-ease);
+    }
+    .tab:hover { color: var(--sn-fg); border-color: var(--sn-border-strong); }
+    .tab[aria-selected="true"] { color: var(--sn-fg); border-color: var(--sn-accent-border); background: var(--sn-accent-soft); }
+    .tab:focus-visible, .swatch:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
+    .showcase { position: relative; }
     .showcase::before {
       content: ""; position: absolute; inset: -12% 8% auto; height: 70%; z-index: 0;
-      background: radial-gradient(ellipse at center, var(--sn-accent-soft), transparent 70%);
-      filter: blur(24px); pointer-events: none;
+      background: radial-gradient(ellipse at center, var(--sn-accent-soft), transparent 70%); filter: blur(24px); pointer-events: none;
     }
+    .stack { position: relative; z-index: 1; display: grid; }
+    /* Each picture sits in the same cell, so the frame keeps one size while they crossfade. */
+    .stack > * { grid-area: 1 / 1; opacity: 0; transition: opacity 0.4s var(--sn-ease); }
+    .stack > [data-active] { opacity: 1; }
     .shot {
-      position: relative; z-index: 1; display: block; width: 100%; height: auto;
-      border-radius: 12px; border: 1px solid var(--sn-border-strong);
-      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+      display: block; width: 100%; height: auto;
+      border: 1px solid var(--sn-border-strong); border-radius: 12px; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
     }
+    .caption { min-height: 3em; max-width: 640px; margin: 22px auto 0; color: var(--sn-fg-muted); font-size: var(--sn-text-sm); text-align: center; }
 
-    .features { list-style: none; margin: 0 auto; display: grid; gap: 28px; }
-    @media (min-width: 760px) { .features { grid-template-columns: repeat(2, 1fr); } }
-    @media (min-width: 980px) { .features { grid-template-columns: repeat(3, 1fr); } }
-    .features h2 { font-size: inherit; font-weight: 500; margin: 0 0 6px; }
-    .features p { color: var(--sn-fg-muted); font-size: var(--sn-text-sm); margin: 0; }
-    .faq { margin-top: 96px; }
-    .faq h2 { font-size: 20px; font-weight: 500; margin: 0 0 20px; letter-spacing: -0.01em; text-align: center; }
-    .faq h3 { font-size: inherit; font-weight: 500; margin: 28px 0 6px; }
-    .faq p { color: var(--sn-fg-muted); font-size: var(--sn-text-sm); margin: 0; }
+    .section-title { margin: 0 0 10px; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; text-align: center; }
+    .section-lede { max-width: 560px; margin: 0 auto 24px; color: var(--sn-fg-muted); font-size: var(--sn-text-sm); text-align: center; }
+    .themes { margin-top: 96px; }
+    .swatches { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 24px; }
+    .swatch {
+      display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border: 1px solid var(--sn-border-subtle);
+      border-radius: 999px; background: transparent; color: var(--sn-fg-muted); font: inherit; font-size: var(--sn-text-sm); cursor: pointer;
+      transition: color 0.15s var(--sn-ease), border-color 0.15s var(--sn-ease);
+    }
+    .swatch:hover, .swatch[aria-checked="true"] { color: var(--sn-fg); border-color: var(--sn-border-strong); }
+    .swatch[aria-checked="true"] { border-color: var(--accent); }
+    .chip { position: relative; width: 20px; height: 20px; border-radius: 50%; background: var(--bg); box-shadow: inset 0 0 0 1px var(--sn-border-strong); }
+    .chip::after { content: ""; position: absolute; right: 3px; bottom: 3px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
 
     .reel { margin: 96px auto 0; text-align: center; }
-    .reel h2 { font-size: 20px; font-weight: 500; margin: 0 0 20px; letter-spacing: -0.01em; }
     .reel-frame { position: relative; }
     .reel-frame::before {
       content: ""; position: absolute; inset: -10% 10% auto; height: 72%; z-index: 0;
-      background: radial-gradient(ellipse at center, var(--sn-accent-soft), transparent 72%);
-      filter: blur(32px); opacity: 0.55;
+      background: radial-gradient(ellipse at center, var(--sn-accent-soft), transparent 72%); filter: blur(32px); opacity: 0.55;
     }
     .reel video {
       position: relative; z-index: 1; display: block; width: 100%; height: auto;
-      border: 1px solid var(--sn-border-strong); border-radius: 12px; background: #000;
-      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--sn-border-strong); border-radius: 12px; background: #000; box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
     }
 
+    .faq { margin-top: 96px; }
+    .faq details { border-bottom: 1px solid var(--sn-border-subtle); }
+    .faq summary {
+      display: flex; justify-content: space-between; gap: 16px; padding: 16px 0; cursor: pointer; list-style: none; font-weight: 500;
+    }
+    .faq summary::-webkit-details-marker { display: none; }
+    .faq summary::after { content: "+"; color: var(--sn-fg-subtle); transition: transform 0.2s var(--sn-ease); }
+    .faq details[open] summary::after { transform: rotate(45deg); }
+    .faq summary:hover { color: var(--sn-fg); }
+    .faq details p { margin: 0; padding: 0 0 18px; color: var(--sn-fg-muted); font-size: var(--sn-text-sm); }
+    .faq a { color: var(--sn-fg); text-underline-offset: 3px; }
+
+    /* Sections rise into place once, as they scroll in. */
+    .js .reveal { opacity: 0; transform: translateY(10px); transition: opacity 0.6s var(--sn-ease), transform 0.6s var(--sn-ease); }
+    .js .reveal.in { opacity: 1; transform: none; }
+    @media (max-width: 600px) {
+      .hero { padding-top: 40px; }
+      h1 { font-size: 27px; }
+      .tab, .swatch { font-size: var(--sn-text-xs); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      .js .reveal { opacity: 1; transform: none; }
+    }
   </style>
 </head>
 <body>
   <main>
     <section class="hero column">
-      <img src="icon.png" alt="Farol icon">
-      <h1>Farol <span class="tagline">A fast macOS terminal for Claude Code, Codex and other AI coding agents.</span></h1>
+      <img class="hero-icon" src="icon.png" alt="">
+      <p class="brand">Farol</p>
+      <h1>Run your coding agents side by side. Know which one needs you.</h1>
+      <p class="tagline">A fast, native macOS terminal for Claude Code, Codex and other AI coding agents, built on libghostty.</p>
       <div class="actions">
         <a class="sn-btn sn-btn--primary sn-btn--lg" href="https://github.com/snowztech/farol/releases/latest/download/Farol.dmg">Download for Mac</a>
         <a class="sn-btn sn-btn--secondary sn-btn--lg" href="https://github.com/snowztech/farol">GitHub</a>
       </div>
-      <p class="fine">Apple silicon, macOS 14+. Free and open source.</p>
-      <p class="docs-link"><a href="docs">Read the docs →</a></p>
+      <div class="install"><code><span class="prompt">$ </span>brew install --cask snowztech/tap/farol</code><button class="sn-copy-btn" type="button" aria-label="Copy the command"></button></div>
+      <p class="fine">Free and open source, MIT. Apple silicon, macOS 14+. <a href="docs">Read the docs</a> · <a href="https://github.com/snowztech/farol/blob/main/CHANGELOG.md">What's new</a></p>
     </section>
 
-    <div class="showcase wide">
-      <picture>
-        <source srcset="screenshot-review.avif" type="image/avif">
-        <img class="shot" src="screenshot-review.png" width="2540" height="1520" fetchpriority="high"
-             alt="Farol with a project open in the sidebar, its sessions working, waiting for you and done, a folded second project and tasks for later below, Claude Code reviewing the change in the terminal, and the review panel with a note for the agent">
-      </picture>
-    </div>
+    <section class="tour wide" aria-label="What Farol does">
+      <div class="tabs" role="tablist" aria-label="Features">
+        <button class="tab" type="button" role="tab" id="tab-review" aria-controls="tour-shot" aria-selected="true" tabindex="0" data-caption="Every changed file as one diff. Leave a note for the agent on any line, or commit, push and open a pull request on GitHub or GitLab.">Review and ship</button>
+        <button class="tab" type="button" role="tab" id="tab-glance" aria-controls="tour-shot" aria-selected="false" tabindex="-1" data-caption="Each agent in its own session, on your Mac or your servers. A dot says which one works, which one needs you and which one is done, and the menu bar or the notch says it from any app.">Every agent at a glance</button>
+        <button class="tab" type="button" role="tab" id="tab-task" aria-controls="tour-shot" aria-selected="false" tabindex="-1" data-caption="Describe it and pick an agent. Farol opens a git worktree on a new branch from the default one and starts the agent there, so agents never touch each other&#x27;s files. Or set it to run later.">A task in one step</button>
+        <button class="tab" type="button" role="tab" id="tab-files" aria-controls="tour-shot" aria-selected="false" tabindex="-1" data-caption="The project as a tree beside your agent, an editor with tabs and go to definition, and search across every file.">Files and search</button>
+        <button class="tab" type="button" role="tab" id="tab-conflicts" aria-controls="tour-shot" aria-selected="false" tabindex="-1" data-caption="When a merge or rebase stops, settle it in three columns, yours, the result and theirs, one change at a time.">Merge conflicts</button>
+      </div>
+      <div class="showcase">
+        <div class="stack" id="tour-shot" role="tabpanel" aria-labelledby="tab-review">
+          <div data-active data-key="review"><picture><source type="image/avif" srcset="screenshot-review-half.avif 1270w, screenshot-review.avif 2540w" sizes="(max-width: 1080px) calc(100vw - 40px), 1040px"><img class="shot" src="screenshot-review.png" width="2540" height="1520" fetchpriority="high" alt="Farol with a project open in the sidebar, its sessions working, waiting for you and done, Claude Code reviewing the change in the terminal, and the review panel with a note for the agent"></picture></div>
+          <div data-key="glance"><picture><source type="image/avif" data-srcset="features/agent-status-half.avif 1270w, features/agent-status.avif 2540w" sizes="(max-width: 1080px) calc(100vw - 40px), 1040px"><img class="shot" data-src="features/agent-status.png" width="2540" height="1520" loading="lazy" decoding="async" alt="The sidebar grouped by project, with sessions working, waiting for you with the agent&#x27;s question and done, agents on two servers, and tasks for later"></picture></div>
+          <div data-key="task"><picture><source type="image/avif" data-srcset="features/new-task-half.avif 1270w, features/new-task.avif 2540w" sizes="(max-width: 1080px) calc(100vw - 40px), 1040px"><img class="shot" data-src="features/new-task.png" width="2540" height="1520" loading="lazy" decoding="async" alt="The New Task sheet: the task typed in, a branch made from it, Claude Code picked, and Now beside Start for when it runs"></picture></div>
+          <div data-key="files"><picture><source type="image/avif" data-srcset="features/files-half.avif 1270w, features/files.avif 2540w" sizes="(max-width: 1080px) calc(100vw - 40px), 1040px"><img class="shot" data-src="features/files.png" width="2540" height="1520" loading="lazy" decoding="async" alt="The files panel with src/queue.ts open in the editor beside Claude Code"></picture></div>
+          <div data-key="conflicts"><picture><source type="image/avif" data-srcset="features/conflicts-half.avif 1270w, features/conflicts.avif 2540w" sizes="(max-width: 1080px) calc(100vw - 40px), 1040px"><img class="shot" data-src="features/conflicts.png" width="2540" height="1520" loading="lazy" decoding="async" alt="Merging main into a branch, stopped on a conflict, in three columns: yours, the editable result and the incoming one"></picture></div>
+        </div>
+      </div>
+      <p class="caption" aria-live="polite">Every changed file as one diff. Leave a note for the agent on any line, or commit, push and open a pull request on GitHub or GitLab.</p>
+    </section>
 
-    <ul class="features wide">
-      <li><h2>Every agent at a glance</h2><p>Run Claude Code and Codex sessions side by side. The sidebar shows which agent is working, which one needs you and which one is done.</p></li>
-      <li><h2>From any app</h2><p>The lighthouse in the menu bar, or a panel at the notch, keeps you posted while you work elsewhere.</p></li>
-      <li><h2>Review and ship</h2><p>Every changed file as a diff. Commit, push and open a pull request from there, on GitHub or GitLab.</p></li>
-      <li><h2>Files and git graph</h2><p>The project as a tree, a light editor for quick fixes, and a graph of every branch and commit.</p></li>
-      <li><h2>A task in one step</h2><p>Describe it and pick an agent. Farol opens a git worktree on a new branch and starts the agent on it, so parallel agents never touch each other's files.</p></li>
-      <li><h2>Built on libghostty</h2><p>Ghostty's speed, themes and config, in a native Mac app.</p></li>
-    </ul>
+    <section class="themes wide reveal" aria-labelledby="themes-title">
+      <h2 class="section-title" id="themes-title">Eight themes, or your own</h2>
+      <p class="section-lede">Farol's themes, any of Ghostty's, or one you write. Turn on Match system appearance and it follows macOS from light to dark.</p>
+      <div class="swatches" role="radiogroup" aria-label="Themes">
+        <button class="swatch" type="button" role="radio" aria-checked="true" tabindex="0" data-key="beam" style="--bg: #0d1018; --accent: #71adff"><span class="chip" aria-hidden="true"></span>Farol Beam</button>
+        <button class="swatch" type="button" role="radio" aria-checked="false" tabindex="-1" data-key="dark" style="--bg: #08090c; --accent: #e6e6e8"><span class="chip" aria-hidden="true"></span>Farol Dark</button>
+        <button class="swatch" type="button" role="radio" aria-checked="false" tabindex="-1" data-key="fog" style="--bg: #22262d; --accent: #a9b2bd"><span class="chip" aria-hidden="true"></span>Farol Fog</button>
+        <button class="swatch" type="button" role="radio" aria-checked="false" tabindex="-1" data-key="navy" style="--bg: #0d1730; --accent: #7fa7ff"><span class="chip" aria-hidden="true"></span>Farol Navy</button>
+        <button class="swatch" type="button" role="radio" aria-checked="false" tabindex="-1" data-key="dusk" style="--bg: #1d1a23; --accent: #f4c56b"><span class="chip" aria-hidden="true"></span>Farol Dusk</button>
+        <button class="swatch" type="button" role="radio" aria-checked="false" tabindex="-1" data-key="ember" style="--bg: #262220; --accent: #f0883e"><span class="chip" aria-hidden="true"></span>Farol Ember</button>
+        <button class="swatch" type="button" role="radio" aria-checked="false" tabindex="-1" data-key="dawn" style="--bg: #f8f4ec; --accent: #b06d0c"><span class="chip" aria-hidden="true"></span>Farol Dawn</button>
+        <button class="swatch" type="button" role="radio" aria-checked="false" tabindex="-1" data-key="light" style="--bg: #f6f7f9; --accent: #1f66d6"><span class="chip" aria-hidden="true"></span>Farol Light</button>
+      </div>
+      <div class="showcase">
+        <div class="stack" id="theme-shot">
+          <div data-active data-key="beam"><picture><source type="image/avif" srcset="features/themes/beam-half.avif 1270w, features/themes/beam.avif 2540w" sizes="(max-width: 1080px) calc(100vw - 40px), 1040px"><img class="shot" src="features/themes/beam.png" width="2540" height="1520" loading="lazy" decoding="async" alt="Farol in its Beam theme, with the review panel open beside Claude Code"></picture></div>
+          <div data-key="dark"><picture><source type="image/avif" data-srcset="features/themes/dark-half.avif 1270w, features/themes/dark.avif 2540w" sizes="(max-width: 1080px) calc(100vw - 40px), 1040px"><img class="shot" data-src="features/themes/dark.png" width="2540" height="1520" loading="lazy" decoding="async" alt="Farol in its Dark theme, with the review panel open beside Claude Code"></picture></div>
+          <div data-key="fog"><picture><source type="image/avif" data-srcset="features/themes/fog-half.avif 1270w, features/themes/fog.avif 2540w" sizes="(max-width: 1080px) calc(100vw - 40px), 1040px"><img class="shot" data-src="features/themes/fog.png" width="2540" height="1520" loading="lazy" decoding="async" alt="Farol in its Fog theme, with the review panel open beside Claude Code"></picture></div>
+          <div data-key="navy"><picture><source type="image/avif" data-srcset="features/themes/navy-half.avif 1270w, features/themes/navy.avif 2540w" sizes="(max-width: 1080px) calc(100vw - 40px), 1040px"><img class="shot" data-src="features/themes/navy.png" width="2540" height="1520" loading="lazy" decoding="async" alt="Farol in its Navy theme, with the review panel open beside Claude Code"></picture></div>
+          <div data-key="dusk"><picture><source type="image/avif" data-srcset="features/themes/dusk-half.avif 1270w, features/themes/dusk.avif 2540w" sizes="(max-width: 1080px) calc(100vw - 40px), 1040px"><img class="shot" data-src="features/themes/dusk.png" width="2540" height="1520" loading="lazy" decoding="async" alt="Farol in its Dusk theme, with the review panel open beside Claude Code"></picture></div>
+          <div data-key="ember"><picture><source type="image/avif" data-srcset="features/themes/ember-half.avif 1270w, features/themes/ember.avif 2540w" sizes="(max-width: 1080px) calc(100vw - 40px), 1040px"><img class="shot" data-src="features/themes/ember.png" width="2540" height="1520" loading="lazy" decoding="async" alt="Farol in its Ember theme, with the review panel open beside Claude Code"></picture></div>
+          <div data-key="dawn"><picture><source type="image/avif" data-srcset="features/themes/dawn-half.avif 1270w, features/themes/dawn.avif 2540w" sizes="(max-width: 1080px) calc(100vw - 40px), 1040px"><img class="shot" data-src="features/themes/dawn.png" width="2540" height="1520" loading="lazy" decoding="async" alt="Farol in its Dawn theme, with the review panel open beside Claude Code"></picture></div>
+          <div data-key="light"><picture><source type="image/avif" data-srcset="features/themes/light-half.avif 1270w, features/themes/light.avif 2540w" sizes="(max-width: 1080px) calc(100vw - 40px), 1040px"><img class="shot" data-src="features/themes/light.png" width="2540" height="1520" loading="lazy" decoding="async" alt="Farol in its Light theme, with the review panel open beside Claude Code"></picture></div>
+        </div>
+      </div>
+    </section>
 
-    <section class="reel wide" aria-labelledby="reel-title">
-      <h2 id="reel-title">See Farol in motion</h2>
+    <section class="reel wide reveal" aria-labelledby="reel-title">
+      <h2 class="section-title" id="reel-title">See Farol in motion</h2>
       <div class="reel-frame">
         <video controls playsinline preload="metadata" poster="farol-reel-poster.jpg"
                aria-label="A 40-second tour of Farol">
@@ -149,35 +303,44 @@
       </div>
     </section>
 
-    <section class="faq column" aria-labelledby="faq-title">
-      <h2 id="faq-title">Questions</h2>
-
-      <h3>What is Farol?</h3>
-      <p>Farol is a free, open source terminal app for macOS made for agentic coding, where AI coding agents write the code and you supervise. Each agent runs in its own session, and Farol shows which one is working, which one is waiting for you and which one is done.</p>
-
-      <h3>What is an agentic terminal?</h3>
-      <p>A terminal built for AI coding agents as well as for typing commands. Agents like Claude Code and Codex already run in a terminal. An agentic terminal app such as Farol adds what you need to supervise several at once: a session per agent, live status, notifications and a review step before you ship.</p>
-
-      <h3>How do I run several Claude Code agents in parallel?</h3>
-      <p>Press ⇧⌘N, describe the task and pick an agent. Farol creates a git worktree on a new branch and starts Claude Code or Codex there, so each agent works on its own copy of the repo. Open as many as you like.</p>
-
-      <h3>Which coding agents does Farol work with?</h3>
-      <p>Claude Code and Codex report their status once connected in Settings → Agents. Any other agent that runs in a terminal works too, and can report its status through Farol's CLI or the terminal bell.</p>
-
-      <h3>Is Farol a fork of Ghostty?</h3>
-      <p>No. Farol is its own native Mac app that embeds libghostty, the engine behind Ghostty. You get the same rendering and speed, and Farol reads your Ghostty config and themes.</p>
-
-      <h3>How do I know when an agent needs me?</h3>
-      <p>The session's dot turns yellow, macOS sends a notification and the Dock icon counts the sessions that are waiting. The menu bar item or the notch panel shows the same from any app.</p>
-
-      <h3>Can I answer my agents from my phone?</h3>
-      <p>Yes, with <a href="remote">Farol Remote</a>. Farol for iPhone lists your sessions, notifies you when one waits, and lets you answer Claude Code or Codex with a tap. It's end-to-end encrypted and in beta on TestFlight.</p>
-
-      <h3>Can I talk to my agents by voice?</h3>
-      <p>You can dictate your prompts with <a href="https://voice.farol.sh">Farol Voice</a>, our free app that runs on your Mac and types into any app, including Farol. Controlling Farol by voice is coming next.</p>
-
-      <h3>Is Farol free?</h3>
-      <p>Yes. Farol is open source under the MIT license. It needs a Mac with Apple silicon and macOS 14 or later.</p>
+    <section class="faq column reveal" aria-labelledby="faq-title">
+      <h2 class="section-title" id="faq-title">Questions</h2>
+      <details>
+        <summary>What is Farol?</summary>
+        <p>Farol is a free, open source terminal app for macOS made for agentic coding, where AI coding agents write the code and you supervise. Each agent runs in its own session, and Farol shows which one is working, which one is waiting for you and which one is done.</p>
+      </details>
+      <details>
+        <summary>What is an agentic terminal?</summary>
+        <p>A terminal built for AI coding agents as well as for typing commands. Agents like Claude Code and Codex already run in a terminal. An agentic terminal app such as Farol adds what you need to supervise several at once: a session per agent, live status, notifications and a review step before you ship.</p>
+      </details>
+      <details>
+        <summary>How do I run several Claude Code agents in parallel?</summary>
+        <p>Press ⇧⌘N, describe the task and pick an agent. Farol creates a git worktree on a new branch and starts Claude Code or Codex there, so each agent works on its own copy of the repo. Open as many as you like.</p>
+      </details>
+      <details>
+        <summary>Which coding agents does Farol work with?</summary>
+        <p>Claude Code, Codex, OpenCode and Pi report their status once connected in Settings → Agents. Any other agent that runs in a terminal works too, and can report its status through Farol's CLI or the terminal bell.</p>
+      </details>
+      <details>
+        <summary>Is Farol a fork of Ghostty?</summary>
+        <p>No. Farol is its own native Mac app that embeds libghostty, the engine behind Ghostty. You get the same rendering and speed, and Farol reads your Ghostty config and themes.</p>
+      </details>
+      <details>
+        <summary>How do I know when an agent needs me?</summary>
+        <p>The session's dot turns yellow, macOS sends a notification and the Dock icon counts the sessions that are waiting. The menu bar item or the notch panel shows the same from any app.</p>
+      </details>
+      <details>
+        <summary>Can I answer my agents from my phone?</summary>
+        <p>Yes, with <a href="remote">Farol Remote</a>. Farol for iPhone lists your sessions, notifies you when one waits, and lets you answer Claude Code or Codex with a tap. It's free, end-to-end encrypted and in beta on TestFlight.</p>
+      </details>
+      <details>
+        <summary>Can I talk to my agents by voice?</summary>
+        <p>You can dictate your prompts with <a href="https://voice.farol.sh">Farol Voice</a>, our free app that runs on your Mac and types into any app, including Farol. Controlling Farol by voice is coming next.</p>
+      </details>
+      <details>
+        <summary>Is Farol free?</summary>
+        <p>Yes. Farol is open source under the MIT license. It needs a Mac with Apple silicon and macOS 14 or later.</p>
+      </details>
     </section>
   </main>
 
@@ -219,5 +382,69 @@
       <span><a href="/privacy">Privacy</a> · <a href="https://github.com/snowztech/farol/blob/main/LICENSE">MIT</a></span>
     </div>
   </footer>
+  <script>
+    // Tabs and swatches crossfade the picture under them. Arrow keys move between them, as in any tab list.
+    function picker(buttons, stack, select) {
+      const shotOf = button => [...stack.children].find(shot => shot.dataset.key === (button.dataset.key ?? button.id.slice(4)));
+      // A picture's sources wait in data attributes until it's about to show, and hovering its button starts the download.
+      const wake = shot => {
+        for (const element of shot.querySelectorAll("[data-src], [data-srcset]")) {
+          if (element.dataset.srcset) element.srcset = element.dataset.srcset;
+          if (element.dataset.src) element.src = element.dataset.src;
+          delete element.dataset.srcset;
+          delete element.dataset.src;
+        }
+      };
+      let latest;
+      const choose = async button => {
+        latest = button;
+        for (const other of buttons) {
+          const on = other === button;
+          other.setAttribute(other.role === "tab" ? "aria-selected" : "aria-checked", on);
+          other.tabIndex = on ? 0 : -1;
+        }
+        select?.(button);
+        const target = shotOf(button);
+        wake(target);
+        // Faded in once decoded, so the frame never fades to a blank picture. A quicker click in between wins.
+        await target.querySelector("img").decode().catch(() => {});
+        if (latest !== button) return;
+        for (const shot of stack.children) shot.toggleAttribute("data-active", shot === target);
+      };
+      buttons.forEach((button, index) => {
+        button.addEventListener("pointerenter", () => wake(shotOf(button)));
+        button.addEventListener("focus", () => wake(shotOf(button)));
+        button.addEventListener("click", () => choose(button));
+        button.addEventListener("keydown", event => {
+          const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+          if (!step) return;
+          event.preventDefault();
+          const next = buttons[(index + step + buttons.length) % buttons.length];
+          next.focus();
+          choose(next);
+        });
+      });
+    }
+    const caption = document.querySelector(".caption");
+    const stack = document.getElementById("tour-shot");
+    picker([...document.querySelectorAll(".tab")], stack, tab => {
+      caption.textContent = tab.dataset.caption;
+      stack.setAttribute("aria-labelledby", tab.id);
+    });
+    picker([...document.querySelectorAll(".swatch")], document.getElementById("theme-shot"));
+
+    const reveal = new IntersectionObserver(entries => {
+      for (const entry of entries) if (entry.isIntersecting) { entry.target.classList.add("in"); reveal.unobserve(entry.target); }
+    }, { rootMargin: "0px 0px -10% 0px" });
+    document.querySelectorAll(".reveal").forEach(element => reveal.observe(element));
+
+    for (const button of document.querySelectorAll(".sn-copy-btn")) {
+      button.addEventListener("click", async () => {
+        await navigator.clipboard.writeText(button.previousElementSibling.textContent.replace(/^\$ /, ""));
+        button.dataset.copied = "true";
+        setTimeout(() => delete button.dataset.copied, 1500);
+      });
+    }
+  </script>
 </body>
 </html>
