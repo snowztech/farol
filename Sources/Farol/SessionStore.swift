@@ -344,6 +344,8 @@ final class Session: ObservableObject, Identifiable {
 final class SessionStore: ObservableObject {
     @Published private(set) var sessions: [Session] = []
     @Published private(set) var selectedID: UUID?
+    /// The one on screen before this one, to go back to when a session outside the list closes, like a server setup.
+    private var previousID: UUID?
 
     private let runtime: TerminalRuntime
     /// Called when a session's terminal view is created, so the window can host it.
@@ -766,6 +768,7 @@ final class SessionStore: ObservableObject {
         let before = session.activity
         session.acknowledge()
         report(session, from: before)
+        if selectedID != session.id { previousID = selectedID }
         selectedID = session.id
         onSelectionChange?(session)
         save()
@@ -806,11 +809,16 @@ final class SessionStore: ObservableObject {
             return
         }
         // Where it sat on screen, so the session that takes its place is the one shown next to it.
-        let shown = ordered.firstIndex { $0.id == session.id } ?? 0
+        let listed = ordered.firstIndex { $0.id == session.id }
+        let shown = listed ?? 0
         session.panes.removeFromSuperview()
         sessions.remove(at: index)
         if session.id == selectedID {
             let ordered = ordered
+            // A server's session sits outside the list, so the one beside it there means nothing: go back to where you were.
+            if listed == nil, let back = sessions.first(where: { $0.id == previousID }) {
+                return select(back)
+            }
             select(ordered[min(shown, ordered.count - 1)])
         } else {
             save()

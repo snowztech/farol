@@ -104,3 +104,9 @@ import Testing
     #expect(ServerSetup.killWindowArguments(ssh: "vps", window: "@3").suffix(2) == ["vps", "tmux kill-window -t '@3'"])
     #expect(ServerSetup.shell(ssh: "vps").hasSuffix("-t 'vps'"))
 }
+
+@Test func namesNewSessionsShellUnlessTaken() {
+    #expect(ServerSetup.sessionName(taken: []) == "shell")
+    #expect(ServerSetup.sessionName(taken: ["root", "shell", "shell-2"]) == "shell-3")
+    #expect(ServerSetup.newWindowArguments(ssh: "vps", name: "shell").last == "tmux new-session -d -s 'shell' -P -F '#{window_id}'")
+}

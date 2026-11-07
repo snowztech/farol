@@ -109,14 +109,21 @@ public enum ServerSetup {
         "\(ssh) -t \(NewTask.shellQuoted(server)) " + NewTask.shellQuoted("TERM=xterm-256color tmux attach-session -t " + NewTask.shellQuoted(window))
     }
 
+    /// The name a new tmux session gets, so the sidebar says "shell" rather than tmux's own "2". Not one the server already has.
+    public static func sessionName(taken: [String]) -> String {
+        let names = Set(taken)
+        return (["shell"] + (2...99).map { "shell-\($0)" }).first { !names.contains($0) } ?? "shell-\(UUID().uuidString.prefix(4))"
+    }
+
     /// Makes a tmux session on the server and prints its window, with no terminal, so the session opened next knows which it is.
-    public static func newWindowArguments(ssh server: String) -> [String] {
-        sshOptions + ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", server, "tmux new-session -d -P -F '#{window_id}'"]
+    public static func newWindowArguments(ssh server: String, name: String) -> [String] {
+        sshOptions + ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", server,
+                      "tmux new-session -d -s \(NewTask.shellQuoted(name)) -P -F '#{window_id}'"]
     }
 
     /// A new tmux session on the server in this terminal, for when ssh can't run without one, like a host that asks for a password.
-    public static func newSession(ssh server: String) -> String {
-        "\(ssh) -t \(NewTask.shellQuoted(server)) 'TERM=xterm-256color tmux new-session'"
+    public static func newSession(ssh server: String, name: String) -> String {
+        "\(ssh) -t \(NewTask.shellQuoted(server)) " + NewTask.shellQuoted("TERM=xterm-256color tmux new-session -s " + NewTask.shellQuoted(name))
     }
 
     /// A plain shell on the server, for a pane split off a server session. tmux isn't asked, so it adds no row to the sidebar.

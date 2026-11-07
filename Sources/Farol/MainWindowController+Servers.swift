@@ -80,10 +80,11 @@ extension MainWindowController {
     /// A new tmux session on the server, made first without a terminal so the one opened next knows its window.
     /// ssh that needs a password can't answer without one, so that case opens a plain ssh session instead.
     private func newServerSession(on server: Server) {
+        let name = ServerSetup.sessionName(taken: servers.state(of: server).sessions.map(\.name))
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let ssh = Process()
             ssh.executableURL = URL(fileURLWithPath: "/usr/bin/ssh")
-            ssh.arguments = ServerSetup.newWindowArguments(ssh: server.ssh)
+            ssh.arguments = ServerSetup.newWindowArguments(ssh: server.ssh, name: name)
             let output = Pipe()
             ssh.standardOutput = output
             ssh.standardError = FileHandle.nullDevice
@@ -95,8 +96,8 @@ extension MainWindowController {
                 ? String(decoding: printed, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines) : nil
             DispatchQueue.main.async {
                 guard let self else { return }
-                if let window = made, ServerSetup.isWindow(window) { return self.openServerWindow(server, window) }
-                self.store.create(run: ServerSetup.newSession(ssh: server.ssh))
+                if let window = made, ServerSetup.isWindow(window) { return self.openServerWindow(server, window, named: name) }
+                self.store.create(run: ServerSetup.newSession(ssh: server.ssh, name: name))
             }
         }
     }

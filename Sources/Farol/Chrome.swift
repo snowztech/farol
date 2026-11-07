@@ -288,6 +288,11 @@ private struct SessionMenu: View {
         } label: {
             HStack(spacing: 5) {
                 Text(session.displayName)
+                // What the sidebar row says under its name, so two sessions both called "dev" can be told apart here too.
+                if let detail = session.serverWindow == nil ? (session.remoteLocation ?? session.branch ?? session.location) : nil {
+                    Text(detail).font(.system(size: 11, design: .monospaced)).foregroundStyle(p.muted.opacity(0.8))
+                        .lineLimit(1).truncationMode(.middle).frame(maxWidth: 220)
+                }
                 Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
             }
             .foregroundStyle(hovering || open ? p.text : p.muted)
