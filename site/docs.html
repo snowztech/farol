@@ -143,6 +143,22 @@
     }
     .phone-shot { width: 300px; max-width: 100%; border-radius: 28px; }
     .narrow-shot { width: 268px; max-width: 100%; }
+    /* The themes, as on the landing: pick one and its picture fades in over the last. */
+    .swatches { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 20px; }
+    .swatch {
+      display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px 4px 4px; border: 1px solid var(--sn-border-subtle);
+      border-radius: 999px; background: transparent; color: var(--sn-fg-muted); font: inherit; font-size: var(--sn-text-xs); cursor: pointer;
+      transition: color 0.15s var(--sn-ease), border-color 0.15s var(--sn-ease);
+    }
+    .swatch:hover, .swatch[aria-checked="true"] { color: var(--sn-fg); border-color: var(--sn-border-strong); }
+    .swatch[aria-checked="true"] { border-color: var(--accent); }
+    .swatch:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 3px; }
+    .chip { position: relative; width: 16px; height: 16px; border-radius: 50%; background: var(--bg); box-shadow: inset 0 0 0 1px var(--sn-border-strong); }
+    .chip::after { content: ""; position: absolute; right: 2px; bottom: 2px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+    .theme-line { margin: 14px 0 0; }
+    .stack { display: grid; }
+    .stack > * { grid-area: 1 / 1; opacity: 0; transition: opacity 0.45s var(--sn-ease); }
+    .stack > [data-active] { opacity: 1; }
     picture { display: block; }
     /* Screenshots and examples rise into place once, as they scroll in. */
     .js .reveal { opacity: 0; transform: translateY(8px); transition: opacity 0.5s var(--sn-ease), transform 0.5s var(--sn-ease); }
@@ -356,7 +372,29 @@ font-size = 14</code></pre>
           <p>The file uses Ghostty's configuration format, so options from the <a href="https://ghostty.org/docs/config">Ghostty documentation</a> work in Farol.</p>
           <p>To use one theme in Light Mode and another in Dark Mode, turn on <strong>Match system appearance</strong> in Settings → Appearance, or name one for each:</p>
           <pre><code>theme = light:Farol Dawn,dark:Farol Dusk</code></pre>
-          <picture><source type="image/avif" srcset="features/themes-all.avif"><img class="doc-shot reveal" src="features/themes-all.png" width="1600" height="1915" alt="The same Farol window in each of its eight themes: Beam, Dark, Fog, Navy, Dusk, Ember, Dawn and Light" loading="lazy" decoding="async"></picture>
+          <h3 id="themes">Themes</h3>
+          <p>Farol has eight themes of its own: six dark, plus Dawn and Light for light mode. Every Ghostty theme works too. Pick one to see it, with the line that sets it:</p>
+          <div class="swatches" role="radiogroup" aria-label="Farol's themes">
+            <button class="swatch" type="button" role="radio" aria-checked="true" tabindex="0" data-key="beam" style="--bg: #0d1018; --accent: #71adff"><span class="chip" aria-hidden="true"></span>Beam</button>
+            <button class="swatch" type="button" role="radio" aria-checked="false" tabindex="-1" data-key="dark" style="--bg: #08090c; --accent: #e6e6e8"><span class="chip" aria-hidden="true"></span>Dark</button>
+            <button class="swatch" type="button" role="radio" aria-checked="false" tabindex="-1" data-key="fog" style="--bg: #22262d; --accent: #a9b2bd"><span class="chip" aria-hidden="true"></span>Fog</button>
+            <button class="swatch" type="button" role="radio" aria-checked="false" tabindex="-1" data-key="navy" style="--bg: #0d1730; --accent: #7fa7ff"><span class="chip" aria-hidden="true"></span>Navy</button>
+            <button class="swatch" type="button" role="radio" aria-checked="false" tabindex="-1" data-key="dusk" style="--bg: #1d1a23; --accent: #f4c56b"><span class="chip" aria-hidden="true"></span>Dusk</button>
+            <button class="swatch" type="button" role="radio" aria-checked="false" tabindex="-1" data-key="ember" style="--bg: #262220; --accent: #f0883e"><span class="chip" aria-hidden="true"></span>Ember</button>
+            <button class="swatch" type="button" role="radio" aria-checked="false" tabindex="-1" data-key="dawn" style="--bg: #f8f4ec; --accent: #b06d0c"><span class="chip" aria-hidden="true"></span>Dawn</button>
+            <button class="swatch" type="button" role="radio" aria-checked="false" tabindex="-1" data-key="light" style="--bg: #f6f7f9; --accent: #1f66d6"><span class="chip" aria-hidden="true"></span>Light</button>
+          </div>
+          <pre class="theme-line"><code>theme = Farol Beam</code></pre>
+          <div class="stack" id="theme-shot">
+            <div data-active data-key="beam"><picture><source type="image/avif" srcset="features/themes/beam-half.avif 1270w, features/themes/beam.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot" src="features/themes/beam.png" width="2540" height="1520" loading="lazy" decoding="async" alt="Farol in its Beam theme, with the review panel open beside Claude Code"></picture></div>
+            <div data-key="dark"><picture><source type="image/avif" data-srcset="features/themes/dark-half.avif 1270w, features/themes/dark.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot" data-src="features/themes/dark.png" width="2540" height="1520" loading="lazy" decoding="async" alt="Farol in its Dark theme, with the review panel open beside Claude Code"></picture></div>
+            <div data-key="fog"><picture><source type="image/avif" data-srcset="features/themes/fog-half.avif 1270w, features/themes/fog.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot" data-src="features/themes/fog.png" width="2540" height="1520" loading="lazy" decoding="async" alt="Farol in its Fog theme, with the review panel open beside Claude Code"></picture></div>
+            <div data-key="navy"><picture><source type="image/avif" data-srcset="features/themes/navy-half.avif 1270w, features/themes/navy.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot" data-src="features/themes/navy.png" width="2540" height="1520" loading="lazy" decoding="async" alt="Farol in its Navy theme, with the review panel open beside Claude Code"></picture></div>
+            <div data-key="dusk"><picture><source type="image/avif" data-srcset="features/themes/dusk-half.avif 1270w, features/themes/dusk.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot" data-src="features/themes/dusk.png" width="2540" height="1520" loading="lazy" decoding="async" alt="Farol in its Dusk theme, with the review panel open beside Claude Code"></picture></div>
+            <div data-key="ember"><picture><source type="image/avif" data-srcset="features/themes/ember-half.avif 1270w, features/themes/ember.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot" data-src="features/themes/ember.png" width="2540" height="1520" loading="lazy" decoding="async" alt="Farol in its Ember theme, with the review panel open beside Claude Code"></picture></div>
+            <div data-key="dawn"><picture><source type="image/avif" data-srcset="features/themes/dawn-half.avif 1270w, features/themes/dawn.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot" data-src="features/themes/dawn.png" width="2540" height="1520" loading="lazy" decoding="async" alt="Farol in its Dawn theme, with the review panel open beside Claude Code"></picture></div>
+            <div data-key="light"><picture><source type="image/avif" data-srcset="features/themes/light-half.avif 1270w, features/themes/light.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot" data-src="features/themes/light.png" width="2540" height="1520" loading="lazy" decoding="async" alt="Farol in its Light theme, with the review panel open beside Claude Code"></picture></div>
+          </div>
 
           <h3>Custom themes</h3>
           <p>Put Ghostty theme files in <code>~/.config/farol/themes</code>. They appear in Settings → Appearance → Theme after Farol's built-in themes. The <strong>Themes folder</strong> button opens the right location.</p>
@@ -445,7 +483,13 @@ font-size = 14</code></pre>
       <span><a href="/privacy">Privacy</a> · <a href="https://github.com/snowztech/farol/blob/main/LICENSE">MIT</a></span>
     </div>
   </footer>
+  <script src="/picker.js"></script>
   <script>
+    const themeLine = document.querySelector(".theme-line code");
+    picker([...document.querySelectorAll(".swatch")], document.getElementById("theme-shot"), swatch => {
+      themeLine.textContent = "theme = Farol " + swatch.textContent.trim();
+    });
+
     // A # link on each heading, to share a part of the page.
     for (const heading of document.querySelectorAll(".content h2, .content h3")) {
       // A section's h2 goes by the section's id. An h3 keeps its own, or gets one from its text.
