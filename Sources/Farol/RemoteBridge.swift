@@ -132,6 +132,8 @@ final class RemoteBridge: ObservableObject {
     init(store: SessionStore, worktrees: WorktreeSettings) {
         self.store = store
         self.worktrees = worktrees
+        // zsh rings on an ambiguous Tab, which is no question when you type from the phone.
+        store.isOpenOnPhone = { [weak self] id in self?.phones.values.contains { $0.terminal == id } ?? false }
         if let saved = UserDefaults.standard.data(forKey: Self.devicesKey) {
             devices = (try? JSONDecoder().decode([PairedDevice].self, from: saved)) ?? []
         }

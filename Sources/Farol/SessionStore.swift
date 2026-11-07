@@ -356,6 +356,8 @@ final class SessionStore: ObservableObject {
     var onPaneExit: ((Session, TerminalView) -> Void)?
     /// Every new terminal, first pane or split, so the window can attach its handlers.
     var onTerminalCreated: ((TerminalView) -> Void)?
+    /// A phone shows this session's terminal, so you see what rang, as when it is selected here.
+    var isOpenOnPhone: (UUID) -> Bool = { _ in false }
 
     /// A session's activity changed, from the old value to the new one. Used for notifications.
     var onActivityChange: ((Session, Session.Activity, Session.Activity) -> Void)?
@@ -834,7 +836,7 @@ final class SessionStore: ObservableObject {
     }
 
     private func flag(_ session: Session?, pane: UUID?) {
-        guard let session, session.id != selectedID, let pane, session.agents[pane]?.reports != true else { return }
+        guard let session, session.id != selectedID, !isOpenOnPhone(session.id), let pane, session.agents[pane]?.reports != true else { return }
         let before = session.activity
         session.bellRang = true
         report(session, from: before)
