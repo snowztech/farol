@@ -120,7 +120,8 @@ final class Scheduler: ObservableObject {
         }
         starting.insert(id)
         store.startTask(schedule.task, in: schedule.repos, with: agent, branch: schedule.branch(on: now),
-                        copyEnvironmentFiles: worktrees.copyEnvironmentFiles, select: due == nil) { [weak self] result in
+                        copyEnvironmentFiles: worktrees.copyEnvironmentFiles,
+                        fromDefaultBranch: worktrees.startFromDefaultBranch, select: due == nil) { [weak self] result in
             guard let self else { return }
             starting.remove(id)
             update(id) { saved in

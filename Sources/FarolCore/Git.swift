@@ -15,6 +15,16 @@ public enum Git {
         try run("/usr/bin/git", arguments, in: directory, trimming: trimming, started: started)
     }
 
+    /// Stops git after `timeout` seconds, for network calls that would otherwise hang on a dead connection.
+    @discardableResult
+    static func run(_ arguments: [String], in directory: String, timeout: TimeInterval) throws -> String {
+        try run(arguments, in: directory) { process in
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
+                if process.isRunning { process.terminate() }
+            }
+        }
+    }
+
     /// Runs any command line tool the same way, as for the forges' own tools.
     /// Some tools report on stderr even when all is well, and `mergingErrors` returns that with the output.
     /// `started` gets the running process, for a caller that may stop it before it ends.

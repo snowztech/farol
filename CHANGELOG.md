@@ -8,6 +8,8 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 - Notes for the agent in the review panel. On your own changes, click the + beside a line, or select lines and right-click, and leave a note. Notes wait under their lines until you send them all to the session's agent in one message with one click, or send one at once with ⇧⌘↩. Each note quotes its lines, so it follows them as the agent edits the file. A sent note fades until you resolve it. The Send button shows the agent it goes to, and with no agent in the session the notes just wait. Notes are kept across launches. On a pull request of the session's own branch, a reviewer's comments go to the agent with Send to Claude Code under them.
 
+- New tasks and worktrees start from the remote's default branch, fetched first, so they no longer build on whatever branch the repo is on. Main, master or develop all work, since Farol asks the remote. The New Task sheet names the branch before you start, like origin/main. To stack on the checked out branch instead, pick Current branch in Settings → Worktrees. The branch doesn't track the default branch, so a push goes to its own branch, and a repo without a remote uses the current branch.
+
 ### Fixed
 
 - A new task on a branch whose worktree folder was deleted by hand no longer fails with "already used by worktree". Farol clears git's record of deleted worktrees before it makes one.

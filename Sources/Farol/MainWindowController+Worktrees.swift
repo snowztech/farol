@@ -13,7 +13,8 @@ extension MainWindowController {
     func newTask() {
         withRepo(purpose: "the new task", orFolderOfRepos: true) { [weak self] directory in
             guard let self, let window = self.window else { return }
-            NewTaskSheet.present(in: window, directory: directory, palette: self.state.palette, start: { branch, command, task, repos in
+            NewTaskSheet.present(in: window, directory: directory, fromDefaultBranch: self.worktreeSettings.startFromDefaultBranch,
+                                 palette: self.state.palette, start: { branch, command, task, repos in
                 self.startWorktreeSession(branch: branch, from: repos, run: command, environment: [NewTask.variable: task])
             }, schedule: { self.scheduler.add($0) })
         }
@@ -68,10 +69,11 @@ extension MainWindowController {
     }
 
     private func askForBranch(from directory: String) {
+        let fromDefaultBranch = worktreeSettings.startFromDefaultBranch
         // Git is asked off the main thread, so a slow repo can't freeze the window before the sheet shows.
         DispatchQueue.global(qos: .userInitiated).async {
             let repo = Git.repoRoot(of: directory).map { URL(fileURLWithPath: $0).lastPathComponent } ?? "repository"
-            let base = Git.branch(of: directory) ?? "the current commit"
+            let base = Worktrees.startPoint(in: directory, fromDefaultBranch: fromDefaultBranch)
             let setup = WorktreeScripts.hasSetup(in: Git.topLevel(of: directory) ?? directory)
             DispatchQueue.main.async { [weak self] in self?.askForBranch(from: directory, repo: repo, base: base, setup: setup) }
         }
@@ -104,7 +106,8 @@ extension MainWindowController {
     /// One repo gets a plain worktree. Several get a task folder with a worktree of each.
     private func startWorktreeSession(branch: String, from repos: [String], run command: String?, environment: [String: String] = [:]) {
         store.createWorktreeSession(branch: branch, from: repos, run: command, environment: environment,
-                                    copyEnvironmentFiles: worktreeSettings.copyEnvironmentFiles) { [weak self] result in
+                                    copyEnvironmentFiles: worktreeSettings.copyEnvironmentFiles,
+                                    fromDefaultBranch: worktreeSettings.startFromDefaultBranch) { [weak self] result in
             if case .failure(let error) = result { self?.showError("Couldn't create the worktree", "\(error)") }
         }
     }

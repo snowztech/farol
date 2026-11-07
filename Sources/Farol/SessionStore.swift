@@ -530,7 +530,7 @@ final class SessionStore: ObservableObject {
     /// Several get a task folder, as New Task makes. What `farol task`, the phone and a schedule start, a schedule naming the `branch`.
     /// `done` gets the session and its branch, which the session itself learns only once git answers.
     func startTask(_ task: String, in directories: [String], with agent: AgentFolder, branch named: String? = nil, copyEnvironmentFiles: Bool,
-                   select: Bool, done: @escaping (Result<(session: Session, branch: String), Error>) -> Void) {
+                   fromDefaultBranch: Bool = false, select: Bool, done: @escaping (Result<(session: Session, branch: String), Error>) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
             let roots = directories.map { Git.repoRoot(of: $0) }
             if let missing = zip(directories, roots).first(where: { $1 == nil })?.0 {
@@ -545,7 +545,8 @@ final class SessionStore: ObservableObject {
             let branch = named.map { NewTask.freeBranch(named: $0, taken: taken) } ?? NewTask.freeBranch(for: task, taken: taken)
             DispatchQueue.main.async { [weak self] in
                 self?.createWorktreeSession(branch: branch, from: repos, run: agent.command() + " \"$\(NewTask.variable)\"",
-                                            environment: [NewTask.variable: task], copyEnvironmentFiles: copyEnvironmentFiles, select: select) {
+                                            environment: [NewTask.variable: task], copyEnvironmentFiles: copyEnvironmentFiles,
+                                            fromDefaultBranch: fromDefaultBranch, select: select) {
                     if case .success(let session) = $0 { session.prompts[session.panes.focused.id] = task }
                     done($0.map { ($0, branch) })
                 }
@@ -556,12 +557,14 @@ final class SessionStore: ObservableObject {
     /// A session in a new worktree on `branch`: a plain worktree for one repo, a task folder with a worktree of each for several.
     /// Checking out a big repo takes a moment, so git runs off the main thread, and `done` is called on it.
     func createWorktreeSession(branch: String, from repos: [String], run command: String?, environment: [String: String] = [:],
-                               copyEnvironmentFiles: Bool, select: Bool = true, done: @escaping (Result<Session, Error>) -> Void) {
+                               copyEnvironmentFiles: Bool, fromDefaultBranch: Bool = false, select: Bool = true, done: @escaping (Result<Session, Error>) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
             let result = Result {
                 repos.count == 1
-                    ? try Worktrees.default.create(branch: branch, from: repos[0], copyEnvironmentFiles: copyEnvironmentFiles)
-                    : try TaskFolders.default.create(branch: branch, repos: repos, copyEnvironmentFiles: copyEnvironmentFiles)
+                    ? try Worktrees.default.create(branch: branch, from: repos[0], copyEnvironmentFiles: copyEnvironmentFiles,
+                                                   fromDefaultBranch: fromDefaultBranch)
+                    : try TaskFolders.default.create(branch: branch, repos: repos, copyEnvironmentFiles: copyEnvironmentFiles,
+                                                     fromDefaultBranch: fromDefaultBranch)
             }
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }

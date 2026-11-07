@@ -9,7 +9,10 @@ struct NewTaskSheet: View {
 
     let directory: String
     let repo: String
+    /// What a new branch starts from, named before anything runs.
     let base: String
+    /// New branches start from the remote's default branch, so `base` holds for a run later too.
+    let fromDefaultBranch: Bool
     /// The repos inside `directory` when it is a folder of them rather than a repo. Empty for a repo.
     let repos: [String]
     /// From inside a repo: its main checkout, and the repos beside it that "Add repos" offers.
@@ -68,7 +71,7 @@ struct NewTaskSheet: View {
     @State private var query = ""
     @FocusState private var searching: Bool
 
-    static func present(in window: NSWindow, directory: String, palette: Palette, start: @escaping (String, String, String, [String]) -> Void,
+    static func present(in window: NSWindow, directory: String, fromDefaultBranch: Bool, palette: Palette, start: @escaping (String, String, String, [String]) -> Void,
                         schedule: @escaping (Schedule) -> Void) {
         // Git is asked off the main thread, so a slow repo can't freeze the window before the sheet shows.
         DispatchQueue.global(qos: .userInitiated).async {
@@ -81,14 +84,14 @@ struct NewTaskSheet: View {
             // The current repo starts from the checkout you are in, which may be a worktree on another branch than its main one.
             if let root { branches[root] = current }
             let repo = URL(fileURLWithPath: root ?? directory).lastPathComponent
-            let base = current ?? "the current commit"
+            let base = Worktrees.startPoint(in: directory, fromDefaultBranch: fromDefaultBranch)
             let expectsTickets = Jira.isSetUp || Forge.detect(in: directory)?.listsIssues == true
             DispatchQueue.main.async { [weak window] in
                 // Checked here too: a second press can arrive while git is still answering the first.
                 guard let window, window.attachedSheet == nil else { return }
                 let sheet = NSWindow(contentRect: .zero, styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: true)
                 let view = NewTaskSheet(
-                    directory: directory, repo: repo, base: base, repos: repos, root: root, checkout: checkout,
+                    directory: directory, repo: repo, base: base, fromDefaultBranch: fromDefaultBranch, repos: repos, root: root, checkout: checkout,
                     siblings: siblings, branches: branches, expectsTickets: expectsTickets,
                     palette: palette, start: start, schedule: schedule,
                     close: { [weak window, weak sheet] in sheet.map { window?.endSheet($0) } })
@@ -142,7 +145,7 @@ struct NewTaskSheet: View {
     private var whenLabel: String { starts.label(at: at, weekdays: weekdays) }
     /// A run later branches from the repo itself, since the worktree you're in may be gone by then.
     private var laterBase: String {
-        guard let root, let checkout, checkout != root else { return base }
+        guard !fromDefaultBranch, let root, let checkout, checkout != root else { return base }
         return "what \(repo) has checked out then"
     }
 

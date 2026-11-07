@@ -51,14 +51,17 @@ public struct Worktrees {
     }
 
     /// Creates a worktree for `branch` from the repo containing `directory`.
-    /// A new branch starts from whatever `directory` has checked out. An existing branch is checked out as is.
-    public func create(branch: String, from directory: String, copyEnvironmentFiles: Bool = false) throws -> String {
+    /// A new branch starts from whatever `directory` has checked out, or from the remote's latest default branch with `fromDefaultBranch`.
+    /// An existing branch is checked out as is.
+    public func create(branch: String, from directory: String, copyEnvironmentFiles: Bool = false,
+                       fromDefaultBranch: Bool = false) throws -> String {
         guard let root = Git.repoRoot(of: directory) else {
             throw GitError(description: "\(directory) is not inside a git repository.")
         }
         let path = base.appendingPathComponent(URL(fileURLWithPath: root).lastPathComponent)
             .appendingPathComponent(Self.folderName(for: branch)).path
-        try Self.add(branch: branch, from: directory, at: path, copyEnvironmentFiles: copyEnvironmentFiles)
+        try Self.add(branch: branch, from: directory, at: path, copyEnvironmentFiles: copyEnvironmentFiles,
+                     fromDefaultBranch: fromDefaultBranch)
         return path
     }
 
@@ -67,8 +70,33 @@ public struct Worktrees {
         branch.replacingOccurrences(of: "/", with: "-")
     }
 
+    /// What a new branch will start from, for the sheets to name before anything runs. Reads only what git already knows, without the network.
+    public static func startPoint(in directory: String, fromDefaultBranch: Bool) -> String {
+        if fromDefaultBranch {
+            if let ref = try? Git.run(["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"], in: directory) { return ref }
+            if (try? Git.run(["remote", "get-url", "origin"], in: directory)) != nil { return "origin's default branch" }
+        }
+        return Git.branch(of: directory) ?? "the current commit"
+    }
+
+    /// The remote's default branch, like `origin/main`, fetched first so a new branch starts from the latest commit.
+    /// Nil without an `origin` that names one. An offline fetch still returns the ref as it was last fetched.
+    static func latestDefaultBranch(in directory: String) -> String? {
+        let head = ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"]
+        if (try? Git.run(head, in: directory)) == nil {
+            // A repo made with `git remote add` rather than cloned has no origin/HEAD until git asks the remote.
+            _ = try? Git.run(["remote", "set-head", "origin", "--auto"], in: directory, timeout: 15)
+        }
+        guard let ref = try? Git.run(head, in: directory), ref.hasPrefix("origin/") else { return nil }
+        _ = try? Git.run(["fetch", "--quiet", "--no-tags", "origin", String(ref.dropFirst("origin/".count))],
+                         in: directory, timeout: 15)
+        return ref
+    }
+
     /// Checks out `branch` of the repo containing `directory` at `path`, creating the branch when it doesn't exist.
-    static func add(branch: String, from directory: String, at path: String, copyEnvironmentFiles: Bool) throws {
+    /// A new branch starts from the remote's latest default branch when `fromDefaultBranch` is set and there is one.
+    static func add(branch: String, from directory: String, at path: String, copyEnvironmentFiles: Bool,
+                    fromDefaultBranch: Bool = false) throws {
         let source = Git.topLevel(of: directory) ?? directory
         guard !FileManager.default.fileExists(atPath: path) else {
             throw GitError(description: "A worktree already exists at \(path).")
@@ -81,6 +109,9 @@ public struct Worktrees {
         let exists = Git.hasBranch(branch, in: directory)
         if exists {
             try Git.run(["worktree", "add", path, branch], in: directory)
+        } else if fromDefaultBranch, let start = latestDefaultBranch(in: directory) {
+            // Without --no-track the branch would track origin/main, and a plain push or pull would aim at main.
+            try Git.run(["worktree", "add", "--no-track", "-b", branch, path, start], in: directory)
         } else {
             try Git.run(["worktree", "add", "-b", branch, path], in: directory)
         }

@@ -53,7 +53,8 @@ public struct TaskFolders {
     }
 
     /// Creates the task folder with a worktree of each repo on `branch`. Either all of them are made or none.
-    public func create(branch: String, repos: [String], copyEnvironmentFiles: Bool = false) throws -> String {
+    public func create(branch: String, repos: [String], copyEnvironmentFiles: Bool = false,
+                       fromDefaultBranch: Bool = false) throws -> String {
         let roots = repos.map { Git.repoRoot(of: $0) ?? $0 }
         if let name = Self.duplicateName(in: roots) {
             throw GitError(description: "Two selected repositories are named \(name). Choose one of them.")
@@ -71,7 +72,8 @@ public struct TaskFolders {
         DispatchQueue.concurrentPerform(iterations: repos.count) { index in
             do {
                 try Worktrees.add(
-                    branch: branch, from: repos[index], at: paths[index], copyEnvironmentFiles: copyEnvironmentFiles)
+                    branch: branch, from: repos[index], at: paths[index], copyEnvironmentFiles: copyEnvironmentFiles,
+                    fromDefaultBranch: fromDefaultBranch)
             } catch {
                 lock.withLock { errors[index] = error }
             }
