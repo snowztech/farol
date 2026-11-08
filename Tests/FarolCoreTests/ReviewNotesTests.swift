@@ -28,10 +28,14 @@ private let before = file(" let a = 1\n-let b = 2\n+let b = 3\n+let c = 4\n let 
     #expect(moved.line == 17 && moved.end == 17 && !moved.lost)
 }
 
-@Test func aNoteIsLostOnceItsLinesAreGone() {
+/// The agent rewrote its line, so the note stays there, marked, instead of leaving the diff. Only without its file is it lost.
+@Test func aNoteStaysWhereItWasOnceItsLinesAreRewritten() {
     let note = ReviewNote(path: "app.swift", line: 12, end: 12, old: false, quote: ["let c = 4"], text: "Name it count")
     let fixed = file(" let a = 1\n-let b = 2\n+let count = 4\n let d = 5")
-    #expect(ReviewNotes.anchor(note, in: [fixed]).lost)
+    let kept = ReviewNotes.anchor(note, in: [fixed])
+    #expect(!kept.lost && kept.changed == true && kept.line == 12)
+    // Anchored again on the next refresh, it doesn't move.
+    #expect(ReviewNotes.anchor(kept, in: [fixed]).line == 12)
     #expect(ReviewNotes.anchor(note, in: []).lost)
 }
 

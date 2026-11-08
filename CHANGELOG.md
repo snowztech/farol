@@ -6,7 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
-- Send notes works with no agent running. The review starts yours in a new session on the same checkout, in the background, with the notes as its first message, and later notes go to that agent. While it works, the notes button shows it, and turns into Resolve once it's done.
+- Send notes works with no agent running. The review starts yours in a new session on the same checkout, in the background, with the notes as its first message, and later notes go to that agent. While it works, the notes button shows it, and turns into Resolve once it's done. A note whose lines the agent rewrote stays where it was, marked "lines changed since", instead of moving to the top.
 - The review follows the agent. While an agent works on the checkout, the review scrolls to each change as it lands, in the file it wrote last, and the new lines light up for a moment. It waits while you scroll, and stays put once the agent stops.
 - A search field on Settings → Shortcuts. Type an action or a key, like split or ⌘K. Words like cmd, shift, opt and ctrl find their symbols.
 - The review can fill the window: click the arrows in its header, or press ⌥⌘↩. The terminal keeps running out of sight at its size, so an agent doesn't redraw, and its status dot and notifications still reach you. The arrows, the shortcut, closing the review or opening a file from it bring the terminal back, and each session remembers it.

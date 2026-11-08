@@ -2085,8 +2085,9 @@ private struct NoteView: View {
     }
 
     private var status: String {
-        guard let sent = note.sentAt else { return "Draft" }
-        return "Sent \(Self.age.localizedString(for: sent, relativeTo: .now))"
+        let changed = note.changed == true ? ", lines changed since" : ""
+        guard let sent = note.sentAt else { return "Draft" + changed }
+        return "Sent \(Self.age.localizedString(for: sent, relativeTo: .now))" + changed
     }
 
     private var place: String {
