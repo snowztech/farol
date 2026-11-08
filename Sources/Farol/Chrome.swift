@@ -32,6 +32,8 @@ final class WindowState: ObservableObject {
     @Published var graphWidth: CGFloat = 0
     /// Zero while the review panel is closed.
     @Published var reviewWidth: CGFloat = 0
+    /// The panel filling the window. The widths above stay what the panels go back to.
+    @Published var expanded: Panels.Expanded?
     let ghosttyConfigPreview: ThemeColors?
     @Published var style = UIStyle.saved {
         didSet { UserDefaults.standard.set(style.rawValue, forKey: UIStyle.key) }
@@ -127,6 +129,7 @@ struct TopBar: View {
     private var filesVisible: Bool { state.filesVisible && !covered }
     private var reviewWidth: CGFloat { covered ? 0 : state.reviewWidth }
     private var graphWidth: CGFloat { covered ? 0 : state.graphWidth }
+    private var expanded: Panels.Expanded? { covered ? nil : state.expanded }
 
     /// Every panel runs up into the bar in its own color, like Mac apps with a sidebar, and the terminal's part matches the terminal.
     @ViewBuilder private func columns(_ p: Palette) -> some View {
@@ -143,9 +146,10 @@ struct TopBar: View {
             Rectangle().fill(p.panel).frame(width: state.sidebarVisible ? state.sidebarWidth - 1 : 0)
             Rectangle().fill(p.line).frame(width: state.sidebarVisible ? 1 : 0)
             Rectangle().fill(p.panel).frame(width: filesVisible ? state.filesWidth - 1 : 0)
-            Rectangle().fill(p.line).frame(width: filesVisible ? 1 : 0)
-            Rectangle().fill(p.background)
-            Rectangle().fill(p.line).frame(width: reviewWidth > 0 ? 1 : 0)
+            Rectangle().fill(p.line).frame(width: filesVisible && expanded == nil ? 1 : 0)
+            // An expanded panel runs on where the terminal was.
+            Rectangle().fill(expanded == .files ? p.panel : p.background)
+            Rectangle().fill(p.line).frame(width: reviewWidth > 0 && expanded == nil ? 1 : 0)
             Rectangle().fill(p.background).frame(width: max(reviewWidth - 1, 0))
             Rectangle().fill(p.line).frame(width: graphWidth > 0 ? 1 : 0)
             Rectangle().fill(p.panel).frame(width: max(graphWidth - 1, 0))

@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- The Review and Files panels can fill the window. Click the arrows in the panel's header, or press ⌥⌘↩ (View → Expand Review). The terminal keeps running out of sight at its size, so an agent doesn't redraw, and its status dot and notifications still reach you. The same arrows, the shortcut, closing the panel or opening a file bring the terminal back. Each session remembers it.
+
 ## [0.66.0] - 2026-11-07
 
 Servers in the sidebar: a VPS's agents next to your own, set up over ssh in one step.

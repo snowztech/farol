@@ -849,6 +849,10 @@ struct Panels: Codable, Equatable {
     var files = false
     var graph = false
     var review = false
+    /// The panel filling the window, with the terminal hidden behind it.
+    var expanded: Expanded?
+
+    enum Expanded: String, Codable { case files, review }
 }
 
 /// What a session keeps between launches.

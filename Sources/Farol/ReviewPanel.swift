@@ -1086,6 +1086,8 @@ struct ReviewPanel: View {
     /// Shows another of the task's repos.
     let pick: (String) -> Void
     let close: () -> Void
+    /// Fills the window with the panel, or gives the terminal back.
+    let expand: () -> Void
     let resize: (CGFloat) -> Void
 
     @State private var dragStart: CGFloat?
@@ -1182,7 +1184,7 @@ struct ReviewPanel: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(p.background)
-        .overlay(alignment: .leading) { edge(p) }
+        .overlay(alignment: .leading) { if state.expanded != .review { edge(p) } }
         .commitSheet(review, palette: p)
         // ⌘F with the bar already open puts the cursor back in it.
         .onChange(of: review.findFocus) { DispatchQueue.main.async { findFocused = true } }
@@ -1234,6 +1236,9 @@ struct ReviewPanel: View {
                 Text("\(review.stat.files) \(review.stat.files == 1 ? "file" : "files")").foregroundStyle(p.muted).fixedSize()
                 Counts(added: review.stat.added, removed: review.stat.removed, palette: p).fixedSize()
             }
+            CloseButton(symbol: state.expanded == .review ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
+                        help: state.expanded == .review ? "Show the terminal (⌥⌘↩)" : "Fill the window (⌥⌘↩)",
+                        palette: p, action: expand)
             CloseButton(help: "Close review (⌥⌘R)", palette: p, action: close)
         }
         .font(.system(size: 12))
