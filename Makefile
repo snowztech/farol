@@ -14,7 +14,7 @@ help:
 	@echo "make lint       style check for comments and docs"
 	@echo "make audit      list code smells, in seconds (needs SwiftLint)"
 	@echo "make unused     list code nothing uses, in minutes (needs SwiftLint)"
-	@echo "make profile    record Farol Dev with Instruments while you use it, PROFILE_SECONDS=30"
+	@echo "make profile    record Farol Dev while you use it and say what stands out, PROFILE_SECONDS=30"
 	@echo "make icon       regenerate the app icon from assets/icon-source.png"
 	@echo "make clean      remove build output (keeps libghostty)"
 	@echo "make shots      open Farol Shots on a staged scene, SCENE=sidebar or review"

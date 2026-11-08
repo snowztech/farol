@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Records Farol Dev with Instruments while you use it, then opens the recording: where the CPU went, and what froze the window.
-# Use Farol as you normally would while it records. PROFILE_SECONDS=60 records longer.
+# Records Farol Dev with Instruments while you use it, then says whether anything stands out: freezes, busy CPU, commands on the main thread.
+# The details go to build/profile.md, to hand to an agent. Use Farol as you normally would while it records. PROFILE_SECONDS=60 records longer.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -30,5 +30,6 @@ fi
 echo "Recording for ${seconds}s. Use Farol Dev as you normally would."
 # Points of Interest holds the git and other runs Perf marks, next to where the CPU went and every hang.
 xcrun xctrace record --template "Time Profiler" --instrument "Hangs" --instrument "Points of Interest" \
-  --time-limit "${seconds}s" --output "$trace" --attach "$pid"
-open "$trace"
+  --time-limit "${seconds}s" --output "$trace" --attach "$pid" > /dev/null
+python3 "$root/scripts/profile-report.py" "$trace" "$pid" "$root/build/profile.md"
+echo "The recording, for Instruments: open \"$trace\""
