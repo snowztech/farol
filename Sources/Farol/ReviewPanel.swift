@@ -1237,7 +1237,7 @@ struct ReviewPanel: View {
                 Counts(added: review.stat.added, removed: review.stat.removed, palette: p).fixedSize()
             }
             CloseButton(symbol: state.reviewExpanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
-                        help: state.reviewExpanded ? "Show the terminal (⌥⌘↩)" : "Fill the window (⌥⌘↩)",
+                        help: state.reviewExpanded ? "Show the terminal (⌥⌘↩)" : "Expand (⌥⌘↩)",
                         palette: p, action: expand)
             CloseButton(help: "Close review (⌥⌘R)", palette: p, action: close)
         }
