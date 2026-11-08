@@ -43,7 +43,14 @@ final class PaneContainer: NSView {
     /// The file in front in the file pane.
     var file: FileView? { tabs?.current }
     private(set) var fileFocused = false
-    private var zoomed = false
+    private var zoomed = false {
+        didSet {
+            tabs?.expanded = zoomed && zoomedFile
+            if oldValue, !zoomed, zoomedFile { zoomedFile = false; showTerminals() }
+        }
+    }
+    /// The zoom shows the file pane, with every terminal hidden behind it but still running.
+    private var zoomedFile = false
     private var dragging: Node?
 
     /// The terminal theme's background and text colors, which the dividers and search bar are mixed from.
@@ -233,6 +240,7 @@ final class PaneContainer: NSView {
         tabs.runCommand = { [weak self] in _ = self?.runInNewPane?($0) }
         tabs.willJump = { [weak self] in self?.record(jumpingTo: $0, line: $1) }
         tabs.onEmpty = { [weak self] in self?.removeTabs() }
+        tabs.onExpand = { [weak self] in self?.toggleFileZoom() }
         self.tabs = tabs
         addSubview(tabs)
         needsLayout = true
@@ -383,15 +391,34 @@ final class PaneContainer: NSView {
 
     func toggleZoom() {
         guard terminals.count > 1 else { return }
+        if zoomedFile { zoomed = false }
         zoomed.toggle()
         needsLayout = true
+    }
+
+    /// The file pane fills the panes, or gives the terminals back.
+    func toggleFileZoom() {
+        guard tabs != nil else { return }
+        let on = !(zoomed && zoomedFile)
+        zoomed = false
+        zoomedFile = on
+        zoomed = on
+        showTerminals()
+        needsLayout = true
+    }
+
+    private func showTerminals() {
+        guard !isHidden else { return }
+        for terminal in terminals {
+            terminal.setVisible(!zoomed || (!zoomedFile && terminal === focused))
+        }
     }
 
     /// Hidden sessions keep running but stop rendering.
     func setVisible(_ visible: Bool) {
         isHidden = !visible
         for terminal in terminals {
-            terminal.setVisible(visible && (!zoomed || terminal === focused))
+            terminal.setVisible(visible && (!zoomed || (!zoomedFile && terminal === focused)))
         }
         if visible, let window {
             let point = convert(window.mouseLocationOutsideOfEventStream, from: nil)
@@ -407,7 +434,11 @@ final class PaneContainer: NSView {
 
     override func layout() {
         super.layout()
-        if zoomed, let leaf = node(of: focused) {
+        if zoomed, zoomedFile, let tabs, let leaf = node(of: tabs) {
+            terminals.forEach { $0.isHidden = true }
+            tabs.isHidden = false
+            place(leaf, in: bounds)
+        } else if zoomed, let leaf = node(of: focused) {
             terminals.forEach { $0.isHidden = $0 !== focused }
             tabs?.isHidden = true
             place(leaf, in: bounds)
@@ -922,6 +953,7 @@ final class PaneContainer: NSView {
         file.onShowCommit = { [weak self] in self?.onShowCommit?($0) }
         file.onOpenAt = { [weak self] in self?.open($0, line: $1) }
         file.onMovePane = { [weak self] in self?.goto(.direction($0)) }
+        file.onZoom = { [weak self] in self?.toggleFileZoom() }
         file.palette = { [weak self] in self?.palette }
         // A preview tab shows another file in the same view, which the files panel follows when it's the one in front.
         file.onPathChange = { [weak self, weak file] in

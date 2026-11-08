@@ -102,6 +102,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func toggleBlame(_ sender: Any?) { windowController.toggleBlame() }
     @objc func goToLine(_ sender: Any?) { windowController.goToLine() }
     @objc func toggleReview(_ sender: Any?) { windowController.toggleReview() }
+    @objc func toggleExpanded(_ sender: Any?) {
+        if windowController.canExpand { windowController.toggleExpanded() }
+    }
     @objc func toggleMerge(_ sender: Any?) { windowController.toggleMerge() }
     @objc func commit(_ sender: Any?) { windowController.commit() }
     @objc func push(_ sender: Any?) { windowController.push() }
@@ -137,6 +140,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         if item.action == #selector(toggleBlame) {
             item.title = windowController.isBlaming ? "Hide Git Blame" : "Show Git Blame"
             return windowController.canToggleBlame
+        }
+        if item.action == #selector(toggleExpanded) {
+            // Named after what it does now.
+            item.title = windowController.isExpanded ? "Show Terminal" : "Expand Review"
+            return windowController.canExpand
         }
         return switch item.action {
         case #selector(saveFile): windowController.canSaveFile
@@ -244,6 +252,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         view.addItem(withTitle: "Toggle Git Graph", action: #selector(toggleGraph), keyEquivalent: "g")
             .keyEquivalentModifierMask = [.command, .option]
         view.addItem(withTitle: "Review Changes", action: #selector(toggleReview), keyEquivalent: "r")
+            .keyEquivalentModifierMask = [.command, .option]
+        view.addItem(withTitle: "Expand Review", action: #selector(toggleExpanded), keyEquivalent: "\r")
             .keyEquivalentModifierMask = [.command, .option]
         view.addItem(withTitle: "Commit…", action: #selector(commit), keyEquivalent: "c")
             .keyEquivalentModifierMask = [.command, .option]

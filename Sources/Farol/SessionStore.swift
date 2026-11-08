@@ -849,6 +849,8 @@ struct Panels: Codable, Equatable {
     var files = false
     var graph = false
     var review = false
+    /// The review fills the window, with the terminal hidden behind it. Optional, so sessions saved before it still load.
+    var expanded: Bool?
 }
 
 /// What a session keeps between launches.

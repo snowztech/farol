@@ -49,6 +49,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// The diff the cursor was in when the review's search opened.
     private weak var findReturn: DiffTextView?
     private static let reviewWidthKey = "review.width"
+    /// Holds the terminal at no width while the review fills the window, and the review's own width lets go.
+    private var contentClosed: NSLayoutConstraint!
     private var settingsView: NSView!
     private let merge = MergeModel()
     private let mergeEditor = MergeEditorController()
@@ -148,6 +150,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             open: { [weak self] in self?.open($0, line: $1) },
             pick: { [weak self] in self?.store.selected?.pick($0) },
             close: { [weak self] in self?.toggleReview(closing: true) },
+            expand: { [weak self] in self?.toggleExpanded() },
             resize: { [weak self] in self?.setReviewWidth($0) }))
         reviewPanel.clipsToBounds = true
         reviewHost = reviewPanel
@@ -208,6 +211,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         state.graphWidth = state.graphVisible ? savedGraphWidth : 0
         graphWidth = graphPanel.widthAnchor.constraint(equalToConstant: state.graphWidth)
         reviewWidth = reviewPanel.widthAnchor.constraint(equalToConstant: 0)
+        contentClosed = content.widthAnchor.constraint(equalToConstant: 0)
+        // Below the window's hold on its size, so with no room while the review fills the window, the margin gives way rather than the window growing.
+        let sides = [terminalContainer.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 12),
+                     terminalContainer.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -8)]
+        sides.forEach { $0.priority = .init(490) }
+        NSLayoutConstraint.activate(sides)
         panels = [sidebar, filesPanel, content, reviewPanel, graphPanel]
         var edge = root.leadingAnchor
         for panel in panels {
@@ -265,8 +274,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
             // Breathing room around the text. It shares the terminal background, so it reads as terminal.
             terminalContainer.topAnchor.constraint(equalTo: content.topAnchor, constant: 8),
-            terminalContainer.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 12),
-            terminalContainer.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -8),
             terminalContainer.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -8),
 
             settingsView.topAnchor.constraint(equalTo: content.topAnchor),
@@ -500,14 +507,17 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// Slides the panels. The terminals keep their size until the end, so a program redraws once rather than on every frame.
-    private func animatePanels(_ change: @escaping () -> Void) {
+    private func animatePanels(_ change: @escaping () -> Void, then done: (() -> Void)? = nil) {
         TerminalView.holdSize()
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = Motion.enabled ? Self.panelDuration : 0
             ctx.timingFunction = Self.panelCurve
             change()
             layoutGaps(animated: true)
-        }, completionHandler: { TerminalView.releaseSize() })
+        }, completionHandler: {
+            TerminalView.releaseSize()
+            done?()
+        })
     }
 
     /// Closes the sidebar while the merge view is open, and opens it again after, unless you toggled it yourself meanwhile.
@@ -594,6 +604,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let url = URL(fileURLWithPath: path)
         // The contents decide before the extension does, since macOS calls a TypeScript .ts a video and an SVG an image.
         if case .text? = try? Files.read(path) {
+            // The file opens beside the terminal, so a review filling the window makes room for it.
+            if state.reviewExpanded { toggleExpanded() }
             store.selected?.panes.open(path, line: line, keep: keep)
         } else if let type = UTType(filenameExtension: url.pathExtension),
                   [UTType.image, .pdf, .audiovisualContent].contains(where: type.conforms) {
@@ -609,11 +621,56 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         // Over a commit or a request, "Review changes" brings your changes back. Closing the panel there would hide what you asked for.
         if !closing, review.showYours() { return graph.select(nil) }
         review.isOpen.toggle()
-        remember { $0.review = review.isOpen }
+        if !review.isOpen { setExpanded(false, animated: false) }
+        remember {
+            $0.review = review.isOpen
+            if !review.isOpen { $0.expanded = nil }
+        }
         let saved = UserDefaults.standard.double(forKey: Self.reviewWidthKey)
         let width = review.isOpen ? clampedReviewWidth(saved > 0 ? saved : ReviewPanel.defaultWidth) : 0
         withAnimation(Self.panelMotion) { state.reviewWidth = width }
         animatePanels { self.reviewWidth.animator().constant = width }
+    }
+
+    /// Lets an open panel fill the window, or gives the terminal back. The session remembers it.
+    func toggleExpanded() {
+        let next = !state.reviewExpanded
+        remember { $0.expanded = next }
+        setExpanded(next)
+    }
+
+    var isExpanded: Bool { state.reviewExpanded }
+    var canExpand: Bool { review.isOpen && !state.showingSettings && !state.showingMerge }
+
+    /// The terminal keeps running behind the review, at its size, so an agent never redraws for a terminal no one sees.
+    /// The review slides out to the window's edge, then stops having a width of its own, so it follows the window as it resizes.
+    private func setExpanded(_ expanded: Bool, animated: Bool = true) {
+        guard expanded != state.reviewExpanded else { return }
+        if expanded {
+            TerminalView.holdSize()
+        } else {
+            // A fixed width again, the one it has on screen, so nothing jumps.
+            contentClosed.isActive = false
+            reviewWidth.constant = reviewHost?.frame.width ?? state.reviewWidth
+            reviewWidth.isActive = true
+            TerminalView.releaseSize()
+        }
+        state.reviewExpanded = expanded
+        place(store.selected)
+        if expanded {
+            // The terminal's gap goes too.
+            let grow = content.frame.width + state.palette.style.gap
+            animatePanels({ self.reviewWidth.animator().constant += grow }, then: { [weak self] in
+                guard let self, state.reviewExpanded else { return }
+                reviewWidth.isActive = false
+                reviewWidth.constant = state.reviewWidth
+                contentClosed.isActive = true
+            })
+        } else if animated {
+            animatePanels { self.reviewWidth.animator().constant = self.state.reviewWidth }
+        } else {
+            layoutGaps()
+        }
     }
 
     /// Room for the terminal stays, however wide the sidebar is dragged.
@@ -903,7 +960,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// A closed panel takes no gap, or two gaps would sit side by side where it was.
     private func layoutGaps(animated: Bool = false) {
         let gap = state.palette.style.gap
-        let open = [state.sidebarVisible, state.filesVisible, true, state.reviewWidth > 0, state.graphWidth > 0]
+        let open = [state.sidebarVisible, state.filesVisible, !state.reviewExpanded, state.reviewWidth > 0, state.graphWidth > 0]
         for (constraint, open) in zip(gaps.before, open) {
             (animated ? constraint.animator() : constraint).constant = open ? gap : 0
         }
@@ -1056,6 +1113,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         if !panels.review, review.isOpen { toggleReview(closing: true) }
         show(session)
         if panels.review, !review.isOpen { toggleReview(closing: true) }
+        setExpanded(panels.review && panels.expanded == true)
     }
 
     private func remember(_ change: (inout Panels) -> Void) {
@@ -1067,23 +1125,32 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// Only the terminal on screen renders. Settings replaces it and pauses it too.
     private func show(_ session: Session?) {
-        let settings = state.showingSettings
-        let resolving = state.showingMerge && !settings
-        settingsView.isHidden = !settings
-        mergeView.isHidden = !resolving
-        terminalContainer.isHidden = settings || resolving
-        for s in store.sessions {
-            s.panes.setVisible(!settings && !resolving && s.id == session?.id)
-        }
-        if resolving {
-            window?.makeFirstResponder(mergeEditor.editor.textView)
-        } else if !settings, let session {
-            window?.makeFirstResponder(session.panes.focusTarget)
-        }
+        place(session)
         followFiles(session)
         followReview(session)
         followGraph(session)
         followMerge(session)
+    }
+
+    /// Which of the terminal, settings, the merge view or an expanded panel is on screen, and has the keyboard.
+    private func place(_ session: Session?) {
+        let settings = state.showingSettings
+        let resolving = state.showingMerge && !settings
+        settingsView.isHidden = !settings
+        mergeView.isHidden = !resolving
+        let expanded = state.reviewExpanded
+        terminalContainer.isHidden = settings || resolving || expanded
+        for s in store.sessions {
+            s.panes.setVisible(!settings && !resolving && !expanded && s.id == session?.id)
+        }
+        if resolving {
+            window?.makeFirstResponder(mergeEditor.editor.textView)
+        } else if !settings, expanded {
+            // Off the hidden terminal, so typing never reaches an agent you can't see.
+            window?.makeFirstResponder(reviewHost)
+        } else if !settings, let session {
+            window?.makeFirstResponder(session.panes.focusTarget)
+        }
     }
 
     private func followMerge(_ session: Session?) {
