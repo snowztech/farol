@@ -19,6 +19,12 @@ final class FileTabs: NSView {
     var runCommand: ((String) -> Void)?
     /// Go to Line is about to move the cursor to this line of the file in front, so the place it leaves can be gone back to.
     var willJump: ((String, Int) -> Void)?
+    /// The arrows in the bar: the file pane fills the panes, or gives the terminals back.
+    var onExpand: (() -> Void)?
+    var expanded: Bool {
+        get { model.expanded }
+        set { model.expanded = newValue }
+    }
 
     private let model = FileTabsModel()
     private let bar: NSHostingView<FileTabBar>
@@ -47,6 +53,7 @@ final class FileTabs: NSView {
         model.closeAll = { [weak self] in self?.close(except: nil) }
         model.openServerMenu = { [weak self] in self?.openServerMenu() }
         model.askLine = { [weak self] in self?.askLine() }
+        model.expand = { [weak self] in self?.onExpand?() }
         addSubview(bar)
         addSubview(status)
         NotificationCenter.default.addObserver(self, selector: #selector(serversChanged), name: LanguageServers.didChange, object: nil)
@@ -284,6 +291,7 @@ final class FileTabsModel: ObservableObject {
     @Published var palette: Palette?
     @Published var canPreview = false
     @Published var previewing = false
+    @Published var expanded = false
     /// The file in front's language server, beside its language in the status bar. Nil with language servers off.
     @Published var server: Server?
     @Published var facts: Facts?
@@ -328,6 +336,7 @@ final class FileTabsModel: ObservableObject {
     var closeAll: () -> Void = {}
     var openServerMenu: () -> Void = {}
     var askLine: () -> Void = {}
+    var expand: () -> Void = {}
 }
 
 struct FileTabBar: View {
@@ -356,6 +365,8 @@ struct FileTabBar: View {
                         IconButton(symbol: model.previewing ? "chevron.left.forwardslash.chevron.right" : "eye",
                                    help: model.previewing ? "Show the source" : "Preview", palette: p, action: model.togglePreview)
                     }
+                    IconButton(symbol: model.expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
+                               help: model.expanded ? "Show the terminal (⌥⌘↩)" : "Expand (⌥⌘↩)", palette: p, action: model.expand)
                     IconButton(symbol: "xmark", help: "Close all files", palette: p, action: model.closeAll)
                 }
                 .padding(.trailing, 6)

@@ -49,7 +49,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// The diff the cursor was in when the review's search opened.
     private weak var findReturn: DiffTextView?
     private static let reviewWidthKey = "review.width"
-    /// Holds the terminal at no width while a panel fills the window, and that panel's own width lets go.
+    /// Holds the terminal at no width while the review fills the window, and the review's own width lets go.
     private var contentClosed: NSLayoutConstraint!
     private var settingsView: NSView!
     private let merge = MergeModel()
@@ -138,7 +138,6 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             open: { [weak self] in self?.open($0, line: $1, keep: true) },
             openMatch: { [weak self] in self?.openMatch($0, line: $1) },
             resize: { [weak self] in self?.setFilesWidth($0) },
-            expand: { [weak self] in self?.toggleExpanded(.files) },
             startSearch: { [weak self] in self?.findInFiles() }))
         filesPanel.clipsToBounds = true
         let graphPanel = hosting(GraphPanel(
@@ -151,7 +150,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             open: { [weak self] in self?.open($0, line: $1) },
             pick: { [weak self] in self?.store.selected?.pick($0) },
             close: { [weak self] in self?.toggleReview(closing: true) },
-            expand: { [weak self] in self?.toggleExpanded(.review) },
+            expand: { [weak self] in self?.toggleExpanded() },
             resize: { [weak self] in self?.setReviewWidth($0) }))
         reviewPanel.clipsToBounds = true
         reviewHost = reviewPanel
@@ -213,7 +212,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         graphWidth = graphPanel.widthAnchor.constraint(equalToConstant: state.graphWidth)
         reviewWidth = reviewPanel.widthAnchor.constraint(equalToConstant: 0)
         contentClosed = content.widthAnchor.constraint(equalToConstant: 0)
-        // Below the window's hold on its size, so with no room while a panel fills the window, the margin gives way rather than the window growing.
+        // Below the window's hold on its size, so with no room while the review fills the window, the margin gives way rather than the window growing.
         let sides = [terminalContainer.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 12),
                      terminalContainer.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -8)]
         sides.forEach { $0.priority = .init(490) }
@@ -558,11 +557,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     private func setFiles(visible open: Bool) {
         if !open { state.filesSearching = false }
-        if !open, state.expanded == .files { setExpanded(nil, animated: false) }
-        remember {
-            $0.files = open
-            if !open, $0.expanded == .files { $0.expanded = nil }
-        }
+        remember { $0.files = open }
         withAnimation(Self.panelMotion) { state.filesVisible = open }
         animatePanels { self.filesWidth.animator().constant = open ? self.state.filesWidth : 0 }
         followFiles(store.selected)
@@ -609,8 +604,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let url = URL(fileURLWithPath: path)
         // The contents decide before the extension does, since macOS calls a TypeScript .ts a video and an SVG an image.
         if case .text? = try? Files.read(path) {
-            // The file opens beside the terminal, so a panel filling the window makes room for it.
-            if let expanded = state.expanded { toggleExpanded(expanded) }
+            // The file opens beside the terminal, so a review filling the window makes room for it.
+            if state.reviewExpanded { toggleExpanded() }
             store.selected?.panes.open(path, line: line, keep: keep)
         } else if let type = UTType(filenameExtension: url.pathExtension),
                   [UTType.image, .pdf, .audiovisualContent].contains(where: type.conforms) {
@@ -626,10 +621,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         // Over a commit or a request, "Review changes" brings your changes back. Closing the panel there would hide what you asked for.
         if !closing, review.showYours() { return graph.select(nil) }
         review.isOpen.toggle()
-        if !review.isOpen, state.expanded == .review { setExpanded(nil, animated: false) }
+        if !review.isOpen { setExpanded(false, animated: false) }
         remember {
             $0.review = review.isOpen
-            if !review.isOpen, $0.expanded == .review { $0.expanded = nil }
+            if !review.isOpen { $0.expanded = nil }
         }
         let saved = UserDefaults.standard.double(forKey: Self.reviewWidthKey)
         let width = review.isOpen ? clampedReviewWidth(saved > 0 ? saved : ReviewPanel.defaultWidth) : 0
@@ -638,67 +633,58 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// Lets an open panel fill the window, or gives the terminal back. The session remembers it.
-    func toggleExpanded(_ panel: Panels.Expanded) {
-        let next = state.expanded == panel ? nil : panel
+    func toggleExpanded() {
+        let next = !state.reviewExpanded
         remember { $0.expanded = next }
         setExpanded(next)
     }
 
-    var isExpanded: Bool { state.expanded != nil }
-
-    /// The panel the View menu expands: the review when it's open, else the files.
-    var expandablePanel: Panels.Expanded? {
+    /// What ⌥⌘↩ fills: the file pane while it has the keyboard, else the review.
+    enum Expandable { case review, file }
+    var expandable: Expandable? {
         if state.showingSettings || state.showingMerge { return nil }
-        if let expanded = state.expanded { return expanded }
-        return review.isOpen ? .review : state.filesVisible ? .files : nil
+        if let panes = store.selected?.panes, panes.tabs != nil, panes.fileFocused || panes.fileZoomed, !state.reviewExpanded { return .file }
+        return review.isOpen ? .review : nil
     }
+    var isExpanded: Bool { state.reviewExpanded || store.selected?.panes.fileZoomed == true }
 
-    /// The terminal keeps running behind the panel, at its size, so an agent never redraws for a terminal no one sees.
-    /// The panel slides out to the window's edge, then stops having a width of its own, so it follows the window as it resizes.
-    private func setExpanded(_ panel: Panels.Expanded?, animated: Bool = true) {
-        let old = state.expanded
-        guard panel != old else { return }
-        if let old { pin(old) }
-        if old == nil { TerminalView.holdSize() }
-        if panel == nil { TerminalView.releaseSize() }
-        state.expanded = panel
-        place(store.selected)
-        if let panel {
-            // The terminal's gap goes too.
-            let grow = content.frame.width + state.palette.style.gap
-            let width = widthConstraint(panel)
-            animatePanels({ width.animator().constant += grow }, then: { [weak self] in
-                guard let self, state.expanded == panel else { return }
-                width.isActive = false
-                width.constant = normalWidth(panel)
-                contentClosed.isActive = true
-            })
-        } else if let old, animated {
-            animatePanels { self.widthConstraint(old).animator().constant = self.normalWidth(old) }
-        } else {
-            layoutGaps()
+    func expand() {
+        switch expandable {
+        case .file: store.selected?.panes.toggleFileZoom()
+        case .review: toggleExpanded()
+        case nil: break
         }
     }
 
-    /// Gives a panel that was filling the window a fixed width again, the one it has on screen, so nothing jumps.
-    private func pin(_ panel: Panels.Expanded) {
-        let width = widthConstraint(panel)
-        guard !width.isActive else { return }
-        contentClosed.isActive = false
-        width.constant = host(panel).frame.width
-        width.isActive = true
-    }
-
-    private func widthConstraint(_ panel: Panels.Expanded) -> NSLayoutConstraint {
-        panel == .files ? filesWidth : reviewWidth
-    }
-
-    private func host(_ panel: Panels.Expanded) -> NSView {
-        panel == .files ? panels[1] : panels[3]
-    }
-
-    private func normalWidth(_ panel: Panels.Expanded) -> CGFloat {
-        panel == .files ? state.filesWidth : state.reviewWidth
+    /// The terminal keeps running behind the review, at its size, so an agent never redraws for a terminal no one sees.
+    /// The review slides out to the window's edge, then stops having a width of its own, so it follows the window as it resizes.
+    private func setExpanded(_ expanded: Bool, animated: Bool = true) {
+        guard expanded != state.reviewExpanded else { return }
+        if expanded {
+            TerminalView.holdSize()
+        } else {
+            // A fixed width again, the one it has on screen, so nothing jumps.
+            contentClosed.isActive = false
+            reviewWidth.constant = reviewHost?.frame.width ?? state.reviewWidth
+            reviewWidth.isActive = true
+            TerminalView.releaseSize()
+        }
+        state.reviewExpanded = expanded
+        place(store.selected)
+        if expanded {
+            // The terminal's gap goes too.
+            let grow = content.frame.width + state.palette.style.gap
+            animatePanels({ self.reviewWidth.animator().constant += grow }, then: { [weak self] in
+                guard let self, state.reviewExpanded else { return }
+                reviewWidth.isActive = false
+                reviewWidth.constant = state.reviewWidth
+                contentClosed.isActive = true
+            })
+        } else if animated {
+            animatePanels { self.reviewWidth.animator().constant = self.state.reviewWidth }
+        } else {
+            layoutGaps()
+        }
     }
 
     /// Room for the terminal stays, however wide the sidebar is dragged.
@@ -988,7 +974,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// A closed panel takes no gap, or two gaps would sit side by side where it was.
     private func layoutGaps(animated: Bool = false) {
         let gap = state.palette.style.gap
-        let open = [state.sidebarVisible, state.filesVisible, state.expanded == nil, state.reviewWidth > 0, state.graphWidth > 0]
+        let open = [state.sidebarVisible, state.filesVisible, !state.reviewExpanded, state.reviewWidth > 0, state.graphWidth > 0]
         for (constraint, open) in zip(gaps.before, open) {
             (animated ? constraint.animator() : constraint).constant = open ? gap : 0
         }
@@ -1141,8 +1127,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         if !panels.review, review.isOpen { toggleReview(closing: true) }
         show(session)
         if panels.review, !review.isOpen { toggleReview(closing: true) }
-        let expanded = panels.expanded.flatMap { $0 == .files ? (panels.files ? $0 : nil) : (panels.review ? $0 : nil) }
-        setExpanded(expanded)
+        setExpanded(panels.review && panels.expanded == true)
     }
 
     private func remember(_ change: (inout Panels) -> Void) {
@@ -1167,16 +1152,16 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         let resolving = state.showingMerge && !settings
         settingsView.isHidden = !settings
         mergeView.isHidden = !resolving
-        let expanded = state.expanded.map(host)
-        terminalContainer.isHidden = settings || resolving || expanded != nil
+        let expanded = state.reviewExpanded
+        terminalContainer.isHidden = settings || resolving || expanded
         for s in store.sessions {
-            s.panes.setVisible(!settings && !resolving && expanded == nil && s.id == session?.id)
+            s.panes.setVisible(!settings && !resolving && !expanded && s.id == session?.id)
         }
         if resolving {
             window?.makeFirstResponder(mergeEditor.editor.textView)
-        } else if !settings, let expanded {
+        } else if !settings, expanded {
             // Off the hidden terminal, so typing never reaches an agent you can't see.
-            window?.makeFirstResponder(expanded)
+            window?.makeFirstResponder(reviewHost)
         } else if !settings, let session {
             window?.makeFirstResponder(session.panes.focusTarget)
         }

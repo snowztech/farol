@@ -162,8 +162,6 @@ struct FilesPanel: View {
     /// A search result, which also marks every match in the file.
     let openMatch: (String, Int) -> Void
     let resize: (CGFloat) -> Void
-    /// Fills the window with the panel, or gives the terminal back.
-    let expand: () -> Void
     /// The magnifier: Find in Files in place of the tree.
     let startSearch: () -> Void
 
@@ -179,12 +177,11 @@ struct FilesPanel: View {
                 tree(p)
             }
         }
-        // Fixed width, so closing the panel clips it instead of reflowing every row. Expanded, it fills the window.
-        .frame(width: state.expanded == .files ? nil : state.filesWidth, alignment: .leading)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        // Fixed width, so closing the panel clips it instead of reflowing every row.
+        .frame(width: state.filesWidth, alignment: .leading)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(p.panel)
-        .overlay(alignment: .trailing) { if state.expanded != .files { edge(p) } }
+        .overlay(alignment: .trailing) { edge(p) }
     }
 
     /// The line between the panel and the terminal, wide enough to grab and drag.
@@ -218,9 +215,6 @@ struct FilesPanel: View {
                        active: state.filesSearching, palette: p) {
                 if state.filesSearching { state.filesSearching = false } else { startSearch() }
             }
-            IconButton(symbol: state.expanded == .files ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
-                       help: state.expanded == .files ? "Show the terminal (⌥⌘↩)" : "Fill the window (⌥⌘↩)",
-                       palette: p, action: expand)
         }
         .padding(.leading, 14)
         .padding(.trailing, 8)

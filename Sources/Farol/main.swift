@@ -103,7 +103,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func goToLine(_ sender: Any?) { windowController.goToLine() }
     @objc func toggleReview(_ sender: Any?) { windowController.toggleReview() }
     @objc func toggleExpanded(_ sender: Any?) {
-        if let panel = windowController.expandablePanel { windowController.toggleExpanded(panel) }
+        windowController.expand()
     }
     @objc func toggleMerge(_ sender: Any?) { windowController.toggleMerge() }
     @objc func commit(_ sender: Any?) { windowController.commit() }
@@ -142,10 +142,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             return windowController.canToggleBlame
         }
         if item.action == #selector(toggleExpanded) {
-            // Named after what it does now: the panel it would expand, or the terminal it brings back.
-            let panel = windowController.expandablePanel
-            item.title = windowController.isExpanded ? "Show Terminal" : panel == .files ? "Expand Files" : "Expand Review"
-            return panel != nil
+            // Named after what it does now.
+            let target = windowController.expandable
+            item.title = windowController.isExpanded && target != nil ? "Show Terminal" : target == .file ? "Expand File" : "Expand Review"
+            return target != nil
         }
         return switch item.action {
         case #selector(saveFile): windowController.canSaveFile
@@ -254,7 +254,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             .keyEquivalentModifierMask = [.command, .option]
         view.addItem(withTitle: "Review Changes", action: #selector(toggleReview), keyEquivalent: "r")
             .keyEquivalentModifierMask = [.command, .option]
-        view.addItem(withTitle: "Expand Panel", action: #selector(toggleExpanded), keyEquivalent: "\r")
+        view.addItem(withTitle: "Expand Review", action: #selector(toggleExpanded), keyEquivalent: "\r")
             .keyEquivalentModifierMask = [.command, .option]
         view.addItem(withTitle: "Commit…", action: #selector(commit), keyEquivalent: "c")
             .keyEquivalentModifierMask = [.command, .option]
