@@ -16,8 +16,19 @@ fi
 "$root/scripts/bundle.sh" profile
 mkdir -p "$root/build/traces"
 trace="$root/build/traces/$(date +%Y-%m-%d-%H%M%S).trace"
+# Started here and recorded by its process id: by name, xctrace can't tell it from an installed Farol.
+open -n "$app"
+pid=""
+for _ in $(seq 40); do
+  pid="$(pgrep -f "$app/Contents/MacOS/Farol" | head -1)" && [ -n "$pid" ] && break
+  sleep 0.25
+done
+if [ -z "$pid" ]; then
+  echo "Farol Dev didn't start."
+  exit 1
+fi
 echo "Recording for ${seconds}s. Use Farol Dev as you normally would."
 # Points of Interest holds the git and other runs Perf marks, next to where the CPU went and every hang.
 xcrun xctrace record --template "Time Profiler" --instrument "Hangs" --instrument "Points of Interest" \
-  --time-limit "${seconds}s" --output "$trace" --launch -- "$app/Contents/MacOS/Farol"
+  --time-limit "${seconds}s" --output "$trace" --attach "$pid"
 open "$trace"
