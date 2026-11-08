@@ -10,6 +10,16 @@ Three rules decide what gets in:
 
 Milestones are themes, not version numbers. Releases ship whatever is ready.
 
+## Up next
+
+The biggest gaps next to cmux, Paradev and Warp, in the order they get closed. The [compare pages](https://farol.sh/compare/) source each one.
+
+1. **More agents in one click**, like Gemini CLI, Cursor Agent, Aider and Amp. Others name more agents out of the box, and each one is small to add.
+2. **Agents that run without you at the Mac**: a New Task and tasks for later on a `farol-host` server, then tasks started by an event. The others do this in their cloud. Farol does it on a server of your own.
+3. **A browser for agents**, as a browser MCP server in the docs rather than one built in, so an agent can check its own UI work and Farol stays a terminal.
+4. **Linear as a ticket source**, next to Jira and GitHub issues.
+5. **Intel Macs**, if a universal build of libghostty and Farol turns out cheap. Every other one runs there.
+
 ## Done
 
 - Terminal engine: libghostty embedded through `GhosttyTerminal`
@@ -30,7 +40,7 @@ Someone who downloads Farol understands what it is for in the first minute.
 - [x] **New task**: one flow that picks the repo, takes a task description, creates the worktree and starts the agent with the task as its first prompt
 - [x] Manage saved project and global commands in a quiet, native Farol flow: edit a name or script, or remove a command
 - [x] Codex notifications through its terminal notifications, since its hooks lose track of the terminal
-- [ ] A working dot for Codex, once its hooks know which terminal they belong to
+- [x] A working dot for Codex, followed live from its terminal titles, with hooks for its background runs
 - [x] Sessions grouped by project in the sidebar, as a setting
 - [x] Update check: a quiet Update button when a new version is out
 - [x] Agent status in the menu bar: a lamp with the most urgent state across sessions, and a menu to jump to any of them, so you see agents working from any app
@@ -39,7 +49,8 @@ Someone who downloads Farol understands what it is for in the first minute.
 - [x] Install updates in place (Sparkle), behind the same button
 - [x] Homebrew cask
 - [x] A setup script for new worktrees: `.farol/setup` runs once in the new session's terminal, so dependencies are installed and the project's services are up before the agent needs them. The agent starts only if it succeeds. `.farol/teardown` runs when the worktree is removed
-- [ ] More agents set up in one click, like Gemini CLI and Cursor Agent, next to Claude Code, Codex, OpenCode and Pi
+- [x] Tasks for later: a New task that starts once at a set time or again on the days you pick, each run in a fresh worktree on the Mac
+- [ ] More agents set up in one click, like Gemini CLI, Cursor Agent, Aider and Amp, next to Claude Code, Codex, OpenCode and Pi
 
 ## Next: review
 
@@ -51,8 +62,13 @@ Most of the time with parallel agents goes into checking what they did. That wor
 - [x] ⌘P finds files and folders next to the sessions: a file opens in the file pane, a folder as a new session
 - [x] Review panel: the session's changes as one scrolling diff, per file, with the count in the title bar. Uncommitted work or everything since the branch left main
 - [x] Push the branch and open a merge request or pull request from the session
-- [ ] Pipeline status and open review comments in the sidebar, with a notification when a pipeline fails
-- [ ] Send review comments or a failed job's log back to the agent in one action
+- [x] Notes for the agent on lines of the diff, sent in one message, and a pull request reviewer's comments sent to the agent the same way
+- [x] A pull request's checks or a merge request's pipeline in the review panel, each step's log one click away
+- [ ] Pipeline status in the sidebar, with a notification when a pipeline fails
+- [ ] A failed job's log sent back to the agent in one action
+- [x] A git graph to check out, create, rebase, delete, cherry-pick or revert
+- [x] A three-column resolver when a merge or rebase stops on conflicts
+- [x] Find in Files across the project, and language servers for go to definition and references, installed in one click
 - [x] The ports a session's programs listen on, under its branch in the sidebar, so a dev server an agent started is easy to find. Read at each prompt, never polled
 
 ## Then: integrations
@@ -62,6 +78,7 @@ Work comes from a ticket and goes out as a merge request, on the services teams 
 - [x] Settings → Integrations shows whether `gh`, `glab` and jira-cli are set up, and for which account
 - [x] Reuse the `gh`, `glab` and jira-cli logins when they exist
 - [x] Start a New task from a Jira ticket or a GitHub issue: branch named after the ticket, ticket text as the first prompt
+- [ ] Start a New task from a Linear issue
 - [ ] Start a New task from a GitLab issue
 - [ ] A server field for self-hosted instances, and a token stored in the macOS Keychain for when the tools aren't installed
 - [ ] A board's tickets on Jira Data Center, which only Jira Cloud answers today
@@ -116,6 +133,7 @@ A session over ssh says where you are, and shows nothing that belongs to another
 - [x] Pairing a phone with a server from the Mac, its code drawn in a sheet
 - [ ] Adding a server to a phone already paired with this Mac, with no code to scan
 - [ ] Starting a New Task on a server
+- [ ] Tasks for later on a `farol-host` server that stays on, so they run with the Mac off
 
 ## From your phone
 
@@ -137,6 +155,7 @@ It needs an iPhone for now. For Android or the web, [say so in an issue](https:/
 - [x] Agents on a machine of your own that stays on, so the Mac can be off: `farol-host` in farol-remote makes each tmux window a session. Still experimental until [what farol-remote lists](https://github.com/snowztech/farol-remote/blob/main/ROADMAP.md#not-done-yet) is done
 - [x] Several Macs and servers in one list on the phone
 - [x] A live terminal on the phone with its colors, sent as VT through a small patch to libghostty
+- [x] Farol Remote on the App Store, with TestFlight for early features
 - [ ] Android or the web, if people ask
 
 ## Hardening
@@ -148,8 +167,6 @@ It needs an iPhone for now. For Android or the web, [say so in an issue](https:/
 
 ## Later
 
-- Linear as a ticket source
-- Scheduled tasks: a New task that starts at a set time or every day, like a nightly dependency bump or a morning issue triage, and waits for you as a session when it's done or needs you. On the Mac while it's awake, or on a `farol-host` server that stays on
 - The server's repo in the panels over ssh, which needs git run on the server
 - Command palette: Farol's actions, like push, commit or new task, in the ⌘P list
 
