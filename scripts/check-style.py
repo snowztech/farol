@@ -116,6 +116,14 @@ def repo_files() -> list[Path]:
     return [p for p in (ROOT / name for name in listed if name) if p.is_file() and p.suffix in CHECKED]
 
 
+def missing_from_readme() -> list[str]:
+    """Pictures and links in the README to a file the repo no longer has, like a screenshot removed from site/features."""
+    text = (ROOT / "README.md").read_text()
+    targets = [a or b for a, b in re.findall(r'src="([^"]+)"|\]\(([^)\s]+)\)', text)]
+    local = [t.split("#")[0] for t in targets if t and not t.startswith(("http", "#", "mailto:"))]
+    return [f"README.md: {t} doesn't exist." for t in local if t and not (ROOT / t).exists()]
+
+
 def main() -> int:
     args = sys.argv[1:]
     if args == ["--hook"]:
@@ -128,7 +136,7 @@ def main() -> int:
     else:
         files = [Path(a).resolve() for a in args] or repo_files()
 
-    problems = [p for f in files for p in check(f)]
+    problems = [p for f in files for p in check(f)] + ([] if args else missing_from_readme())
     if not problems:
         return 0
     print("Style check failed (see scripts/check-style.py):", file=sys.stderr)
