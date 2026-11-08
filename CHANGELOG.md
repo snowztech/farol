@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.67.0] - 2026-11-08
+
+The review follows the agent as it works, and notes start one when none is running.
+
 ### Added
 
 - Send notes works with no agent running. The review starts yours in a new session on the same checkout, in the background, with the notes as its first message, and later notes go to that agent. With more than one agent connected, the arrow beside Send starts another one instead. The note box says who reads it: only your agent for a note, everyone on GitHub for a comment on a pull request. Each note says where it stands: waiting, Changed once the agent rewrote its lines, or Not changed if the agent stopped without touching them. While it works, the notes button counts how many changed, then turns into Resolve. A note whose lines were rewritten stays where it was instead of moving to the top.
@@ -15,6 +19,8 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Fixed
 
 - The + beside lines you selected in the review now notes all of them, not only the line it sits on.
+- A session open on your phone no longer flags itself on the Mac when its shell rings, as on an ambiguous Tab.
+- A folded server keeps its icon beside its name, so it doesn't read as a project.
 
 ## [0.66.0] - 2026-11-07
 
@@ -1348,7 +1354,10 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.64.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.67.0...HEAD
+[0.67.0]: https://github.com/snowztech/farol/releases/tag/v0.67.0
+[0.66.0]: https://github.com/snowztech/farol/releases/tag/v0.66.0
+[0.65.0]: https://github.com/snowztech/farol/releases/tag/v0.65.0
 [0.64.0]: https://github.com/snowztech/farol/releases/tag/v0.64.0
 [0.63.0]: https://github.com/snowztech/farol/releases/tag/v0.63.0
 [0.62.0]: https://github.com/snowztech/farol/releases/tag/v0.62.0
