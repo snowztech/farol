@@ -70,14 +70,33 @@ final class ReviewModel: ObservableObject {
     /// A file to bring into view once the diff is read. The id changes each time, so asking twice for one file scrolls again.
     @Published private(set) var focus: (path: String, id: UUID)?
     private var pendingFocus: String?
-    /// Follow, from the button in the header: each change the agent makes scrolls the review to it. Remembered, so it stays on.
-    @Published var follows = UserDefaults.standard.bool(forKey: "review.follow") {
-        didSet { UserDefaults.standard.set(follows, forKey: "review.follow") }
-    }
-    /// Whether the session's agent works now. Asked when a write comes in, since it may be done by the time the refresh runs.
+    /// While an agent works on the session's checkout, in it or in another session there, each change it makes scrolls the review to it.
+    /// Whether one works now. Asked when a write comes in, since it may be done by the time the refresh runs.
     var agentWorking: () -> Bool = { false }
-    /// When you last scrolled or clicked in the review. Following waits a moment after, so it never pulls the page from under you.
+    /// When you last scrolled the review. Following waits a moment after, so it never pulls the page from under you.
     var lastUsed = Date.distantPast
+    @Published private(set) var fresh: FreshLines?
+    /// The agent working on this checkout now, by name, so the review can say so. Nil while none works.
+    @Published private(set) var working: String?
+
+    /// When an agent on this checkout last stopped, so a note sent before it and still untouched reads as not changed.
+    @Published private(set) var lastFinished: Date?
+
+    func setWorking(_ name: String?) {
+        guard name != working else { return }
+        if working != nil, name == nil { lastFinished = .now }
+        working = name
+    }
+
+    /// Where a note you sent stands: its lines rewritten, still waiting on the agent, or left as they were once it stopped.
+    enum NoteState { case draft, waiting, changed, untouched }
+
+    func state(of note: ReviewNote) -> NoteState {
+        guard let sentAt = note.sentAt else { return .draft }
+        if note.changed == true { return .changed }
+        if working == nil, let lastFinished, lastFinished > sentAt { return .untouched }
+        return .waiting
+    }
     /// The files the watcher saw written since the last refresh, oldest first, relative to the root.
     private var touched: [String] = []
     /// The subject of the commit being shown, for the compare menu.
@@ -514,6 +533,8 @@ final class ReviewModel: ObservableObject {
 
     /// The agent of the session on screen, to send notes to. Set by the window, which knows the sessions.
     var agent: () -> ReviewAgent? = { nil }
+    /// The agents Farol could start for your notes when none runs, yours first, for the arrow beside Send.
+    var agentsToStart: () -> [ReviewAgent] = { [] }
     /// Your notes on your own changes, per checkout. Kept across launches, since a review can take a while.
     @Published private var allNotes: [String: [ReviewNote]] = ReviewModel.savedNotes() {
         didSet { UserDefaults.standard.set(try? JSONEncoder().encode(allNotes), forKey: Self.notesKey) }
@@ -538,8 +559,8 @@ final class ReviewModel: ObservableObject {
         }
         return marks
     }
-    /// Said once notes went, or why they couldn't.
-    @Published private(set) var noteStatus: (text: String, failed: Bool)?
+    /// Why notes couldn't go. Nothing is said when they do: each note says it's waiting.
+    @Published private(set) var noteError: String?
     private static let notesKey = "review.notes"
 
     private static func savedNotes() -> [String: [ReviewNote]] {
@@ -593,18 +614,23 @@ final class ReviewModel: ObservableObject {
     }
 
     /// The notes not sent yet, in one prompt, with `also` for the change as a whole.
-    func sendNotes(also: String? = nil) {
-        send(unsentNotes, also: also)
+    func sendNotes(also: String? = nil, via chosen: ReviewAgent? = nil) {
+        send(unsentNotes, also: also, via: chosen)
     }
 
-    private func send(_ list: [ReviewNote], also: String? = nil) {
+    private func send(_ list: [ReviewNote], also: String? = nil, via chosen: ReviewAgent? = nil) {
         guard let root, !list.isEmpty else { return }
         let prompt = ReviewNotes.prompt(list.map(ReviewNotes.Item.init), also: also)
-        guard deliver(prompt) else { return }
+        guard deliver(prompt, via: chosen) else { return }
         let ids = Set(list.map(\.id))
         allNotes[root] = allNotes[root]?.map { note in
             var note = note
-            if ids.contains(note.id) { note.sentAt = .now }
+            guard ids.contains(note.id) else { return note }
+            // Sent as the lines read now, so "changed" means changed after you sent it.
+            note.sentAt = .now
+            note.changed = nil
+            if let file = files.first(where: { $0.path == note.path }),
+               let quote = ReviewNotes.quote(in: file, line: note.line, end: note.end, old: note.old) { note.quote = quote }
             return note
         }
         rebuild()
@@ -625,20 +651,17 @@ final class ReviewModel: ObservableObject {
         return shown.number == number && agent() != nil
     }
 
-    private func deliver(_ prompt: String) -> Bool {
-        guard let agent = agent() else {
-            noteStatus = ("No agent is running in this session. Start one, then send again.", true)
+    private func deliver(_ prompt: String, via chosen: ReviewAgent? = nil) -> Bool {
+        guard let agent = chosen ?? agent() else {
+            noteError = "Connect an agent in Settings → Agents to send your notes to it."
             return false
         }
         if let refusal = agent.refusal {
-            noteStatus = (refusal, true)
+            noteError = refusal
             return false
         }
         agent.send(prompt)
-        noteStatus = ("Sent to \(agent.name).", false)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
-            if self?.noteStatus?.failed == false { self?.noteStatus = nil }
-        }
+        noteError = nil
         return true
     }
 
@@ -1032,7 +1055,7 @@ final class ReviewModel: ObservableObject {
     /// Agents write in bursts, so changes wait a moment and refresh once.
     private func changed(_ paths: [String]) {
         guard Self.matters(paths, ignored: ignored) else { return }
-        if let root, follows, agentWorking() {
+        if let root, agentWorking() {
             let prefix = root + "/"
             touched = (touched + paths.filter { $0.hasPrefix(prefix) }.map { String($0.dropFirst(prefix.count)) }).suffix(50)
         }
@@ -1045,10 +1068,11 @@ final class ReviewModel: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
     }
 
-    /// Scrolls to the line a change landed on, or to its file when the line isn't one the diff shows.
-    private func land(on change: (path: String, line: Int)) {
+    /// Scrolls to the lines a change landed on, or to its file when they aren't ones the diff shows, and marks them for a moment.
+    private func land(on change: (path: String, lines: ClosedRange<Int>)) {
         guard let file = files.first(where: { $0.path == change.path }) else { return }
-        if let row = DiffTextView.row(of: change.line, old: false, in: file) {
+        fresh = FreshLines(path: change.path, lines: change.lines)
+        if let row = DiffTextView.row(of: change.lines.lowerBound, old: false, in: file) {
             reveal = Reveal(path: change.path, row: row)
         } else {
             focus = (change.path, UUID())
@@ -1132,10 +1156,6 @@ struct ReviewPanel: View {
             if review.root != nil {
                 HStack(spacing: 8) {
                     ScopeMenu(review: review, palette: p)
-                    if review.showsYours {
-                        IconButton(symbol: "scope", help: review.follows ? "Stop following the agent" : "Follow the agent's changes",
-                                   active: review.follows, palette: p) { review.follows.toggle() }
-                    }
                     Spacer(minLength: 0)
                     // The slot holds the next step: commit what's there, then open the request for the branch.
                     // Where there is no request to open, as on main or once the branch has one, the next step is a push.
@@ -1159,10 +1179,10 @@ struct ReviewPanel: View {
                 .padding(.horizontal, 10)
                 .padding(.bottom, 8)
             }
-            if let status = review.noteStatus {
-                Text(status.text)
+            if let error = review.noteError {
+                Text(error)
                     .font(.system(size: 11))
-                    .foregroundStyle(status.failed ? p.waiting : p.muted)
+                    .foregroundStyle(p.waiting)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 12)
                     .padding(.bottom, 8)
@@ -1297,7 +1317,8 @@ struct ReviewPanel: View {
                      expand: { review.expand(file.path, gap: $0, fromTop: $1) },
                      loading: review.expanding.contains(file.path),
                      marks: review.marks[file.path],
-                     notes: review.noteLines(in: file.path, color: NSColor(p.accent)))
+                     notes: review.noteLines(in: file.path, color: NSColor(p.accent)),
+                     fresh: review.fresh?.path == file.path ? review.fresh : nil)
                 .padding(.horizontal, 8)
         case .thread(let line, let comments):
             VStack(alignment: .leading, spacing: 0) {
@@ -1981,7 +2002,19 @@ private struct LineComposer: View {
                 Text(error).font(.system(size: 11)).foregroundStyle(palette.removed).fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 8) {
-                Text(place).font(.system(size: 11)).foregroundStyle(palette.muted)
+                // Who reads it, where you write it: a note stays with your agent, a comment goes up for everyone and can't be taken back.
+                HStack(spacing: 5) {
+                    if review.canNote {
+                        if let kind = review.agent()?.kind { ToolTile(agent: kind, size: 13) }
+                        Text("\(place), only \(review.agent()?.name ?? "your agent") sees it")
+                    } else {
+                        if let forge = review.forge { ForgeIcon(kind: forge.kind) }
+                        Text("\(place), posted publicly on \(review.forge?.name ?? "the forge")")
+                    }
+                }
+                .font(.system(size: 11))
+                .foregroundStyle(palette.muted)
+                .lineLimit(1)
                 Spacer(minLength: 8)
                 NoteAction(title: "Cancel", help: "Close without saving · Esc", palette: palette) { review.cancelComment() }
                 if review.canNote {
@@ -1996,7 +2029,8 @@ private struct LineComposer: View {
                                busy: false, primary: true, keys: "⌘↩", palette: palette) { review.saveNote() }
                         .keyboardShortcut(.return, modifiers: .command)
                 } else {
-                    ShipButton(title: "Comment", busy: review.isSending, keys: "⌘↩", palette: palette) { review.sendComment() }
+                    ShipButton(title: "Comment", help: "Post it on \(review.forge?.name ?? "the forge"), where everyone on the request sees it",
+                               busy: review.isSending, keys: "⌘↩", palette: palette) { review.sendComment() }
                         .keyboardShortcut(.return, modifiers: .command)
                 }
             }
@@ -2028,6 +2062,8 @@ struct ReviewAgent {
     let kind: AgentFolder.Kind?
     /// Why it can't take a message now, like waiting on a question. Nil when it can.
     let refusal: String?
+    /// None runs yet, so sending starts one in a new session in the background.
+    var starts = false
     let send: (String) -> Void
 }
 
@@ -2046,7 +2082,8 @@ private struct NoteView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     if let kind = review.agent()?.kind { ToolTile(agent: kind, size: 14).opacity(note.sent ? 0.6 : 1) }
-                    Text(status).font(.system(size: 11, weight: .medium)).foregroundStyle(palette.muted)
+                    if review.state(of: note) == .waiting, review.working != nil { ProgressView().controlSize(.mini) }
+                    Text(status).font(.system(size: 11, weight: .medium)).foregroundStyle(statusColor)
                     if showsPlace || note.line != note.end {
                         Text(place).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1)
                     }
@@ -2080,8 +2117,21 @@ private struct NoteView: View {
     }
 
     private var status: String {
-        guard let sent = note.sentAt else { return "Draft" }
-        return "Sent \(Self.age.localizedString(for: sent, relativeTo: .now))"
+        switch review.state(of: note) {
+        case .draft: note.changed == true ? "Draft, lines changed since" : "Draft"
+        case .waiting: "Sent \(note.sentAt.map { Self.age.localizedString(for: $0, relativeTo: .now) } ?? ""), waiting"
+        case .changed: "Changed"
+        // Its lines, not the request: an agent can do what a note asks somewhere else in the file.
+        case .untouched: "Not changed"
+        }
+    }
+
+    private var statusColor: Color {
+        switch review.state(of: note) {
+        case .changed: palette.done
+        case .untouched: palette.waiting
+        case .draft, .waiting: palette.muted
+        }
     }
 
     private var place: String {
@@ -2105,7 +2155,13 @@ private struct NotesButton: View {
     var body: some View {
         let unsent = review.unsentNotes.count
         let notes = "\(unsent) \(unsent == 1 ? "note" : "notes")"
-        if unsent == 0 {
+        let sent = review.notes.filter(\.sent)
+        let changed = sent.filter { review.state(of: $0) == .changed }.count
+        if unsent == 0, let name = review.working {
+            // The button turning into Resolve is how you see it's done.
+            ShipButton(title: "\(changed) of \(sent.count) changed", help: "\(name) is working on your notes. It turns into Resolve once it's done.",
+                       busy: true, spinning: true, palette: palette) {}
+        } else if unsent == 0 {
             // Named for what it removes, so it can't read as accepting the changes next to Commit.
             let sent = review.notes.count
             ShipButton(title: "Resolve \(sent) \(sent == 1 ? "note" : "notes")",
@@ -2113,14 +2169,25 @@ private struct NotesButton: View {
                        palette: palette) { review.clearSentNotes() }
         } else if let agent = review.agent() {
             // The next step while notes wait, ahead of committing work the agent is about to change.
-            ShipButton(title: "Send \(notes)", help: "Send them to \(agent.name) in one message", busy: false, agent: agent.kind,
-                       primary: true, palette: palette) { review.sendNotes() }
+            let help = agent.starts ? "Start \(agent.name) in a new session here, with them as its first message" : "Send them to \(agent.name) in one message"
+            // With none running and more than one connected, the arrow starts another instead.
+            let others = agent.starts ? Array(review.agentsToStart().dropFirst()) : []
+            if others.isEmpty {
+                ShipButton(title: "Send \(notes)", help: help, busy: false, agent: agent.kind,
+                           primary: true, palette: palette) { review.sendNotes() }
+            } else {
+                SplitShipButton(title: "Send \(notes)", help: help, busy: false, agent: agent.kind, palette: palette, action: { review.sendNotes() }) {
+                    ForEach(others.indices, id: \.self) { index in
+                        Button("Start \(others[index].name) with them") { review.sendNotes(via: others[index]) }
+                    }
+                }
+            }
         } else {
             // Nothing to send to, so a count rather than a button that would only say no.
             Text(notes)
                 .font(.system(size: 12))
                 .foregroundStyle(palette.muted)
-                .hoverTip("Start an agent in this session to send your notes to it")
+                .hoverTip("Connect an agent in Settings → Agents to send your notes to it")
         }
     }
 }

@@ -157,8 +157,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         reviewPanel.clipsToBounds = true
         reviewHost = reviewPanel
         review.agent = { [weak self] in self?.reviewAgent() }
-        review.agentWorking = { [weak self] in self?.store.selected?.activity == .working }
-        reviewUse = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .leftMouseDown]) { [weak self] event in
+        review.agentsToStart = { [weak self] in self?.agentsToStart() ?? [] }
+        review.agentWorking = { [weak self] in
+            guard let self, let session = store.selected else { return false }
+            return sessions(sharing: session).contains { $0.activity == .working }
+        }
+        // Scrolling only, since a click on Send or Commit in the review isn't reading it.
+        reviewUse = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
             if let self, let host = reviewHost, event.window === host.window,
                host.bounds.contains(host.convert(event.locationInWindow, from: nil)) {
                 review.lastUsed = .now
@@ -346,6 +351,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             refreshBadge(enabled: agents.dockBadge)
             menuBar.refresh()
             notch.refresh()
+            showWorking()
         }
         menuBar.onSelect = { [weak self] session in
             self?.window?.makeKeyAndOrderFront(nil)
@@ -1138,6 +1144,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         place(session)
         followFiles(session)
         followReview(session)
+        showWorking()
         followGraph(session)
         followMerge(session)
     }
@@ -1176,8 +1183,40 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
 extension MainWindowController {
     /// The agent your review notes go to: the focused pane's when it runs one, or else the session's first that does.
+    /// The agent the review's notes go to: one running in the session on screen, or in another session on the same checkout, as one started from the notes.
+    /// With none, a new one in that checkout, in the background, with the notes as its first prompt. The notes point at these files, so not a new worktree.
     fileprivate func reviewAgent() -> ReviewAgent? {
         guard let session = store.selected else { return nil }
+        if let running = sessions(sharing: session).lazy.compactMap(runningAgent).first { return running }
+        return agentsToStart().first
+    }
+
+    /// Every connected agent, as one to start for the notes in the background, the one new sessions start with first. None while one runs.
+    fileprivate func agentsToStart() -> [ReviewAgent] {
+        guard let session = store.selected, !session.isRemote, let checkout = session.checkout,
+              !sessions(sharing: session).contains(where: { runningAgent(in: $0) != nil }) else { return [] }
+        let folders = AgentFolder.find()
+        let yours = folders.filter { $0.command() == agents.startCommand }
+        return (yours + folders.filter { folder in !yours.contains { $0.id == folder.id } }).map { folder in
+            ReviewAgent(name: folder.label, kind: folder.kind, refusal: nil, starts: true) { [weak self] prompt in
+                let (run, environment) = SessionStore.hidden(folder.command(task: prompt))
+                self?.store.create(directory: checkout, run: run, environment: environment, select: false)
+            }
+        }
+    }
+
+    /// Tells the review which agent works on the checkout on screen, if one does.
+    private func showWorking() {
+        let working = store.selected.flatMap { session in sessions(sharing: session).first { $0.activity == .working } }
+        review.setWorking(working.map { runningAgent(in: $0)?.name ?? "The agent" })
+    }
+
+    /// The session and the others on its checkout, as one started from the review's notes. Itself first.
+    private func sessions(sharing session: Session) -> [Session] {
+        [session] + store.sessions.filter { $0 !== session && $0.checkout != nil && $0.checkout == session.checkout }
+    }
+
+    private func runningAgent(in session: Session) -> ReviewAgent? {
         let panes = [session.panes.focused] + session.panes.terminals
         guard let terminal = panes.first(where: { session.agent(in: $0) != nil }), let program = session.agent(in: terminal) else { return nil }
         let kind = AgentFolder.Kind(rawValue: program)

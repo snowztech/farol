@@ -14,8 +14,10 @@ public struct ReviewNote: Codable, Equatable, Identifiable, Sendable {
     /// When it went to the agent. Kept until you resolve it, so you can check it was dealt with.
     public var sentAt: Date?
     public var sent: Bool { sentAt != nil }
-    /// Its lines are no longer in the diff, so it shows apart, without a line.
+    /// Its file is no longer in the diff, so it shows apart, without a line.
     public var lost = false
+    /// Its lines were rewritten, as the agent does to address it, so it sits on the nearest line left. Optional, so notes saved before it still load.
+    public var changed: Bool?
 
     public init(path: String, line: Int, end: Int, old: Bool, quote: [String], text: String) {
         self.path = path
@@ -105,7 +107,8 @@ public enum ReviewNotes {
         return rows[first...last].map(\.text)
     }
 
-    /// The note on the lines that still read as it quotes, nearest where it was. Lost when no lines do.
+    /// The note on the lines that still read as it quotes, nearest where it was.
+    /// When none do, it stays where it was, on the nearest line the diff still shows, so it never jumps away. Lost only without its file.
     public static func anchor(_ note: ReviewNote, in files: [Diff.File]) -> ReviewNote {
         var note = note
         guard let file = files.first(where: { $0.path == note.path }), !note.quote.isEmpty else {
@@ -118,11 +121,19 @@ public enum ReviewNotes {
             note.lost = false
             return note
         }
+        if note.changed == true, let was, rows[was].new != nil || rows[was].old != nil {
+            note.lost = false
+            return note
+        }
         let starts = rows.indices.filter { start in
             start + note.quote.count <= rows.count && rows[start..<(start + note.quote.count)].map(\.text) == note.quote
         }
         guard let start = starts.min(by: { abs($0 - (was ?? $0)) < abs($1 - (was ?? $1)) }) else {
-            note.lost = true
+            guard let nearest = rows.compactMap(\.new).min(by: { abs($0 - note.line) < abs($1 - note.line) }) else {
+                note.lost = true
+                return note
+            }
+            (note.line, note.end, note.old, note.changed, note.lost) = (nearest, nearest, false, true, false)
             return note
         }
         let span = rows[start..<(start + note.quote.count)]

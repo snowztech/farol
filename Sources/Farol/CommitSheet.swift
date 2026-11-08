@@ -217,6 +217,8 @@ struct ShipButton: View {
     var primary = false
     /// The shortcut that does the same, shown after the title.
     var keys: String? = nil
+    /// A spinner before the title, for something under way. `busy` alone also means there's nothing to do yet.
+    var spinning = false
     let palette: Palette
     let action: () -> Void
 
@@ -229,6 +231,7 @@ struct ShipButton: View {
     private var button: some View {
         Button(action: action) {
             HStack(spacing: 6) {
+                if spinning { ProgressView().controlSize(.mini) }
                 if let icon { ForgeIcon(kind: icon) }
                 if let agent { ToolTile(agent: agent, size: 15) }
                 Text(title).font(.system(size: 12, weight: .medium))
@@ -254,6 +257,7 @@ struct SplitShipButton<Choices: View>: View {
     let help: String
     let busy: Bool
     var icon: Forge.Kind? = nil
+    var agent: AgentFolder.Kind? = nil
     let palette: Palette
     let action: () -> Void
     @ViewBuilder let choices: Choices
@@ -266,6 +270,7 @@ struct SplitShipButton<Choices: View>: View {
             Button(action: action) {
                 HStack(spacing: 6) {
                     if let icon { ForgeIcon(kind: icon) }
+                    if let agent { ToolTile(agent: agent, size: 15) }
                     Text(title).font(.system(size: 12, weight: .medium))
                 }
                 .padding(.horizontal, 10)
