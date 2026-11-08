@@ -133,7 +133,6 @@
       box-shadow: 0 18px 48px rgba(0, 0, 0, 0.3);
     }
     .phone-shot { width: 300px; max-width: 100%; border-radius: 28px; }
-    .narrow-shot { width: 268px; max-width: 100%; }
     /* The themes, as on the landing: pick one and its picture fades in over the last. */
     .swatches { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 20px; }
     .swatch {
@@ -151,6 +150,7 @@
     .stack > * { grid-area: 1 / 1; opacity: 0; transition: opacity 0.45s var(--sn-ease); }
     .stack > [data-active] { opacity: 1; }
     picture { display: block; }
+    picture + p, picture + ul { margin-top: 24px; }
     /* Screenshots and examples rise into place once, as they scroll in. */
     .js .reveal { opacity: 0; transform: translateY(8px); transition: opacity 0.5s var(--sn-ease), transform 0.5s var(--sn-ease); }
     .js .reveal.in { opacity: 1; transform: none; }
@@ -365,9 +365,23 @@ farol-host setup</code></pre>
           <picture><source type="image/avif" srcset="features/phone-hosts.avif"><img class="doc-shot reveal phone-shot" src="features/phone-hosts.png" width="600" height="1304" alt="Farol for iPhone listing sessions from a MacBook Pro and a server, each row naming the machine it runs on" loading="lazy" decoding="async"></picture>
 
           <h3 id="servers">Servers in the sidebar</h3>
-          <p>Your Mac can show a server's agents too. Click the server button beside <strong>New task</strong>, or <strong>Settings → Remote → Add Server</strong>, and pick a host from <code>~/.ssh/config</code> or type <code>user@host</code>. Farol installs or updates <code>farol-host</code> there over ssh and lets this Mac in, in a terminal under the server that closes once it is done. A password or sudo prompt can be answered there. A server you set up by hand is added the same way. ssh already proves it is you, so there is no code to scan.</p>
-          <picture><source type="image/avif" srcset="features/servers.avif"><img class="doc-shot reveal narrow-shot" src="features/servers.png" width="536" height="1010" alt="The sidebar with a project's sessions, then a server named build-box listing three agents working, waiting and done, and a second server folded with its count" loading="lazy" decoding="async"></picture>
-          <p>The server's agents show after your own sessions, under its name, with the same status dots. Farol notifies you when one waits or finishes and counts it on the Dock. Click one to open its tmux window over ssh. The + on the server's name starts a new tmux session there, and the ✕ on a row ends one. A pane you split off opens on the server too. Right-click the name to rename or remove the server. The Mac and your phone are let in separately, so the phone keeps seeing the server with the Mac off. <strong>Pair a Phone…</strong> in the same menu, or in <strong>Settings → Remote → Servers</strong>, shows the server's code to scan from the app.</p>
+          <p>Your Mac can show a server's agents too, under its name in the sidebar, with the same dots and notifications as your own.</p>
+          <ol class="steps">
+            <li>Click the server button beside <strong>New task</strong>, or open <strong>Settings → Remote → Add Server</strong>.</li>
+            <li>Pick a host from <code>~/.ssh/config</code>, or type <code>user@host</code>.</li>
+            <li>Farol installs or updates <code>farol-host</code> there, in a terminal you can see. If ssh asks for a password or sudo, answer it there.</li>
+          </ol>
+          <p>A server you set up by hand is added the same way. There is no code to scan: ssh already proves it is you.</p>
+          <picture><source type="image/avif" srcset="features/servers-add-half.avif 1270w, features/servers-add.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot reveal" src="features/servers-add.png" width="2540" height="1520" alt="The Add a server sheet listing build-box, gpu-box and staging from ~/.ssh/config, with a field to type another host" loading="lazy" decoding="async"></picture>
+          <p>Then, in the server's rows:</p>
+          <ul>
+            <li>Click an agent to open its tmux window over ssh.</li>
+            <li>The <strong>+</strong> on the server's name opens a new tmux session there, and the <strong>✕</strong> on a row ends one.</li>
+            <li>A pane you split off opens on the server too.</li>
+            <li>Right-click the name to rename or remove the server, or <strong>Pair a Phone…</strong> to show its code for the app. It's also in <strong>Settings → Remote → Servers</strong>.</li>
+          </ul>
+          <picture><source type="image/avif" srcset="features/servers-half.avif 1270w, features/servers.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot reveal" src="features/servers.png" width="2540" height="1520" alt="A shell opened on build-box with the + on its name, where tmux lists the agent sessions running there, and the sidebar shows build-box's agents with their status and the new shell selected" loading="lazy" decoding="async"></picture>
+          <p>The Mac and your phone are let in separately, so the phone keeps seeing the server with the Mac off.</p>
         </section>
 
         <section id="configuration">
