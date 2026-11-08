@@ -216,6 +216,7 @@
           <li><a href="#tasks">Tasks and worktrees</a></li>
           <li><a href="#status">Agent status</a></li>
           <li><a href="#review">Review and ship</a></li>
+          <li><a href="#editor">Files and editor</a></li>
           <li><a href="#outside">From any app</a></li>
           <li><a href="#remote">From your phone</a></li>
           <li><a href="#servers">Servers</a></li>
@@ -322,7 +323,7 @@ cp "$main/.claude/settings.local.json" .claude/ 2&gt;/dev/null || true</code></p
           <h2>Review and ship</h2>
           <p>The title bar shows the current branch's changed lines. Click the count or press <kbd>⌥⌘R</kbd> to review every changed file as one scrolling diff.</p>
           <ul>
-            <li><strong>Files:</strong> Press <kbd>⇧⌘E</kbd> to browse the project, open a file beside the terminal and save quick fixes with <kbd>⌘S</kbd>. <kbd>⌘</kbd>-click a name to go to its definition or list its references, once its language's server is on in Settings → Editor.</li>
+            <li><strong>Files:</strong> Press <kbd>⇧⌘E</kbd> to open a file beside the terminal and fix it by hand. See <a href="#editor">Files and editor</a>.</li>
             <li><strong>Review:</strong> Compare uncommitted work or everything since the branch left main or another branch.</li>
             <li><strong>Notes for the agent:</strong> Click the + beside a line of your own changes, or select lines and right-click, to leave a note. Send them all to the session's agent in one message, or one at once with <kbd>⇧⌘↩</kbd>. Each note quotes its lines, so it follows them as the agent edits.</li>
             <li><strong>Git graph:</strong> Press <kbd>⌥⌘G</kbd> to inspect branches and commits, then check out, create, rebase, delete, cherry-pick or revert.</li>
@@ -342,6 +343,30 @@ cp "$main/.claude/settings.local.json" .claude/ 2&gt;/dev/null || true</code></p
             <li><strong>Finish:</strong> <kbd>⌘S</kbd> marks the file resolved, and <strong>Reopen</strong> puts it back in conflict until you continue. Once every file is, run the tests or ask the agent to check, then continue, skip or abort. Continuing a merge, cherry-pick or revert asks for the commit message, starting from the one git prepared. A rebase keeps each commit's message unless you choose <strong>Edit Message</strong>. <kbd>Esc</kbd> goes back to the terminal.</li>
           </ul>
           <picture><source type="image/avif" srcset="features/conflicts-half.avif 1270w, features/conflicts.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot reveal" src="features/conflicts.png" width="2540" height="1520" alt="Merging main into a branch, stopped on a conflict in main.go: your version, the editable result and the incoming one in three columns, with one change left to decide" loading="lazy" decoding="async"></picture>
+        </section>
+
+        <section id="editor">
+          <h2>Files and editor</h2>
+          <p>A light editor for reading what the agent wrote and fixing it by hand, beside the terminal, without leaving the session.</p>
+          <ul>
+            <li><strong>Files:</strong> Press <kbd>⇧⌘E</kbd> to browse the project as a tree, and click a file to open it.</li>
+            <li><strong>Tabs:</strong> A file you click opens in a tab that the next one replaces. Edit it or double-click its tab to keep it. <kbd>⌃Tab</kbd> moves between tabs and <kbd>⌘W</kbd> closes one.</li>
+            <li><strong>Edit:</strong> Syntax colors for the common languages, <kbd>⌘L</kbd> to go to a line, and <kbd>⌘S</kbd> to save.</li>
+            <li><strong>Find in Files:</strong> Press <kbd>⇧⌘F</kbd> to search the whole project, then click a match to open it on its line.</li>
+          </ul>
+          <picture><source type="image/avif" srcset="features/find-in-files-half.avif 1270w, features/find-in-files.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot reveal" src="features/find-in-files.png" width="2540" height="1520" alt="Find in Files searching for pending, with every match in queue.ts listed and the file open on line 7, each match marked" loading="lazy" decoding="async"></picture>
+
+          <h3>Language servers</h3>
+          <p>With a language's server on, <kbd>⌘</kbd>-click a name to go to its definition, or on a definition to list its references. <kbd>⌃⌘←</kbd> and <kbd>⌃⌘→</kbd>, or the mouse's side buttons, move back and forward between the places you jumped to.</p>
+          <p>Turn servers on in <strong>Settings → Editor</strong>. Farol finds a server you already have, or installs it with one click. Only the ones you turn on run, one per checkout.</p>
+          <ul>
+            <li>Go: <code>gopls</code></li>
+            <li>TypeScript and JavaScript: <code>typescript-language-server</code>, and Vue through its plugin</li>
+            <li>Python: <code>pyright</code></li>
+            <li>Rust: <code>rust-analyzer</code></li>
+            <li>Swift: <code>sourcekit-lsp</code></li>
+            <li>C, C++ and Objective-C: <code>clangd</code></li>
+          </ul>
         </section>
 
         <section id="outside">
@@ -489,7 +514,6 @@ font-size = 14</code></pre>
             <li><a href="/docs">Docs</a></li>
             <li><a href="/remote">iPhone</a></li>
             <li><a href="https://voice.farol.sh">Farol Voice</a></li>
-            <li><a href="https://github.com/snowztech/farol/blob/main/CHANGELOG.md">Changelog</a></li>
           </ul>
         </div>
         <div>
@@ -497,9 +521,7 @@ font-size = 14</code></pre>
           <ul>
             <li><a href="/blog/">Blog</a></li>
             <li><a href="/compare/">Compare</a></li>
-            <li><a href="/compare/warp">vs Warp</a></li>
-            <li><a href="/compare/cmux">vs cmux</a></li>
-            <li><a href="/compare/paradev">vs Paradev</a></li>
+            <li><a href="https://github.com/snowztech/farol/blob/main/CHANGELOG.md">Changelog</a></li>
           </ul>
         </div>
         <div>
