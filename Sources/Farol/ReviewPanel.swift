@@ -635,7 +635,7 @@ final class ReviewModel: ObservableObject {
             return false
         }
         agent.send(prompt)
-        noteStatus = ("Sent to \(agent.name).", false)
+        noteStatus = (agent.starts ? "Started \(agent.name) in a new session with your notes." : "Sent to \(agent.name).", false)
         DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
             if self?.noteStatus?.failed == false { self?.noteStatus = nil }
         }
@@ -2028,6 +2028,8 @@ struct ReviewAgent {
     let kind: AgentFolder.Kind?
     /// Why it can't take a message now, like waiting on a question. Nil when it can.
     let refusal: String?
+    /// None runs yet, so sending starts one in a new session in the background.
+    var starts = false
     let send: (String) -> Void
 }
 
@@ -2113,14 +2115,15 @@ private struct NotesButton: View {
                        palette: palette) { review.clearSentNotes() }
         } else if let agent = review.agent() {
             // The next step while notes wait, ahead of committing work the agent is about to change.
-            ShipButton(title: "Send \(notes)", help: "Send them to \(agent.name) in one message", busy: false, agent: agent.kind,
+            let help = agent.starts ? "Start \(agent.name) in a new session here, with them as its first message" : "Send them to \(agent.name) in one message"
+            ShipButton(title: "Send \(notes)", help: help, busy: false, agent: agent.kind,
                        primary: true, palette: palette) { review.sendNotes() }
         } else {
             // Nothing to send to, so a count rather than a button that would only say no.
             Text(notes)
                 .font(.system(size: 12))
                 .foregroundStyle(palette.muted)
-                .hoverTip("Start an agent in this session to send your notes to it")
+                .hoverTip("Connect an agent in Settings → Agents to send your notes to it")
         }
     }
 }

@@ -1176,8 +1176,22 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
 extension MainWindowController {
     /// The agent your review notes go to: the focused pane's when it runs one, or else the session's first that does.
+    /// The agent the review's notes go to: one running in the session on screen, or in another session on the same checkout, as one started from the notes.
+    /// With none, a new one in that checkout, in the background, with the notes as its first prompt. The notes point at these files, so not a new worktree.
     fileprivate func reviewAgent() -> ReviewAgent? {
         guard let session = store.selected else { return nil }
+        let near = [session] + store.sessions.filter { $0 !== session && $0.checkout != nil && $0.checkout == session.checkout }
+        if let running = near.lazy.compactMap(runningAgent).first { return running }
+        guard !session.isRemote, let checkout = session.checkout else { return nil }
+        let folders = AgentFolder.find()
+        guard let folder = folders.first(where: { $0.command() == agents.startCommand }) ?? folders.first else { return nil }
+        return ReviewAgent(name: folder.label, kind: folder.kind, refusal: nil, starts: true) { [weak self] prompt in
+            let (run, environment) = SessionStore.hidden(folder.command(task: prompt))
+            self?.store.create(directory: checkout, run: run, environment: environment, select: false)
+        }
+    }
+
+    private func runningAgent(in session: Session) -> ReviewAgent? {
         let panes = [session.panes.focused] + session.panes.terminals
         guard let terminal = panes.first(where: { session.agent(in: $0) != nil }), let program = session.agent(in: terminal) else { return nil }
         let kind = AgentFolder.Kind(rawValue: program)
