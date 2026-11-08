@@ -1,7 +1,7 @@
 APP := build/Farol.app
 GHOSTTY := vendor/GhosttyKit.xcframework
 
-.PHONY: help build release run install uninstall dist test lint icon clean shots shot
+.PHONY: help build release run install uninstall dist test lint audit profile icon clean shots shot
 
 help:
 	@echo "make build      debug build into $(APP)"
@@ -12,6 +12,8 @@ help:
 	@echo "make dist       signed and notarized zip for sharing (see scripts/dist.sh)"
 	@echo "make test       run the FarolCore tests"
 	@echo "make lint       style check for comments and docs"
+	@echo "make audit      list code smells and unused code (needs SwiftLint)"
+	@echo "make profile    record Farol Dev with Instruments while you use it, PROFILE_SECONDS=30"
 	@echo "make icon       regenerate the app icon from assets/icon-source.png"
 	@echo "make clean      remove build output (keeps libghostty)"
 	@echo "make shots      open Farol Shots on a staged scene, SCENE=sidebar or review"
@@ -48,6 +50,12 @@ test: $(GHOSTTY)
 
 lint:
 	python3 scripts/check-style.py
+
+audit: $(GHOSTTY)
+	./scripts/audit.sh
+
+profile: $(GHOSTTY)
+	./scripts/profile.sh
 
 icon:
 	swift scripts/make-icon.swift

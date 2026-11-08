@@ -1,0 +1,36 @@
+# What `make audit` looks for. Only rules that point at a real problem, never style, so it never fights how Farol is written.
+# It lists and fixes nothing: a to-do to read when the code has grown, not a gate. The limits start loose and can tighten.
+
+only_rules:
+  - cyclomatic_complexity
+  - function_body_length
+  - type_body_length
+  - file_length
+  - force_unwrapping
+  - force_try
+
+analyzer_rules:
+  - unused_declaration
+  - unused_import
+
+included:
+  - Sources
+  - Tests
+
+cyclomatic_complexity:
+  warning: 15
+  error: 30
+  ignores_case_statements: true
+
+function_body_length:
+  warning: 80
+  error: 200
+
+type_body_length:
+  warning: 600
+  error: 1500
+
+file_length:
+  warning: 1500
+  error: 3000
+  ignore_comment_only_lines: true
