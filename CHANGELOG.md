@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- The + beside lines you selected in the review now notes all of them, not only the line it sits on.
+
 ### Added
 
 - Follow in the review, the target beside the scope. While the session's agent works, the review scrolls to each change it makes as it lands, in the file it wrote last. It waits while you scroll or click in the review, does nothing once the agent stops, and stays on until you turn it off.

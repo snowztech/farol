@@ -490,18 +490,24 @@ extension DiffTextView {
     /// A selection of only removed lines counts in the old one.
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = super.menu(for: event) ?? NSMenu()
-        guard let onNoteLines, let storage = textStorage, selectedRange().length > 0 else { return menu }
+        guard let onNoteLines, let (first, last, old) = selectedLines() else { return menu }
+        let title = first == last ? "Add Note on Line \(first)" : "Add Note on Lines \(first)–\(last)"
+        menu.insertItem(ActionMenuItem(title: title) { onNoteLines(first, last, old) }, at: 0)
+        menu.insertItem(.separator(), at: 1)
+        return menu
+    }
+
+    /// The first and last line of the selection, in the new file, or in the old one when it holds only removed lines.
+    private func selectedLines() -> (first: Int, last: Int, old: Bool)? {
+        guard let storage = textStorage, selectedRange().length > 0 else { return nil }
         var new: [Int] = []
         var old: [Int] = []
         storage.enumerateAttributes(in: selectedRange()) { attributes, _, _ in
             if let number = attributes[.diffNumber] as? Int { new.append(number) } else if let number = attributes[.diffOldNumber] as? Int { old.append(number) }
         }
         let lines = new.isEmpty ? old : new
-        guard let first = lines.min(), let last = lines.max() else { return menu }
-        let title = first == last ? "Add Note on Line \(first)" : "Add Note on Lines \(first)–\(last)"
-        menu.insertItem(ActionMenuItem(title: title) { onNoteLines(first, last, new.isEmpty) }, at: 0)
-        menu.insertItem(.separator(), at: 1)
-        return menu
+        guard let first = lines.min(), let last = lines.max() else { return nil }
+        return (first, last, new.isEmpty)
     }
 
     override func mouseExited(with event: NSEvent) {
@@ -519,6 +525,11 @@ extension DiffTextView {
             return onExpand?(target.lines, target.fromTop) ?? ()
         }
         guard point.x < Self.gutter, let line = commentable(at: point) else { return super.mouseDown(with: event) }
+        // The + beside lines you selected notes all of them, as you'd expect, and not only the one it sits on.
+        if let onNoteLines, let selection = selectedLines(), selection.first != selection.last, selection.old == line.old,
+           (selection.first...selection.last).contains(line.number) {
+            return onNoteLines(selection.first, selection.last, selection.old)
+        }
         onComment?(line.number, line.old)
     }
 
