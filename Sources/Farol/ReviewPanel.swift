@@ -2004,7 +2004,19 @@ private struct LineComposer: View {
                 Text(error).font(.system(size: 11)).foregroundStyle(palette.removed).fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 8) {
-                Text(place).font(.system(size: 11)).foregroundStyle(palette.muted)
+                // Who reads it, where you write it: a note stays with your agent, a comment goes up for everyone and can't be taken back.
+                HStack(spacing: 5) {
+                    if review.canNote {
+                        if let kind = review.agent()?.kind { ToolTile(agent: kind, size: 13) }
+                        Text("\(place), only \(review.agent()?.name ?? "your agent") sees it")
+                    } else {
+                        if let forge = review.forge { ForgeIcon(kind: forge.kind) }
+                        Text("\(place), posted publicly on \(review.forge?.name ?? "the forge")")
+                    }
+                }
+                .font(.system(size: 11))
+                .foregroundStyle(palette.muted)
+                .lineLimit(1)
                 Spacer(minLength: 8)
                 NoteAction(title: "Cancel", help: "Close without saving · Esc", palette: palette) { review.cancelComment() }
                 if review.canNote {
@@ -2019,7 +2031,8 @@ private struct LineComposer: View {
                                busy: false, primary: true, keys: "⌘↩", palette: palette) { review.saveNote() }
                         .keyboardShortcut(.return, modifiers: .command)
                 } else {
-                    ShipButton(title: "Comment", busy: review.isSending, keys: "⌘↩", palette: palette) { review.sendComment() }
+                    ShipButton(title: "Comment", help: "Post it on \(review.forge?.name ?? "the forge"), where everyone on the request sees it",
+                               busy: review.isSending, keys: "⌘↩", palette: palette) { review.sendComment() }
                         .keyboardShortcut(.return, modifiers: .command)
                 }
             }
