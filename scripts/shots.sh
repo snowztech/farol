@@ -7,6 +7,7 @@ usage="usage: scripts/shots.sh stage [sidebar|review|new-task]   build the shelf
        scripts/shots.sh shoot <name>              save the Farol Shots window as site/features/<name>.png
        scripts/shots.sh library                   stage once and shoot every feature into assets/screenshots
        scripts/shots.sh themes                    the review in each of Farol's themes, into assets/screenshots/themes
+       scripts/shots.sh servers                   adding a server, and a shell on one, into assets/screenshots
        scripts/shots.sh reset                     quit Farol Shots and forget the scene
 
 make shots SCENE=review builds Farol Shots and stages a scene, and make shot NAME=review shoots it.
@@ -276,6 +277,8 @@ print(json.dumps(servers))' "$list" "$name" "$link")
   agent build-box "Nightly backups" done
   agent gpu-box "Train the ranker" working
   agent gpu-box "Evaluate on the test set" done
+  # A host in the scene's ssh config that isn't added yet, so the Add Server sheet offers a choice.
+  printf 'Host staging\n  HostName staging.internal\n  User deploy\n' >> "$dir/home/ssh_config"
   echo "$list" > "$dir/home/servers.json"
 }
 
@@ -422,8 +425,10 @@ print(next((s["status"] for s in json.load(sys.stdin)["sessions"] if s["name"] =
   echo "Done. Set up anything else by hand, then: scripts/shots.sh shoot <name>"
 }
 
+# A sheet is a window of its own that a window capture leaves out.
+# With "sheet", shoot captures the window's part of the screen, which holds the sheet, and takes the rounded corners from the window's own capture.
 shoot() {
-  local name="${1:?usage: scripts/shots.sh shoot <name>}"
+  local name="${1:?usage: scripts/shots.sh shoot <name>}" mode="${2:-}"
   local pid
   pid=$(pgrep -f "$app/Contents/MacOS/Farol" | head -1) || { echo "shots: Farol Shots isn't running. Run stage first." >&2; exit 1; }
   # The app's largest window on screen, by its process, so another Farol never gets in the shot.
@@ -436,13 +441,22 @@ shoot() {
     mine.sort(function (a, b) {
       var x = a.kCGWindowBounds.js, y = b.kCGWindowBounds.js;
       return y.Width.js * y.Height.js - x.Width.js * x.Height.js; });
-    mine.length ? mine[0].kCGWindowNumber.js : ''")
+    var b = mine.length && mine[0].kCGWindowBounds.js;
+    mine.length ? [mine[0].kCGWindowNumber.js, b.X.js, b.Y.js, b.Width.js, b.Height.js, mine.length].join(' ') : ''")
   [ -n "$window" ] || { echo "shots: no Farol Shots window on screen" >&2; exit 1; }
   # In front, so the window has its colored traffic lights.
   open -a "$app"; sleep 1
   local out="$root/site/features/$name.png"
   case "$name" in */*) out="$root/$name.png" ;; esac
-  screencapture -x -o -l "$window" "$out"
+  if [ "$mode" = sheet ]; then
+    set -- $window
+    [ "$6" -gt 1 ] || { echo "shots: no sheet is open on Farol Shots, so $name wasn't saved" >&2; return 1; }
+    screencapture -x -o -l "$1" "$dir/window.png"
+    screencapture -x -R "$2,$3,$4,$5" "$dir/region.png"
+    ffmpeg -loglevel error -y -i "$dir/region.png" -i "$dir/window.png" -filter_complex "[1]alphaextract[a];[0][a]alphamerge" "$out"
+  else
+    screencapture -x -o -l "${window%% *}" "$out"
+  fi
   local size
   size=$(sips -g pixelWidth -g pixelHeight "$out" | awk '/pixel/ { printf "%s%s", sep, $2; sep = "x" }')
   echo "saved ${out#"$root"/} ($size)"
@@ -459,6 +473,22 @@ click() {
   local origin
   origin=$(osascript -e "tell application \"System Events\" to tell (first process whose unix id is $(pgrep -f "$app/Contents/MacOS/Farol" | head -1)) to get position of window 1")
   osascript -e "tell application \"System Events\" to click at {$((${origin%%,*} + $1)), $((${origin##*, } + $2))}" >/dev/null; sleep "${3:-2}"
+}
+
+# A click posted as the mouse's own events at x, y points from the window's top left.
+# The pointer moves there first, so a button that only shows on hover, like the + on a server, is there to click.
+tap() {
+  local origin
+  # In front first: on a window that isn't active, a click only activates it.
+  open -a "$app"; sleep 1
+  origin=$(osascript -e "tell application \"System Events\" to tell (first process whose unix id is $(pgrep -f "$app/Contents/MacOS/Farol" | head -1)) to get position of window 1")
+  swift -e "import CoreGraphics; import Foundation
+let point = CGPoint(x: $((${origin%%,*} + $1)), y: $((${origin##*, } + $2)))
+for type in [CGEventType.mouseMoved, .leftMouseDown, .leftMouseUp] {
+  CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: .left)?.post(tap: .cghidEventTap)
+  Thread.sleep(forTimeInterval: type == .mouseMoved ? 0.6 : 0.08)
+}" 2>/dev/null
+  sleep "${3:-2}"
 }
 
 # Quits and reopens Farol Shots from the layout saved after staging, with the main session's panels and the selected session set.
@@ -495,6 +525,24 @@ shoot_themes() {
       -frames:v 1 all.png ) && echo "saved $out/all.png"
 }
 
+# Adding a server from the button beside New task, and a shell opened on build-box with the + on its name, where tmux lists the agents running there.
+shoot_servers() {
+  local out="assets/screenshots"
+  relaunch none; tap 241 733 3; shoot "$out/servers-add" sheet
+  relaunch none; tap 214 336 5
+  # Typed only once the shell is there, so the keys never land in another session.
+  docker exec farol-shots-build-box tmux has-session -t shell 2>/dev/null \
+    || { echo "shots: no shell opened on build-box, so nothing was typed. Is the + still at 214, 336?" >&2; return 1; }
+  typed "tmux ls"; enter 2; shoot "$out/servers"
+}
+
+# Only the servers, from one stage.
+servers_only() {
+  stage library
+  quit; defaults export "$id" "$dir/base.plist"
+  shoot_servers
+}
+
 # Only the themes, from one stage.
 themes() {
   stage library
@@ -526,14 +574,16 @@ library() {
   relaunch none; press d "command down" 2; typed "git log --oneline"; enter; shoot "$out/split"
   # The sixth session is harbor's Go upgrade, stopped on a merge conflict.
   relaunch none 5; press m "option down, command down" 3; shoot "$out/conflicts"
+  shoot_servers
   echo "Library shot into $out. Farol Shots stays open for anything else."
 }
 
 case "${1:-}" in
   stage) stage "${2:-}" ;;
-  shoot) shoot "${2:-}" ;;
+  shoot) shoot "${2:-}" "${3:-}" ;;
   library) library ;;
   themes) themes ;;
+  servers) servers_only ;;
   reset) quit; defaults delete "$id" >/dev/null 2>&1 || true; forget
          docker rm -f farol-shots-build-box farol-shots-gpu-box >/dev/null 2>&1 || true; echo "Farol Shots reset" ;;
   *) echo "$usage"; exit 64 ;;

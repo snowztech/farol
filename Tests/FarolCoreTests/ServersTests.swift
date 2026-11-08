@@ -14,6 +14,12 @@ import Testing
     #expect(ServerSetup.hosts(inSSHConfig: config) == ["hetzner", "mac-mini"])
 }
 
+// Outside a staged scene, Farol lists the hosts in your own ~/.ssh/config and gives ssh no config of its own.
+@Test func readsYourOwnSSHConfigOutsideAScene() {
+    #expect(ServerSetup.sceneConfigFile == nil)
+    #expect(!ServerSetup.sshOptions.contains("-F"))
+}
+
 @Test func namesAServerAfterItsMachine() {
     #expect(Server.name(for: "hetzner") == "hetzner")
     #expect(Server.name(for: "root@box.example.com") == "box")

@@ -19,8 +19,10 @@ Retake them all with `./scripts/shots.sh library` after `make shots`. It stages 
 | `settings.png` | Settings, on the Terminal page |
 | `themes.png` | Settings → Appearance with the theme browser open beside it |
 | `split.png` | Claude Code with a pane split beside it, checking the branch's history |
+| `servers-add.png` | The Add a server sheet, over the review, listing the hosts in the scene's own ssh config |
+| `servers.png` | A shell opened on build-box with the + on its name, where `tmux ls` lists the agents running there |
 | `conflicts.png` | Merging main into a branch stopped on a conflict, in the three-column resolver |
 
-`themes/` holds the review above in each of Farol's themes, `beam.png` through `light.png`, and `all.png` with all eight side by side. Retake only those with `./scripts/shots.sh themes`.
+`themes/` holds the review above in each of Farol's themes, `beam.png` through `light.png`, and `all.png` with all eight side by side. Retake only those with `./scripts/shots.sh themes`, and the two server shots with `./scripts/shots.sh servers`.
 
 Not here yet: the menu bar and notch panels and the task editor. The iPhone app's shots live in the farol-ios repo.
