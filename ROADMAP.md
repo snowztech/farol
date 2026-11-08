@@ -10,6 +10,16 @@ Three rules decide what gets in:
 
 Milestones are themes, not version numbers. Releases ship whatever is ready.
 
+## Up next
+
+The biggest gaps next to cmux, Paradev and Warp, in the order they get closed. The [compare pages](https://farol.sh/compare/) source each one.
+
+1. **More agents in one click**, like Gemini CLI, Cursor Agent, Aider and Amp. Others name more agents out of the box, and each one is small to add.
+2. **Agents that run without you at the Mac**: a New Task and tasks for later on a `farol-host` server, then tasks started by an event. The others do this in their cloud. Farol does it on a server of your own.
+3. **A browser for agents**, as a browser MCP server in the docs rather than one built in, so an agent can check its own UI work and Farol stays a terminal.
+4. **Linear as a ticket source**, next to Jira and GitHub issues.
+5. **Intel Macs**, if a universal build of libghostty and Farol turns out cheap. Every other one runs there.
+
 ## Done
 
 - Terminal engine: libghostty embedded through `GhosttyTerminal`
@@ -40,7 +50,7 @@ Someone who downloads Farol understands what it is for in the first minute.
 - [x] Homebrew cask
 - [x] A setup script for new worktrees: `.farol/setup` runs once in the new session's terminal, so dependencies are installed and the project's services are up before the agent needs them. The agent starts only if it succeeds. `.farol/teardown` runs when the worktree is removed
 - [x] Tasks for later: a New task that starts once at a set time or again on the days you pick, each run in a fresh worktree on the Mac
-- [ ] More agents set up in one click, like Gemini CLI and Cursor Agent, next to Claude Code, Codex, OpenCode and Pi
+- [ ] More agents set up in one click, like Gemini CLI, Cursor Agent, Aider and Amp, next to Claude Code, Codex, OpenCode and Pi
 
 ## Next: review
 
@@ -68,6 +78,7 @@ Work comes from a ticket and goes out as a merge request, on the services teams 
 - [x] Settings → Integrations shows whether `gh`, `glab` and jira-cli are set up, and for which account
 - [x] Reuse the `gh`, `glab` and jira-cli logins when they exist
 - [x] Start a New task from a Jira ticket or a GitHub issue: branch named after the ticket, ticket text as the first prompt
+- [ ] Start a New task from a Linear issue
 - [ ] Start a New task from a GitLab issue
 - [ ] A server field for self-hosted instances, and a token stored in the macOS Keychain for when the tools aren't installed
 - [ ] A board's tickets on Jira Data Center, which only Jira Cloud answers today
@@ -156,7 +167,6 @@ It needs an iPhone for now. For Android or the web, [say so in an issue](https:/
 
 ## Later
 
-- Linear as a ticket source
 - The server's repo in the panels over ssh, which needs git run on the server
 - Command palette: Farol's actions, like push, commit or new task, in the ⌘P list
 
