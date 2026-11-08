@@ -2113,7 +2113,7 @@ private struct NotesButton: View {
         let notes = "\(unsent) \(unsent == 1 ? "note" : "notes")"
         if unsent == 0, let name = review.working {
             // The button turning into Resolve is how you see it's done.
-            ShipButton(title: "Working…", help: "\(name) is working on your notes", busy: true, palette: palette) {}
+            ShipButton(title: "\(name) is working", help: "It turns into Resolve once \(name) is done", busy: true, spinning: true, palette: palette) {}
         } else if unsent == 0 {
             // Named for what it removes, so it can't read as accepting the changes next to Commit.
             let sent = review.notes.count
