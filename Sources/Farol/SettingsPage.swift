@@ -24,6 +24,8 @@ struct SettingsPage: View {
     /// The relay field, shown only once you ask to use your own.
     @State private var relayDraft: String?
     @State private var versionCopied = false
+    @State private var shortcutQuery = ""
+    @FocusState private var shortcutSearchFocused: Bool
     /// One setup per agent config folder, with each one's state by id.
     @State private var agentSetups: [AgentSetup] = []
     @State private var agentFolders = AgentFolder.find()
@@ -940,8 +942,35 @@ struct SettingsPage: View {
 
     @ViewBuilder private func shortcuts(_ p: Palette) -> some View {
         Heading(title: "Shortcuts", detail: "Standard terminal shortcuts, plus Farol's own for sessions.", palette: p)
-        ForEach(Self.shortcutGroups, id: \.title) { group in
-            GroupTitle(title: group.title, first: group.title == Self.shortcutGroups.first?.title, palette: p)
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass").font(.system(size: 11)).foregroundStyle(p.muted)
+            TextField("Search shortcuts, like split or ⌘K", text: $shortcutQuery)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13))
+                .focused($shortcutSearchFocused)
+                .onKeyPress(.escape) {
+                    shortcutQuery = ""
+                    return .handled
+                }
+            if !shortcutQuery.isEmpty {
+                CloseButton(help: "Clear", palette: p) { shortcutQuery = "" }
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 30)
+        .background(p.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(p.line.opacity(0.7)))
+        // Ready to type as the page opens, since looking one up is why you came.
+        .onAppear { shortcutSearchFocused = true }
+        let groups = Self.shortcutGroups(matching: shortcutQuery)
+        if groups.isEmpty {
+            Text("No shortcut matches “\(shortcutQuery)”.")
+                .font(.system(size: 13))
+                .foregroundStyle(p.muted)
+                .padding(.top, 20)
+        }
+        ForEach(groups, id: \.title) { group in
+            GroupTitle(title: group.title, palette: p)
             Card(palette: p) {
                 ForEach(group.items, id: \.action) { item in
                     Row(title: item.action, palette: p) {
@@ -1034,6 +1063,21 @@ struct SettingsPage: View {
         let items: [(action: String, keys: [String])]
     }
 
+    /// Each word of the query is in the action, the group's title or the keys. A word like cmd or shift also finds its symbol.
+    private static func shortcutGroups(matching query: String) -> [ShortcutGroup] {
+        let symbols = ["cmd": "⌘", "command": "⌘", "shift": "⇧", "opt": "⌥", "option": "⌥", "alt": "⌥",
+                       "ctrl": "⌃", "control": "⌃", "enter": "↩", "return": "↩"]
+        let words = query.lowercased().split(whereSeparator: \.isWhitespace).map(String.init)
+        guard !words.isEmpty else { return shortcutGroups }
+        return shortcutGroups.compactMap { group in
+            let items = group.items.filter { item in
+                let text = "\(group.title) \(item.action) \(item.keys.joined(separator: " "))".lowercased()
+                return words.allSatisfy { text.contains($0) || symbols[$0].map(text.contains) == true }
+            }
+            return items.isEmpty ? nil : ShortcutGroup(title: group.title, items: items)
+        }
+    }
+
     private static let shortcutGroups = [
         ShortcutGroup(title: "Sessions", items: [
             ("New task", ["⇧⌘N"]),
@@ -1051,7 +1095,7 @@ struct SettingsPage: View {
             ("Move to the pane in a direction", ["⌥⌘ arrows"]),
             ("Resize the focused pane", ["⌃⌘ arrows"]),
             ("Make panes equal", ["⌃⌘="]),
-            ("Zoom the focused pane", ["⇧⌘↩"]),
+            ("Zoom the focused pane or file", ["⇧⌘↩"]),
             ("Name the focused pane", ["⇧⌘R"]),
             ("Run a project command", ["⌥⌘K"]),
         ]),
@@ -1086,6 +1130,7 @@ struct SettingsPage: View {
             ("Toggle sidebar", ["⌘B"]),
             ("Toggle files", ["⇧⌘E"]),
             ("Review changes", ["⌥⌘R"]),
+            ("Expand the review, hiding the terminal", ["⌥⌘↩"]),
             ("Commit", ["⌥⌘C"]),
             ("Push", ["⌥⌘P"]),
             ("Git graph", ["⌥⌘G"]),

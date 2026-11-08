@@ -6,6 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
+- A search field on Settings → Shortcuts. Type an action or a key, like split or ⌘K. Words like cmd, shift, opt and ctrl find their symbols.
 - The review can fill the window: click the arrows in its header, or press ⌥⌘↩. The terminal keeps running out of sight at its size, so an agent doesn't redraw, and its status dot and notifications still reach you. The arrows, the shortcut, closing the review or opening a file from it bring the terminal back, and each session remembers it.
 - ⇧⌘↩ zooms the file pane too, as it does a terminal pane, and the file's tab bar has the same arrows.
 
