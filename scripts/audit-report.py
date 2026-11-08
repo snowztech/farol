@@ -1,12 +1,14 @@
-"""Turns SwiftLint's JSON into a short to-do for make audit: grouped by problem, most useful first, one line per finding."""
+"""Turns SwiftLint's JSON into a short to-do for the terminal, and the full list as Markdown for an agent.
+Grouped by problem, most worth acting on first. Usage: audit-report.py <root> <markdown out> <json>..."""
 import json
 import sys
 from collections import Counter
 from pathlib import Path
 
 root = Path(sys.argv[1])
+out = Path(sys.argv[2])
 findings = []
-for path in sys.argv[2:]:
+for path in sys.argv[3:]:
     text = Path(path).read_text().strip()
     if text:
         findings += json.loads(text)
@@ -38,13 +40,23 @@ def short(file):
     return str(Path(file).relative_to(root / "Sources")) if (root / "Sources") in Path(file).parents else str(Path(file).relative_to(root))
 
 
+def place(f):
+    if f["rule_id"] == "file_length":
+        return short(f["file"]), f"{len(Path(f['file']).read_text().splitlines())} lines"
+    return f"{short(f['file'])}:{f['line']}", code(f["file"], f["line"])
+
+
+markdown = ["# Code audit", "", "Each line is a file and line in Sources, then the code there. Fix what's worth it, leave the rest.", ""]
 if not findings:
     print("Nothing found.")
+    markdown.append("Nothing found.")
 for rule, title, why in groups:
     hits = sorted((f for f in findings if f["rule_id"] == rule), key=lambda f: (f["file"], f["line"]))
     if not hits:
         continue
     print(f"\n{title} ({len(hits)}): {why}")
+    markdown += [f"## {title} ({len(hits)})", "", f"{why[0].upper()}{why[1:]}. SwiftLint rule `{rule}`.", ""]
+    markdown += [f"- `{where}` `{text}`" for where, text in map(place, hits)] + [""]
     if len(hits) > noisy:
         counts = Counter(short(f["file"]) for f in hits).most_common()
         for file, count in counts[:top]:
@@ -52,9 +64,8 @@ for rule, title, why in groups:
         if len(counts) > top:
             print(f"       and {len(counts) - top} more files")
         continue
-    for f in hits:
-        if rule == "file_length":
-            print(f"  {short(f['file']):44} {len(Path(f['file']).read_text().splitlines())} lines")
-            continue
-        place = f"{short(f['file'])}:{f['line']}"
-        print(f"  {place:44} {code(f['file'], f['line'])}")
+    for where, text in map(place, hits):
+        print(f"  {where:44} {text}")
+
+out.write_text("\n".join(markdown))
+print(f"\nThe full list, to hand to an agent: {out}")
