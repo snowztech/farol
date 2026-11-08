@@ -79,14 +79,8 @@ final class ReviewModel: ObservableObject {
     /// The agent working on this checkout now, by name, so the review can say so. Nil while none works.
     @Published private(set) var working: String?
 
-    /// `quietly` for a switch to another session, where the last one stopping says nothing about this one.
-    func setWorking(_ name: String?, quietly: Bool = false) {
-        guard name != working else { return }
-        let finished = working
-        working = name
-        if !quietly, let finished, name == nil, notes.contains(where: \.sent) {
-            noteStatus = ("\(finished) is done. Check what changed, then resolve the notes.", false)
-        }
+    func setWorking(_ name: String?) {
+        if name != working { working = name }
     }
     /// The files the watcher saw written since the last refresh, oldest first, relative to the root.
     private var touched: [String] = []
@@ -599,7 +593,6 @@ final class ReviewModel: ObservableObject {
     func clearSentNotes() {
         guard let root else { return }
         allNotes[root]?.removeAll(where: \.sent)
-        noteStatus = nil
         rebuild()
     }
 
@@ -1167,17 +1160,7 @@ struct ReviewPanel: View {
                 .padding(.horizontal, 10)
                 .padding(.bottom, 8)
             }
-            if let name = review.working, review.showsYours {
-                HStack(spacing: 6) {
-                    ProgressView().controlSize(.mini)
-                    Text(review.notes.contains(where: \.sent) ? "\(name) is working on your notes" : "\(name) is working")
-                }
-                .font(.system(size: 11))
-                .foregroundStyle(p.muted)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 8)
-            }
-            // While it works, the line above says more than "Sent to …" would.
+            // While it works, the notes button says so, which is more than "Sent to …" would.
             if let status = review.noteStatus, status.failed || review.working == nil {
                 Text(status.text)
                     .font(.system(size: 11))
@@ -2127,7 +2110,10 @@ private struct NotesButton: View {
     var body: some View {
         let unsent = review.unsentNotes.count
         let notes = "\(unsent) \(unsent == 1 ? "note" : "notes")"
-        if unsent == 0 {
+        if unsent == 0, let name = review.working {
+            // The button turning into Resolve is how you see it's done.
+            ShipButton(title: "Working…", help: "\(name) is working on your notes", busy: true, palette: palette) {}
+        } else if unsent == 0 {
             // Named for what it removes, so it can't read as accepting the changes next to Commit.
             let sent = review.notes.count
             ShipButton(title: "Resolve \(sent) \(sent == 1 ? "note" : "notes")",

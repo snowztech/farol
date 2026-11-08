@@ -1143,7 +1143,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         place(session)
         followFiles(session)
         followReview(session)
-        showWorking(quietly: true)
+        showWorking()
         followGraph(session)
         followMerge(session)
     }
@@ -1197,9 +1197,9 @@ extension MainWindowController {
     }
 
     /// Tells the review which agent works on the checkout on screen, if one does.
-    private func showWorking(quietly: Bool = false) {
+    private func showWorking() {
         let working = store.selected.flatMap { session in sessions(sharing: session).first { $0.activity == .working } }
-        review.setWorking(working.map { runningAgent(in: $0)?.name ?? "The agent" }, quietly: quietly)
+        review.setWorking(working.map { runningAgent(in: $0)?.name ?? "The agent" })
     }
 
     /// The session and the others on its checkout, as one started from the review's notes. Itself first.
