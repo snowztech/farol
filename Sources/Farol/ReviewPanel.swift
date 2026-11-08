@@ -559,8 +559,8 @@ final class ReviewModel: ObservableObject {
         }
         return marks
     }
-    /// Said once notes went, or why they couldn't.
-    @Published private(set) var noteStatus: (text: String, failed: Bool)?
+    /// Why notes couldn't go. Nothing is said when they do: each note says it's waiting.
+    @Published private(set) var noteError: String?
     private static let notesKey = "review.notes"
 
     private static func savedNotes() -> [String: [ReviewNote]] {
@@ -653,16 +653,15 @@ final class ReviewModel: ObservableObject {
 
     private func deliver(_ prompt: String, via chosen: ReviewAgent? = nil) -> Bool {
         guard let agent = chosen ?? agent() else {
-            noteStatus = ("No agent is running in this session. Start one, then send again.", true)
+            noteError = "Connect an agent in Settings → Agents to send your notes to it."
             return false
         }
         if let refusal = agent.refusal {
-            noteStatus = (refusal, true)
+            noteError = refusal
             return false
         }
-        // No "Sent" line: each note says it's waiting, where you look.
         agent.send(prompt)
-        noteStatus = nil
+        noteError = nil
         return true
     }
 
@@ -1180,11 +1179,10 @@ struct ReviewPanel: View {
                 .padding(.horizontal, 10)
                 .padding(.bottom, 8)
             }
-            // While it works, the notes button says so, which is more than "Sent to …" would.
-            if let status = review.noteStatus, status.failed || review.working == nil {
-                Text(status.text)
+            if let error = review.noteError {
+                Text(error)
                     .font(.system(size: 11))
-                    .foregroundStyle(status.failed ? p.waiting : p.muted)
+                    .foregroundStyle(p.waiting)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 12)
                     .padding(.bottom, 8)
