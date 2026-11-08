@@ -166,3 +166,34 @@ private func write(_ text: String, _ name: String, in box: Sandbox) throws {
     #expect(all.gaps == [1..<2])
     #expect(all.hunks.count == 1)
 }
+
+@Test func latestChangeIsTheNewHunkInTheFileWrittenLast() {
+    func added(_ line: Int, _ text: String) -> Diff.Hunk {
+        Diff.Hunk(oldStart: line, newStart: line, lines: [.init(kind: .added, text: text, number: line)])
+    }
+    let a = Diff.File(path: "a.txt", hunks: [added(3, "x")])
+    let b = Diff.File(path: "b.txt", hunks: [added(1, "y")])
+    let old = [a, b]
+
+    // The second hunk in a.txt is new, and a.txt was written last.
+    let grown = Diff.File(path: "a.txt", hunks: [added(3, "x"), added(20, "z")])
+    let edited = Diff.File(path: "b.txt", hunks: [added(1, "y2")])
+    let change = Diff.latestChange(from: old, to: [grown, edited], touched: ["b.txt", "a.txt"])
+    #expect(change?.path == "a.txt")
+    #expect(change?.line == 20)
+
+    // A new file is one hunk that grows at the bottom, so the change is the first line that wasn't there.
+    let short = Diff.File(path: "d.txt", status: .added, hunks: [
+        Diff.Hunk(oldStart: 0, newStart: 1, lines: [.init(kind: .added, text: "a", number: 1), .init(kind: .added, text: "b", number: 2)]),
+    ])
+    let long = Diff.File(path: "d.txt", status: .added, hunks: [
+        Diff.Hunk(oldStart: 0, newStart: 1, lines: ["a", "b", "c"].enumerated().map { .init(kind: .added, text: $1, number: $0 + 1) }),
+    ])
+    #expect(Diff.latestChange(from: [short], to: [long], touched: ["d.txt"])?.line == 3)
+
+    // A file that is new to the diff starts at its first hunk.
+    let new = Diff.File(path: "c.txt", status: .added, hunks: [added(1, "c")])
+    #expect(Diff.latestChange(from: old, to: old + [new], touched: [])?.path == "c.txt")
+
+    #expect(Diff.latestChange(from: old, to: old, touched: ["a.txt"]) == nil)
+}

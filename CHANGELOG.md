@@ -6,6 +6,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
+- Follow in the review, the target beside the scope. While the session's agent works, the review scrolls to each change it makes as it lands, in the file it wrote last. It waits while you scroll or click in the review, does nothing once the agent stops, and stays on until you turn it off.
+
+### Added
+
 - A search field on Settings → Shortcuts. Type an action or a key, like split or ⌘K. Words like cmd, shift, opt and ctrl find their symbols.
 - The review can fill the window: click the arrows in its header, or press ⌥⌘↩. The terminal keeps running out of sight at its size, so an agent doesn't redraw, and its status dot and notifications still reach you. The arrows, the shortcut, closing the review or opening a file from it bring the terminal back, and each session remembers it.
 - ⇧⌘↩ zooms the file pane too, as it does a terminal pane, and the file's tab bar has the same arrows.

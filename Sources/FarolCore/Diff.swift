@@ -333,3 +333,26 @@ public enum Diff {
         return Hunk(oldStart: old, newStart: new, lines: [])
     }
 }
+
+extension Diff {
+    /// Where the newest change is, for following an agent: in the file written last of those that changed, at its first added line that wasn't there.
+    /// Lines are compared, not hunks, since a new file is one hunk that grows. An edit moves the lines under it, so the first that differs is the edit.
+    /// With only lines removed, it's the first hunk that changed.
+    public static func latestChange(from old: [File], to new: [File], touched: [String]) -> (path: String, line: Int)? {
+        let before = Dictionary(old.map { ($0.path, $0) }, uniquingKeysWith: { first, _ in first })
+        let changed = new.filter { before[$0.path] != $0 }
+        guard let fallback = changed.first else { return nil }
+        let file = touched.reversed().lazy.compactMap { path in changed.first { $0.path == path } }.first ?? fallback
+        let previous = before[file.path]
+        var was: [Int: String] = [:]
+        for line in previous?.hunks.flatMap(\.lines) ?? [] where line.kind != .removed {
+            if let number = line.number { was[number] = line.text }
+        }
+        for line in file.hunks.flatMap(\.lines) where line.kind == .added {
+            if let number = line.number, was[number] != line.text { return (file.path, number) }
+        }
+        let seen = previous?.hunks ?? []
+        let hunk = file.hunks.first { !seen.contains($0) } ?? file.hunks.first
+        return (file.path, hunk?.newBegin ?? 1)
+    }
+}

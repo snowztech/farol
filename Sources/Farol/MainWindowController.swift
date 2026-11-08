@@ -46,6 +46,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     /// Follows the selected session's checkout and branch, so the count in the title bar stays current.
     private var reviewFollow: AnyCancellable?
     private weak var reviewHost: NSView?
+    /// Notes when you scroll or click in the review, so Follow leaves you to read.
+    private var reviewUse: Any?
     /// The diff the cursor was in when the review's search opened.
     private weak var findReturn: DiffTextView?
     private static let reviewWidthKey = "review.width"
@@ -155,6 +157,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         reviewPanel.clipsToBounds = true
         reviewHost = reviewPanel
         review.agent = { [weak self] in self?.reviewAgent() }
+        review.agentWorking = { [weak self] in self?.store.selected?.activity == .working }
+        reviewUse = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .leftMouseDown]) { [weak self] event in
+            if let self, let host = reviewHost, event.window === host.window,
+               host.bounds.contains(host.convert(event.locationInWindow, from: nil)) {
+                review.lastUsed = .now
+            }
+            return event
+        }
         settingsView = hosting(SettingsPage(
             settings: settings, agents: agents, worktrees: worktrees, state: state, updates: updates, remote: remote,
             remoteServers: servers, serverCommands: serverCommands,
