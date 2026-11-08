@@ -157,6 +157,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         reviewPanel.clipsToBounds = true
         reviewHost = reviewPanel
         review.agent = { [weak self] in self?.reviewAgent() }
+        review.agentsToStart = { [weak self] in self?.agentsToStart() ?? [] }
         review.agentWorking = { [weak self] in
             guard let self, let session = store.selected else { return false }
             return sessions(sharing: session).contains { $0.activity == .working }
@@ -1187,12 +1188,20 @@ extension MainWindowController {
     fileprivate func reviewAgent() -> ReviewAgent? {
         guard let session = store.selected else { return nil }
         if let running = sessions(sharing: session).lazy.compactMap(runningAgent).first { return running }
-        guard !session.isRemote, let checkout = session.checkout else { return nil }
+        return agentsToStart().first
+    }
+
+    /// Every connected agent, as one to start for the notes in the background, the one new sessions start with first. None while one runs.
+    fileprivate func agentsToStart() -> [ReviewAgent] {
+        guard let session = store.selected, !session.isRemote, let checkout = session.checkout,
+              !sessions(sharing: session).contains(where: { runningAgent(in: $0) != nil }) else { return [] }
         let folders = AgentFolder.find()
-        guard let folder = folders.first(where: { $0.command() == agents.startCommand }) ?? folders.first else { return nil }
-        return ReviewAgent(name: folder.label, kind: folder.kind, refusal: nil, starts: true) { [weak self] prompt in
-            let (run, environment) = SessionStore.hidden(folder.command(task: prompt))
-            self?.store.create(directory: checkout, run: run, environment: environment, select: false)
+        let yours = folders.filter { $0.command() == agents.startCommand }
+        return (yours + folders.filter { folder in !yours.contains { $0.id == folder.id } }).map { folder in
+            ReviewAgent(name: folder.label, kind: folder.kind, refusal: nil, starts: true) { [weak self] prompt in
+                let (run, environment) = SessionStore.hidden(folder.command(task: prompt))
+                self?.store.create(directory: checkout, run: run, environment: environment, select: false)
+            }
         }
     }
 

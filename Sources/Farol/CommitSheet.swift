@@ -257,6 +257,7 @@ struct SplitShipButton<Choices: View>: View {
     let help: String
     let busy: Bool
     var icon: Forge.Kind? = nil
+    var agent: AgentFolder.Kind? = nil
     let palette: Palette
     let action: () -> Void
     @ViewBuilder let choices: Choices
@@ -269,6 +270,7 @@ struct SplitShipButton<Choices: View>: View {
             Button(action: action) {
                 HStack(spacing: 6) {
                     if let icon { ForgeIcon(kind: icon) }
+                    if let agent { ToolTile(agent: agent, size: 15) }
                     Text(title).font(.system(size: 12, weight: .medium))
                 }
                 .padding(.horizontal, 10)

@@ -533,6 +533,8 @@ final class ReviewModel: ObservableObject {
 
     /// The agent of the session on screen, to send notes to. Set by the window, which knows the sessions.
     var agent: () -> ReviewAgent? = { nil }
+    /// The agents Farol could start for your notes when none runs, yours first, for the arrow beside Send.
+    var agentsToStart: () -> [ReviewAgent] = { [] }
     /// Your notes on your own changes, per checkout. Kept across launches, since a review can take a while.
     @Published private var allNotes: [String: [ReviewNote]] = ReviewModel.savedNotes() {
         didSet { UserDefaults.standard.set(try? JSONEncoder().encode(allNotes), forKey: Self.notesKey) }
@@ -612,14 +614,14 @@ final class ReviewModel: ObservableObject {
     }
 
     /// The notes not sent yet, in one prompt, with `also` for the change as a whole.
-    func sendNotes(also: String? = nil) {
-        send(unsentNotes, also: also)
+    func sendNotes(also: String? = nil, via chosen: ReviewAgent? = nil) {
+        send(unsentNotes, also: also, via: chosen)
     }
 
-    private func send(_ list: [ReviewNote], also: String? = nil) {
+    private func send(_ list: [ReviewNote], also: String? = nil, via chosen: ReviewAgent? = nil) {
         guard let root, !list.isEmpty else { return }
         let prompt = ReviewNotes.prompt(list.map(ReviewNotes.Item.init), also: also)
-        guard deliver(prompt) else { return }
+        guard deliver(prompt, via: chosen) else { return }
         let ids = Set(list.map(\.id))
         allNotes[root] = allNotes[root]?.map { note in
             var note = note
@@ -649,8 +651,8 @@ final class ReviewModel: ObservableObject {
         return shown.number == number && agent() != nil
     }
 
-    private func deliver(_ prompt: String) -> Bool {
-        guard let agent = agent() else {
+    private func deliver(_ prompt: String, via chosen: ReviewAgent? = nil) -> Bool {
+        guard let agent = chosen ?? agent() else {
             noteStatus = ("No agent is running in this session. Start one, then send again.", true)
             return false
         }
@@ -2157,8 +2159,18 @@ private struct NotesButton: View {
         } else if let agent = review.agent() {
             // The next step while notes wait, ahead of committing work the agent is about to change.
             let help = agent.starts ? "Start \(agent.name) in a new session here, with them as its first message" : "Send them to \(agent.name) in one message"
-            ShipButton(title: "Send \(notes)", help: help, busy: false, agent: agent.kind,
-                       primary: true, palette: palette) { review.sendNotes() }
+            // With none running and more than one connected, the arrow starts another instead.
+            let others = agent.starts ? Array(review.agentsToStart().dropFirst()) : []
+            if others.isEmpty {
+                ShipButton(title: "Send \(notes)", help: help, busy: false, agent: agent.kind,
+                           primary: true, palette: palette) { review.sendNotes() }
+            } else {
+                SplitShipButton(title: "Send \(notes)", help: help, busy: false, agent: agent.kind, palette: palette, action: { review.sendNotes() }) {
+                    ForEach(others.indices, id: \.self) { index in
+                        Button("Start \(others[index].name) with them") { review.sendNotes(via: others[index]) }
+                    }
+                }
+            }
         } else {
             // Nothing to send to, so a count rather than a button that would only say no.
             Text(notes)
