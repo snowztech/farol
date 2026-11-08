@@ -41,6 +41,8 @@ final class FileView: NSView {
     var onOpenAt: ((String, Int) -> Void)?
     /// ⌥⌘ with an arrow while the text has the keyboard: go to the pane that way, as in a terminal.
     var onMovePane: ((TerminalRequest.Direction) -> Void)?
+    /// ⇧⌘↩, which zooms a terminal pane, zooms the file pane here.
+    var onZoom: (() -> Void)?
     /// The theme's colors, for the list of definitions or references to look like the rest of Farol.
     var palette: () -> Palette? = { nil }
     /// The pane now shows another file, which the files panel follows.
@@ -199,10 +201,24 @@ final class FileView: NSView {
 
     /// Only when the keyboard is in this file, since a terminal beside it has the same keys and handles them itself.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        guard let direction = Self.paneDirection(of: event), let responder = window?.firstResponder as? NSView,
-              responder.isDescendant(of: self) else { return super.performKeyEquivalent(with: event) }
-        onMovePane?(direction)
-        return true
+        guard let responder = window?.firstResponder as? NSView, responder.isDescendant(of: self) else {
+            return super.performKeyEquivalent(with: event)
+        }
+        if let direction = Self.paneDirection(of: event) {
+            onMovePane?(direction)
+            return true
+        }
+        if Self.isZoom(event) {
+            onZoom?()
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
+    /// ⇧⌘↩ or ⇧⌘ and the keypad's enter, as Ghostty reads them for its split zoom.
+    static func isZoom(_ event: NSEvent) -> Bool {
+        event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.numericPad, .function, .capsLock]) == [.command, .shift]
+            && [36, 76].contains(event.keyCode)
     }
 
     /// The text that takes the keyboard: the preview while it shows, else the source.

@@ -639,22 +639,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         setExpanded(next)
     }
 
-    /// What ⌥⌘↩ fills: the file pane while it has the keyboard, else the review.
-    enum Expandable { case review, file }
-    var expandable: Expandable? {
-        if state.showingSettings || state.showingMerge { return nil }
-        if let panes = store.selected?.panes, panes.tabs != nil, panes.fileFocused || panes.fileZoomed, !state.reviewExpanded { return .file }
-        return review.isOpen ? .review : nil
-    }
-    var isExpanded: Bool { state.reviewExpanded || store.selected?.panes.fileZoomed == true }
-
-    func expand() {
-        switch expandable {
-        case .file: store.selected?.panes.toggleFileZoom()
-        case .review: toggleExpanded()
-        case nil: break
-        }
-    }
+    var isExpanded: Bool { state.reviewExpanded }
+    var canExpand: Bool { review.isOpen && !state.showingSettings && !state.showingMerge }
 
     /// The terminal keeps running behind the review, at its size, so an agent never redraws for a terminal no one sees.
     /// The review slides out to the window's edge, then stops having a width of its own, so it follows the window as it resizes.

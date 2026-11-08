@@ -103,7 +103,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func goToLine(_ sender: Any?) { windowController.goToLine() }
     @objc func toggleReview(_ sender: Any?) { windowController.toggleReview() }
     @objc func toggleExpanded(_ sender: Any?) {
-        windowController.expand()
+        if windowController.canExpand { windowController.toggleExpanded() }
     }
     @objc func toggleMerge(_ sender: Any?) { windowController.toggleMerge() }
     @objc func commit(_ sender: Any?) { windowController.commit() }
@@ -143,9 +143,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
         if item.action == #selector(toggleExpanded) {
             // Named after what it does now.
-            let target = windowController.expandable
-            item.title = windowController.isExpanded && target != nil ? "Show Terminal" : target == .file ? "Expand File" : "Expand Review"
-            return target != nil
+            item.title = windowController.isExpanded ? "Show Terminal" : "Expand Review"
+            return windowController.canExpand
         }
         return switch item.action {
         case #selector(saveFile): windowController.canSaveFile

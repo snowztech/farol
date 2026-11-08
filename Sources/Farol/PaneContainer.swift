@@ -51,7 +51,6 @@ final class PaneContainer: NSView {
     }
     /// The zoom shows the file pane, with every terminal hidden behind it but still running.
     private var zoomedFile = false
-    var fileZoomed: Bool { zoomed && zoomedFile }
     private var dragging: Node?
 
     /// The terminal theme's background and text colors, which the dividers and search bar are mixed from.
@@ -954,6 +953,7 @@ final class PaneContainer: NSView {
         file.onShowCommit = { [weak self] in self?.onShowCommit?($0) }
         file.onOpenAt = { [weak self] in self?.open($0, line: $1) }
         file.onMovePane = { [weak self] in self?.goto(.direction($0)) }
+        file.onZoom = { [weak self] in self?.toggleFileZoom() }
         file.palette = { [weak self] in self?.palette }
         // A preview tab shows another file in the same view, which the files panel follows when it's the one in front.
         file.onPathChange = { [weak self, weak file] in

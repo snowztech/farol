@@ -366,7 +366,7 @@ struct FileTabBar: View {
                                    help: model.previewing ? "Show the source" : "Preview", palette: p, action: model.togglePreview)
                     }
                     IconButton(symbol: model.expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
-                               help: model.expanded ? "Show the terminal (⌥⌘↩)" : "Expand (⌥⌘↩)", palette: p, action: model.expand)
+                               help: model.expanded ? "Show the terminal (⇧⌘↩)" : "Expand (⇧⌘↩)", palette: p, action: model.expand)
                     IconButton(symbol: "xmark", help: "Close all files", palette: p, action: model.closeAll)
                 }
                 .padding(.trailing, 6)

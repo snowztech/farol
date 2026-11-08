@@ -6,7 +6,8 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
-- The review can fill the window, and a file you have open can fill the terminal's space. Click the arrows in the review's header or the file's tab bar, or press ⌥⌘↩, which fills the file while it has the keyboard and the review otherwise. The terminal keeps running out of sight at its size, so an agent doesn't redraw, and its status dot and notifications still reach you. The same arrows or shortcut bring it back, and so do closing the review and opening a file from it. Each session remembers an expanded review.
+- The review can fill the window: click the arrows in its header, or press ⌥⌘↩. The terminal keeps running out of sight at its size, so an agent doesn't redraw, and its status dot and notifications still reach you. The arrows, the shortcut, closing the review or opening a file from it bring the terminal back, and each session remembers it.
+- ⇧⌘↩ zooms the file pane too, as it does a terminal pane, and the file's tab bar has the same arrows.
 
 ## [0.66.0] - 2026-11-07
 
