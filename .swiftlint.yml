@@ -13,9 +13,9 @@ analyzer_rules:
   - unused_declaration
   - unused_import
 
+# Tests may force unwrap and run long. They still count as uses for unused code, since the audit build includes them.
 included:
   - Sources
-  - Tests
 
 cyclomatic_complexity:
   warning: 15

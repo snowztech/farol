@@ -10,20 +10,18 @@ if ! command -v swiftlint >/dev/null; then
   exit 1
 fi
 
-report="$(mktemp)"
-swiftlint lint --quiet > "$report" || true
+lint="$(mktemp)"
+swiftlint lint --quiet --reporter json > "$lint" || true
 
 # Unused code needs every file's compile command, so it builds from scratch in a folder of its own.
 log="$(mktemp)"
 echo "Building from scratch to look for unused code. It takes a few minutes."
 rm -rf .build/audit
-if ! swift build -v --build-path .build/audit > "$log" 2>&1; then
+if ! swift build -v --build-tests --build-path .build/audit > "$log" 2>&1; then
   tail -20 "$log"
   exit 1
 fi
-swiftlint analyze --quiet --compiler-log-path "$log" >> "$report" || true
+unused="$(mktemp)"
+swiftlint analyze --quiet --reporter json --compiler-log-path "$log" > "$unused" || true
 
-sed "s|$root/||" "$report"
-echo
-echo "By rule:"
-grep -oE '\(([a-z_]+)\)$' "$report" | tr -d '()' | sort | uniq -c | sort -rn || echo "  nothing found"
+python3 "$root/scripts/audit-report.py" "$root" "$lint" "$unused"
