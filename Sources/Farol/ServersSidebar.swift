@@ -110,6 +110,7 @@ struct ServerGroups: View {
 }
 
 /// A server's name over its sessions. Its icon sits in the lamps' column, and gives way to a lamp when folded.
+/// Folded, the icon moves beside the name, so a server never reads as a project.
 private struct ServerHeader: View {
     let name: String
     let state: ServerLinks.State
@@ -139,9 +140,12 @@ private struct ServerHeader: View {
                 }
             }
             .frame(width: Lamp.size)
-            Text(name)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(hovering ? palette.text : palette.muted)
+            HStack(spacing: 6) {
+                if folded, loudest != nil { ServerIcon(palette: palette) }
+                Text(name)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(hovering ? palette.text : palette.muted)
+            }
             if let word = settingUp ? "setting up" : offline ? "offline" : nil {
                 Text(word).font(.system(size: 11)).foregroundStyle(palette.muted.opacity(0.7))
             } else if folded, !state.sessions.isEmpty {
