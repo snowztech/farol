@@ -45,6 +45,7 @@ struct SettingsPage: View {
     @State private var avatars: [Forge.Kind: URL] = [:]
     /// Whether jira-cli is there and set up. Nil while it is being asked.
     @State private var jira: Forge.ToolState?
+    @State private var linear: Forge.ToolState?
     @State private var jiraAvatar: URL?
     @State private var jiraBoards: [Jira.Board] = []
     /// A line that says which board, or empty for your own tickets.
@@ -600,7 +601,7 @@ struct SettingsPage: View {
         }
 
         GroupTitle(title: "Tickets",
-                   detail: "New Task lists your open Jira tickets, next to the open issues of a repo on GitHub. Picking one names the branch after it and hands the agent the ticket in full.",
+                   detail: "New Task lists your open Jira tickets and Linear issues, next to the open issues of a repo on GitHub. Picking one names the branch after it and hands the agent the ticket in full.",
                    palette: p)
         Card(palette: p) {
             Row(title: "Jira", detail: jiraDetail, icon: ToolTile(jira: 26), link: ("Jira CLI (jira)", Jira.docs), palette: p) {
@@ -625,6 +626,9 @@ struct SettingsPage: View {
                     .hoverLift()
                 }
             }
+            Row(title: "Linear", detail: linearDetail, icon: ToolTile(linear: 26), link: ("Linear CLI (linear)", Linear.docs), palette: p) {
+                toolControl(linear, avatar: nil, setup: Linear.setupCommand(from:), p)
+            }
         }
     }
 
@@ -633,6 +637,15 @@ struct SettingsPage: View {
     private var listsBoards: Bool {
         if case .connected = jira { return true }
         return jira == nil && Jira.isSetUp
+    }
+
+    private var linearDetail: String {
+        switch linear {
+        case nil: "Checking the Linear CLI (linear)…"
+        case .connected: "Uses the Linear CLI (linear). It lists your open issues."
+        case .loggedOut: "The Linear CLI (linear) is installed but not logged in. It keeps your API key in the Keychain."
+        case .missing: "The Linear CLI (linear) isn't installed."
+        }
     }
 
     private var jiraDetail: String {
@@ -771,6 +784,8 @@ struct SettingsPage: View {
             DispatchQueue.main.async { tools = states }
             let jira = Jira.toolState()
             DispatchQueue.main.async { self.jira = jira }
+            let linear = Linear.toolState()
+            DispatchQueue.main.async { self.linear = linear }
             // After the states are on screen, since GitLab's picture takes another call to its server.
             var found: [Forge.Kind: URL] = [:]
             for (kind, state) in states {
