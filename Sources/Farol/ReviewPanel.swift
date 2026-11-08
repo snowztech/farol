@@ -76,6 +76,18 @@ final class ReviewModel: ObservableObject {
     /// When you last scrolled the review. Following waits a moment after, so it never pulls the page from under you.
     var lastUsed = Date.distantPast
     @Published private(set) var fresh: FreshLines?
+    /// The agent working on this checkout now, by name, so the review can say so. Nil while none works.
+    @Published private(set) var working: String?
+
+    /// `quietly` for a switch to another session, where the last one stopping says nothing about this one.
+    func setWorking(_ name: String?, quietly: Bool = false) {
+        guard name != working else { return }
+        let finished = working
+        working = name
+        if !quietly, let finished, name == nil, notes.contains(where: \.sent) {
+            noteStatus = ("\(finished) is done. Check what changed, then resolve the notes.", false)
+        }
+    }
     /// The files the watcher saw written since the last refresh, oldest first, relative to the root.
     private var touched: [String] = []
     /// The subject of the commit being shown, for the compare menu.
@@ -587,6 +599,7 @@ final class ReviewModel: ObservableObject {
     func clearSentNotes() {
         guard let root else { return }
         allNotes[root]?.removeAll(where: \.sent)
+        noteStatus = nil
         rebuild()
     }
 
@@ -1154,7 +1167,18 @@ struct ReviewPanel: View {
                 .padding(.horizontal, 10)
                 .padding(.bottom, 8)
             }
-            if let status = review.noteStatus {
+            if let name = review.working, review.showsYours {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.mini)
+                    Text(review.notes.contains(where: \.sent) ? "\(name) is working on your notes" : "\(name) is working")
+                }
+                .font(.system(size: 11))
+                .foregroundStyle(p.muted)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
+            }
+            // While it works, the line above says more than "Sent to …" would.
+            if let status = review.noteStatus, status.failed || review.working == nil {
                 Text(status.text)
                     .font(.system(size: 11))
                     .foregroundStyle(status.failed ? p.waiting : p.muted)

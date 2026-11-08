@@ -350,6 +350,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             refreshBadge(enabled: agents.dockBadge)
             menuBar.refresh()
             notch.refresh()
+            showWorking()
         }
         menuBar.onSelect = { [weak self] session in
             self?.window?.makeKeyAndOrderFront(nil)
@@ -1142,6 +1143,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         place(session)
         followFiles(session)
         followReview(session)
+        showWorking(quietly: true)
         followGraph(session)
         followMerge(session)
     }
@@ -1192,6 +1194,12 @@ extension MainWindowController {
             let (run, environment) = SessionStore.hidden(folder.command(task: prompt))
             self?.store.create(directory: checkout, run: run, environment: environment, select: false)
         }
+    }
+
+    /// Tells the review which agent works on the checkout on screen, if one does.
+    private func showWorking(quietly: Bool = false) {
+        let working = store.selected.flatMap { session in sessions(sharing: session).first { $0.activity == .working } }
+        review.setWorking(working.map { runningAgent(in: $0)?.name ?? "The agent" }, quietly: quietly)
     }
 
     /// The session and the others on its checkout, as one started from the review's notes. Itself first.
