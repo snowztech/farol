@@ -8,6 +8,8 @@
 - [Blog](https://farol.sh/blog/): posts on building Farol, like how Remote answers Claude Code from a phone through a relay that cannot read the messages
 - [Best terminal for Claude Code and Codex](https://farol.sh/blog/best-terminal-for-claude-code): Farol, Paradev, Conductor, cmux, Warp, Ghostty and iTerm2 compared for running coding agents in parallel
 - [Run Claude Code agents in parallel with git worktrees](https://farol.sh/blog/parallel-claude-code-agents-git-worktrees): how to give each Claude Code or Codex agent its own git worktree, with the commands, gotchas, review and cleanup
+- [Farol compared](https://farol.sh/compare/): Farol next to Warp, cmux and Paradev, at a glance
+- [Farol vs Warp](https://farol.sh/compare/warp): Farol compared with Warp, a cross-platform terminal and agent platform, feature by feature
 - [Farol vs Paradev](https://farol.sh/compare/paradev): Farol compared with Paradev, formerly Superset, feature by feature
 - [Farol vs cmux](https://farol.sh/compare/cmux): Farol compared with cmux, another native macOS terminal on libghostty, feature by feature
 - [Source](https://github.com/snowztech/farol): README, roadmap and releases
