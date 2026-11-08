@@ -70,11 +70,8 @@ final class ReviewModel: ObservableObject {
     /// A file to bring into view once the diff is read. The id changes each time, so asking twice for one file scrolls again.
     @Published private(set) var focus: (path: String, id: UUID)?
     private var pendingFocus: String?
-    /// Follow, from the button in the header: each change the agent makes scrolls the review to it. Remembered, so it stays on.
-    @Published var follows = UserDefaults.standard.bool(forKey: "review.follow") {
-        didSet { UserDefaults.standard.set(follows, forKey: "review.follow") }
-    }
-    /// Whether an agent works on the session's checkout now, in it or in another session there. Asked when a write comes in, since it may be done by the time the refresh runs.
+    /// While an agent works on the session's checkout, in it or in another session there, each change it makes scrolls the review to it.
+    /// Whether one works now. Asked when a write comes in, since it may be done by the time the refresh runs.
     var agentWorking: () -> Bool = { false }
     /// When you last scrolled the review. Following waits a moment after, so it never pulls the page from under you.
     var lastUsed = Date.distantPast
@@ -1033,7 +1030,7 @@ final class ReviewModel: ObservableObject {
     /// Agents write in bursts, so changes wait a moment and refresh once.
     private func changed(_ paths: [String]) {
         guard Self.matters(paths, ignored: ignored) else { return }
-        if let root, follows, agentWorking() {
+        if let root, agentWorking() {
             let prefix = root + "/"
             touched = (touched + paths.filter { $0.hasPrefix(prefix) }.map { String($0.dropFirst(prefix.count)) }).suffix(50)
         }
@@ -1134,10 +1131,6 @@ struct ReviewPanel: View {
             if review.root != nil {
                 HStack(spacing: 8) {
                     ScopeMenu(review: review, palette: p)
-                    if review.showsYours {
-                        IconButton(symbol: "scope", help: review.follows ? "Stop following the agent" : "Follow the agent's changes",
-                                   active: review.follows, palette: p) { review.follows.toggle() }
-                    }
                     Spacer(minLength: 0)
                     // The slot holds the next step: commit what's there, then open the request for the branch.
                     // Where there is no request to open, as on main or once the branch has one, the next step is a push.
