@@ -79,8 +79,23 @@ final class ReviewModel: ObservableObject {
     /// The agent working on this checkout now, by name, so the review can say so. Nil while none works.
     @Published private(set) var working: String?
 
+    /// When an agent on this checkout last stopped, so a note sent before it and still untouched reads as not changed.
+    @Published private(set) var lastFinished: Date?
+
     func setWorking(_ name: String?) {
-        if name != working { working = name }
+        guard name != working else { return }
+        if working != nil, name == nil { lastFinished = .now }
+        working = name
+    }
+
+    /// Where a note you sent stands: its lines rewritten, still waiting on the agent, or left as they were once it stopped.
+    enum NoteState { case draft, waiting, changed, untouched }
+
+    func state(of note: ReviewNote) -> NoteState {
+        guard let sentAt = note.sentAt else { return .draft }
+        if note.changed == true { return .changed }
+        if working == nil, let lastFinished, lastFinished > sentAt { return .untouched }
+        return .waiting
     }
     /// The files the watcher saw written since the last refresh, oldest first, relative to the root.
     private var touched: [String] = []
@@ -608,7 +623,12 @@ final class ReviewModel: ObservableObject {
         let ids = Set(list.map(\.id))
         allNotes[root] = allNotes[root]?.map { note in
             var note = note
-            if ids.contains(note.id) { note.sentAt = .now }
+            guard ids.contains(note.id) else { return note }
+            // Sent as the lines read now, so "changed" means changed after you sent it.
+            note.sentAt = .now
+            note.changed = nil
+            if let file = files.first(where: { $0.path == note.path }),
+               let quote = ReviewNotes.quote(in: file, line: note.line, end: note.end, old: note.old) { note.quote = quote }
             return note
         }
         rebuild()
@@ -638,11 +658,9 @@ final class ReviewModel: ObservableObject {
             noteStatus = (refusal, true)
             return false
         }
+        // No "Sent" line: each note says it's waiting, where you look.
         agent.send(prompt)
-        noteStatus = (agent.starts ? "Started \(agent.name) in a new session with your notes." : "Sent to \(agent.name).", false)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
-            if self?.noteStatus?.failed == false { self?.noteStatus = nil }
-        }
+        noteStatus = nil
         return true
     }
 
@@ -2051,7 +2069,8 @@ private struct NoteView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     if let kind = review.agent()?.kind { ToolTile(agent: kind, size: 14).opacity(note.sent ? 0.6 : 1) }
-                    Text(status).font(.system(size: 11, weight: .medium)).foregroundStyle(palette.muted)
+                    if review.state(of: note) == .waiting, review.working != nil { ProgressView().controlSize(.mini) }
+                    Text(status).font(.system(size: 11, weight: .medium)).foregroundStyle(statusColor)
                     if showsPlace || note.line != note.end {
                         Text(place).font(.system(size: 11, design: .monospaced)).foregroundStyle(palette.muted).lineLimit(1)
                     }
@@ -2085,9 +2104,21 @@ private struct NoteView: View {
     }
 
     private var status: String {
-        let changed = note.changed == true ? ", lines changed since" : ""
-        guard let sent = note.sentAt else { return "Draft" + changed }
-        return "Sent \(Self.age.localizedString(for: sent, relativeTo: .now))" + changed
+        switch review.state(of: note) {
+        case .draft: note.changed == true ? "Draft, lines changed since" : "Draft"
+        case .waiting: "Sent \(note.sentAt.map { Self.age.localizedString(for: $0, relativeTo: .now) } ?? ""), waiting"
+        case .changed: "Changed"
+        // Its lines, not the request: an agent can do what a note asks somewhere else in the file.
+        case .untouched: "Not changed"
+        }
+    }
+
+    private var statusColor: Color {
+        switch review.state(of: note) {
+        case .changed: palette.done
+        case .untouched: palette.waiting
+        case .draft, .waiting: palette.muted
+        }
     }
 
     private var place: String {
@@ -2111,9 +2142,12 @@ private struct NotesButton: View {
     var body: some View {
         let unsent = review.unsentNotes.count
         let notes = "\(unsent) \(unsent == 1 ? "note" : "notes")"
+        let sent = review.notes.filter(\.sent)
+        let changed = sent.filter { review.state(of: $0) == .changed }.count
         if unsent == 0, let name = review.working {
             // The button turning into Resolve is how you see it's done.
-            ShipButton(title: "\(name) is working", help: "It turns into Resolve once \(name) is done", busy: true, spinning: true, palette: palette) {}
+            ShipButton(title: "\(changed) of \(sent.count) changed", help: "\(name) is working on your notes. It turns into Resolve once it's done.",
+                       busy: true, spinning: true, palette: palette) {}
         } else if unsent == 0 {
             // Named for what it removes, so it can't read as accepting the changes next to Commit.
             let sent = review.notes.count
