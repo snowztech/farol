@@ -133,7 +133,6 @@
       box-shadow: 0 18px 48px rgba(0, 0, 0, 0.3);
     }
     .phone-shot { width: 300px; max-width: 100%; border-radius: 28px; }
-    .narrow-shot { width: 268px; max-width: 100%; }
     /* The themes, as on the landing: pick one and its picture fades in over the last. */
     .swatches { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 20px; }
     .swatch {
@@ -151,6 +150,7 @@
     .stack > * { grid-area: 1 / 1; opacity: 0; transition: opacity 0.45s var(--sn-ease); }
     .stack > [data-active] { opacity: 1; }
     picture { display: block; }
+    picture + p, picture + ul { margin-top: 24px; }
     /* Screenshots and examples rise into place once, as they scroll in. */
     .js .reveal { opacity: 0; transform: translateY(8px); transition: opacity 0.5s var(--sn-ease), transform 0.5s var(--sn-ease); }
     .js .reveal.in { opacity: 1; transform: none; }
@@ -218,6 +218,7 @@
           <li><a href="#review">Review and ship</a></li>
           <li><a href="#outside">From any app</a></li>
           <li><a href="#remote">From your phone</a></li>
+          <li><a href="#servers">Servers</a></li>
           <li><a href="#configuration">Configuration</a></li>
           <li><a href="#shortcuts">Shortcuts</a></li>
           <li><a href="#troubleshooting">Troubleshooting</a></li>
@@ -356,18 +357,41 @@ cp "$main/.claude/settings.local.json" .claude/ 2&gt;/dev/null || true</code></p
           <p>The phone lists your sessions with their status and opens each as its agent's conversation, with the terminal one tap away. Approve or answer an agent with a tap, reply with a slash command or a picture, open a new session, and look over what changed. It notifies you when an agent waits or finishes, and a Live Activity keeps count while the app is closed. Everything between the Mac and the phone is encrypted end to end, so the relay that joins them cannot read it.</p>
           <p>The agents run on the Mac, so it has to stay on. <strong>Keep the Mac awake for agents</strong> stops it from sleeping by itself while an agent works or waits for you. It is on unless you turn it off. Using Farol from your phone counts as using the Mac, so it sleeps after its usual time once you put the phone away.</p>
           <picture><source type="image/avif" srcset="features/phone-session.avif"><img class="doc-shot reveal phone-shot" src="features/phone-session.png" width="600" height="1304" alt="Farol for iPhone showing a Claude Code session waiting for you, with its question and two answers to pick with a tap" loading="lazy" decoding="async"></picture>
+          <p>To keep agents going with the Mac closed, run them on a server. See <a href="#servers">Servers</a>.</p>
+        </section>
 
-          <h3>On a server</h3>
-          <p>To keep agents going with the Mac closed, run them on a machine that stays on, with tmux. <a href="https://github.com/snowztech/farol-remote/tree/main/host"><code>farol-host</code></a> lets the phone see and answer every tmux window there. It is still experimental: <a href="https://github.com/snowztech/farol-remote/blob/main/ROADMAP.md#not-done-yet">here is what is left</a>.</p>
-          <pre><code>curl -fsSL https://farol.sh/host.sh | sh
-farol-host setup</code></pre>
-          <p>Setup connects Claude Code and Codex, keeps <code>farol-host</code> running, and shows a code to scan from the app. Start agents in tmux, like <code>tmux new -s api</code> then <code>claude</code>. The server shows next to your Mac on the phone.</p>
+        <section id="servers">
+          <h2>Servers</h2>
+          <p>Run agents on a machine that stays on, in tmux, and follow them from your Mac and your phone. <a href="https://github.com/snowztech/farol-remote/tree/main/host"><code>farol-host</code></a> reports their status from there. It is still experimental: <a href="https://github.com/snowztech/farol-remote/blob/main/ROADMAP.md#not-done-yet">here is what is left</a>.</p>
+
+          <h3>Add one from your Mac</h3>
+          <ol class="steps">
+            <li>Click the server button beside <strong>New task</strong>, or open <strong>Settings → Remote → Add Server</strong>.</li>
+            <li>Pick a host from <code>~/.ssh/config</code>, or type <code>user@host</code>.</li>
+            <li>Farol installs or updates <code>farol-host</code> there, in a terminal you can see. If ssh asks for a password or sudo, answer it there.</li>
+          </ol>
+          <p>There is no code to scan: ssh already proves it is you.</p>
+          <picture><source type="image/avif" srcset="features/servers-add-half.avif 1270w, features/servers-add.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot reveal" src="features/servers-add.png" width="2540" height="1520" alt="The Add a server sheet listing build-box, gpu-box and staging from ~/.ssh/config, with a field to type another host" loading="lazy" decoding="async"></picture>
+
+          <h3>In the sidebar</h3>
+          <p>The server's agents show under its name, with the same dots and notifications as your own.</p>
+          <ul>
+            <li>Click an agent to open its tmux window over ssh.</li>
+            <li>The <strong>+</strong> on the server's name opens a new tmux session there, and the <strong>✕</strong> on a row ends one.</li>
+            <li>A pane you split off opens on the server too.</li>
+            <li>Right-click the name to rename or remove the server.</li>
+          </ul>
+          <picture><source type="image/avif" srcset="features/servers-half.avif 1270w, features/servers.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot reveal" src="features/servers.png" width="2540" height="1520" alt="A shell opened on build-box with the + on its name, where tmux lists the agent sessions running there, and the sidebar shows build-box's agents with their status and the new shell selected" loading="lazy" decoding="async"></picture>
+
+          <h3>On your phone</h3>
+          <p>Right-click the server's name and choose <strong>Pair a Phone…</strong>, or open <strong>Settings → Remote → Servers</strong>, then scan the code from the app. The Mac and the phone are let in separately, so the phone keeps seeing the server with the Mac off.</p>
           <picture><source type="image/avif" srcset="features/phone-hosts.avif"><img class="doc-shot reveal phone-shot" src="features/phone-hosts.png" width="600" height="1304" alt="Farol for iPhone listing sessions from a MacBook Pro and a server, each row naming the machine it runs on" loading="lazy" decoding="async"></picture>
 
-          <h3 id="servers">Servers in the sidebar</h3>
-          <p>Your Mac can show a server's agents too. Click the server button beside <strong>New task</strong>, or <strong>Settings → Remote → Add Server</strong>, and pick a host from <code>~/.ssh/config</code> or type <code>user@host</code>. Farol installs or updates <code>farol-host</code> there over ssh and lets this Mac in, in a terminal under the server that closes once it is done. A password or sudo prompt can be answered there. A server you set up by hand is added the same way. ssh already proves it is you, so there is no code to scan.</p>
-          <picture><source type="image/avif" srcset="features/servers.avif"><img class="doc-shot reveal narrow-shot" src="features/servers.png" width="536" height="1010" alt="The sidebar with a project's sessions, then a server named build-box listing three agents working, waiting and done, and a second server folded with its count" loading="lazy" decoding="async"></picture>
-          <p>The server's agents show after your own sessions, under its name, with the same status dots. Farol notifies you when one waits or finishes and counts it on the Dock. Click one to open its tmux window over ssh. The + on the server's name starts a new tmux session there, and the ✕ on a row ends one. A pane you split off opens on the server too. Right-click the name to rename or remove the server. The Mac and your phone are let in separately, so the phone keeps seeing the server with the Mac off. <strong>Pair a Phone…</strong> in the same menu, or in <strong>Settings → Remote → Servers</strong>, shows the server's code to scan from the app.</p>
+          <h3>Set one up by hand</h3>
+          <p>Without a Mac in the loop, install <code>farol-host</code> on the server and scan the code it shows from the app:</p>
+          <pre><code>curl -fsSL https://farol.sh/host.sh | sh
+farol-host setup</code></pre>
+          <p>Setup connects Claude Code and Codex and keeps <code>farol-host</code> running. Start agents in tmux, like <code>tmux new -s api</code> then <code>claude</code>. A server set up this way can still be added from the Mac later.</p>
         </section>
 
         <section id="configuration">

@@ -60,7 +60,7 @@ public enum ServerSetup {
     }
 
     public static var sshHosts: [String] {
-        let file = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".ssh/config")
+        let file = sceneConfigFile ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".ssh/config")
         return hosts(inSSHConfig: (try? String(contentsOf: file, encoding: .utf8)) ?? "")
     }
 
@@ -71,11 +71,13 @@ public enum ServerSetup {
         ["-o", "ControlMaster=auto", "-o", "ControlPath=\(connectionFolder.path)/%C", "-o", "ControlPersist=10m"] + sceneConfig
     }
 
-    /// A staged scene's own ssh config in FAROL_HOME, so its servers never need a line in yours.
-    private static var sceneConfig: [String] {
-        let file = FarolHome.url.appendingPathComponent("ssh_config").path
-        return FarolHome.isMoved && FileManager.default.fileExists(atPath: file) ? ["-F", file] : []
+    /// A staged scene's own ssh config in FAROL_HOME, so its servers never need a line in yours and the hosts in yours never show in its shots.
+    /// Nil in normal use.
+    static var sceneConfigFile: URL? {
+        let file = FarolHome.url.appendingPathComponent("ssh_config")
+        return FarolHome.isMoved && FileManager.default.fileExists(atPath: file.path) ? file : nil
     }
+    private static var sceneConfig: [String] { sceneConfigFile.map { ["-F", $0.path] } ?? [] }
     private static var ssh: String { "ssh " + sshOptions.map(NewTask.shellQuoted).joined(separator: " ") }
 
     /// Where the setup script hands the server's link to Farol: the terminal's title, which never wraps and isn't shown in the text.
