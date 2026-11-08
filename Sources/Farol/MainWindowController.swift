@@ -157,8 +157,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         reviewPanel.clipsToBounds = true
         reviewHost = reviewPanel
         review.agent = { [weak self] in self?.reviewAgent() }
-        review.agentWorking = { [weak self] in self?.store.selected?.activity == .working }
-        reviewUse = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .leftMouseDown]) { [weak self] event in
+        review.agentWorking = { [weak self] in
+            guard let self, let session = store.selected else { return false }
+            return sessions(sharing: session).contains { $0.activity == .working }
+        }
+        // Scrolling only, since a click on Send or Commit in the review isn't reading it.
+        reviewUse = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
             if let self, let host = reviewHost, event.window === host.window,
                host.bounds.contains(host.convert(event.locationInWindow, from: nil)) {
                 review.lastUsed = .now
@@ -1180,8 +1184,7 @@ extension MainWindowController {
     /// With none, a new one in that checkout, in the background, with the notes as its first prompt. The notes point at these files, so not a new worktree.
     fileprivate func reviewAgent() -> ReviewAgent? {
         guard let session = store.selected else { return nil }
-        let near = [session] + store.sessions.filter { $0 !== session && $0.checkout != nil && $0.checkout == session.checkout }
-        if let running = near.lazy.compactMap(runningAgent).first { return running }
+        if let running = sessions(sharing: session).lazy.compactMap(runningAgent).first { return running }
         guard !session.isRemote, let checkout = session.checkout else { return nil }
         let folders = AgentFolder.find()
         guard let folder = folders.first(where: { $0.command() == agents.startCommand }) ?? folders.first else { return nil }
@@ -1189,6 +1192,11 @@ extension MainWindowController {
             let (run, environment) = SessionStore.hidden(folder.command(task: prompt))
             self?.store.create(directory: checkout, run: run, environment: environment, select: false)
         }
+    }
+
+    /// The session and the others on its checkout, as one started from the review's notes. Itself first.
+    private func sessions(sharing session: Session) -> [Session] {
+        [session] + store.sessions.filter { $0 !== session && $0.checkout != nil && $0.checkout == session.checkout }
     }
 
     private func runningAgent(in session: Session) -> ReviewAgent? {

@@ -74,9 +74,9 @@ final class ReviewModel: ObservableObject {
     @Published var follows = UserDefaults.standard.bool(forKey: "review.follow") {
         didSet { UserDefaults.standard.set(follows, forKey: "review.follow") }
     }
-    /// Whether the session's agent works now. Asked when a write comes in, since it may be done by the time the refresh runs.
+    /// Whether an agent works on the session's checkout now, in it or in another session there. Asked when a write comes in, since it may be done by the time the refresh runs.
     var agentWorking: () -> Bool = { false }
-    /// When you last scrolled or clicked in the review. Following waits a moment after, so it never pulls the page from under you.
+    /// When you last scrolled the review. Following waits a moment after, so it never pulls the page from under you.
     var lastUsed = Date.distantPast
     /// The files the watcher saw written since the last refresh, oldest first, relative to the root.
     private var touched: [String] = []
