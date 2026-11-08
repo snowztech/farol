@@ -180,7 +180,7 @@ private func write(_ text: String, _ name: String, in box: Sandbox) throws {
     let edited = Diff.File(path: "b.txt", hunks: [added(1, "y2")])
     let change = Diff.latestChange(from: old, to: [grown, edited], touched: ["b.txt", "a.txt"])
     #expect(change?.path == "a.txt")
-    #expect(change?.line == 20)
+    #expect(change?.lines == 20...20)
 
     // A new file is one hunk that grows at the bottom, so the change is the first line that wasn't there.
     let short = Diff.File(path: "d.txt", status: .added, hunks: [
@@ -189,7 +189,7 @@ private func write(_ text: String, _ name: String, in box: Sandbox) throws {
     let long = Diff.File(path: "d.txt", status: .added, hunks: [
         Diff.Hunk(oldStart: 0, newStart: 1, lines: ["a", "b", "c"].enumerated().map { .init(kind: .added, text: $1, number: $0 + 1) }),
     ])
-    #expect(Diff.latestChange(from: [short], to: [long], touched: ["d.txt"])?.line == 3)
+    #expect(Diff.latestChange(from: [short], to: [long], touched: ["d.txt"])?.lines == 3...3)
 
     // A file that is new to the diff starts at its first hunk.
     let new = Diff.File(path: "c.txt", status: .added, hunks: [added(1, "c")])

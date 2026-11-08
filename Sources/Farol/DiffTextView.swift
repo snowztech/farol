@@ -36,6 +36,14 @@ struct DiffNotes: Equatable {
     let color: NSColor
 }
 
+/// Lines an agent just wrote, while the review follows it. They show brighter for a moment, so you see them arrive.
+struct FreshLines: Equatable {
+    let path: String
+    let lines: ClosedRange<Int>
+    let at = Date()
+    static let lasts: TimeInterval = 2.5
+}
+
 /// The matches of the review's search in one file, by row, and the one the search is on.
 struct DiffMarks: Equatable {
     /// The characters to mark in each row's text, as the diff shows it.
@@ -62,6 +70,7 @@ struct DiffText: NSViewRepresentable {
     var loading = false
     var marks: DiffMarks? = nil
     var notes: DiffNotes? = nil
+    var fresh: FreshLines? = nil
 
     func makeNSView(context: Context) -> DiffScrollView { DiffScrollView() }
 
@@ -69,6 +78,7 @@ struct DiffText: NSViewRepresentable {
         view.text.onComment = comment
         view.text.onNoteLines = noteLines
         view.text.notes = notes
+        view.text.fresh = fresh
         view.text.onExpand = expand
         view.text.loading = loading
         view.text.show(file, rows: rows, colors: colors, syntax: syntax, marks: marks)
@@ -169,6 +179,25 @@ final class DiffTextView: NSTextView {
     var onNoteLines: ((Int, Int, _ old: Bool) -> Void)?
     var notes: DiffNotes? {
         didSet { if notes != oldValue { needsDisplay = true } }
+    }
+    var fresh: FreshLines? {
+        didSet { if fresh != oldValue { fade() } }
+    }
+    private var fadeTimer: Timer?
+
+    /// Redraws while fresh lines fade, then once more without them.
+    private func fade() {
+        fadeTimer?.invalidate()
+        needsDisplay = true
+        guard fresh != nil else { return }
+        fadeTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { [weak self] timer in
+            guard let self, let fresh, Date().timeIntervalSince(fresh.at) < FreshLines.lasts else {
+                timer.invalidate()
+                self?.needsDisplay = true
+                return
+            }
+            needsDisplay = true
+        }
     }
     /// The row whose gutter is under the mouse, where the "+" shows.
     private var hoveredRow: CGFloat? {
@@ -388,6 +417,13 @@ extension DiffTextView {
                 row.fill()
                 tint.withAlphaComponent(0.9).setFill()
                 NSRect(x: 0, y: row.minY, width: 3, height: row.height).fill()
+            }
+            if let fresh = self.fresh, let number = attributes[.diffNumber] as? Int, fresh.lines.contains(number) {
+                let left = 1 - Date().timeIntervalSince(fresh.at) / FreshLines.lasts
+                if left > 0 {
+                    colors.added.withAlphaComponent(0.4 * left).setFill()
+                    row.fill()
+                }
             }
             if let notes = self.notes {
                 let new = attributes[.diffNumber] as? Int

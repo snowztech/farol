@@ -338,7 +338,7 @@ extension Diff {
     /// Where the newest change is, for following an agent: in the file written last of those that changed, at its first added line that wasn't there.
     /// Lines are compared, not hunks, since a new file is one hunk that grows. An edit moves the lines under it, so the first that differs is the edit.
     /// With only lines removed, it's the first hunk that changed.
-    public static func latestChange(from old: [File], to new: [File], touched: [String]) -> (path: String, line: Int)? {
+    public static func latestChange(from old: [File], to new: [File], touched: [String]) -> (path: String, lines: ClosedRange<Int>)? {
         let before = Dictionary(old.map { ($0.path, $0) }, uniquingKeysWith: { first, _ in first })
         let changed = new.filter { before[$0.path] != $0 }
         guard let fallback = changed.first else { return nil }
@@ -348,11 +348,16 @@ extension Diff {
         for line in previous?.hunks.flatMap(\.lines) ?? [] where line.kind != .removed {
             if let number = line.number { was[number] = line.text }
         }
-        for line in file.hunks.flatMap(\.lines) where line.kind == .added {
-            if let number = line.number, was[number] != line.text { return (file.path, number) }
+        // The run of added lines from the first new one, which is what the edit wrote.
+        let lines = file.hunks.flatMap(\.lines)
+        for (index, line) in lines.enumerated() where line.kind == .added {
+            guard let number = line.number, was[number] != line.text else { continue }
+            let run = lines[index...].prefix { $0.kind == .added }.compactMap(\.number)
+            return (file.path, number...(run.last ?? number))
         }
         let seen = previous?.hunks ?? []
         let hunk = file.hunks.first { !seen.contains($0) } ?? file.hunks.first
-        return (file.path, hunk?.newBegin ?? 1)
+        let begin = hunk?.newBegin ?? 1
+        return (file.path, begin...begin)
     }
 }

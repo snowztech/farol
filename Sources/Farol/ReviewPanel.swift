@@ -78,6 +78,7 @@ final class ReviewModel: ObservableObject {
     var agentWorking: () -> Bool = { false }
     /// When you last scrolled the review. Following waits a moment after, so it never pulls the page from under you.
     var lastUsed = Date.distantPast
+    @Published private(set) var fresh: FreshLines?
     /// The files the watcher saw written since the last refresh, oldest first, relative to the root.
     private var touched: [String] = []
     /// The subject of the commit being shown, for the compare menu.
@@ -1045,10 +1046,11 @@ final class ReviewModel: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
     }
 
-    /// Scrolls to the line a change landed on, or to its file when the line isn't one the diff shows.
-    private func land(on change: (path: String, line: Int)) {
+    /// Scrolls to the lines a change landed on, or to its file when they aren't ones the diff shows, and marks them for a moment.
+    private func land(on change: (path: String, lines: ClosedRange<Int>)) {
         guard let file = files.first(where: { $0.path == change.path }) else { return }
-        if let row = DiffTextView.row(of: change.line, old: false, in: file) {
+        fresh = FreshLines(path: change.path, lines: change.lines)
+        if let row = DiffTextView.row(of: change.lines.lowerBound, old: false, in: file) {
             reveal = Reveal(path: change.path, row: row)
         } else {
             focus = (change.path, UUID())
@@ -1297,7 +1299,8 @@ struct ReviewPanel: View {
                      expand: { review.expand(file.path, gap: $0, fromTop: $1) },
                      loading: review.expanding.contains(file.path),
                      marks: review.marks[file.path],
-                     notes: review.noteLines(in: file.path, color: NSColor(p.accent)))
+                     notes: review.noteLines(in: file.path, color: NSColor(p.accent)),
+                     fresh: review.fresh?.path == file.path ? review.fresh : nil)
                 .padding(.horizontal, 8)
         case .thread(let line, let comments):
             VStack(alignment: .leading, spacing: 0) {
