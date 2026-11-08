@@ -1,4 +1,5 @@
-"""Reads a make profile recording and says whether anything stands out: freezes, where the CPU went, and the commands Farol ran.
+"""Reads a make profile recording and says whether anything stands out: freezes, and where the CPU went.
+The commands Farol runs, like git, are the Farol Inspector's (⌥⌘I): its Copy Report goes well next to this.
 Prints a short verdict, and writes the details as Markdown for an agent. Usage: profile-report.py <trace> <pid> <markdown out>"""
 import subprocess
 import sys
@@ -65,6 +66,11 @@ def frames(row):
     return row.get("stack") or []
 
 
+def wrapper(name):
+    """Frames every sample goes through, like main or a closure thunk, which would top the list and say nothing."""
+    return name in ("main", "Farol_main") or name.startswith(("thunk for", "reabstraction thunk", "partial apply"))
+
+
 def ms(nanoseconds):
     return f"{nanoseconds / 1e6:,.0f} ms"
 
@@ -83,7 +89,7 @@ for row in samples:
     stack = frames(row)
     if stack:
         alone[stack[0][0]] += weight
-    for name in {name for name, farol in stack if farol}:
+    for name in {name for name, farol in stack if farol and not wrapper(name)}:
         total[name] += weight
 
 hangs = [row for row in table("potential-hangs") if ours(row.get("process"))]
@@ -102,39 +108,13 @@ def busy_during(hang):
     return max(spent, key=spent.get) if spent else "nothing of Farol's own, so likely the system"
 
 
-# Perf marks every process it starts as a "Command" interval, named after the command.
-opened = {}
-commands = defaultdict(lambda: {"runs": 0, "time": 0, "longest": 0, "main": 0})
-for row in table("os-signpost"):
-    if not ours(row.get("process")) or (row.get("name").text if row.get("name") is not None else "") != "Command":
-        continue
-    kind = (row.get("event-type").text or "").lower()
-    key = row.get("identifier").text
-    if kind == "begin":
-        message = row.get("message")
-        opened[key] = (number(row.get("time")), message.text if message is not None else "?", on_main(row))
-    elif kind == "end" and key in opened:
-        began, command, main = opened.pop(key)
-        took = number(row.get("time")) - began
-        stats = commands[" ".join(command.split()[:2])]
-        stats["runs"] += 1
-        stats["time"] += took
-        stats["longest"] = max(stats["longest"], took)
-        stats["main"] += main
-
 # What counts as worth a look, like the Inspector's readings.
 issues = []
 if hangs:
     issues.append(f"{len(hangs)} {'freeze' if len(hangs) == 1 else 'freezes'} of the window")
-blocking = sum(stats["main"] for stats in commands.values())
-if blocking:
-    issues.append(f"{blocking} {'command' if blocking == 1 else 'commands'} run on the main thread")
 if cpu / 1e9 / seconds > 0.5:
     issues.append(f"busy CPU: {cpu / 1e9 / seconds:.0%} of one core on average")
-runs = sum(stats["runs"] for stats in commands.values())
-if runs / seconds > 4:
-    issues.append(f"{runs / seconds:.1f} commands a second, which looks like a loop")
-verdict = "Nothing stands out." if issues else ""
+verdict = "Nothing stands out." if not issues else ""
 
 md = ["# Farol profile", "", f"Recording: `{trace}`, open it in Instruments for the full picture.", ""]
 print()
@@ -172,14 +152,7 @@ if heaviest:
 for name, weight in heaviest[:5]:
     print(f"  {ms(weight):>9}  {name[:90]}")
 md.append("")
-
-md += ["## Commands", ""]
-if commands:
-    md += ["| Command | Runs | Total | Longest | On the main thread |", "|---|---|---|---|---|"]
-    for command, stats in sorted(commands.items(), key=lambda item: -item[1]["time"]):
-        md.append(f"| `{command}` | {stats['runs']} | {ms(stats['time'])} | {ms(stats['longest'])} | {stats['main']} |")
-else:
-    md.append("None ran.")
+md += ["For git and the other commands Farol runs, see the Farol Inspector (⌥⌘I) and its Copy Report."]
 
 out.write_text("\n".join(md) + "\n")
 print(f"\nThe details, to hand to an agent: {out}")
