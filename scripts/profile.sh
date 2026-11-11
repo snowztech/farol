@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Records Farol Dev with Instruments while you use it, then says whether anything stands out: freezes, busy CPU, commands on the main thread.
+# The details go to build/profile.md, to hand to an agent. Use Farol as you normally would while it records. PROFILE_SECONDS=60 records longer.
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+seconds="${PROFILE_SECONDS:-30}"
+app="$root/build/Farol.app"
+
+# A second Farol Dev would fight the first for its socket and its sessions.
+if pgrep -f "$app/Contents/MacOS/Farol" >/dev/null; then
+  echo "Quit Farol Dev first, then run make profile again."
+  exit 1
+fi
+
+"$root/scripts/bundle.sh" profile
+mkdir -p "$root/build/traces"
+trace="$root/build/traces/$(date +%Y-%m-%d-%H%M%S).trace"
+# Started here and recorded by its process id: by name, xctrace can't tell it from an installed Farol.
+open -n "$app"
+pid=""
+for _ in $(seq 40); do
+  pid="$(pgrep -f "$app/Contents/MacOS/Farol" | head -1)" && [ -n "$pid" ] && break
+  sleep 0.25
+done
+if [ -z "$pid" ]; then
+  echo "Farol Dev didn't start."
+  exit 1
+fi
+echo "Recording for ${seconds}s. Use Farol Dev as you normally would."
+# Points of Interest holds the git and other runs Perf marks, next to where the CPU went and every hang.
+xcrun xctrace record --template "Time Profiler" --instrument "Hangs" --instrument "Points of Interest" \
+  --time-limit "${seconds}s" --output "$trace" --attach "$pid" > /dev/null
+python3 "$root/scripts/profile-report.py" "$trace" "$pid" "$root/build/profile.md"
+echo "The recording, for Instruments: open \"$trace\""

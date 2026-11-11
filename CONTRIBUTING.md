@@ -26,6 +26,8 @@ make lint
 - For UI changes, add a screenshot.
 - Screenshots for the site come from Farol Shots, so they look the same on any Mac: `make shots SCENE=review` opens a staged demo, set up anything else by hand, then `make shot NAME=review` saves `site/features/review.png`. Your terminal app needs Screen Recording.
 - If your change runs git or touches the main thread, press ⌥⌘I in Farol for the Farol Inspector. It shows the programs Farol starts, like git, freezes since launch and any process that blocks the window, memory and CPU. Click any reading to see what it means. Copy Report gives a before and after to paste in the PR.
+- When the code has grown, `make audit` lists what smells in seconds: functions too long or too tangled, and force unwraps. `make unused` lists code and imports nothing uses, and takes a few minutes since it builds from scratch. Both need SwiftLint (`brew install swiftlint`), change nothing, and write the full list to `build/audit.md` or `build/unused.md` to hand to an agent. Neither is required for a PR.
+- To see why something is slow, `make profile` records an optimized Farol Dev with Instruments for 30 seconds while you use it, then says whether anything stands out: freezes and busy CPU. The details, like each freeze and the heaviest functions, go to `build/profile.md` to hand to an agent. The Inspector covers git and the other commands. Quit Farol Dev first.
 
 ## Writing
 

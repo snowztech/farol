@@ -11,6 +11,8 @@ app="$root/build/Farol.app"
 case "$config" in
   debug) bundle_id="dev.farol.Farol.debug"; name="Farol Dev" ;;
   shots) bundle_id="dev.farol.Farol.shots"; name="Farol Shots"; app="$root/build/Farol Shots.app"; config="debug" ;;
+  # Optimized, as it ships, but as Farol Dev, so measuring it never touches the installed app's sessions.
+  profile) bundle_id="dev.farol.Farol.debug"; name="Farol Dev"; config="release" ;;
   *) bundle_id="dev.farol.Farol"; name="Farol" ;;
 esac
 
