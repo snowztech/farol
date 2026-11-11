@@ -267,7 +267,7 @@
         <section id="tasks">
           <h2>Tasks and worktrees</h2>
           <p>Press <kbd>⇧⌘N</kbd> to start a task. Describe the work, choose an agent and account, then pick a branch name. Farol creates a git worktree and sends the task as the agent's first prompt.</p>
-          <p>You can start from one of your open Jira tickets or the repository's GitHub issues. Farol names the branch from the ticket and gives the agent its full description.</p>
+          <p>You can start from one of your open Jira tickets or Linear issues, or the repository's GitHub issues. Farol names the branch from the ticket and gives the agent its full description.</p>
           <aside class="sn-callout sn-callout--note"><strong class="sn-callout__title">Why worktrees?</strong><p>Each task gets its own checkout, so agents on different branches never write to the same files. <a href="/blog/parallel-claude-code-agents-git-worktrees">More on running agents in parallel</a>.</p></aside>
           <p>Press <kbd>⇧⌘T</kbd> when you want a worktree session without starting an agent. Closing a worktree session offers to remove the checkout and always keeps its branch.</p>
           <picture><source type="image/avif" srcset="features/new-task-half.avif 1270w, features/new-task.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot reveal" src="features/new-task.png" width="2540" height="1520" alt="The New Task sheet over a Claude Code session: the task typed in, a branch name made from it, Claude Code picked as the agent, and Now beside Start for when it runs" loading="lazy" decoding="async"></picture>

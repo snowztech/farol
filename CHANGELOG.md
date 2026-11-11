@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Linear in New Task, next to Jira and GitHub issues: pick one of your open Linear issues to name the branch after it and hand the agent the issue in full. It goes through the Linear CLI (`brew install schpet/tap/linear`, then `linear auth login`), which keeps your API key in the Keychain. Set it up in Settings → Integrations.
+
 ## [0.67.0] - 2026-11-08
 
 The review follows the agent as it works, and notes start one when none is running.

@@ -45,6 +45,7 @@ struct SettingsPage: View {
     @State private var avatars: [Forge.Kind: URL] = [:]
     /// Whether jira-cli is there and set up. Nil while it is being asked.
     @State private var jira: Forge.ToolState?
+    @State private var linear: Forge.ToolState?
     @State private var jiraAvatar: URL?
     @State private var jiraBoards: [Jira.Board] = []
     /// A line that says which board, or empty for your own tickets.
@@ -600,7 +601,7 @@ struct SettingsPage: View {
         }
 
         GroupTitle(title: "Tickets",
-                   detail: "New Task lists your open Jira tickets, next to the open issues of a repo on GitHub. Picking one names the branch after it and hands the agent the ticket in full.",
+                   detail: "New Task lists your open Jira tickets and Linear issues, next to the open issues of a repo on GitHub. Picking one names the branch after it and hands the agent the ticket in full.",
                    palette: p)
         Card(palette: p) {
             Row(title: "Jira", detail: jiraDetail, icon: ToolTile(jira: 26), link: ("Jira CLI (jira)", Jira.docs), palette: p) {
@@ -625,6 +626,9 @@ struct SettingsPage: View {
                     .hoverLift()
                 }
             }
+            Row(title: "Linear", detail: linearDetail, icon: ToolTile(linear: 26), link: ("Linear CLI (linear)", Linear.docs), palette: p) {
+                toolControl(linear, avatar: nil, setup: Linear.setupCommand(from:), p)
+            }
         }
     }
 
@@ -635,12 +639,21 @@ struct SettingsPage: View {
         return jira == nil && Jira.isSetUp
     }
 
+    private var linearDetail: String {
+        switch linear {
+        case nil: "Checking the Linear CLI (linear)…"
+        case .connected: "Uses the Linear CLI (linear). It lists your open issues."
+        case .loggedOut: "The Linear CLI (linear) is installed. Log in to use it with Farol. It keeps your API key in the Keychain."
+        case .missing: "Optional. Install the Linear CLI (linear) to use it with Farol."
+        }
+    }
+
     private var jiraDetail: String {
         switch jira {
         case nil: "Checking the Jira CLI (jira)…"
         case .connected: "Uses the Jira CLI (jira)."
-        case .loggedOut: "The Jira CLI (jira) is installed but not set up. It reads your token from JIRA_API_TOKEN."
-        case .missing: "The Jira CLI (jira) isn't installed."
+        case .loggedOut: "The Jira CLI (jira) is installed. Set it up to use it with Farol. It reads your token from JIRA_API_TOKEN."
+        case .missing: "Optional. Install the Jira CLI (jira) to use it with Farol."
         }
     }
 
@@ -651,8 +664,8 @@ struct SettingsPage: View {
         let detail = switch state {
         case nil: "Checking \(cli)…"
         case .connected: "Uses \(cli)."
-        case .loggedOut: "\(cli.prefix(1).uppercased() + cli.dropFirst()) is installed but not logged in."
-        case .missing: "\(cli.prefix(1).uppercased() + cli.dropFirst()) isn't installed."
+        case .loggedOut: "\(cli.prefix(1).uppercased() + cli.dropFirst()) is installed. Log in to use it with Farol."
+        case .missing: "Optional. Install \(cli) to use it with Farol."
         }
         return Row(title: kind.name, detail: detail, icon: ToolTile(kind: kind, size: 26),
                    link: ("\(kind.name) CLI (\(kind.tool))", kind.docs), palette: p) {
@@ -665,10 +678,11 @@ struct SettingsPage: View {
                              _ p: Palette) -> some View {
         HStack(spacing: 12) {
             if let state {
+                // Not logged in or not installed is fine for something optional, so only the button says it: no warning color.
                 if case .connected(let account?) = state {
                     AccountPill(url: avatar, name: account, palette: p)
-                } else {
-                    ToolStateLabel(state: state, palette: p)
+                } else if case .connected = state {
+                    ConnectedLabel(palette: p)
                 }
                 if state == .missing || state == .loggedOut {
                     // The system's small button reads as switched off in a dark theme, and a filled one shouts for something optional.
@@ -771,6 +785,8 @@ struct SettingsPage: View {
             DispatchQueue.main.async { tools = states }
             let jira = Jira.toolState()
             DispatchQueue.main.async { self.jira = jira }
+            let linear = Linear.toolState()
+            DispatchQueue.main.async { self.linear = linear }
             // After the states are on screen, since GitLab's picture takes another call to its server.
             var found: [Forge.Kind: URL] = [:]
             for (kind, state) in states {
@@ -1414,14 +1430,12 @@ private struct Avatar: View {
     }
 }
 
-/// "Connected" with a green dot, "Not logged in" with a yellow one, or a muted "Not installed".
-private struct ToolStateLabel: View {
-    let state: Forge.ToolState
+/// "Connected" with a green dot, for a tool that doesn't say which account.
+private struct ConnectedLabel: View {
     let palette: Palette
 
     var body: some View {
-        Badge(text: state == .missing ? "Not installed" : state == .loggedOut ? "Not logged in" : "Connected",
-              tint: state == .missing ? nil : state == .loggedOut ? palette.waiting : palette.done, dot: true, palette: palette)
+        Badge(text: "Connected", tint: palette.done, dot: true, palette: palette)
     }
 }
 

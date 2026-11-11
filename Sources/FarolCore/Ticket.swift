@@ -3,7 +3,7 @@ import Foundation
 /// Something to start a task from: a Jira ticket, or a GitHub or GitLab issue.
 public struct Ticket: Equatable, Identifiable, Sendable {
     public enum Source: Sendable {
-        case jira, github, gitlab
+        case jira, linear, github, gitlab
     }
 
     public let source: Source

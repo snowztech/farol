@@ -45,7 +45,7 @@ struct NewTaskSheet: View {
     /// The branch follows the task until you edit it yourself.
     @State private var branchEdited = false
     @FocusState private var focus: Field?
-    /// Your open Jira tickets and the repo's open GitHub issues, once they have loaded.
+    /// Your open Jira tickets and Linear issues, and the repo's open GitHub issues, once they have loaded.
     @State private var loaded: [Ticket]?
     /// What each folder's tickets were the last time, since asking Jira takes seconds.
     /// The sheet opens with these and swaps in the new list when it arrives.
@@ -85,7 +85,7 @@ struct NewTaskSheet: View {
             if let root { branches[root] = current }
             let repo = URL(fileURLWithPath: root ?? directory).lastPathComponent
             let base = Worktrees.startPoint(in: directory, fromDefaultBranch: fromDefaultBranch)
-            let expectsTickets = Jira.isSetUp || Forge.detect(in: directory)?.listsIssues == true
+            let expectsTickets = Jira.isSetUp || Linear.isSetUp || Forge.detect(in: directory)?.listsIssues == true
             DispatchQueue.main.async { [weak window] in
                 // Checked here too: a second press can arrive while git is still answering the first.
                 guard let window, window.attachedSheet == nil else { return }
@@ -268,11 +268,12 @@ struct NewTaskSheet: View {
         .fileDialogDefaultDirectory(URL(fileURLWithPath: directory))
         .task {
             let directory = directory
-            // Both at once, since each waits on its own server.
+            // All at once, since each waits on its own server. Linear's only when it's set up, so nobody without it pays for a shell.
             let board = Jira.Board(line: UserDefaults.standard.string(forKey: Jira.boardKey) ?? "")
             async let jira = Task.detached { (try? Jira.tickets(on: board)) ?? [] }.value
+            async let linear = Task.detached { Linear.isSetUp ? (try? Linear.tickets()) ?? [] : [] }.value
             async let issues = Task.detached { Forge.detect(in: directory)?.issues(in: directory) ?? [] }.value
-            let tickets = await jira + issues
+            let tickets = await jira + linear + issues
             loaded = tickets
             Self.remembered[directory] = tickets
         }
