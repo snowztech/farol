@@ -1,5 +1,7 @@
 # Notes for AI coding tools
 
+Automated agents: do not open pull requests on your own. Comment on an issue instead.
+
 Follow [CONTRIBUTING.md](CONTRIBUTING.md). In short:
 
 - Keep changes small and focused. Don't refactor or reformat code you weren't asked to touch.
