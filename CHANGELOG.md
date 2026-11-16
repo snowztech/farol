@@ -4,11 +4,23 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.68.0] - 2026-11-16
+
+New Task lists your Linear issues, and config files color their keys.
+
 ### Added
 
 - Linear in New Task, next to Jira and GitHub issues: pick one of your open Linear issues to name the branch after it and hand the agent the issue in full. It goes through the Linear CLI (`brew install schpet/tap/linear`, then `linear auth login`), which keeps your API key in the Keychain. Set it up in Settings → Integrations.
 - Keys are colored in YAML, TOML, INI and JSON, and so are Makefile targets and variables. TOML `[sections]` stand out, a YAML `run: |` block reads as one string, and `macos-26` no longer colors its `26`. Makefiles get `ifeq`, `define` and the other make words too.
 - `.env` files are colored: `.env`, `.env.local`, `.env.example` and any `*.env`. Variable names get the key color, and comments, quoted values, numbers and `export` theirs.
+
+### Changed
+
+- Settings → Integrations no longer warns in yellow about a tool you haven't installed or logged in to. It says the tool is optional, and its button sets it up.
+
+### Fixed
+
+- In shell scripts and YAML, a `#` inside a word, like `$#` or `https://a.io/#top`, no longer starts a comment.
 
 ## [0.67.0] - 2026-11-08
 
@@ -1360,7 +1372,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.67.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.68.0...HEAD
+[0.68.0]: https://github.com/snowztech/farol/releases/tag/v0.68.0
 [0.67.0]: https://github.com/snowztech/farol/releases/tag/v0.67.0
 [0.66.0]: https://github.com/snowztech/farol/releases/tag/v0.66.0
 [0.65.0]: https://github.com/snowztech/farol/releases/tag/v0.65.0
