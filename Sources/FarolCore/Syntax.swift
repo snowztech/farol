@@ -27,6 +27,8 @@ public enum Syntax {
         var names = false
         /// A capitalized call is a type being made, like Swift's `Token(range:)`. In Go or JavaScript, `NewEngine(` is a function.
         var capitalCallsAreTypes = false
+        /// A name before `=` that starts its line, or follows `export`, is a key, as in a .env file.
+        var keysBeforeEquals = false
         /// Types written in lower case, like Go's `string` or TypeScript's `number`, which no capital gives away.
         var builtinTypes: Set<String> = []
     }
@@ -36,6 +38,8 @@ public enum Syntax {
         let name = (path as NSString).lastPathComponent
         if ["Makefile", "Dockerfile", "Gemfile", "Rakefile"].contains(name) { return name == "Gemfile" || name == "Rakefile" ? ruby : shell }
         if name == "go.mod" || name == "go.work" { return goModule }
+        // `.env.local` or `.env.example` end in the variant, not in env, so the name says it.
+        if name == ".env" || name.hasPrefix(".env.") { return dotenv }
         switch (name as NSString).pathExtension.lowercased() {
         case "swift": return swift
         case "go": return go
@@ -44,6 +48,7 @@ public enum Syntax {
         case "rs": return rust
         case "rb": return ruby
         case "sh", "bash", "zsh", "fish": return shell
+        case "env": return dotenv
         case "c", "h", "cc", "cpp", "hpp", "m", "mm", "java", "kt", "kts", "cs", "scala", "dart": return cFamily
         case "json", "jsonc": return json
         case "yml", "yaml", "toml", "ini", "conf": return config
@@ -63,7 +68,7 @@ public enum Syntax {
             "javascript": "a.js", "typescript": "a.ts", "python": "a.py", "ruby": "a.rb", "rust": "a.rs", "golang": "a.go",
             "shell": "a.sh", "console": "a.sh", "shellsession": "a.sh", "kotlin": "a.kt", "objc": "a.m", "objective-c": "a.m",
             "csharp": "a.cs", "c#": "a.cs", "c++": "a.cpp", "dockerfile": "Dockerfile", "docker": "Dockerfile",
-            "make": "Makefile", "makefile": "Makefile", "markdown": "a.md",
+            "make": "Makefile", "makefile": "Makefile", "markdown": "a.md", "dotenv": ".env",
         ]
         let name = name.lowercased()
         return language(for: names[name] ?? "a.\(name)")
@@ -125,6 +130,8 @@ public enum Syntax {
                 let afterDot = i > 0 && chars[i - 1] == code(".")
                 if !afterDot && language.keywords.contains(word) {
                     add(i, end, .keyword)
+                } else if language.keysBeforeEquals, isAssignment(start: i, end: end) {
+                    add(i, end, .property)
                 } else if language.names, let kind = name(word, at: i, end: end, afterDot: afterDot) {
                     add(i, end, kind)
                 }
@@ -160,6 +167,20 @@ public enum Syntax {
             var before = start - 1
             while before >= 0, chars[before] == code(" ") || chars[before] == code("\t") { before -= 1 }
             return before < 0 || chars[before] == newline || chars[before] == code("{")
+        }
+
+        /// `KEY=` at the start of its line or after `export`, so a `?page=2` in a value stays plain.
+        func isAssignment(start: Int, end: Int) -> Bool {
+            guard end < chars.count, chars[end] == code("=") else { return false }
+            func lineStart(before index: Int) -> Bool {
+                var before = index - 1
+                while before >= 0, chars[before] == code(" ") || chars[before] == code("\t") { before -= 1 }
+                return before < 0 || chars[before] == newline
+            }
+            if lineStart(before: start) { return true }
+            let export = Array("export ".utf16)
+            let from = start - export.count
+            return from >= 0 && Array(chars[from..<start]) == export && lineStart(before: from)
         }
     }
 
@@ -255,6 +276,10 @@ public enum Syntax {
 
     static let shell = Language(lineComments: ["#"], blockComments: [], quotes: ["\"", "'"], keywords: words(
         "if then else elif fi for while until do done case esac in function return local export readonly set unset exit true false source"))
+
+    /// Shell's comments, quotes and `export`, with each variable's name colored as a key.
+    static let dotenv = Language(lineComments: ["#"], blockComments: [], quotes: ["\"", "'"], keywords: words("export"),
+        keysBeforeEquals: true)
 
     static let cFamily = Language(lineComments: ["//"], blockComments: [("/*", "*/")], quotes: ["\"", "'"], keywords: words(
         "if else for while do switch case default break continue return struct class enum union typedef static const void int char float double long short unsigned signed bool boolean true false null nullptr NULL new delete this public private protected virtual override final import package namespace using template typename try catch throw throws fun val var when object interface extends implements sealed data suspend"),
