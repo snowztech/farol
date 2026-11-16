@@ -35,6 +35,9 @@ public enum Syntax {
         var lineKeys: [String] = []
         /// A string before a colon is a key, as in JSON.
         var quotedKeys = false
+        /// A number or keyword only as a whole value, so `macos-26` and `turn-on` stay plain.
+        /// Also `[section]` headers, and YAML's `run: |` blocks as strings, since what they hold is text, not keys.
+        var configValues = false
         /// Types written in lower case, like Go's `string` or TypeScript's `number`, which no capital gives away.
         var builtinTypes: Set<String> = []
     }
@@ -128,10 +131,24 @@ public enum Syntax {
                 while next < chars.count, chars[next] == code(" ") { next += 1 }
                 add(i, end, language.quotedKeys && next < chars.count && chars[next] == code(":") ? .property : .string)
                 i = end
-            // A digit after `name.` goes on the name, like `v1.2.3` or Rust's `t.0`. CSS's `.5` is still a number.
+            } else if language.configValues, c == code("["), let end = sectionHeader(at: i) {
+                add(i, end, .keyword)
+                i = end
+            } else if language.configValues, c == code("|") || c == code(">"), let (from, end) = blockScalar(at: i) {
+                add(from, end, .string)
+                i = end
             } else if let end = lineKey(at: i) {
                 add(i, end, .property)
                 i = end
+            } else if language.configValues, isWord(c) {
+                var end = i
+                while end < chars.count, isWord(chars[end]) || chars[end] == code(".") { end += 1 }
+                let word = String(utf16CodeUnits: Array(chars[i..<end]), count: end - i)
+                if wholeValue(start: i, end: end) {
+                    if isDigit(c) { add(i, end, .number) } else if language.keywords.contains(word) { add(i, end, .keyword) }
+                }
+                i = end
+            // A digit after `name.` goes on the name, like `v1.2.3` or Rust's `t.0`. CSS's `.5` is still a number.
             } else if isDigit(c), i == 0 || !(isWord(chars[i - 1]) || chars[i - 1] == code(".") && i > 1 && isWord(chars[i - 2])) {
                 var end = i
                 while end < chars.count, isWord(chars[end]) || chars[end] == code(".") { end += 1 }
@@ -190,9 +207,9 @@ public enum Syntax {
             guard !language.lineKeys.isEmpty, isWord(chars[start]) else { return nil }
             var before = start - 1
             while before >= 0, chars[before] == code(" ") || chars[before] == code("\t") { before -= 1 }
-            if before >= 0, chars[before] == code("-"), before + 1 < start { before -= 1 }
-            while before >= 0, chars[before] == code(" ") || chars[before] == code("\t") { before -= 1 }
-            guard before < 0 || chars[before] == newline else { return nil }
+            // A YAML list item, `- name:`.
+            let item = before >= 0 && chars[before] == code("-") && before + 1 < start
+            guard startsLine(item ? before : start) else { return nil }
             var end = start
             while end < chars.count, isWord(chars[end]) || chars[end] == code("-") || chars[end] == code(".") { end += 1 }
             var next = end
@@ -203,6 +220,59 @@ public enum Syntax {
                 guard after >= chars.count || [code(" "), code("\t"), newline].contains(chars[after]) else { return nil }
             }
             return end
+        }
+
+        func startsLine(_ index: Int) -> Bool {
+            var before = index - 1
+            while before >= 0, chars[before] == code(" ") || chars[before] == code("\t") { before -= 1 }
+            return before < 0 || chars[before] == newline
+        }
+
+        /// Nothing but spaces, separators or a leading minus around it, so `26` in `macos-26` is not a number.
+        func wholeValue(start: Int, end: Int) -> Bool {
+            let opens: Set<UInt16> = [code(" "), code("\t"), newline, code(":"), code("="), code("["), code("{"), code(","), code("(")]
+            let closes: Set<UInt16> = [code(" "), code("\t"), newline, code(","), code("]"), code("}"), code(")")]
+            var before = start - 1
+            if before >= 0, chars[before] == code("-") { before -= 1 }
+            return (before < 0 || opens.contains(chars[before])) && (end >= chars.count || closes.contains(chars[end]))
+        }
+
+        /// A TOML or INI `[section]` or `[[table]]` alone on its line. A comma means a YAML list instead.
+        func sectionHeader(at start: Int) -> Int? {
+            guard startsLine(start) else { return nil }
+            var end = start
+            while end < chars.count, chars[end] != newline, chars[end] != code(",") {
+                if chars[end] == code("]"), end + 1 >= chars.count || chars[end + 1] != code("]") { return end + 1 }
+                end += 1
+            }
+            return nil
+        }
+
+        /// The lines under a YAML `key: |` or `key: >`, indented deeper than the key: from the next line to the block's end.
+        func blockScalar(at start: Int) -> (Int, Int)? {
+            var before = start - 1
+            while before >= 0, chars[before] == code(" ") { before -= 1 }
+            guard before >= 0, chars[before] == code(":") || chars[before] == code("-") else { return nil }
+            var end = start + 1
+            while end < chars.count, chars[end] == code("-") || chars[end] == code("+") || isDigit(chars[end]) { end += 1 }
+            while end < chars.count, chars[end] == code(" ") { end += 1 }
+            if end < chars.count, chars[end] == code("#") { while end < chars.count, chars[end] != newline { end += 1 } }
+            guard end < chars.count, chars[end] == newline else { return nil }
+            var lineStart = start
+            while lineStart > 0, chars[lineStart - 1] != newline { lineStart -= 1 }
+            var indent = 0
+            while chars[lineStart + indent] == code(" ") { indent += 1 }
+            var from: Int?, blockEnd = 0, line = end + 1
+            while line < chars.count {
+                var depth = 0
+                while line + depth < chars.count, chars[line + depth] == code(" ") { depth += 1 }
+                let lineEnd = chars[line...].firstIndex(of: newline) ?? chars.count
+                let blank = line + depth == lineEnd
+                if !blank, depth <= indent { break }
+                if !blank { from = from ?? line + depth; blockEnd = lineEnd }
+                line = lineEnd + 1
+            }
+            return from.map { ($0, blockEnd) }
         }
 
         /// `KEY=` at the start of its line or after `export`, so a `?page=2` in a value stays plain.
@@ -326,7 +396,7 @@ public enum Syntax {
     static let json = Language(lineComments: [], blockComments: [], quotes: ["\""], keywords: words("true false null"), quotedKeys: true)
 
     static let config = Language(lineComments: ["#"], blockComments: [], commentsAfterSpace: true, quotes: ["\"", "'"],
-        keywords: words("true false null yes no on off"), lineKeys: [":", "="], quotedKeys: true)
+        keywords: words("true false null yes no on off"), lineKeys: [":", "="], quotedKeys: true, configValues: true)
 
     /// Shell's words in recipes, with targets and variables as keys: `build:`, `CC := clang`, `FLAGS += -O2`.
     static let makefile = Language(lineComments: ["#"], blockComments: [], commentsAfterSpace: true, quotes: ["\"", "'"],

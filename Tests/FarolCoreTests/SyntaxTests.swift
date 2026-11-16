@@ -54,8 +54,26 @@ private func tokens(_ text: String, _ path: String) -> [String] {
 @Test func colorsKeysInConfigFiles() {
     #expect(tokens("name: farol\n  - port: 80 # web\nurl: http://x", "a.yml") == ["name:property", "port:property", "80:number", "# web:comment", "url:property"])
     #expect(tokens("http://x", "a.yml") == [])
-    #expect(tokens("[server]\ntls.cert = \"a\"\nmax-size=2", "a.toml") == ["tls.cert:property", "\"a\":string", "max-size:property", "2:number"])
+    #expect(tokens("[server]\ntls.cert = \"a\"\nmax-size=2", "a.toml") == ["[server]:keyword", "tls.cert:property", "\"a\":string", "max-size:property", "2:number"])
     #expect(tokens("{\"name\": \"farol\", \"on\" : true}", "a.json") == ["\"name\":property", "\"farol\":string", "\"on\":property", "true:keyword"])
+}
+
+@Test func configValuesColorOnlyWhole() {
+    #expect(tokens("runs-on: macos-26\nport: 80\nlevel: -1\nmode: turn-on\non: [push, 2]", "a.yml") == [
+        "runs-on:property", "port:property", "80:number", "level:property", "1:number", "mode:property", "on:property", "2:number",
+    ])
+}
+
+@Test func colorsTomlSectionHeaders() {
+    #expect(tokens("[package]\nname = \"farol\"\n[[bin]]\nlist: [a, b]", "a.toml") == [
+        "[package]:keyword", "name:property", "\"farol\":string", "[[bin]]:keyword", "list:property",
+    ])
+}
+
+@Test func yamlBlockScalarsAreStrings() {
+    let code = "steps:\n  - run: |\n      echo a: b\n\n      make test\n  - name: x\n"
+    #expect(tokens(code, "a.yml") == ["steps:property", "run:property", "echo a: b\n\n      make test:string", "name:property"])
+    #expect(tokens("cmd: a > b", "a.yml") == ["cmd:property"])
 }
 
 @Test func colorsMakefileTargetsAndVariables() {
