@@ -44,6 +44,12 @@ private func tokens(_ text: String, _ path: String) -> [String] {
     ])
 }
 
+@Test func aHashInsideAValueIsNotAComment() {
+    #expect(tokens("PASSWORD=abc#123\nURL=https://a.io/#top", ".env") == ["PASSWORD:property", "123:number", "URL:property"])
+    #expect(tokens("url: http://x/#a # note", "a.yml") == ["# note:comment"])
+    #expect(tokens("echo $# # count", "a.sh") == ["# count:comment"])
+}
+
 @Test func codeFencesNameTheirLanguage() {
     for name in ["swift", "ts", "TypeScript", "bash", "json", "yaml", "dockerfile", "c++"] {
         #expect(Syntax.language(named: name) != nil, "\(name)")

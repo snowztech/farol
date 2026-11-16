@@ -15,6 +15,8 @@ public enum Syntax {
     public struct Language {
         let lineComments: [String]
         let blockComments: [(open: String, close: String)]
+        /// A comment starts only at a line's start or after a space, as in shell, where `abc#123` and `$#` are not comments.
+        var commentsAfterSpace = false
         let quotes: Set<Character>
         /// Quotes whose strings can span lines, like JavaScript's backtick.
         var multilineQuotes: Set<Character> = []
@@ -99,7 +101,8 @@ public enum Syntax {
                 end = min(end + block.close.utf16.count, chars.count)
                 add(i, end, .comment)
                 i = end
-            } else if language.lineComments.contains(where: { starts(with: $0, at: i) }) {
+            } else if language.lineComments.contains(where: { starts(with: $0, at: i) }),
+                      !language.commentsAfterSpace || i == 0 || [code(" "), code("\t"), newline].contains(chars[i - 1]) {
                 var end = i
                 while end < chars.count, chars[end] != newline { end += 1 }
                 add(i, end, .comment)
@@ -274,11 +277,11 @@ public enum Syntax {
     static let goModule = Language(lineComments: ["//"], blockComments: [], quotes: ["\"", "`"], keywords: words(
         "module go toolchain godebug require replace exclude retract tool use"))
 
-    static let shell = Language(lineComments: ["#"], blockComments: [], quotes: ["\"", "'"], keywords: words(
+    static let shell = Language(lineComments: ["#"], blockComments: [], commentsAfterSpace: true, quotes: ["\"", "'"], keywords: words(
         "if then else elif fi for while until do done case esac in function return local export readonly set unset exit true false source"))
 
     /// Shell's comments, quotes and `export`, with each variable's name colored as a key.
-    static let dotenv = Language(lineComments: ["#"], blockComments: [], quotes: ["\"", "'"], keywords: words("export"),
+    static let dotenv = Language(lineComments: ["#"], blockComments: [], commentsAfterSpace: true, quotes: ["\"", "'"], keywords: words("export"),
         keysBeforeEquals: true)
 
     static let cFamily = Language(lineComments: ["//"], blockComments: [("/*", "*/")], quotes: ["\"", "'"], keywords: words(
@@ -287,7 +290,7 @@ public enum Syntax {
 
     static let json = Language(lineComments: [], blockComments: [], quotes: ["\""], keywords: words("true false null"))
 
-    static let config = Language(lineComments: ["#"], blockComments: [], quotes: ["\"", "'"], keywords: words("true false null yes no on off"))
+    static let config = Language(lineComments: ["#"], blockComments: [], commentsAfterSpace: true, quotes: ["\"", "'"], keywords: words("true false null yes no on off"))
 
     /// Only double quotes, since an apostrophe in page text would otherwise color the rest of its line.
     /// No `//` comments either, or every `https://` would start one.
