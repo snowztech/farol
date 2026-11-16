@@ -47,8 +47,21 @@ private func tokens(_ text: String, _ path: String) -> [String] {
 
 @Test func aHashInsideAValueIsNotAComment() {
     #expect(tokens("PASSWORD=abc#123\nURL=https://a.io/#top", ".env") == ["PASSWORD:property", "123:number", "URL:property"])
-    #expect(tokens("url: http://x/#a # note", "a.yml") == ["# note:comment"])
+    #expect(tokens("url: http://x/#a # note", "a.yml") == ["url:property", "# note:comment"])
     #expect(tokens("echo $# # count", "a.sh") == ["# count:comment"])
+}
+
+@Test func colorsKeysInConfigFiles() {
+    #expect(tokens("name: farol\n  - port: 80 # web\nurl: http://x", "a.yml") == ["name:property", "port:property", "80:number", "# web:comment", "url:property"])
+    #expect(tokens("http://x", "a.yml") == [])
+    #expect(tokens("[server]\ntls.cert = \"a\"\nmax-size=2", "a.toml") == ["tls.cert:property", "\"a\":string", "max-size:property", "2:number"])
+    #expect(tokens("{\"name\": \"farol\", \"on\" : true}", "a.json") == ["\"name\":property", "\"farol\":string", "\"on\":property", "true:keyword"])
+}
+
+@Test func colorsMakefileTargetsAndVariables() {
+    #expect(Syntax.language(for: "rules.mk") != nil)
+    let code = "CC := clang\nFLAGS += -O2\nbuild: deps\n\techo $(CC)\nifeq ($(CC),clang)\nendif"
+    #expect(tokens(code, "Makefile") == ["CC:property", "FLAGS:property", "build:property", "ifeq:keyword", "endif:keyword"])
 }
 
 @Test func codeFencesNameTheirLanguage() {
@@ -88,9 +101,9 @@ private func tokens(_ text: String, _ path: String) -> [String] {
     #expect(tokens("const total: number = count(ids as string[])", "a.ts") == [
         "const:keyword", "number:type", "count:function", "as:keyword", "string:type",
     ])
-    // Neither convention holds in a shell script or JSON, so their names stay plain.
+    // Neither convention holds in a shell script, so its names stay plain. A JSON key is still a key.
     #expect(tokens("Run() {\n  echo Hi\n}", "a.sh") == [])
-    #expect(tokens("{\"Name\": true}", "a.json") == ["\"Name\":string", "true:keyword"])
+    #expect(tokens("{\"Name\": true}", "a.json") == ["\"Name\":property", "true:keyword"])
 }
 
 @Test func colorsKeysAndMembersAsPropertiesButNotTypedVariables() {

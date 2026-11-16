@@ -7,6 +7,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Added
 
 - Linear in New Task, next to Jira and GitHub issues: pick one of your open Linear issues to name the branch after it and hand the agent the issue in full. It goes through the Linear CLI (`brew install schpet/tap/linear`, then `linear auth login`), which keeps your API key in the Keychain. Set it up in Settings → Integrations.
+- Keys are colored in YAML, TOML, INI and JSON, and so are Makefile targets and variables. Makefiles get `ifeq`, `define` and the other make words too.
 - `.env` files are colored: `.env`, `.env.local`, `.env.example` and any `*.env`. Variable names get the key color, and comments, quoted values, numbers and `export` theirs.
 
 ## [0.67.0] - 2026-11-08
