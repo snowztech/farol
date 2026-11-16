@@ -33,6 +33,24 @@ private func tokens(_ text: String, _ path: String) -> [String] {
     #expect(Syntax.language(for: "Makefile") != nil)
 }
 
+@Test func colorsEnvFilesKeysAndValues() {
+    for path in [".env", ".env.local", ".env.example", "app.env", "config/.env.production"] {
+        #expect(Syntax.language(for: path) != nil, "\(path)")
+    }
+    #expect(Syntax.language(for: ".envrc") == nil)
+    #expect(Syntax.language(named: "dotenv") != nil)
+    #expect(tokens("# db\nexport PORT=5432\nNAME=\"farol\"\nURL=https://a.io/?page=2", ".env") == [
+        "# db:comment", "export:keyword", "PORT:property", "5432:number", "NAME:property", "\"farol\":string", "URL:property", "2:number",
+    ])
+    #expect(tokens("KEY = 1 # note", ".env") == ["KEY:property", "1:number", "# note:comment"])
+}
+
+@Test func aHashInsideAValueIsNotAComment() {
+    #expect(tokens("PASSWORD=abc#123\nURL=https://a.io/#top", ".env") == ["PASSWORD:property", "123:number", "URL:property"])
+    #expect(tokens("url: http://x/#a # note", "a.yml") == ["# note:comment"])
+    #expect(tokens("echo $# # count", "a.sh") == ["# count:comment"])
+}
+
 @Test func codeFencesNameTheirLanguage() {
     for name in ["swift", "ts", "TypeScript", "bash", "json", "yaml", "dockerfile", "c++"] {
         #expect(Syntax.language(named: name) != nil, "\(name)")
