@@ -31,6 +31,13 @@ public enum Syntax {
         var capitalCallsAreTypes = false
         /// A name before `=` that starts its line, or follows `export`, is a key, as in a .env file. Spaces around `=` are fine.
         var keysBeforeEquals = false
+        /// What ends a key that starts its line, like YAML's `:` or TOML's `=`. Checked in order, so `:=` goes before `:`.
+        var lineKeys: [String] = []
+        /// A string before a colon is a key, as in JSON.
+        var quotedKeys = false
+        /// A number or keyword only as a whole value, so `macos-26` and `turn-on` stay plain.
+        /// Also `[section]` headers, and YAML's `run: |` blocks as strings, since what they hold is text, not keys.
+        var configValues = false
         /// Types written in lower case, like Go's `string` or TypeScript's `number`, which no capital gives away.
         var builtinTypes: Set<String> = []
     }
@@ -38,7 +45,9 @@ public enum Syntax {
     /// The language for a file name, or nil when Farol doesn't color it.
     public static func language(for path: String) -> Language? {
         let name = (path as NSString).lastPathComponent
-        if ["Makefile", "Dockerfile", "Gemfile", "Rakefile"].contains(name) { return name == "Gemfile" || name == "Rakefile" ? ruby : shell }
+        if ["Gemfile", "Rakefile"].contains(name) { return ruby }
+        if name == "Dockerfile" { return shell }
+        if name == "Makefile" || name == "GNUmakefile" { return makefile }
         if name == "go.mod" || name == "go.work" { return goModule }
         // `.env.local` or `.env.example` end in the variant, not in env, so the name says it.
         if name == ".env" || name.hasPrefix(".env.") { return dotenv }
@@ -50,6 +59,7 @@ public enum Syntax {
         case "rs": return rust
         case "rb": return ruby
         case "sh", "bash", "zsh", "fish": return shell
+        case "mk": return makefile
         case "env": return dotenv
         case "c", "h", "cc", "cpp", "hpp", "m", "mm", "java", "kt", "kts", "cs", "scala", "dart": return cFamily
         case "json", "jsonc": return json
@@ -117,7 +127,26 @@ public enum Syntax {
                 }
                 // Include the closing quote, but not the line break of an unclosed one.
                 if end < chars.count, chars[end] == c { end += 1 }
-                add(i, end, .string)
+                var next = end
+                while next < chars.count, chars[next] == code(" ") { next += 1 }
+                add(i, end, language.quotedKeys && next < chars.count && chars[next] == code(":") ? .property : .string)
+                i = end
+            } else if language.configValues, c == code("["), let end = sectionHeader(at: i) {
+                add(i, end, .keyword)
+                i = end
+            } else if language.configValues, c == code("|") || c == code(">"), let (from, end) = blockScalar(at: i) {
+                add(from, end, .string)
+                i = end
+            } else if let end = lineKey(at: i) {
+                add(i, end, .property)
+                i = end
+            } else if language.configValues, isWord(c) {
+                var end = i
+                while end < chars.count, isWord(chars[end]) || chars[end] == code(".") { end += 1 }
+                let word = String(utf16CodeUnits: Array(chars[i..<end]), count: end - i)
+                if wholeValue(start: i, end: end) {
+                    if isDigit(c) { add(i, end, .number) } else if language.keywords.contains(word) { add(i, end, .keyword) }
+                }
                 i = end
             // A digit after `name.` goes on the name, like `v1.2.3` or Rust's `t.0`. CSS's `.5` is still a number.
             } else if isDigit(c), i == 0 || !(isWord(chars[i - 1]) || chars[i - 1] == code(".") && i > 1 && isWord(chars[i - 2])) {
@@ -170,6 +199,80 @@ public enum Syntax {
             var before = start - 1
             while before >= 0, chars[before] == code(" ") || chars[before] == code("\t") { before -= 1 }
             return before < 0 || chars[before] == newline || chars[before] == code("{")
+        }
+
+        /// A key like `name:`, `- name:`, `a.b = 1` or a Makefile's `build:`, starting its line.
+        /// A `:` needs a space or the line's end after it, so a line starting with `http://` is not a key.
+        func lineKey(at start: Int) -> Int? {
+            guard !language.lineKeys.isEmpty, isWord(chars[start]) else { return nil }
+            var before = start - 1
+            while before >= 0, chars[before] == code(" ") || chars[before] == code("\t") { before -= 1 }
+            // A YAML list item, `- name:`.
+            let item = before >= 0 && chars[before] == code("-") && before + 1 < start
+            guard startsLine(item ? before : start) else { return nil }
+            var end = start
+            while end < chars.count, isWord(chars[end]) || chars[end] == code("-") || chars[end] == code(".") { end += 1 }
+            var next = end
+            while next < chars.count, chars[next] == code(" ") || chars[next] == code("\t") { next += 1 }
+            guard let separator = language.lineKeys.first(where: { starts(with: $0, at: next) }) else { return nil }
+            if separator == ":" {
+                let after = next + 1
+                guard after >= chars.count || [code(" "), code("\t"), newline].contains(chars[after]) else { return nil }
+            }
+            return end
+        }
+
+        func startsLine(_ index: Int) -> Bool {
+            var before = index - 1
+            while before >= 0, chars[before] == code(" ") || chars[before] == code("\t") { before -= 1 }
+            return before < 0 || chars[before] == newline
+        }
+
+        /// Nothing but spaces, separators or a leading minus around it, so `26` in `macos-26` is not a number.
+        func wholeValue(start: Int, end: Int) -> Bool {
+            let opens: Set<UInt16> = [code(" "), code("\t"), newline, code(":"), code("="), code("["), code("{"), code(","), code("(")]
+            let closes: Set<UInt16> = [code(" "), code("\t"), newline, code(","), code("]"), code("}"), code(")")]
+            var before = start - 1
+            if before >= 0, chars[before] == code("-") { before -= 1 }
+            return (before < 0 || opens.contains(chars[before])) && (end >= chars.count || closes.contains(chars[end]))
+        }
+
+        /// A TOML or INI `[section]` or `[[table]]` alone on its line. A comma means a YAML list instead.
+        func sectionHeader(at start: Int) -> Int? {
+            guard startsLine(start) else { return nil }
+            var end = start
+            while end < chars.count, chars[end] != newline, chars[end] != code(",") {
+                if chars[end] == code("]"), end + 1 >= chars.count || chars[end + 1] != code("]") { return end + 1 }
+                end += 1
+            }
+            return nil
+        }
+
+        /// The lines under a YAML `key: |` or `key: >`, indented deeper than the key: from the next line to the block's end.
+        func blockScalar(at start: Int) -> (Int, Int)? {
+            var before = start - 1
+            while before >= 0, chars[before] == code(" ") { before -= 1 }
+            guard before >= 0, chars[before] == code(":") || chars[before] == code("-") else { return nil }
+            var end = start + 1
+            while end < chars.count, chars[end] == code("-") || chars[end] == code("+") || isDigit(chars[end]) { end += 1 }
+            while end < chars.count, chars[end] == code(" ") { end += 1 }
+            if end < chars.count, chars[end] == code("#") { while end < chars.count, chars[end] != newline { end += 1 } }
+            guard end < chars.count, chars[end] == newline else { return nil }
+            var lineStart = start
+            while lineStart > 0, chars[lineStart - 1] != newline { lineStart -= 1 }
+            var indent = 0
+            while chars[lineStart + indent] == code(" ") { indent += 1 }
+            var from: Int?, blockEnd = 0, line = end + 1
+            while line < chars.count {
+                var depth = 0
+                while line + depth < chars.count, chars[line + depth] == code(" ") { depth += 1 }
+                let lineEnd = chars[line...].firstIndex(of: newline) ?? chars.count
+                let blank = line + depth == lineEnd
+                if !blank, depth <= indent { break }
+                if !blank { from = from ?? line + depth; blockEnd = lineEnd }
+                line = lineEnd + 1
+            }
+            return from.map { ($0, blockEnd) }
         }
 
         /// `KEY=` at the start of its line or after `export`, so a `?page=2` in a value stays plain.
@@ -290,9 +393,15 @@ public enum Syntax {
         "if else for while do switch case default break continue return struct class enum union typedef static const void int char float double long short unsigned signed bool boolean true false null nullptr NULL new delete this public private protected virtual override final import package namespace using template typename try catch throw throws fun val var when object interface extends implements sealed data suspend"),
         names: true, capitalCallsAreTypes: true)
 
-    static let json = Language(lineComments: [], blockComments: [], quotes: ["\""], keywords: words("true false null"))
+    static let json = Language(lineComments: [], blockComments: [], quotes: ["\""], keywords: words("true false null"), quotedKeys: true)
 
-    static let config = Language(lineComments: ["#"], blockComments: [], commentsAfterSpace: true, quotes: ["\"", "'"], keywords: words("true false null yes no on off"))
+    static let config = Language(lineComments: ["#"], blockComments: [], commentsAfterSpace: true, quotes: ["\"", "'"],
+        keywords: words("true false null yes no on off"), lineKeys: [":", "="], quotedKeys: true, configValues: true)
+
+    /// Shell's words in recipes, with targets and variables as keys: `build:`, `CC := clang`, `FLAGS += -O2`.
+    static let makefile = Language(lineComments: ["#"], blockComments: [], commentsAfterSpace: true, quotes: ["\"", "'"],
+        keywords: shell.keywords.union(words("ifeq ifneq ifdef ifndef endif include define endef override")),
+        lineKeys: ["::=", ":=", "?=", "+=", "!=", "=", ":"])
 
     /// Only double quotes, since an apostrophe in page text would otherwise color the rest of its line.
     /// No `//` comments either, or every `https://` would start one.
