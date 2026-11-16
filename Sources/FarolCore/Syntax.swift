@@ -29,7 +29,7 @@ public enum Syntax {
         var names = false
         /// A capitalized call is a type being made, like Swift's `Token(range:)`. In Go or JavaScript, `NewEngine(` is a function.
         var capitalCallsAreTypes = false
-        /// A name before `=` that starts its line, or follows `export`, is a key, as in a .env file.
+        /// A name before `=` that starts its line, or follows `export`, is a key, as in a .env file. Spaces around `=` are fine.
         var keysBeforeEquals = false
         /// Types written in lower case, like Go's `string` or TypeScript's `number`, which no capital gives away.
         var builtinTypes: Set<String> = []
@@ -174,7 +174,9 @@ public enum Syntax {
 
         /// `KEY=` at the start of its line or after `export`, so a `?page=2` in a value stays plain.
         func isAssignment(start: Int, end: Int) -> Bool {
-            guard end < chars.count, chars[end] == code("=") else { return false }
+            var equals = end
+            while equals < chars.count, chars[equals] == code(" ") || chars[equals] == code("\t") { equals += 1 }
+            guard equals < chars.count, chars[equals] == code("=") else { return false }
             func lineStart(before index: Int) -> Bool {
                 var before = index - 1
                 while before >= 0, chars[before] == code(" ") || chars[before] == code("\t") { before -= 1 }

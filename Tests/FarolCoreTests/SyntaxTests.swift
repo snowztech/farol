@@ -42,6 +42,7 @@ private func tokens(_ text: String, _ path: String) -> [String] {
     #expect(tokens("# db\nexport PORT=5432\nNAME=\"farol\"\nURL=https://a.io/?page=2", ".env") == [
         "# db:comment", "export:keyword", "PORT:property", "5432:number", "NAME:property", "\"farol\":string", "URL:property", "2:number",
     ])
+    #expect(tokens("KEY = 1 # note", ".env") == ["KEY:property", "1:number", "# note:comment"])
 }
 
 @Test func aHashInsideAValueIsNotAComment() {
