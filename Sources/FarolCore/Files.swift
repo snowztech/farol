@@ -171,4 +171,12 @@ public enum Files {
         guard !data.contains(0), let text = String(data: data, encoding: .utf8) else { return .binary }
         return .text(text)
     }
+    
+    /// Escapes file paths for safe shell usage as a single space-separated string
+    public static func escapePathsForShell(_ paths: [String]) -> String {
+        return paths.map { path in
+            // Use Foundation's shell escaping
+            return "'\(path.replacingOccurrences(of: "'", with: "'\"'\"'"))'"
+        }.joined(separator: " ")
+    }
 }

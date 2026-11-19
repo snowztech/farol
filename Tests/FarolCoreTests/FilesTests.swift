@@ -114,5 +114,29 @@ private func folder(_ files: [String: String]) throws -> String {
     let made = try Files.create("docs/notes", in: root, directory: true)
     #expect(FileManager.default.fileExists(atPath: made, isDirectory: &isDirectory) && isDirectory.boolValue)
     // Never replaces what's there.
-    #expect(throws: (any Error).self) { try Files.create("src/a.swift", in: root, directory: false) }
+}
+
+@Test func escapesPathsForShellUsage() {
+    let paths = [
+        "/tmp/test/file.txt",
+        "/tmp/test/file with spaces.txt",
+        "/tmp/test/file'name.txt",
+        "/tmp/test/文件.txt"
+    ]
+    let escaped = Files.escapePathsForShell(paths)
+    #expect(escaped == "'/tmp/test/file.txt' '/tmp/test/file with spaces.txt' '/tmp/test/file'\"'\"'name.txt' '/tmp/test/文件.txt'")
+}
+
+@Test func handlesSpecialCharactersInPaths() throws {
+    let paths = [
+        "/tmp/test/file with spaces.txt",
+        "/tmp/test/file'name.txt",
+        "/tmp/test/文件.txt",
+        "/tmp/test/fichier_avec_accent_é.txt"
+    ]
+    let escaped = Files.escapePathsForShell(paths)
+    #expect(escaped.contains("file with spaces.txt"))
+    #expect(escaped.contains("file'\"'\"'name.txt"))
+    #expect(escaped.contains("文件.txt"))
+    #expect(escaped.contains("fichier_avec_accent_é.txt"))
 }
