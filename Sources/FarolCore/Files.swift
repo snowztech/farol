@@ -197,9 +197,12 @@ public enum Files {
             if let anchor, !remaining.contains(anchor) { self.anchor = nil }
         }
 
-        public func pathsForContext(_ clicked: String, visible: [String]) -> [String] {
-            guard paths.contains(clicked) else { return [clicked] }
-            return visible.filter { paths.contains($0) }
+        public func orderedPaths(in visible: [String]) -> [String] {
+            visible.filter { paths.contains($0) }
+        }
+
+        public func pathsForContext(_ clicked: String, orderedSelection: [String]) -> [String] {
+            paths.contains(clicked) ? orderedSelection : [clicked]
         }
     }
 

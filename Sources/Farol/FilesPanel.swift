@@ -156,9 +156,6 @@ final class FileTree: ObservableObject {
         selection.click(path, in: rows.map(\.id), shift: shift, command: command)
     }
 
-    func pathsForContext(_ path: String) -> [String] {
-        selection.pathsForContext(path, visible: rows.map(\.id))
-    }
 }
 
 /// The tree of the session's folder, or Find in Files in its place.
@@ -238,9 +235,11 @@ struct FilesPanel: View {
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         if let draft = tree.draft, draft.folder == tree.root { NewItemRow(draft: draft, depth: 0, tree: tree, palette: p, open: open) }
+                        let selectedInOrder = tree.selection.orderedPaths(in: tree.rows.map(\.id))
                         ForEach(tree.rows) { row in
                             FileRow(row: row, active: row.id == tree.selected, marked: tree.selection.paths.contains(row.id),
-                                    hasSelection: !tree.selection.paths.isEmpty, pathsToCopy: tree.pathsForContext(row.id),
+                                    hasSelection: !tree.selection.paths.isEmpty,
+                                    pathsToCopy: tree.selection.pathsForContext(row.id, orderedSelection: selectedInOrder),
                                     palette: p, create: { directory in
                                 // In a folder, the new one goes inside it. On a file, beside it.
                                 let folder = row.entry.isDirectory ? row.entry.path : (row.entry.path as NSString).deletingLastPathComponent
