@@ -6,9 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
-- Copy file and folder paths from the Files panel with "Copy Absolute Path" context menu action
-- Multi-selection support in Files panel with Command-click to toggle selection and Shift-click to select ranges
-- "Copy Selected Paths" context menu action to copy multiple selected paths as shell-escaped strings
+- Copy file or folder paths from the Files panel, or select multiple entries to copy shell-ready paths.
 
 ## [0.68.0] - 2026-11-16
 

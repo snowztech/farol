@@ -15,12 +15,8 @@ final class FileTree: ObservableObject {
     @Published private(set) var root: String?
     @Published private(set) var rows: [Row] = []
     /// The file in view in the file pane, highlighted. A click on a row sets it too, before the pane catches up.
-/// The file in view in the file pane, highlighted. A click on a row sets it too, before the pane catches up.
-@Published var selected: String?
-/// Paths selected for multi-selection operations (copy paths, etc.)
-@Published var selectedPaths: Set<String> = []
-/// The last clicked row for shift-selection range calculations
-private var lastClickedRow: String?
+    @Published var selected: String?
+    @Published private(set) var selection = Files.Selection()
     /// Set once the row of the file in view is in the list, so the panel can scroll to it.
     @Published private(set) var revealed: (path: String, token: UUID)?
     private var pendingReveal: String?
@@ -45,6 +41,7 @@ private var lastClickedRow: String?
         watcher = nil
         self.root = root
         selected = nil
+        selection = Files.Selection()
         listings = [:]
         ignored = []
         rows = []
@@ -143,6 +140,7 @@ private var lastClickedRow: String?
         }
         add(root, depth: 0, dimmed: false)
         self.rows = rows
+        selection.retainVisible(rows.map(\.id))
         revealIfListed()
     }
 
@@ -153,22 +151,13 @@ private var lastClickedRow: String?
         let shown = folders.filter { listings[$0] != nil }
         if !shown.isEmpty || outsideGit.contains(where: { $0.hasSuffix("/.gitignore") }) { reload(Array(shown)) }
     }
-    
-    /// Selects a range of paths between two endpoints
-    func selectRange(from startPath: String, to endPath: String) {
-        // Find indices of start and end paths
-        guard let startIndex = rows.firstIndex(where: { $0.entry.path == startPath }),
-              let endIndex = rows.firstIndex(where: { $0.entry.path == endPath }) else {
-            return
-        }
-        
-        // Determine the range
-        let range = startIndex < endIndex ? startIndex...endIndex : endIndex...startIndex
-        
-        // Add all paths in the range to selection
-        let pathsInRange = range.map { rows[$0].entry.path }
-        selectedPaths = Set(pathsInRange)
-        lastClickedRow = endPath
+
+    func select(_ path: String, shift: Bool, command: Bool) {
+        selection.click(path, in: rows.map(\.id), shift: shift, command: command)
+    }
+
+    func pathsForContext(_ path: String) -> [String] {
+        selection.pathsForContext(path, visible: rows.map(\.id))
     }
 }
 
@@ -250,11 +239,15 @@ struct FilesPanel: View {
                     LazyVStack(spacing: 0) {
                         if let draft = tree.draft, draft.folder == tree.root { NewItemRow(draft: draft, depth: 0, tree: tree, palette: p, open: open) }
                         ForEach(tree.rows) { row in
-                            FileRow(row: row, selected: row.id == tree.selected, tree: tree, palette: p, create: { directory in
+                            FileRow(row: row, active: row.id == tree.selected, marked: tree.selection.paths.contains(row.id),
+                                    hasSelection: !tree.selection.paths.isEmpty, pathsToCopy: tree.pathsForContext(row.id),
+                                    palette: p, create: { directory in
                                 // In a folder, the new one goes inside it. On a file, beside it.
                                 let folder = row.entry.isDirectory ? row.entry.path : (row.entry.path as NSString).deletingLastPathComponent
                                 tree.startCreating(in: folder, directory: directory)
-                            }) {
+                            }) { shift, command in
+                                tree.select(row.id, shift: shift, command: command)
+                                guard !shift && !command else { return }
                                 if row.entry.isDirectory {
                                     tree.toggle(row.entry.path)
                                 } else {
@@ -290,12 +283,14 @@ struct FilesPanel: View {
 
 private struct FileRow: View {
     let row: FileTree.Row
-    let selected: Bool
+    let active: Bool
+    let marked: Bool
+    let hasSelection: Bool
+    let pathsToCopy: [String]
     let palette: Palette
     /// New File or New Folder, true for a folder.
     let create: (Bool) -> Void
-    let action: () -> Void
-    let tree: FileTree
+    let action: (Bool, Bool) -> Void
 
     @State private var hovering = false
 
@@ -319,29 +314,29 @@ private struct FileRow: View {
         .foregroundStyle(row.dimmed ? palette.muted : palette.text)
         .padding(.leading, CGFloat(row.depth) * 14 + 4)
         .frame(height: 24)
-        .background(RoundedRectangle(cornerRadius: 6).fill(selected ? palette.raised : hovering ? palette.hover : .clear))
+        .background(RoundedRectangle(cornerRadius: 6).fill(marked || (active && !hasSelection) ? palette.raised : hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
         .onClickableHover { hovering = $0 }
-        .onTapGesture(perform: action)
+        .onTapGesture {
+            let flags = NSApp.currentEvent?.modifierFlags ?? []
+            action(flags.contains(.shift), flags.contains(.command))
+        }
         .contextMenu {
             Button("New File…") { create(false) }
             Button("New Folder…") { create(true) }
             Divider()
-            Button("Copy Absolute Path") {
-                let pasteboard = NSPasteboard.general
-                pasteboard.clearContents()
-                pasteboard.setString(row.entry.path, forType: .string)
+            Button("Copy Absolute Path") { copy(row.entry.path) }
+            if pathsToCopy.count > 1 {
+                Button("Copy Selected Paths") { copy(Files.escapePathsForShell(pathsToCopy)) }
             }
             Divider()
-            Button("Copy Selected Paths") {
-                let pasteboard = NSPasteboard.general
-                pasteboard.clearContents()
-                let escapedPaths = Files.escapePathsForShell(Array(tree.selectedPaths))
-                pasteboard.setString(escapedPaths, forType: .string)
-            }
-            .disabled(tree.selectedPaths.count < 2)
             OpenInItems(path: row.entry.path)
         }
+    }
+
+    private func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 }
 

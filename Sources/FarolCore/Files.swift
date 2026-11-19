@@ -171,12 +171,39 @@ public enum Files {
         guard !data.contains(0), let text = String(data: data, encoding: .utf8) else { return .binary }
         return .text(text)
     }
-    
-    /// Escapes file paths for safe shell usage as a single space-separated string
+
+    public struct Selection {
+        public private(set) var paths: Set<String> = []
+        private var anchor: String?
+
+        public init() {}
+
+        public mutating func click(_ path: String, in visible: [String], shift: Bool, command: Bool) {
+            guard visible.contains(path) else { return }
+            if shift, let anchor, let start = visible.firstIndex(of: anchor), let end = visible.firstIndex(of: path) {
+                paths = Set(visible[min(start, end)...max(start, end)])
+            } else if command {
+                if !paths.insert(path).inserted { paths.remove(path) }
+                anchor = path
+            } else {
+                paths = [path]
+                anchor = path
+            }
+        }
+
+        public mutating func retainVisible(_ visible: [String]) {
+            let remaining = Set(visible)
+            paths.formIntersection(remaining)
+            if let anchor, !remaining.contains(anchor) { self.anchor = nil }
+        }
+
+        public func pathsForContext(_ clicked: String, visible: [String]) -> [String] {
+            guard paths.contains(clicked) else { return [clicked] }
+            return visible.filter { paths.contains($0) }
+        }
+    }
+
     public static func escapePathsForShell(_ paths: [String]) -> String {
-        return paths.map { path in
-            // Use Foundation's shell escaping
-            return "'\(path.replacingOccurrences(of: "'", with: "'\"'\"'"))'"
-        }.joined(separator: " ")
+        paths.map(NewTask.shellQuoted).joined(separator: " ")
     }
 }

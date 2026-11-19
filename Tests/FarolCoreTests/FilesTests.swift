@@ -114,29 +114,57 @@ private func folder(_ files: [String: String]) throws -> String {
     let made = try Files.create("docs/notes", in: root, directory: true)
     #expect(FileManager.default.fileExists(atPath: made, isDirectory: &isDirectory) && isDirectory.boolValue)
     // Never replaces what's there.
+    #expect(throws: (any Error).self) { try Files.create("src/a.swift", in: root, directory: false) }
 }
 
-@Test func escapesPathsForShellUsage() {
+@Test func escapesPathsForShellUsage() throws {
     let paths = [
-        "/tmp/test/file.txt",
-        "/tmp/test/file with spaces.txt",
-        "/tmp/test/file'name.txt",
-        "/tmp/test/文件.txt"
+        "/tmp/plain.txt",
+        "/tmp/a file.txt",
+        "/tmp/it's a file",
+        "/tmp/文件.txt",
+        "/tmp/é & \"quoted\" $(echo unsafe)",
+        "/tmp/line\nbreak"
     ]
-    let escaped = Files.escapePathsForShell(paths)
-    #expect(escaped == "'/tmp/test/file.txt' '/tmp/test/file with spaces.txt' '/tmp/test/file'\"'\"'name.txt' '/tmp/test/文件.txt'")
+    let shell = Process()
+    shell.executableURL = URL(fileURLWithPath: "/bin/sh")
+    shell.arguments = ["-c", "printf '%s\\0' " + Files.escapePathsForShell(paths)]
+    let output = Pipe()
+    shell.standardOutput = output
+    try shell.run()
+    shell.waitUntilExit()
+    let data = output.fileHandleForReading.readDataToEndOfFile()
+    #expect(shell.terminationStatus == 0)
+    #expect(String(decoding: data, as: UTF8.self).split(separator: "\0").map(String.init) == paths)
+    #expect(Files.escapePathsForShell([]).isEmpty)
 }
 
-@Test func handlesSpecialCharactersInPaths() throws {
-    let paths = [
-        "/tmp/test/file with spaces.txt",
-        "/tmp/test/file'name.txt",
-        "/tmp/test/文件.txt",
-        "/tmp/test/fichier_avec_accent_é.txt"
-    ]
-    let escaped = Files.escapePathsForShell(paths)
-    #expect(escaped.contains("file with spaces.txt"))
-    #expect(escaped.contains("file'\"'\"'name.txt"))
-    #expect(escaped.contains("文件.txt"))
-    #expect(escaped.contains("fichier_avec_accent_é.txt"))
+@Test func selectionSupportsCommandAndShiftClick() {
+    let rows = ["/p/a", "/p/b", "/p/c", "/p/d"]
+    var selection = Files.Selection()
+    selection.click("/p/b", in: rows, shift: false, command: false)
+    #expect(selection.paths == ["/p/b"])
+    selection.click("/p/d", in: rows, shift: true, command: false)
+    #expect(selection.paths == ["/p/b", "/p/c", "/p/d"])
+    #expect(selection.pathsForContext("/p/d", visible: rows) == ["/p/b", "/p/c", "/p/d"])
+    selection.click("/p/c", in: rows, shift: false, command: true)
+    #expect(selection.paths == ["/p/b", "/p/d"])
+    #expect(selection.pathsForContext("/p/c", visible: rows) == ["/p/c"])
+    selection.click("/p/c", in: rows, shift: false, command: true)
+    #expect(selection.paths == ["/p/b", "/p/c", "/p/d"])
+    selection.click("/p/a", in: rows, shift: true, command: false)
+    #expect(selection.paths == ["/p/a", "/p/b", "/p/c"])
+}
+
+@Test func selectionDiscardsInvisibleRows() {
+    let rows = ["/p/a", "/p/b", "/p/c"]
+    var selection = Files.Selection()
+    selection.click("/p/b", in: rows, shift: false, command: false)
+    selection.click("/p/c", in: rows, shift: false, command: true)
+    selection.retainVisible(["/p/a", "/p/c"])
+    #expect(selection.paths == ["/p/c"])
+    #expect(selection.pathsForContext("/p/a", visible: rows) == ["/p/a"])
+    selection.retainVisible(["/p/a"])
+    selection.click("/p/a", in: ["/p/a"], shift: true, command: false)
+    #expect(selection.paths == ["/p/a"])
 }
