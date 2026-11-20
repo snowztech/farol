@@ -21,6 +21,8 @@ struct SidebarView: View {
     @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = false
     /// The projects folded shut, by repo path, one per line.
     @AppStorage("sidebar.folded") private var folded = ""
+    /// A project's tag color, by repo path, so a right-click menu can set it. An index into `Palette.projectColors`.
+    @AppStorage("sidebar.projectColors") private var projectColorsData = Data()
 
     var body: some View {
         let p = state.palette
@@ -33,6 +35,7 @@ struct SidebarView: View {
                         if let key = group.key, let name {
                             ProjectHeader(name: name, sessions: group.items, folded: shut,
                                           holdsSelection: group.items.contains { $0.id == store.selectedID }, palette: p,
+                                          colorIndex: projectColors[key], onColor: { setColor($0, for: key) },
                                           onToggle: { toggleFold(key) }, onNew: { commands.newSessionIn(key) })
                         }
                         ForEach(shut ? [] : group.items) { session in
@@ -109,6 +112,16 @@ struct SidebarView: View {
         var keys = folded.split(separator: "\n").map(String.init)
         if let index = keys.firstIndex(of: key) { keys.remove(at: index) } else { keys.append(key) }
         withAnimation(.easeOut(duration: 0.15)) { folded = keys.joined(separator: "\n") }
+    }
+
+    private var projectColors: [String: Int] {
+        (try? JSONDecoder().decode([String: Int].self, from: projectColorsData)) ?? [:]
+    }
+
+    private func setColor(_ index: Int?, for key: String) {
+        var map = projectColors
+        if let index { map[key] = index } else { map.removeValue(forKey: key) }
+        projectColorsData = (try? JSONEncoder().encode(map)) ?? Data()
     }
 }
 
@@ -582,6 +595,8 @@ private struct ProjectHeader: View {
     /// Folded with the session on screen inside, it takes the selection's highlight so you can see where it went.
     let holdsSelection: Bool
     let palette: Palette
+    let colorIndex: Int?
+    let onColor: (Int?) -> Void
     let onToggle: () -> Void
     let onNew: () -> Void
 
@@ -594,6 +609,11 @@ private struct ProjectHeader: View {
                 if folded { FoldedLamp(sessions: sessions, palette: palette) }
             }
             .frame(width: Lamp.size)
+            if let colorIndex, palette.projectColors.indices.contains(colorIndex) {
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(palette.projectColors[colorIndex])
+                    .frame(width: 10, height: 10)
+            }
             Text(name)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(hovering ? palette.text : palette.muted)
@@ -624,7 +644,54 @@ private struct ProjectHeader: View {
         .onTapGesture(perform: onToggle)
         .onClickableHover { hovering = $0 }
         .hoverTip(folded ? "Show \(name)'s sessions" : "Fold \(name)")
+        .contextMenu {
+            Menu("Color") {
+                Button {
+                    onColor(nil)
+                } label: {
+                    Label {
+                        HStack {
+                            Text("None")
+                            Spacer()
+                            if colorIndex == nil { Image(systemName: "checkmark") }
+                        }
+                    } icon: {
+                        Image(systemName: "nosign")
+                    }
+                }
+                Divider()
+                ForEach(Array(palette.projectColors.enumerated()), id: \.offset) { index, color in
+                    Button {
+                        onColor(index)
+                    } label: {
+                        Label {
+                            HStack {
+                                Text(colorName(index))
+                                Spacer()
+                                if colorIndex == index { Image(systemName: "checkmark") }
+                            }
+                        } icon: {
+                            Image(nsImage: swatch(color))
+                        }
+                    }
+                }
+            }
+        }
         .padding(.top, 10)
+    }
+
+    private func colorName(_ index: Int) -> String {
+        ["Blue", "Violet", "Amber", "Pink"][index]
+    }
+
+    private func swatch(_ color: Color) -> NSImage {
+        let size = NSSize(width: 12, height: 12)
+        let image = NSImage(size: size)
+        image.lockFocus()
+        NSColor(color).setFill()
+        NSBezierPath(roundedRect: NSRect(origin: .zero, size: size), xRadius: 4, yRadius: 4).fill()
+        image.unlockFocus()
+        return image
     }
 }
 

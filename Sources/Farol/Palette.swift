@@ -146,6 +146,9 @@ extension Palette {
             return Color(nsColor: NSColor(hue: CGFloat(hue), saturation: s, brightness: b, alpha: 1))
         }
     }
+
+    /// A project's tag colors, from the theme's own hues. Skips the lamp's green, yellow and cyan so a tag never reads as agent status.
+    var projectColors: [Color] { [lanes[0], lanes[3], lanes[4], lanes[6]] }
 }
 
 /// Colors for code, from the terminal theme's ANSI palette so they always match it.
