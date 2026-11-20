@@ -12,8 +12,10 @@ final class FileView: NSView {
     private var syntax: SyntaxColors?
     private var plainColor = NSColor.textColor
     private var pendingHighlight: DispatchWorkItem?
-    /// Coloring reruns on the whole file, so very large files stay plain. Coloring only the edited lines would lift the limit.
-    private static let highlightLimit = 400_000
+    /// Up to this, a file opens already colored. Past it, and after every edit, colors are read off the main thread, so typing never waits on them.
+    private static let colorsOnOpen = 200_000
+    /// Bumped on every edit and every coloring, so colors read from an older text are dropped rather than put on the wrong characters.
+    private var highlightGeneration = 0
     /// Lines wrap only in a file with a very long line, which would lag every mouse move otherwise.
     private var wraps = false {
         didSet {
@@ -631,17 +633,31 @@ final class FileView: NSView {
 
     /// Typing waits for a pause, so a burst of keys colors the file once.
     private func highlightSoon() {
+        highlightGeneration += 1
         pendingHighlight?.cancel()
-        let work = DispatchWorkItem { [weak self] in self?.highlight() }
+        let work = DispatchWorkItem { [weak self] in self?.highlight(inBackground: true) }
         pendingHighlight = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
     }
 
     /// Colors go straight on the text storage, so they never enter the undo history.
-    private func highlight() {
+    private func highlight(inBackground: Bool = false) {
         guard let storage = text.textStorage else { return }
-        let small = storage.length <= Self.highlightLimit
-        CodeText.highlight(storage, small ? language : nil, syntax, plain: plainColor)
+        highlightGeneration += 1
+        guard let language, inBackground || storage.length > Self.colorsOnOpen else {
+            return CodeText.highlight(storage, language, syntax, plain: plainColor)
+        }
+        let generation = highlightGeneration
+        let length = storage.length
+        // Bridging copies the storage's mutable string, so the other thread reads text no edit can change.
+        let snapshot = storage.string
+        DispatchQueue.global(qos: .userInitiated).async {
+            let tokens = Syntax.tokens(in: snapshot, language)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, generation == highlightGeneration, let storage = text.textStorage, storage.length == length else { return }
+                CodeText.color(storage, tokens, syntax, plain: plainColor)
+            }
+        }
     }
 
     /// ⌘F, ⌘G and ⌘E use the text view's own find bar while the file has focus.

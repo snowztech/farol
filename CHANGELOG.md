@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- Large files are colored too, up to the 2 MB the editor opens, and coloring never holds up typing. Big files open plain and color a moment later.
+
 ### Fixed
 
 - A file with a very long line, like minified JSON, no longer lags as you scroll or click. Its lines wrap to the pane.
