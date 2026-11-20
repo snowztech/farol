@@ -325,7 +325,7 @@ private struct FileRow: View {
             Button("New Folder…") { create(true) }
             Divider()
             Button(pathsToCopy.count > 1 ? "Copy Paths of \(pathsToCopy.count) Selected Items" : "Copy Path") {
-                copy(pathsToCopy.count > 1 ? Files.escapePathsForShell(pathsToCopy) : row.entry.path)
+                copy(pathsToCopy.count > 1 ? pathsToCopy.map(NewTask.shellQuoted).joined(separator: " ") : row.entry.path)
             }
             Divider()
             OpenInItems(path: row.entry.path)

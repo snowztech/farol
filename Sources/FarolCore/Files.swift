@@ -208,8 +208,4 @@ public enum Files {
             paths.contains(clicked) ? orderedSelection : [clicked]
         }
     }
-
-    public static func escapePathsForShell(_ paths: [String]) -> String {
-        paths.map(NewTask.shellQuoted).joined(separator: " ")
-    }
 }

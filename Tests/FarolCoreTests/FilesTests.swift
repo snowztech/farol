@@ -128,7 +128,7 @@ private func folder(_ files: [String: String]) throws -> String {
     ]
     let shell = Process()
     shell.executableURL = URL(fileURLWithPath: "/bin/sh")
-    shell.arguments = ["-c", "printf '%s\\0' " + Files.escapePathsForShell(paths)]
+    shell.arguments = ["-c", "printf '%s\\0' " + paths.map(NewTask.shellQuoted).joined(separator: " ")]
     let output = Pipe()
     shell.standardOutput = output
     try shell.run()
@@ -136,7 +136,6 @@ private func folder(_ files: [String: String]) throws -> String {
     let data = output.fileHandleForReading.readDataToEndOfFile()
     #expect(shell.terminationStatus == 0)
     #expect(String(decoding: data, as: UTF8.self).split(separator: "\0").map(String.init) == paths)
-    #expect(Files.escapePathsForShell([]).isEmpty)
 }
 
 @Test func selectionSupportsCommandAndShiftClick() {
