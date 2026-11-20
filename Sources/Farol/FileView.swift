@@ -921,8 +921,8 @@ private final class LineNumbers: NSView {
     var contextMenu: (() -> NSMenu?)?
     private static let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
     private weak var textView: NSTextView?
-    /// Where each line starts, as UTF-16 offsets, so the first visible line is a binary search away.
-    private var lineStarts: [Int] = [0]
+    /// Where each line starts, so the first visible line is a binary search away.
+    private var lines = LineStarts()
     private(set) var width: CGFloat = 0
     var onResize: (() -> Void)?
     /// `current` is the cursor's line number, brighter so your place is easy to find.
@@ -932,6 +932,13 @@ private final class LineNumbers: NSView {
         self.textView = textView
         super.init(frame: .zero)
         clipsToBounds = true
+        // The storage says what changed, which the text view's own notice doesn't.
+        NotificationCenter.default.addObserver(forName: NSTextStorage.didProcessEditingNotification, object: textView.textStorage, queue: nil) { [weak self] note in
+            guard let storage = note.object as? NSTextStorage, storage.editedMask.contains(.editedCharacters) else { return }
+            MainActor.assumeIsolated {
+                self?.lines.edit(storage.editedRange, changeInLength: storage.changeInLength, in: storage.mutableString)
+            }
+        }
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -940,17 +947,9 @@ private final class LineNumbers: NSView {
 
     override func menu(for event: NSEvent) -> NSMenu? { contextMenu?() }
 
+    /// The lines are already counted as the storage changed. This fits the width to their count and draws them again.
     func textChanged() {
-        let string = (textView?.string ?? "") as NSString
-        var starts = [0]
-        var index = 0
-        while index < string.length {
-            let range = string.lineRange(for: NSRange(location: index, length: 0))
-            index = NSMaxRange(range)
-            if index < string.length { starts.append(index) }
-        }
-        lineStarts = starts
-        let digits = String(repeating: "8", count: max(3, String(starts.count).count)) as NSString
+        let digits = String(repeating: "8", count: max(3, String(lines.starts.count).count)) as NSString
         let width = (digits.size(withAttributes: [.font: Self.font]).width + 20).rounded()
         if width != self.width {
             self.width = width
@@ -965,7 +964,7 @@ private final class LineNumbers: NSView {
         let attributes: [NSAttributedString.Key: Any] = [.font: Self.font, .foregroundColor: colors.text]
         var current = attributes
         current[.foregroundColor] = colors.current
-        let cursor = textView.map { firstLine(atOrBefore: $0.selectedRange().location) }
+        let cursor = textView.map { lines.line(atOrBefore: $0.selectedRange().location) }
         forEachVisibleLine { line, top, height in
             let label = "\(line + 1)" as NSString
             let style = line == cursor ? current : attributes
@@ -981,9 +980,9 @@ private final class LineNumbers: NSView {
         let visible = textView.visibleRect
         let glyphs = layout.glyphRange(forBoundingRect: visible, in: container)
         let characters = layout.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
-        var line = firstLine(atOrBefore: characters.location)
-        while line < lineStarts.count, lineStarts[line] <= NSMaxRange(characters) {
-            let glyph = layout.glyphIndexForCharacter(at: lineStarts[line])
+        var line = lines.line(atOrBefore: characters.location)
+        while line < lines.starts.count, lines.starts[line] <= NSMaxRange(characters) {
+            let glyph = layout.glyphIndexForCharacter(at: lines.starts[line])
             let fragment = layout.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
             // Text view coordinates, shifted by how far it is scrolled. Both views start at the same height.
             body(line, fragment.minY + textView.textContainerOrigin.y - visible.minY, fragment.height)
@@ -991,21 +990,12 @@ private final class LineNumbers: NSView {
         }
     }
 
-    var count: Int { lineStarts.count }
+    var count: Int { lines.starts.count }
 
     /// The line holding `location`, from 0, and where it starts.
     func line(containing location: Int) -> (index: Int, start: Int) {
-        let index = firstLine(atOrBefore: location)
-        return (index, lineStarts[index])
-    }
-
-    private func firstLine(atOrBefore location: Int) -> Int {
-        var low = 0, high = lineStarts.count - 1
-        while low < high {
-            let mid = (low + high + 1) / 2
-            if lineStarts[mid] <= location { low = mid } else { high = mid - 1 }
-        }
-        return low
+        let index = lines.line(atOrBefore: location)
+        return (index, lines.starts[index])
     }
 }
 
