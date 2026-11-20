@@ -4,9 +4,13 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.69.0] - 2026-11-20
+
+The Files panel copies paths, one or several at once.
+
 ### Added
 
-- Copy file or folder paths from the Files panel, or select multiple entries to copy shell-ready paths.
+- Copy Path in the Files panel's right-click menu copies a file or folder's full path. Command-click or Shift-click to select several, and it copies all their paths in one line, quoted for the shell.
 
 ## [0.68.0] - 2026-11-16
 
@@ -1376,7 +1380,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.68.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.69.0...HEAD
+[0.69.0]: https://github.com/snowztech/farol/releases/tag/v0.69.0
 [0.68.0]: https://github.com/snowztech/farol/releases/tag/v0.68.0
 [0.67.0]: https://github.com/snowztech/farol/releases/tag/v0.67.0
 [0.66.0]: https://github.com/snowztech/farol/releases/tag/v0.66.0
