@@ -46,6 +46,7 @@ struct SidebarView: View {
                                 scheduler: scheduler,
                                 palette: p,
                                 highlight: selection,
+                                indent: group.key == nil ? 0 : 14,
                                 // Reselecting would pull focus back into the terminal, which a rename would lose.
                                 onSelect: {
                                     if session.id != store.selectedID || state.showingSettings { store.select(session) }
@@ -132,6 +133,8 @@ private struct SessionRow: View {
     let scheduler: Scheduler
     let palette: Palette
     let highlight: Namespace.ID
+    /// The tree indent for a session under its project header, one level like the file tree.
+    let indent: CGFloat
     let onSelect: () -> Void
     let onRename: (String) -> Void
     let onClose: () -> Void
@@ -153,7 +156,8 @@ private struct SessionRow: View {
                 CloseButton(help: "Close session (⌘W)", palette: palette, action: onClose)
             }
         }
-        .padding(.horizontal, 10)
+        .padding(.leading, 10 + indent)
+        .padding(.trailing, 10)
         .padding(.vertical, 8)
         .background { background }
         .contentShape(Rectangle())
