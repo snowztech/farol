@@ -696,7 +696,7 @@ private struct ProjectHeader: View {
     }
 
     private func colorName(_ index: Int) -> String {
-        ["Blue", "Violet", "Amber", "Pink", "Navy", "Plum"][index]
+        ["Blue", "Violet", "Amber", "Pink", "Indigo", "Purple"][index]
     }
 
     private func swatch(_ color: Color) -> NSImage {
