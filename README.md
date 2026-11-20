@@ -244,6 +244,11 @@ Each tmux window there shows up on the phone next to your Mac's sessions. `farol
 | Toggle files | ⇧⌘E |
 | Save the open file | ⌘S |
 | Go to a line in the open file | ⌘L |
+| Cut or copy the line, with nothing selected | ⌘X, ⌘C |
+| Move the line or selection down or up | ⌥↓ and ⌥↑ |
+| Copy the line or selection below or above | ⇧⌥↓ and ⇧⌥↑ |
+| Delete the line | ⇧⌘K |
+| Comment or uncomment the lines | ⌘/ |
 | Next and previous file tab | ⌃Tab and ⌃⇧Tab |
 | Back and forward through the files and lines you jumped between, also on the mouse's side buttons | ⌃⌘← and ⌃⌘→ |
 | Go to a definition, or list references from one (with its language server on) | ⌘ click |

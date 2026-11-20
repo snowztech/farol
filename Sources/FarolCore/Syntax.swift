@@ -40,6 +40,14 @@ public enum Syntax {
         var configValues = false
         /// Types written in lower case, like Go's `string` or TypeScript's `number`, which no capital gives away.
         var builtinTypes: Set<String> = []
+
+        /// What ⌘/ puts around a line: the line comment, or else a block comment, as HTML and CSS have only those.
+        public var comment: LineEditing.Comment? {
+            if let line = lineComments.first { return .line(line) }
+            if let block = blockComments.first { return .block(block.open, block.close) }
+            if markup != nil || isMarkdown { return .block("<!--", "-->") }
+            return nil
+        }
     }
 
     /// The language for a file name, or nil when Farol doesn't color it.

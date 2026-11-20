@@ -6,6 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
+- Line editing in the file editor, on VS Code's keys: ⌥↑ and ⌥↓ move lines, ⇧⌥↑ and ⇧⌥↓ copy them, ⇧⌘K deletes them and ⌘/ comments them. With nothing selected, ⌘X and ⌘C take the whole line.
 - JSON files get a json menu in the bar under the file: it says whether the file is valid and where it breaks, and formats or minifies it. Comments and trailing commas are kept, like in tsconfig.json. Also in the right-click menu.
 
 ### Changed
