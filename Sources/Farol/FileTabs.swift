@@ -53,6 +53,7 @@ final class FileTabs: NSView {
         model.closeAll = { [weak self] in self?.close(except: nil) }
         model.openServerMenu = { [weak self] in self?.openServerMenu() }
         model.askLine = { [weak self] in self?.askLine() }
+        model.openFormatMenu = { [weak self] in self?.openFormatMenu() }
         model.expand = { [weak self] in self?.onExpand?() }
         addSubview(bar)
         addSubview(status)
@@ -180,6 +181,7 @@ final class FileTabs: NSView {
         }
         model.active = current.map(ObjectIdentifier.init)
         model.canPreview = current?.canPreview == true
+        model.canFormat = current?.canFormat == true
         model.previewing = current?.isPreviewing == true
         refreshFacts()
         refreshServer()
@@ -262,6 +264,12 @@ final class FileTabs: NSView {
         menu.popUp(positioning: nil, at: NSPoint(x: status.frame.maxX - 160, y: status.frame.minY), in: self)
     }
 
+    private func openFormatMenu() {
+        guard let file = current else { return }
+        let menu = LanguageServerMenu.json(problem: file.jsonProblem) { [weak file] in file?.reformatJSON(pretty: $0) }
+        menu.popUp(positioning: nil, at: NSPoint(x: status.frame.maxX - 160, y: status.frame.minY), in: self)
+    }
+
     override func layout() {
         super.layout()
         let foot = Self.statusHeight
@@ -290,6 +298,7 @@ final class FileTabsModel: ObservableObject {
     @Published var active: ObjectIdentifier?
     @Published var palette: Palette?
     @Published var canPreview = false
+    @Published var canFormat = false
     @Published var previewing = false
     @Published var expanded = false
     /// The file in front's language server, beside its language in the status bar. Nil with language servers off.
@@ -336,6 +345,7 @@ final class FileTabsModel: ObservableObject {
     var closeAll: () -> Void = {}
     var openServerMenu: () -> Void = {}
     var askLine: () -> Void = {}
+    var openFormatMenu: () -> Void = {}
     var expand: () -> Void = {}
 }
 
@@ -463,6 +473,10 @@ struct FileStatusBar: View {
                     Text(facts.cursor).monospacedDigit()
                 }
                 Spacer(minLength: 8)
+                // JSON has no language server, so its name opens what Farol does for it instead.
+                if model.canFormat {
+                    StatusButton(palette: p, tip: nil, action: model.openFormatMenu) { _ in Text("json") }
+                }
                 if let server = model.server {
                     // The language and a dot in every state, so the corner stays quiet. A click opens the menu, which says what to do.
                     StatusButton(palette: p, tip: server.state.tip(server.name), action: model.openServerMenu) { _ in
