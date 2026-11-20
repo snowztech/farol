@@ -96,6 +96,8 @@ public enum History {
         /// Commits the branch has that the upstream doesn't, and the other way around, as of the last fetch.
         public let ahead: Int
         public let behind: Int
+        /// The server branch this tracks was deleted, so the upstream can't be pulled or pushed to.
+        public let gone: Bool
     }
 
     /// Each local branch's upstream, like main to origin/main. Branches that track nothing are left out.
@@ -113,7 +115,7 @@ public enum History {
                     return words.count == 2 && words[0] == word ? Int(words[1]) : nil
                 }.first ?? 0
             }
-            upstreams[fields[0]] = Upstream(name: fields[1], ahead: count("ahead"), behind: count("behind"))
+            upstreams[fields[0]] = Upstream(name: fields[1], ahead: count("ahead"), behind: count("behind"), gone: fields[2] == "gone")
         }
         return upstreams
     }

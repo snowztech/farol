@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- The git graph says when a branch's copy on the server has been deleted, so a stale local branch no longer looks in sync with it. The fetch button now mentions that it removes deleted remote branches.
+
 ## [0.70.0] - 2026-11-20
 
 The editor moves and comments lines on VS Code's keys, formats JSON, and stays fast in large files.
