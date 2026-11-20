@@ -197,7 +197,7 @@ The skill Farol adds when you connect an agent teaches it these commands, so you
 
 ## From your phone
 
-Farol for iPhone, in beta on [TestFlight](https://farol.sh/iphone), lets you answer your agents when you are away from the Mac. In Farol, open Settings → Remote, turn it on, press **Show code** and scan it from the app.
+[Farol Remote](https://farol.sh/iphone) for iPhone lets you answer your agents when you are away from the Mac. Install it from the App Store, or try new features early on [TestFlight](https://farol.sh/iphone-beta). In Farol, open Settings → Remote, turn it on, press **Show code** and scan it from the app.
 
 The phone lists your sessions with their status and opens each one as its agent's conversation, with the terminal one tap away. Approvals and questions show up as buttons. You can reply with a slash command or a picture, look over what changed and start a new session. It notifies you when an agent waits or finishes, and widgets and a Live Activity keep count while the app is closed.
 
