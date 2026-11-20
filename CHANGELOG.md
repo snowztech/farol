@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- Project names in the sidebar are larger and bolder than the sessions under them, so grouped projects read clearly as the parent level of the hierarchy.
+
 ## [0.70.0] - 2026-11-20
 
 The editor moves and comments lines on VS Code's keys, formats JSON, and stays fast in large files.

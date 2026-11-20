@@ -595,7 +595,7 @@ private struct ProjectHeader: View {
             }
             .frame(width: Lamp.size)
             Text(name)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(hovering ? palette.text : palette.muted)
             if folded {
                 Text(verbatim: "\(sessions.count)")
@@ -617,7 +617,7 @@ private struct ProjectHeader: View {
         .lineLimit(1)
         .padding(.leading, 10)
         .padding(.trailing, 6)
-        .padding(.vertical, 4)
+        .padding(.vertical, 5)
         .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
             .fill(folded && holdsSelection ? palette.selection : hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
