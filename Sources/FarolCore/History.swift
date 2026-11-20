@@ -96,7 +96,7 @@ public enum History {
         /// Commits the branch has that the upstream doesn't, and the other way around, as of the last fetch.
         public let ahead: Int
         public let behind: Int
-        /// The server branch this tracks was deleted, so the upstream can't be pulled or pushed to.
+        /// Git reports that the configured upstream tracking reference is missing, so there is nothing to pull from. A push recreates the server branch.
         public let gone: Bool
     }
 

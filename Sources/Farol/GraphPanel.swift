@@ -517,7 +517,7 @@ struct GraphPanel: View {
             if graph.fetching {
                 ProgressView().controlSize(.mini).frame(width: 26, height: 20)
             } else {
-                IconButton(symbol: "arrow.clockwise", help: "Fetch from the server, removing deleted branches", palette: p) {
+                IconButton(symbol: "arrow.clockwise", help: "Fetch from the server, pruning local remote-tracking refs for branches deleted there", palette: p) {
                     graph.fetch(failed: gitError("Couldn't fetch"))
                 }
             }
@@ -823,7 +823,7 @@ private struct BranchRow: View {
         }
         .onTapGesture { if !current { checkout() } }
         .hoverTip(([current ? "Checked out" : remote ? "Check out \(name) as a local branch" : "Check out \(name)"]
-            + (upstream.map { $0.gone ? ["\($0.name) was deleted on the server. A push recreates it."] : [] } ?? [])
+            + (upstream.map { $0.gone ? ["\($0.name) was deleted on the server. A push would recreate it."] : [] } ?? [])
             + drift)
             .joined(separator: "\n"))
     }
