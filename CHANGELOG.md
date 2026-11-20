@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- A file with a very long line, like minified JSON, no longer lags as you scroll or click. Its lines wrap to the pane.
+
 ## [0.69.0] - 2026-11-20
 
 The Files panel copies paths, one or several at once.
