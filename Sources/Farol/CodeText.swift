@@ -30,10 +30,15 @@ enum CodeText {
 
     /// Recolors all of `storage`: plain first, then the tokens. Colors bypass undo because they go straight on the storage.
     static func highlight(_ storage: NSTextStorage, _ language: Syntax.Language?, _ syntax: SyntaxColors?, plain: NSColor) {
+        let tokens = language.map { Syntax.tokens(in: storage.string, $0) } ?? []
+        color(storage, tokens, syntax, plain: plain)
+    }
+
+    static func color(_ storage: NSTextStorage, _ tokens: [Syntax.Token], _ syntax: SyntaxColors?, plain: NSColor) {
         storage.beginEditing()
         storage.addAttribute(.foregroundColor, value: plain, range: NSRange(location: 0, length: storage.length))
-        if let language, let syntax {
-            for token in Syntax.tokens(in: storage.string, language) {
+        if let syntax {
+            for token in tokens {
                 storage.addAttribute(.foregroundColor, value: syntax.color(token.kind), range: token.range)
             }
         }

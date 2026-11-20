@@ -12,8 +12,14 @@ final class FileView: NSView {
     private var syntax: SyntaxColors?
     private var plainColor = NSColor.textColor
     private var pendingHighlight: DispatchWorkItem?
-    /// Coloring reruns on the whole file, so very large files stay plain. Coloring only the edited lines would lift the limit.
-    private static let highlightLimit = 400_000
+    /// Up to this, a file opens already colored and lays out whole, which is cheap and never misdraws a line while typing.
+    /// Past it, only what is on screen is laid out, since laying out 2 MB to reach the end takes a second, and coloring would redo it.
+    private static let large = 200_000
+    /// A large file's colors, kept rather than written into the text, which would take seconds. Only the lines on screen get them.
+    private var tokens: [Syntax.Token] = []
+    private var isLarge: Bool { (text.textStorage?.length ?? 0) > Self.large }
+    /// Bumped on every edit and every coloring, so colors read from an older text are dropped rather than put on the wrong characters.
+    private var highlightGeneration = 0
     /// Lines wrap only in a file with a very long line, which would lag every mouse move otherwise.
     private var wraps = false {
         didSet {
@@ -98,8 +104,6 @@ final class FileView: NSView {
         let layout = NSLayoutManager()
         let container = NSTextContainer(size: NSSize(width: CGFloat.greatestFiniteMagnitude, height: .greatestFiniteMagnitude))
         storage.addLayoutManager(layout)
-        // Lays out only what is on screen, so jumping far into a large file doesn't lay out everything before it first.
-        layout.allowsNonContiguousLayout = true
         layout.addTextContainer(container)
         text = CodeTextView(frame: .zero, textContainer: container)
         gutter = LineNumbers(textView: text)
@@ -178,6 +182,7 @@ final class FileView: NSView {
         ) { [weak self] _ in
             self?.gutter.needsDisplay = true
             self?.blame.needsDisplay = true
+            self?.colorVisible()
         }
 
         message.alignment = .center
@@ -475,7 +480,10 @@ final class FileView: NSView {
         let origin = scroll.contentView.bounds.origin
         switch Result(catching: { try Files.read(path) }) {
         case .success(.text(let string)):
+            // A large file's on-screen colors would stay on whatever text comes next.
+            text.layoutManager?.removeTemporaryAttribute(.foregroundColor, forCharacterRange: NSRange(location: 0, length: text.textStorage?.length ?? 0))
             wraps = Files.hasLongLine(string)
+            text.layoutManager?.allowsNonContiguousLayout = string.utf16.count > Self.large
             text.string = string
             onDisk = string
             text.isEditable = true
@@ -633,17 +641,57 @@ final class FileView: NSView {
 
     /// Typing waits for a pause, so a burst of keys colors the file once.
     private func highlightSoon() {
+        highlightGeneration += 1
+        // Their places moved with the edit. The colors on screen stay until the new ones come.
+        tokens = []
         pendingHighlight?.cancel()
-        let work = DispatchWorkItem { [weak self] in self?.highlight() }
+        let work = DispatchWorkItem { [weak self] in self?.highlight(inBackground: true) }
         pendingHighlight = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
     }
 
     /// Colors go straight on the text storage, so they never enter the undo history.
-    private func highlight() {
+    private func highlight(inBackground: Bool = false) {
         guard let storage = text.textStorage else { return }
-        let small = storage.length <= Self.highlightLimit
-        CodeText.highlight(storage, small ? language : nil, syntax, plain: plainColor)
+        highlightGeneration += 1
+        let large = isLarge
+        tokens = []
+        guard let language, inBackground || large else {
+            return CodeText.highlight(storage, language, syntax, plain: plainColor)
+        }
+        let generation = highlightGeneration
+        let length = storage.length
+        // Bridging copies the storage's mutable string, so the other thread reads text no edit can change.
+        let snapshot = storage.string
+        DispatchQueue.global(qos: .userInitiated).async {
+            let tokens = Syntax.tokens(in: snapshot, language)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, generation == highlightGeneration, let storage = text.textStorage, storage.length == length else { return }
+                if isLarge {
+                    self.tokens = tokens
+                    colorVisible()
+                } else {
+                    CodeText.color(storage, tokens, syntax, plain: plainColor)
+                }
+            }
+        }
+    }
+
+    /// Colors the lines on screen of a large file, as drawing-only attributes, which never lay the text out again.
+    private func colorVisible() {
+        guard !tokens.isEmpty, let syntax, let layout = text.layoutManager, let container = text.textContainer else { return }
+        let glyphs = layout.glyphRange(forBoundingRect: text.visibleRect, in: container)
+        let range = layout.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
+        layout.removeTemporaryAttribute(.foregroundColor, forCharacterRange: range)
+        var low = 0, high = tokens.count
+        while low < high {
+            let mid = (low + high) / 2
+            if NSMaxRange(tokens[mid].range) <= range.location { low = mid + 1 } else { high = mid }
+        }
+        for token in tokens[low...] {
+            guard token.range.location < NSMaxRange(range) else { break }
+            layout.addTemporaryAttribute(.foregroundColor, value: syntax.color(token.kind), forCharacterRange: token.range)
+        }
     }
 
     /// ⌘F, ⌘G and ⌘E use the text view's own find bar while the file has focus.
@@ -672,7 +720,8 @@ final class FileView: NSView {
         preview.frame = NSRect(x: 0, y: bar, width: bounds.width, height: body)
         // At least as big as the visible area, so short files still fill it and clicks land in the text.
         text.minSize = scroll.contentSize
-        if wraps { text.setFrameSize(NSSize(width: scroll.contentSize.width, height: text.frame.height)) }
+        // Only on a new width: each resize measures the whole wrapped file again.
+        if wraps, text.frame.width != scroll.contentSize.width { text.setFrameSize(NSSize(width: scroll.contentSize.width, height: text.frame.height)) }
         message.frame = NSRect(x: 12, y: bounds.midY - 10, width: max(0, bounds.width - 24), height: 20)
     }
 }
