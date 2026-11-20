@@ -10,6 +10,8 @@ enum LanguageServerMenu {
     static func make(for path: String, openLog: @escaping (String, Int) -> Void, runInTerminal: ((String) -> Void)? = nil) -> NSMenu {
         let servers = LanguageServers.shared
         let menu = NSMenu()
+        // Otherwise the menu enables every item with an action, and Open Logs stays clickable with nothing logged yet.
+        menu.autoenablesItems = false
         guard let kind = LSP.server(for: path) else { return menu }
         let server = servers.existing(for: path)
         let installed = servers.isInstalled(kind) != false
@@ -80,8 +82,6 @@ enum LanguageServerMenu {
         return menu
     }
 
-    /// The server's name with a gray dot for its state, and after it, muted, what it is doing, its version and memory.
-    /// Gray, since a colored dot in Farol is an agent's.
     /// JSON has no server, so its menu says whether the file is JSON, and formats or minifies it, in the same shape.
     static func json(problem: String?, reformat: @escaping (_ pretty: Bool) -> Void) -> NSMenu {
         let menu = NSMenu()
@@ -99,6 +99,8 @@ enum LanguageServerMenu {
         return menu
     }
 
+    /// The server's name with a gray dot for its state, and after it, muted, what it is doing, its version and memory.
+    /// Gray, since a colored dot in Farol is an agent's.
     private static func title(_ name: String, state: String, symbol: String, details: [String?] = []) -> NSMenuItem {
         let item = NSMenuItem(title: name, action: nil, keyEquivalent: "")
         let text = NSMutableAttributedString(string: name, attributes: [.font: NSFont.menuFont(ofSize: 13)])
