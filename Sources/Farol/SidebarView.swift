@@ -21,9 +21,12 @@ struct SidebarView: View {
     @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = false
     /// The projects folded shut, by repo path, one per line.
     @AppStorage("sidebar.folded") private var folded = ""
+    /// A project's tag color, by repo path, so a right-click menu can set it. An index into `Palette.projectColors`.
+    @AppStorage(SessionStore.projectColorsKey) private var projectColorsData = Data()
 
     var body: some View {
         let p = state.palette
+        let colors = projectColors
         VStack(spacing: 0) {
             ScrollView {
                 LazyVStack(spacing: 2) {
@@ -33,6 +36,7 @@ struct SidebarView: View {
                         if let key = group.key, let name {
                             ProjectHeader(name: name, sessions: group.items, folded: shut,
                                           holdsSelection: group.items.contains { $0.id == store.selectedID }, palette: p,
+                                          colorIndex: colors[key], onColor: { setColor($0, for: key) },
                                           onToggle: { toggleFold(key) }, onNew: { commands.newSessionIn(key) })
                         }
                         ForEach(shut ? [] : group.items) { session in
@@ -43,6 +47,7 @@ struct SidebarView: View {
                                 scheduler: scheduler,
                                 palette: p,
                                 highlight: selection,
+                                indent: group.key == nil ? 0 : 14,
                                 // Reselecting would pull focus back into the terminal, which a rename would lose.
                                 onSelect: {
                                     if session.id != store.selectedID || state.showingSettings { store.select(session) }
@@ -110,6 +115,16 @@ struct SidebarView: View {
         if let index = keys.firstIndex(of: key) { keys.remove(at: index) } else { keys.append(key) }
         withAnimation(.easeOut(duration: 0.15)) { folded = keys.joined(separator: "\n") }
     }
+
+    private var projectColors: [String: Int] {
+        (try? JSONDecoder().decode([String: Int].self, from: projectColorsData)) ?? [:]
+    }
+
+    private func setColor(_ index: Int?, for key: String) {
+        var map = projectColors
+        if let index { map[key] = index } else { map.removeValue(forKey: key) }
+        projectColorsData = (try? JSONEncoder().encode(map)) ?? Data()
+    }
 }
 
 private struct SessionRow: View {
@@ -119,6 +134,7 @@ private struct SessionRow: View {
     let scheduler: Scheduler
     let palette: Palette
     let highlight: Namespace.ID
+    let indent: CGFloat
     let onSelect: () -> Void
     let onRename: (String) -> Void
     let onClose: () -> Void
@@ -140,7 +156,8 @@ private struct SessionRow: View {
                 CloseButton(help: "Close session (⌘W)", palette: palette, action: onClose)
             }
         }
-        .padding(.horizontal, 10)
+        .padding(.leading, 10 + indent)
+        .padding(.trailing, 10)
         .padding(.vertical, 8)
         .background { background }
         .contentShape(Rectangle())
@@ -582,6 +599,8 @@ private struct ProjectHeader: View {
     /// Folded with the session on screen inside, it takes the selection's highlight so you can see where it went.
     let holdsSelection: Bool
     let palette: Palette
+    let colorIndex: Int?
+    let onColor: (Int?) -> Void
     let onToggle: () -> Void
     let onNew: () -> Void
 
@@ -595,8 +614,8 @@ private struct ProjectHeader: View {
             }
             .frame(width: Lamp.size)
             Text(name)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(hovering ? palette.text : palette.muted)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(hovering || projectTint != nil ? palette.text : palette.muted)
             if folded {
                 Text(verbatim: "\(sessions.count)")
                     .font(.system(size: 11, design: .monospaced))
@@ -617,14 +636,77 @@ private struct ProjectHeader: View {
         .lineLimit(1)
         .padding(.leading, 10)
         .padding(.trailing, 6)
-        .padding(.vertical, 4)
-        .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .fill(folded && holdsSelection ? palette.selection : hovering ? palette.hover : .clear))
+        .padding(.vertical, 5)
+        .background(background)
         .contentShape(Rectangle())
         .onTapGesture(perform: onToggle)
         .onClickableHover { hovering = $0 }
         .hoverTip(folded ? "Show \(name)'s sessions" : "Fold \(name)")
+        .contextMenu {
+            Menu("Color") {
+                Button {
+                    onColor(nil)
+                } label: {
+                    Label {
+                        HStack {
+                            Text("None")
+                            Spacer()
+                            if colorIndex == nil { Image(systemName: "checkmark") }
+                        }
+                    } icon: {
+                        Image(systemName: "nosign")
+                    }
+                }
+                Divider()
+                ForEach(Array(palette.projectColors.enumerated()), id: \.offset) { index, color in
+                    Button {
+                        onColor(index)
+                    } label: {
+                        Label {
+                            HStack {
+                                Text(colorName(index))
+                                Spacer()
+                                if colorIndex == index { Image(systemName: "checkmark") }
+                            }
+                        } icon: {
+                            Image(nsImage: swatch(color))
+                        }
+                    }
+                }
+            }
+        }
         .padding(.top, 10)
+    }
+
+    /// The row's fill: the project's color as a wash, the selection highlight when it hides the session you're looking at, hover otherwise.
+    @ViewBuilder private var background: some View {
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        if folded && holdsSelection {
+            shape.fill(palette.selection).overlay(shape.fill(projectTint?.opacity(0.4) ?? .clear))
+        } else if let tint = projectTint {
+            shape.fill(tint.opacity(hovering ? 0.28 : 0.17))
+        } else if hovering {
+            shape.fill(palette.hover)
+        }
+    }
+
+    private var projectTint: Color? {
+        guard let colorIndex, palette.projectColors.indices.contains(colorIndex) else { return nil }
+        return palette.projectColors[colorIndex]
+    }
+
+    private func colorName(_ index: Int) -> String {
+        ["Blue", "Violet", "Amber", "Pink", "Indigo", "Purple"][index]
+    }
+
+    private func swatch(_ color: Color) -> NSImage {
+        let size = NSSize(width: 12, height: 12)
+        let image = NSImage(size: size)
+        image.lockFocus()
+        NSColor(color).setFill()
+        NSBezierPath(roundedRect: NSRect(origin: .zero, size: size), xRadius: 4, yRadius: 4).fill()
+        image.unlockFocus()
+        return image
     }
 }
 
