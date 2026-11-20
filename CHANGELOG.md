@@ -4,18 +4,24 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.70.0] - 2026-11-20
+
+The editor moves and comments lines on VS Code's keys, formats JSON, and stays fast in large files.
+
 ### Added
 
-- Line editing in the file editor, on VS Code's keys: ⌥↑ and ⌥↓ move lines, ⇧⌥↑ and ⇧⌥↓ copy them, ⇧⌘K deletes them and ⌘/ comments them. With nothing selected, ⌘X and ⌘C take the whole line.
+- Line editing in the file editor, on VS Code's keys: ⌥↑ and ⌥↓ move lines, ⇧⌥↑ and ⇧⌥↓ copy them, ⇧⌘K deletes them and ⌘/ comments them. With nothing selected, ⌘X and ⌘C take the whole line. A Lines submenu in the right-click menu lists them with their keys.
 - JSON files get a json menu in the bar under the file: it says whether the file is valid and where it breaks, and formats or minifies it. Comments and trailing commas are kept, like in tsconfig.json. Also in the right-click menu.
 
 ### Changed
 
 - Large files are colored too, up to the 2 MB the editor opens, and coloring never holds up typing. Big files open plain and color a moment later.
+- Typing in a large file stays quick: line numbers follow the edited lines instead of reading the whole file on every key.
 
 ### Fixed
 
 - A file with a very long line, like minified JSON, no longer lags as you scroll or click. Its lines wrap to the pane.
+- Open Logs in a language server's menu stays grayed out until the server has logged something.
 
 ## [0.69.0] - 2026-11-20
 
@@ -1393,7 +1399,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.69.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.70.0...HEAD
+[0.70.0]: https://github.com/snowztech/farol/releases/tag/v0.70.0
 [0.69.0]: https://github.com/snowztech/farol/releases/tag/v0.69.0
 [0.68.0]: https://github.com/snowztech/farol/releases/tag/v0.68.0
 [0.67.0]: https://github.com/snowztech/farol/releases/tag/v0.67.0
