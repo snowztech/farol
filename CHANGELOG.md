@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Copy file or folder paths from the Files panel, or select multiple entries to copy shell-ready paths.
+
 ## [0.68.0] - 2026-11-16
 
 New Task lists your Linear issues, and config files color their keys.

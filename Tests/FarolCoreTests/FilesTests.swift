@@ -116,3 +116,58 @@ private func folder(_ files: [String: String]) throws -> String {
     // Never replaces what's there.
     #expect(throws: (any Error).self) { try Files.create("src/a.swift", in: root, directory: false) }
 }
+
+@Test func escapesPathsForShellUsage() throws {
+    let paths = [
+        "/tmp/plain.txt",
+        "/tmp/a file.txt",
+        "/tmp/it's a file",
+        "/tmp/文件.txt",
+        "/tmp/é & \"quoted\" $(echo unsafe)",
+        "/tmp/line\nbreak"
+    ]
+    let shell = Process()
+    shell.executableURL = URL(fileURLWithPath: "/bin/sh")
+    shell.arguments = ["-c", "printf '%s\\0' " + paths.map(NewTask.shellQuoted).joined(separator: " ")]
+    let output = Pipe()
+    shell.standardOutput = output
+    try shell.run()
+    shell.waitUntilExit()
+    let data = output.fileHandleForReading.readDataToEndOfFile()
+    #expect(shell.terminationStatus == 0)
+    #expect(String(decoding: data, as: UTF8.self).split(separator: "\0").map(String.init) == paths)
+}
+
+@Test func selectionSupportsCommandAndShiftClick() {
+    let rows = ["/p/a", "/p/b", "/p/c", "/p/d"]
+    var selection = Files.Selection()
+    selection.click("/p/b", in: rows, shift: false, command: false)
+    #expect(selection.paths.isEmpty)
+    selection.click("/p/d", in: rows, shift: true, command: false)
+    #expect(selection.paths == ["/p/b", "/p/c", "/p/d"])
+    #expect(selection.pathsForContext("/p/d", orderedSelection: selection.orderedPaths(in: rows)) == ["/p/b", "/p/c", "/p/d"])
+    selection.click("/p/c", in: rows, shift: false, command: true)
+    #expect(selection.paths == ["/p/b", "/p/d"])
+    #expect(selection.pathsForContext("/p/c", orderedSelection: selection.orderedPaths(in: rows)) == ["/p/c"])
+    selection.click("/p/c", in: rows, shift: false, command: true)
+    #expect(selection.paths == ["/p/b", "/p/c", "/p/d"])
+    selection.click("/p/a", in: rows, shift: true, command: false)
+    #expect(selection.paths == ["/p/a", "/p/b", "/p/c"])
+    selection.click("/p/d", in: rows, shift: false, command: false)
+    #expect(selection.paths.isEmpty)
+    selection.click("/p/b", in: rows, shift: false, command: true)
+    #expect(selection.paths == ["/p/b", "/p/d"])
+}
+
+@Test func selectionDiscardsInvisibleRows() {
+    let rows = ["/p/a", "/p/b", "/p/c"]
+    var selection = Files.Selection()
+    selection.click("/p/b", in: rows, shift: false, command: false)
+    selection.click("/p/c", in: rows, shift: false, command: true)
+    selection.retainVisible(["/p/a", "/p/c"])
+    #expect(selection.paths == ["/p/c"])
+    #expect(selection.pathsForContext("/p/a", orderedSelection: selection.orderedPaths(in: rows)) == ["/p/a"])
+    selection.retainVisible(["/p/a"])
+    selection.click("/p/a", in: ["/p/a"], shift: true, command: false)
+    #expect(selection.paths == ["/p/a"])
+}

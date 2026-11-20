@@ -171,4 +171,41 @@ public enum Files {
         guard !data.contains(0), let text = String(data: data, encoding: .utf8) else { return .binary }
         return .text(text)
     }
+
+    public struct Selection {
+        public private(set) var paths: Set<String> = []
+        private var anchor: String?
+
+        public init() {}
+
+        public mutating func click(_ path: String, in visible: [String], shift: Bool, command: Bool) {
+            guard visible.contains(path) else { return }
+            if shift, let anchor, let start = visible.firstIndex(of: anchor), let end = visible.firstIndex(of: path) {
+                paths = Set(visible[min(start, end)...max(start, end)])
+            } else if command {
+                // Like Finder, the row clicked last joins the selection Command-click starts.
+                if paths.isEmpty, let anchor, anchor != path { paths.insert(anchor) }
+                if !paths.insert(path).inserted { paths.remove(path) }
+                anchor = path
+            } else {
+                // A plain click opens the row and leaves the highlight to the file in view.
+                paths = shift ? [path] : []
+                anchor = path
+            }
+        }
+
+        public mutating func retainVisible(_ visible: [String]) {
+            let remaining = Set(visible)
+            paths.formIntersection(remaining)
+            if let anchor, !remaining.contains(anchor) { self.anchor = nil }
+        }
+
+        public func orderedPaths(in visible: [String]) -> [String] {
+            visible.filter { paths.contains($0) }
+        }
+
+        public func pathsForContext(_ clicked: String, orderedSelection: [String]) -> [String] {
+            paths.contains(clicked) ? orderedSelection : [clicked]
+        }
+    }
 }

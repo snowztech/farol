@@ -16,6 +16,7 @@ final class FileTree: ObservableObject {
     @Published private(set) var rows: [Row] = []
     /// The file in view in the file pane, highlighted. A click on a row sets it too, before the pane catches up.
     @Published var selected: String?
+    @Published private(set) var selection = Files.Selection()
     /// Set once the row of the file in view is in the list, so the panel can scroll to it.
     @Published private(set) var revealed: (path: String, token: UUID)?
     private var pendingReveal: String?
@@ -40,6 +41,7 @@ final class FileTree: ObservableObject {
         watcher = nil
         self.root = root
         selected = nil
+        selection = Files.Selection()
         listings = [:]
         ignored = []
         rows = []
@@ -138,6 +140,7 @@ final class FileTree: ObservableObject {
         }
         add(root, depth: 0, dimmed: false)
         self.rows = rows
+        selection.retainVisible(rows.map(\.id))
         revealIfListed()
     }
 
@@ -148,6 +151,11 @@ final class FileTree: ObservableObject {
         let shown = folders.filter { listings[$0] != nil }
         if !shown.isEmpty || outsideGit.contains(where: { $0.hasSuffix("/.gitignore") }) { reload(Array(shown)) }
     }
+
+    func select(_ path: String, shift: Bool, command: Bool) {
+        selection.click(path, in: rows.map(\.id), shift: shift, command: command)
+    }
+
 }
 
 /// The tree of the session's folder, or Find in Files in its place.
@@ -227,12 +235,18 @@ struct FilesPanel: View {
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         if let draft = tree.draft, draft.folder == tree.root { NewItemRow(draft: draft, depth: 0, tree: tree, palette: p, open: open) }
+                        let selectedInOrder = tree.selection.orderedPaths(in: tree.rows.map(\.id))
                         ForEach(tree.rows) { row in
-                            FileRow(row: row, selected: row.id == tree.selected, palette: p, create: { directory in
+                            FileRow(row: row, active: row.id == tree.selected, marked: tree.selection.paths.contains(row.id),
+                                    hasSelection: !tree.selection.paths.isEmpty,
+                                    pathsToCopy: tree.selection.pathsForContext(row.id, orderedSelection: selectedInOrder),
+                                    palette: p, create: { directory in
                                 // In a folder, the new one goes inside it. On a file, beside it.
                                 let folder = row.entry.isDirectory ? row.entry.path : (row.entry.path as NSString).deletingLastPathComponent
                                 tree.startCreating(in: folder, directory: directory)
-                            }) {
+                            }) { shift, command in
+                                tree.select(row.id, shift: shift, command: command)
+                                guard !shift && !command else { return }
                                 if row.entry.isDirectory {
                                     tree.toggle(row.entry.path)
                                 } else {
@@ -268,11 +282,14 @@ struct FilesPanel: View {
 
 private struct FileRow: View {
     let row: FileTree.Row
-    let selected: Bool
+    let active: Bool
+    let marked: Bool
+    let hasSelection: Bool
+    let pathsToCopy: [String]
     let palette: Palette
     /// New File or New Folder, true for a folder.
     let create: (Bool) -> Void
-    let action: () -> Void
+    let action: (Bool, Bool) -> Void
 
     @State private var hovering = false
 
@@ -296,16 +313,28 @@ private struct FileRow: View {
         .foregroundStyle(row.dimmed ? palette.muted : palette.text)
         .padding(.leading, CGFloat(row.depth) * 14 + 4)
         .frame(height: 24)
-        .background(RoundedRectangle(cornerRadius: 6).fill(selected ? palette.raised : hovering ? palette.hover : .clear))
+        .background(RoundedRectangle(cornerRadius: 6).fill(marked || (active && !hasSelection) ? palette.raised : hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
         .onClickableHover { hovering = $0 }
-        .onTapGesture(perform: action)
+        .onTapGesture {
+            let flags = NSApp.currentEvent?.modifierFlags ?? []
+            action(flags.contains(.shift), flags.contains(.command))
+        }
         .contextMenu {
             Button("New File…") { create(false) }
             Button("New Folder…") { create(true) }
             Divider()
+            Button(pathsToCopy.count > 1 ? "Copy Paths of \(pathsToCopy.count) Selected Items" : "Copy Path") {
+                copy(pathsToCopy.count > 1 ? pathsToCopy.map(NewTask.shellQuoted).joined(separator: " ") : row.entry.path)
+            }
+            Divider()
             OpenInItems(path: row.entry.path)
         }
+    }
+
+    private func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 }
 
