@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- The Git graph identifies branches whose tracked upstream has disappeared, and Fetch explains how it removes stale local remote-tracking references.
+
 ## [0.70.0] - 2026-11-20
 
 The editor moves and comments lines on VS Code's keys, formats JSON, and stays fast in large files.

@@ -517,7 +517,7 @@ struct GraphPanel: View {
             if graph.fetching {
                 ProgressView().controlSize(.mini).frame(width: 26, height: 20)
             } else {
-                IconButton(symbol: "arrow.clockwise", help: "Fetch from the server", palette: p) {
+                IconButton(symbol: "arrow.clockwise", help: "Fetch from the server, pruning local remote-tracking refs for branches deleted there", palette: p) {
                     graph.fetch(failed: gitError("Couldn't fetch"))
                 }
             }
@@ -744,7 +744,7 @@ private struct BranchList: View {
 
     private func deleteRemote(_ branch: String) {
         confirm("Delete \(branch) on the server?",
-                "It's removed for everyone who uses this remote, and any open pull request from it closes. Your local branch stays.",
+                "It's removed for everyone who uses this remote, and any open pull request from it closes. Your local branch stays. If it was already deleted on the server, a Fetch removes the stale local copy.",
                 button: "Delete on Server", destructive: true) {
             graph.deleteRemote(branch, failed: gitError("Couldn't delete the remote branch"))
         }
@@ -786,6 +786,8 @@ private struct BranchRow: View {
                 .truncationMode(.middle)
             if remote {
                 Text("remote").font(.system(size: 10)).foregroundStyle(palette.muted).fixedSize()
+            } else if let upstream, upstream.gone {
+                Text("deleted on server").font(.system(size: 10)).foregroundStyle(palette.muted).fixedSize()
             }
             Spacer(minLength: 4)
             // The counts stay out while it runs, since they are about to change.
@@ -820,7 +822,9 @@ private struct BranchRow: View {
             hover($0)
         }
         .onTapGesture { if !current { checkout() } }
-        .hoverTip(([current ? "Checked out" : remote ? "Check out \(name) as a local branch" : "Check out \(name)"] + drift)
+        .hoverTip(([current ? "Checked out" : remote ? "Check out \(name) as a local branch" : "Check out \(name)"]
+            + (upstream.map { $0.gone ? ["\($0.name) was deleted on the server. A push would recreate it."] : [] } ?? [])
+            + drift)
             .joined(separator: "\n"))
     }
 
