@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- JSON files get a json menu in the bar under the file: it says whether the file is valid and where it breaks, and formats or minifies it. Comments and trailing commas are kept, like in tsconfig.json. Also in the right-click menu.
+
 ### Changed
 
 - Large files are colored too, up to the 2 MB the editor opens, and coloring never holds up typing. Big files open plain and color a moment later.

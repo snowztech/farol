@@ -82,6 +82,23 @@ enum LanguageServerMenu {
 
     /// The server's name with a gray dot for its state, and after it, muted, what it is doing, its version and memory.
     /// Gray, since a colored dot in Farol is an agent's.
+    /// JSON has no server, so its menu says whether the file is JSON, and formats or minifies it, in the same shape.
+    static func json(problem: String?, reformat: @escaping (_ pretty: Bool) -> Void) -> NSMenu {
+        let menu = NSMenu()
+        // Otherwise the menu enables every item with an action, and Format would stay clickable on a file it can't read.
+        menu.autoenablesItems = false
+        // The marks a server's state uses: filled when all is well, the warning when it isn't.
+        menu.addItem(title("json", state: problem.map { "not valid · \($0)" } ?? "valid",
+                           symbol: problem == nil ? "circle.fill" : "exclamationmark.triangle"))
+        menu.addItem(.separator())
+        for (name, symbol, pretty) in [("Format", "text.alignleft", true), ("Minify", "arrow.right.and.line.vertical.and.arrow.left", false)] {
+            let item = action(name, symbol) { reformat(pretty) }
+            item.isEnabled = problem == nil
+            menu.addItem(item)
+        }
+        return menu
+    }
+
     private static func title(_ name: String, state: String, symbol: String, details: [String?] = []) -> NSMenuItem {
         let item = NSMenuItem(title: name, action: nil, keyEquivalent: "")
         let text = NSMutableAttributedString(string: name, attributes: [.font: NSFont.menuFont(ofSize: 13)])

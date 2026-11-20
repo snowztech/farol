@@ -17,6 +17,8 @@ final class FileView: NSView {
     private static let large = 200_000
     /// A large file's colors, kept rather than written into the text, which would take seconds. Only the lines on screen get them.
     private var tokens: [Syntax.Token] = []
+    /// The length `fitLayout` last saw. A change far bigger than typing, like formatting, undoing it or a paste, fits the layout again.
+    private var fittedLength = 0
     private var isLarge: Bool { (text.textStorage?.length ?? 0) > Self.large }
     /// Bumped on every edit and every coloring, so colors read from an older text are dropped rather than put on the wrong characters.
     private var highlightGeneration = 0
@@ -115,6 +117,10 @@ final class FileView: NSView {
         text.extraMenuItems = { [weak self] in
             guard let self else { return [] }
             var items: [NSMenuItem] = []
+            if canFormat {
+                items.append(ActionMenuItem(title: "Format JSON") { [weak self] in self?.reformatJSON(pretty: true) })
+                items.append(ActionMenuItem(title: "Minify JSON") { [weak self] in self?.reformatJSON(pretty: false) })
+            }
             if canBlame {
                 items.append(ActionMenuItem(title: blaming ? "Hide Git Blame" : "Show Git Blame") { [weak self] in self?.toggleBlame() })
             }
@@ -156,6 +162,7 @@ final class FileView: NSView {
             guard let self else { return }
             // Typing a line and deleting it again leaves nothing to save.
             isDirty = text.string != onDisk
+            if abs((text.textStorage?.length ?? 0) - fittedLength) > 10_000 { fitLayout(text.string) }
             // The observer runs on the main queue, which the compiler can't see. This checks it, rather than hiding the warning.
             MainActor.assumeIsolated { self.links.textChanged() }
             unmark()
@@ -482,8 +489,7 @@ final class FileView: NSView {
         case .success(.text(let string)):
             // A large file's on-screen colors would stay on whatever text comes next.
             text.layoutManager?.removeTemporaryAttribute(.foregroundColor, forCharacterRange: NSRange(location: 0, length: text.textStorage?.length ?? 0))
-            wraps = Files.hasLongLine(string)
-            text.layoutManager?.allowsNonContiguousLayout = string.utf16.count > Self.large
+            fitLayout(string)
             text.string = string
             onDisk = string
             text.isEditable = true
@@ -511,6 +517,28 @@ final class FileView: NSView {
         } else {
             text.scroll(.zero)
         }
+    }
+
+    /// Wraps a file with a very long line, and lays out only what is on screen in a large one.
+    private func fitLayout(_ string: String) {
+        fittedLength = string.utf16.count
+        wraps = Files.hasLongLine(string)
+        text.layoutManager?.allowsNonContiguousLayout = fittedLength > Self.large
+    }
+
+    var canFormat: Bool { (path as NSString).pathExtension.lowercased() == "json" && message.isHidden }
+
+    var jsonProblem: String? { JSONFormat.problem(text.string) }
+
+    /// An edit like any other, so ⌘Z takes it back and nothing is saved until you save.
+    func reformatJSON(pretty: Bool) {
+        guard let new = pretty ? JSONFormat.pretty(text.string) : JSONFormat.minified(text.string), new != text.string else { return }
+        let all = NSRange(location: 0, length: (text.string as NSString).length)
+        guard text.shouldChangeText(in: all, replacementString: new) else { return }
+        text.textStorage?.replaceCharacters(in: all, with: new)
+        text.didChangeText()
+        text.setSelectedRange(NSRange(location: 0, length: 0))
+        text.scrollRangeToVisible(NSRange(location: 0, length: 0))
     }
 
     private func display(message text: String?) {
