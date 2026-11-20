@@ -236,9 +236,12 @@ struct FilesPanel: View {
                     LazyVStack(spacing: 0) {
                         if let draft = tree.draft, draft.folder == tree.root { NewItemRow(draft: draft, depth: 0, tree: tree, palette: p, open: open) }
                         let selectedInOrder = tree.selection.orderedPaths(in: tree.rows.map(\.id))
-                        ForEach(tree.rows) { row in
-                            FileRow(row: row, active: row.id == tree.selected, marked: tree.selection.paths.contains(row.id),
-                                    hasSelection: !tree.selection.paths.isEmpty,
+                        let marked = tree.selection.paths
+                        ForEach(Array(tree.rows.enumerated()), id: \.element.id) { index, row in
+                            FileRow(row: row, active: row.id == tree.selected, marked: marked.contains(row.id),
+                                    joinsAbove: index > 0 && marked.contains(tree.rows[index - 1].id),
+                                    joinsBelow: index + 1 < tree.rows.count && marked.contains(tree.rows[index + 1].id),
+                                    hasSelection: !marked.isEmpty,
                                     pathsToCopy: tree.selection.pathsForContext(row.id, orderedSelection: selectedInOrder),
                                     palette: p, create: { directory in
                                 // In a folder, the new one goes inside it. On a file, beside it.
@@ -284,6 +287,9 @@ private struct FileRow: View {
     let row: FileTree.Row
     let active: Bool
     let marked: Bool
+    /// Selected rows next to each other read as one block, so only its outer corners are round.
+    let joinsAbove: Bool
+    let joinsBelow: Bool
     let hasSelection: Bool
     let pathsToCopy: [String]
     let palette: Palette
@@ -313,7 +319,7 @@ private struct FileRow: View {
         .foregroundStyle(row.dimmed ? palette.muted : palette.text)
         .padding(.leading, CGFloat(row.depth) * 14 + 4)
         .frame(height: 24)
-        .background(RoundedRectangle(cornerRadius: 6).fill(marked || (active && !hasSelection) ? palette.raised : hovering ? palette.hover : .clear))
+        .background(background.fill(marked || (active && !hasSelection) ? palette.raised : hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
         .onClickableHover { hovering = $0 }
         .onTapGesture {
@@ -330,6 +336,12 @@ private struct FileRow: View {
             Divider()
             OpenInItems(path: row.entry.path)
         }
+    }
+
+    private var background: UnevenRoundedRectangle {
+        let top: CGFloat = marked && joinsAbove ? 0 : 6
+        let bottom: CGFloat = marked && joinsBelow ? 0 : 6
+        return UnevenRoundedRectangle(topLeadingRadius: top, bottomLeadingRadius: bottom, bottomTrailingRadius: bottom, topTrailingRadius: top)
     }
 
     private func copy(_ text: String) {
