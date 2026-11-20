@@ -26,6 +26,7 @@ struct SidebarView: View {
 
     var body: some View {
         let p = state.palette
+        let colors = projectColors
         VStack(spacing: 0) {
             ScrollView {
                 LazyVStack(spacing: 2) {
@@ -35,7 +36,7 @@ struct SidebarView: View {
                         if let key = group.key, let name {
                             ProjectHeader(name: name, sessions: group.items, folded: shut,
                                           holdsSelection: group.items.contains { $0.id == store.selectedID }, palette: p,
-                                          colorIndex: projectColors[key], onColor: { setColor($0, for: key) },
+                                          colorIndex: colors[key], onColor: { setColor($0, for: key) },
                                           onToggle: { toggleFold(key) }, onNew: { commands.newSessionIn(key) })
                         }
                         ForEach(shut ? [] : group.items) { session in
@@ -133,7 +134,6 @@ private struct SessionRow: View {
     let scheduler: Scheduler
     let palette: Palette
     let highlight: Namespace.ID
-    /// The tree indent for a session under its project header, one level like the file tree.
     let indent: CGFloat
     let onSelect: () -> Void
     let onRename: (String) -> Void
@@ -644,37 +644,37 @@ private struct ProjectHeader: View {
         .hoverTip(folded ? "Show \(name)'s sessions" : "Fold \(name)")
         .contextMenu {
             Menu("Color") {
+                Button {
+                    onColor(nil)
+                } label: {
+                    Label {
+                        HStack {
+                            Text("None")
+                            Spacer()
+                            if colorIndex == nil { Image(systemName: "checkmark") }
+                        }
+                    } icon: {
+                        Image(systemName: "nosign")
+                    }
+                }
+                Divider()
+                ForEach(Array(palette.projectColors.enumerated()), id: \.offset) { index, color in
                     Button {
-                        onColor(nil)
+                        onColor(index)
                     } label: {
                         Label {
                             HStack {
-                                Text("None")
+                                Text(colorName(index))
                                 Spacer()
-                                if colorIndex == nil { Image(systemName: "checkmark") }
+                                if colorIndex == index { Image(systemName: "checkmark") }
                             }
                         } icon: {
-                            Image(systemName: "nosign")
-                        }
-                    }
-                    Divider()
-                    ForEach(Array(palette.projectColors.enumerated()), id: \.offset) { index, color in
-                        Button {
-                            onColor(index)
-                        } label: {
-                            Label {
-                                HStack {
-                                    Text(colorName(index))
-                                    Spacer()
-                                    if colorIndex == index { Image(systemName: "checkmark") }
-                                }
-                            } icon: {
-                                Image(nsImage: swatch(color))
-                            }
+                            Image(nsImage: swatch(color))
                         }
                     }
                 }
             }
+        }
         .padding(.top, 10)
     }
 
@@ -690,7 +690,6 @@ private struct ProjectHeader: View {
         }
     }
 
-    /// The assigned color, when a color is set.
     private var projectTint: Color? {
         guard let colorIndex, palette.projectColors.indices.contains(colorIndex) else { return nil }
         return palette.projectColors[colorIndex]
