@@ -14,6 +14,16 @@ final class FileView: NSView {
     private var pendingHighlight: DispatchWorkItem?
     /// Coloring reruns on the whole file, so very large files stay plain. Coloring only the edited lines would lift the limit.
     private static let highlightLimit = 400_000
+    /// Lines wrap only in a file with a very long line, which would lag every mouse move otherwise.
+    private var wraps = false {
+        didSet {
+            guard wraps != oldValue, let container = text.textContainer else { return }
+            text.isHorizontallyResizable = !wraps
+            container.widthTracksTextView = wraps
+            if !wraps { container.size = NSSize(width: CGFloat.greatestFiniteMagnitude, height: .greatestFiniteMagnitude) }
+            needsLayout = true
+        }
+    }
     private(set) var isDirty = false {
         didSet {
             blame.lines = isDirty ? [] : blameLines
@@ -88,6 +98,8 @@ final class FileView: NSView {
         let layout = NSLayoutManager()
         let container = NSTextContainer(size: NSSize(width: CGFloat.greatestFiniteMagnitude, height: .greatestFiniteMagnitude))
         storage.addLayoutManager(layout)
+        // Lays out only what is on screen, so jumping far into a large file doesn't lay out everything before it first.
+        layout.allowsNonContiguousLayout = true
         layout.addTextContainer(container)
         text = CodeTextView(frame: .zero, textContainer: container)
         gutter = LineNumbers(textView: text)
@@ -463,6 +475,7 @@ final class FileView: NSView {
         let origin = scroll.contentView.bounds.origin
         switch Result(catching: { try Files.read(path) }) {
         case .success(.text(let string)):
+            wraps = Files.hasLongLine(string)
             text.string = string
             onDisk = string
             text.isEditable = true
@@ -659,6 +672,7 @@ final class FileView: NSView {
         preview.frame = NSRect(x: 0, y: bar, width: bounds.width, height: body)
         // At least as big as the visible area, so short files still fill it and clicks land in the text.
         text.minSize = scroll.contentSize
+        if wraps { text.setFrameSize(NSSize(width: scroll.contentSize.width, height: text.frame.height)) }
         message.frame = NSRect(x: 12, y: bounds.midY - 10, width: max(0, bounds.width - 24), height: 20)
     }
 }

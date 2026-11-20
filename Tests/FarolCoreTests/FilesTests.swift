@@ -171,3 +171,11 @@ private func folder(_ files: [String: String]) throws -> String {
     selection.click("/p/a", in: ["/p/a"], shift: true, command: false)
     #expect(selection.paths == ["/p/a"])
 }
+
+@Test func findsLongLines() {
+    let long = String(repeating: "a", count: Files.longLine + 1)
+    #expect(Files.hasLongLine(long))
+    #expect(Files.hasLongLine("short\n" + long + "\nshort"))
+    #expect(!Files.hasLongLine(String(repeating: "a", count: Files.longLine)))
+    #expect(!Files.hasLongLine(Array(repeating: String(repeating: "a", count: 100), count: 1_000).joined(separator: "\n")))
+}

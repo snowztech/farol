@@ -164,6 +164,19 @@ public enum Files {
     /// Big enough for any source file, small enough that opening a log by mistake stays quick.
     public static let sizeLimit = 2_000_000
 
+    /// Finding the character under the mouse walks the whole line, so a line this long lags every move over it.
+    public static let longLine = 10_000
+
+    /// Whether any line is longer than `longLine` bytes, like minified JSON.
+    public static func hasLongLine(_ text: String) -> Bool {
+        var length = 0
+        for byte in text.utf8 {
+            length = byte == 0x0A ? 0 : length + 1
+            if length > longLine { return true }
+        }
+        return false
+    }
+
     public static func read(_ path: String) throws -> Content {
         let attributes = try FileManager.default.attributesOfItem(atPath: path)
         if (attributes[.size] as? Int ?? 0) > sizeLimit { return .tooLarge }
