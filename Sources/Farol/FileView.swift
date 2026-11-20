@@ -98,8 +98,6 @@ final class FileView: NSView {
         let layout = NSLayoutManager()
         let container = NSTextContainer(size: NSSize(width: CGFloat.greatestFiniteMagnitude, height: .greatestFiniteMagnitude))
         storage.addLayoutManager(layout)
-        // Lays out only what is on screen, so jumping far into a large file doesn't lay out everything before it first.
-        layout.allowsNonContiguousLayout = true
         layout.addTextContainer(container)
         text = CodeTextView(frame: .zero, textContainer: container)
         gutter = LineNumbers(textView: text)
