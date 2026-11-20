@@ -351,7 +351,7 @@ cp "$main/.claude/settings.local.json" .claude/ 2&gt;/dev/null || true</code></p
           <ul>
             <li><strong>Files:</strong> Press <kbd>⇧⌘E</kbd> to browse the project as a tree, and click a file to open it.</li>
             <li><strong>Tabs:</strong> A file you click opens in a tab that the next one replaces. Edit it or double-click its tab to keep it. <kbd>⌃Tab</kbd> moves between tabs and <kbd>⌘W</kbd> closes one.</li>
-            <li><strong>Edit:</strong> Syntax colors for the common languages, <kbd>⌘L</kbd> to go to a line, and <kbd>⌘S</kbd> to save.</li>
+            <li><strong>Edit:</strong> Syntax colors for the common languages, <kbd>⌘L</kbd> to go to a line, and <kbd>⌘S</kbd> to save. Lines move with <kbd>⌥↑</kbd> and <kbd>⌥↓</kbd>, copy with <kbd>⇧⌥↑</kbd> and <kbd>⇧⌥↓</kbd>, go with <kbd>⇧⌘K</kbd>, and comment with <kbd>⌘/</kbd>. With nothing selected, <kbd>⌘X</kbd> and <kbd>⌘C</kbd> take the whole line.</li>
             <li><strong>Find in Files:</strong> Press <kbd>⇧⌘F</kbd> to search the whole project, then click a match to open it on its line.</li>
           </ul>
           <picture><source type="image/avif" srcset="features/find-in-files-half.avif 1270w, features/find-in-files.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot reveal" src="features/find-in-files.png" width="2540" height="1520" alt="Find in Files searching for pending, with every match in queue.ts listed and the file open on line 7, each match marked" loading="lazy" decoding="async"></picture>
@@ -478,6 +478,10 @@ font-size = 14</code></pre>
               <tr><td>Mark the file resolved</td><td><kbd>⌘S</kbd></td></tr>
               <tr><td>Accept yours or the incoming side, for the whole file</td><td><kbd>⌃⌘←</kbd> or <kbd>⌃⌘→</kbd></td></tr>
               <tr><td>Continue once every file is resolved</td><td><kbd>⌘↩</kbd></td></tr>
+              <tr><td>Move the line or selection down or up</td><td><kbd>⌥↓</kbd> or <kbd>⌥↑</kbd></td></tr>
+              <tr><td>Copy the line or selection below or above</td><td><kbd>⇧⌥↓</kbd> or <kbd>⇧⌥↑</kbd></td></tr>
+              <tr><td>Delete the line</td><td><kbd>⇧⌘K</kbd></td></tr>
+              <tr><td>Comment or uncomment the lines</td><td><kbd>⌘/</kbd></td></tr>
               <tr><td>Find in the focused pane</td><td><kbd>⌘F</kbd></td></tr>
               <tr><td>Settings</td><td><kbd>⌘,</kbd></td></tr>
             </tbody>

@@ -302,6 +302,7 @@ final class FileView: NSView {
         blameLines = []
         blame.lines = []
         language = Syntax.language(for: path)
+        text.comment = language?.comment
         load(keepingPosition: false)
         watch()
         findFolder()
@@ -889,8 +890,36 @@ private final class CodeTextView: NSTextView {
     /// Items after the text's own, like git blame, where a right-click in the code finds them.
     var extraMenuItems: (() -> [NSMenuItem])?
 
+    /// The line commands under Paste, each showing its keys so they're learned from the menu. Only shown, since a right-click menu's keys never fire.
+    private func linesMenu() -> NSMenuItem {
+        let lines = NSMenu()
+        func add(_ title: String, _ key: String, _ modifiers: NSEvent.ModifierFlags, _ run: @escaping () -> Void) {
+            let item = ActionMenuItem(title: title, handler: run)
+            item.keyEquivalent = key
+            item.keyEquivalentModifierMask = modifiers
+            lines.addItem(item)
+        }
+        let up = String(UnicodeScalar(NSUpArrowFunctionKey)!), down = String(UnicodeScalar(NSDownArrowFunctionKey)!)
+        add("Move Line Up", up, .option) { [weak self] in self?.moveLines(up: true) }
+        add("Move Line Down", down, .option) { [weak self] in self?.moveLines(up: false) }
+        add("Copy Line Up", up, [.option, .shift]) { [weak self] in self?.copyLines(up: true) }
+        add("Copy Line Down", down, [.option, .shift]) { [weak self] in self?.copyLines(up: false) }
+        add("Delete Line", "k", [.command, .shift]) { [weak self] in self?.deleteLines() }
+        if comment != nil {
+            lines.addItem(.separator())
+            add("Toggle Comment", "/", .command) { [weak self] in self?.toggleComment() }
+        }
+        let item = NSMenuItem(title: "Lines", action: nil, keyEquivalent: "")
+        item.submenu = lines
+        return item
+    }
+
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = super.menu(for: event) ?? NSMenu()
+        if isEditable {
+            let paste = menu.items.firstIndex { $0.action == #selector(paste(_:)) }
+            menu.insertItem(linesMenu(), at: paste.map { $0 + 1 } ?? menu.items.count)
+        }
         let extra = extraMenuItems?() ?? []
         if !extra.isEmpty {
             menu.addItem(.separator())
@@ -903,6 +932,80 @@ private final class CodeTextView: NSTextView {
         let accepted = super.becomeFirstResponder()
         if accepted { onFocus?() }
         return accepted
+    }
+
+    // MARK: Line commands, on VS Code's keys
+
+    /// What ⌘/ puts around a line, from the file's language. Nil where Farol doesn't know one.
+    var comment: LineEditing.Comment?
+
+    private var text: NSString { textStorage?.mutableString ?? "" }
+
+    private func apply(_ edit: LineEditing.Edit?) {
+        guard isEditable, let edit, shouldChangeText(in: edit.range, replacementString: edit.replacement) else { return }
+        textStorage?.replaceCharacters(in: edit.range, with: edit.replacement)
+        didChangeText()
+        setSelectedRange(edit.selection)
+        scrollRangeToVisible(edit.selection)
+    }
+
+    func moveLines(up: Bool) { apply(LineEditing.move(text, selectedRange(), up: up)) }
+    func copyLines(up: Bool) { apply(LineEditing.duplicate(text, selectedRange(), up: up)) }
+    func deleteLines() { apply(LineEditing.delete(text, selectedRange())) }
+    func toggleComment() { if let comment { apply(LineEditing.toggleComment(text, selectedRange(), comment)) } }
+
+    /// ⌥↑ and ⌥↓ move lines, with ⇧ they copy them. A Mac text view would jump to a paragraph's ends, which code rarely needs.
+    override func keyDown(with event: NSEvent) {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.numericPad, .function, .capsLock])
+        let up = event.keyCode == 126
+        guard event.keyCode == 125 || up, flags == .option || flags == [.option, .shift] else { return super.keyDown(with: event) }
+        flags.contains(.shift) ? copyLines(up: up) : moveLines(up: up)
+    }
+
+    /// ⌘/ comments lines, matched by the character so it works on any keyboard where / takes ⇧. ⇧⌘K deletes them.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard window?.firstResponder === self else { return super.performKeyEquivalent(with: event) }
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.numericPad, .function, .capsLock])
+        let key = event.charactersIgnoringModifiers?.lowercased()
+        if key == "/", flags.subtracting(.shift) == .command {
+            toggleComment()
+            return true
+        }
+        if key == "k", flags == [.command, .shift] {
+            deleteLines()
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
+    /// A text view turns Cut and Copy off with nothing selected, and a menu item that's off never gets its ⌘X or ⌘C.
+    override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+        takesLine(item.action) ?? super.validateUserInterfaceItem(item)
+    }
+
+    override func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        takesLine(item.action) ?? super.validateMenuItem(item)
+    }
+
+    /// Whether Cut or Copy can take the cursor's line, or nil for anything else.
+    private func takesLine(_ action: Selector?) -> Bool? {
+        guard selectedRange().length == 0, action == #selector(cut(_:)) || action == #selector(copy(_:)) else { return nil }
+        return text.length > 0 && (isEditable || action == #selector(copy(_:)))
+    }
+
+    /// With nothing selected, ⌘X and ⌘C take the whole line.
+    override func cut(_ sender: Any?) {
+        if selectedRange().length == 0 { setSelectedRange(LineEditing.lines(text, selectedRange())) }
+        super.cut(sender)
+    }
+
+    override func copy(_ sender: Any?) {
+        guard selectedRange().length == 0 else { return super.copy(sender) }
+        var line = text.substring(with: LineEditing.lines(text, selectedRange()))
+        guard !line.isEmpty else { return }
+        if !line.hasSuffix("\n") { line += "\n" }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(line, forType: .string)
     }
 
     /// A new line starts at the same indent as the one before, which is most of what code needs.
