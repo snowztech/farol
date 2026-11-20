@@ -143,7 +143,7 @@ private func folder(_ files: [String: String]) throws -> String {
     let rows = ["/p/a", "/p/b", "/p/c", "/p/d"]
     var selection = Files.Selection()
     selection.click("/p/b", in: rows, shift: false, command: false)
-    #expect(selection.paths == ["/p/b"])
+    #expect(selection.paths.isEmpty)
     selection.click("/p/d", in: rows, shift: true, command: false)
     #expect(selection.paths == ["/p/b", "/p/c", "/p/d"])
     #expect(selection.pathsForContext("/p/d", orderedSelection: selection.orderedPaths(in: rows)) == ["/p/b", "/p/c", "/p/d"])
@@ -154,6 +154,10 @@ private func folder(_ files: [String: String]) throws -> String {
     #expect(selection.paths == ["/p/b", "/p/c", "/p/d"])
     selection.click("/p/a", in: rows, shift: true, command: false)
     #expect(selection.paths == ["/p/a", "/p/b", "/p/c"])
+    selection.click("/p/d", in: rows, shift: false, command: false)
+    #expect(selection.paths.isEmpty)
+    selection.click("/p/b", in: rows, shift: false, command: true)
+    #expect(selection.paths == ["/p/b", "/p/d"])
 }
 
 @Test func selectionDiscardsInvisibleRows() {

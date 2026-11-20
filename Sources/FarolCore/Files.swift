@@ -183,10 +183,13 @@ public enum Files {
             if shift, let anchor, let start = visible.firstIndex(of: anchor), let end = visible.firstIndex(of: path) {
                 paths = Set(visible[min(start, end)...max(start, end)])
             } else if command {
+                // Like Finder, the row clicked last joins the selection Command-click starts.
+                if paths.isEmpty, let anchor, anchor != path { paths.insert(anchor) }
                 if !paths.insert(path).inserted { paths.remove(path) }
                 anchor = path
             } else {
-                paths = [path]
+                // A plain click opens the row and leaves the highlight to the file in view.
+                paths = shift ? [path] : []
                 anchor = path
             }
         }
