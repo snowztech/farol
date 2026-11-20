@@ -512,6 +512,8 @@ final class SessionStore: ObservableObject {
 
     /// Settings → Appearance → Group sessions by project. Off unless turned on.
     static let groupByRepoKey = "sidebar.groupByRepo"
+    /// A project's tag color by repo path.
+    static let projectColorsKey = "sidebar.projectColors"
 
     /// The sidebar's sections: one per repo once sessions span several, else a single unnamed one.
     var groups: [Grouping.Group<Session>] {

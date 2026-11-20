@@ -147,8 +147,8 @@ extension Palette {
         }
     }
 
-    /// A project's tag colors, from the theme's own hues. Skips the lamp's green, yellow and cyan so a tag never reads as agent status.
-    var projectColors: [Color] { [lanes[0], lanes[3], lanes[4], lanes[6]] }
+    /// A project's tag colors, from the theme's own hues. Six is as many as stay clearly distinct once the lamp's green, yellow and cyan, and error red, are set aside.
+    var projectColors: [Color] { [lanes[0], lanes[3], lanes[4], lanes[6], lanes[8], lanes[11]] }
 }
 
 /// Colors for code, from the terminal theme's ANSI palette so they always match it.

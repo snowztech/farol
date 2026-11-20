@@ -22,7 +22,7 @@ struct SidebarView: View {
     /// The projects folded shut, by repo path, one per line.
     @AppStorage("sidebar.folded") private var folded = ""
     /// A project's tag color, by repo path, so a right-click menu can set it. An index into `Palette.projectColors`.
-    @AppStorage("sidebar.projectColors") private var projectColorsData = Data()
+    @AppStorage(SessionStore.projectColorsKey) private var projectColorsData = Data()
 
     var body: some View {
         let p = state.palette
@@ -609,14 +609,9 @@ private struct ProjectHeader: View {
                 if folded { FoldedLamp(sessions: sessions, palette: palette) }
             }
             .frame(width: Lamp.size)
-            if let colorIndex, palette.projectColors.indices.contains(colorIndex) {
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(palette.projectColors[colorIndex])
-                    .frame(width: 10, height: 10)
-            }
             Text(name)
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(hovering ? palette.text : palette.muted)
+                .foregroundStyle(hovering || projectTint != nil ? palette.text : palette.muted)
             if folded {
                 Text(verbatim: "\(sessions.count)")
                     .font(.system(size: 11, design: .monospaced))
@@ -638,50 +633,67 @@ private struct ProjectHeader: View {
         .padding(.leading, 10)
         .padding(.trailing, 6)
         .padding(.vertical, 5)
-        .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .fill(folded && holdsSelection ? palette.selection : hovering ? palette.hover : .clear))
+        .background(background)
         .contentShape(Rectangle())
         .onTapGesture(perform: onToggle)
         .onClickableHover { hovering = $0 }
         .hoverTip(folded ? "Show \(name)'s sessions" : "Fold \(name)")
         .contextMenu {
             Menu("Color") {
-                Button {
-                    onColor(nil)
-                } label: {
-                    Label {
-                        HStack {
-                            Text("None")
-                            Spacer()
-                            if colorIndex == nil { Image(systemName: "checkmark") }
-                        }
-                    } icon: {
-                        Image(systemName: "nosign")
-                    }
-                }
-                Divider()
-                ForEach(Array(palette.projectColors.enumerated()), id: \.offset) { index, color in
                     Button {
-                        onColor(index)
+                        onColor(nil)
                     } label: {
                         Label {
                             HStack {
-                                Text(colorName(index))
+                                Text("None")
                                 Spacer()
-                                if colorIndex == index { Image(systemName: "checkmark") }
+                                if colorIndex == nil { Image(systemName: "checkmark") }
                             }
                         } icon: {
-                            Image(nsImage: swatch(color))
+                            Image(systemName: "nosign")
+                        }
+                    }
+                    Divider()
+                    ForEach(Array(palette.projectColors.enumerated()), id: \.offset) { index, color in
+                        Button {
+                            onColor(index)
+                        } label: {
+                            Label {
+                                HStack {
+                                    Text(colorName(index))
+                                    Spacer()
+                                    if colorIndex == index { Image(systemName: "checkmark") }
+                                }
+                            } icon: {
+                                Image(nsImage: swatch(color))
+                            }
                         }
                     }
                 }
             }
-        }
         .padding(.top, 10)
     }
 
+    /// The row's fill: the project's color as a wash, the selection highlight when it hides the session you're looking at, hover otherwise.
+    @ViewBuilder private var background: some View {
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        if folded && holdsSelection {
+            shape.fill(palette.selection).overlay(shape.fill(projectTint?.opacity(0.4) ?? .clear))
+        } else if let tint = projectTint {
+            shape.fill(tint.opacity(hovering ? 0.28 : 0.17))
+        } else if hovering {
+            shape.fill(palette.hover)
+        }
+    }
+
+    /// The assigned color, when a color is set.
+    private var projectTint: Color? {
+        guard let colorIndex, palette.projectColors.indices.contains(colorIndex) else { return nil }
+        return palette.projectColors[colorIndex]
+    }
+
     private func colorName(_ index: Int) -> String {
-        ["Blue", "Violet", "Amber", "Pink"][index]
+        ["Blue", "Violet", "Amber", "Pink", "Navy", "Plum"][index]
     }
 
     private func swatch(_ color: Color) -> NSImage {
