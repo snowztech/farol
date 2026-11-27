@@ -56,6 +56,8 @@ final class GraphModel: ObservableObject {
         var selectedFiles: [Diff.File]?
     }
     private var snapshots: [String: Snapshot] = [:]
+    /// When each checkout last fetched.
+    private var fetched: [String: Date] = [:]
     let scroll = ScrollMemory()
     private var watcher: FolderWatcher?
     private var pending: DispatchWorkItem?
@@ -105,6 +107,7 @@ final class GraphModel: ObservableObject {
         }
         reload()
         if rootChanged { loadRequests() }
+        fetchIfStale()
     }
 
     func show(all: Bool) {
@@ -193,12 +196,20 @@ final class GraphModel: ObservableObject {
     }
 
     func fetch(failed: @escaping (String) -> Void) {
-        guard !fetching else { return }
+        guard let root, !fetching else { return }
         fetching = true
+        fetched[root] = Date()
         run(failed, then: { [weak self] in
             self?.fetching = false
             self?.loadRequests()
         }) { try History.fetch(in: $0) }
+    }
+
+    /// Fetches on its own when the panel shows a checkout, so branches deleted on the server go without a click.
+    /// At most every few minutes, and quiet: offline, the graph keeps what it had and the button still says what went wrong.
+    private func fetchIfStale() {
+        guard let root, Date().timeIntervalSince(fetched[root] ?? .distantPast) > 300 else { return }
+        fetch(failed: { _ in })
     }
 
     func update(_ branch: String, failed: @escaping (String) -> Void) {

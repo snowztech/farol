@@ -167,8 +167,9 @@ public enum History {
     }
 
     /// Brings every remote's branches up to date and drops the ones deleted on the server.
+    /// Stops after a minute, so a dead connection can't leave the graph fetching forever.
     public static func fetch(in directory: String) throws {
-        try Git.run(["fetch", "--all", "--prune"], in: directory)
+        try Git.run(["fetch", "--all", "--prune"], in: directory, timeout: 60)
     }
 
     /// Moves `branch` up to its upstream. The checked out one pulls, any other moves without a checkout.
