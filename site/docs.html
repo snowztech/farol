@@ -353,11 +353,18 @@ cp "$main/.claude/settings.local.json" .claude/ 2&gt;/dev/null || true</code></p
             <li><strong>Tabs:</strong> A file you click opens in a tab that the next one replaces. Edit it or double-click its tab to keep it. <kbd>⌃Tab</kbd> moves between tabs and <kbd>⌘W</kbd> closes one.</li>
             <li><strong>Edit:</strong> Syntax colors for the common languages, <kbd>⌘L</kbd> to go to a line, and <kbd>⌘S</kbd> to save. Lines move with <kbd>⌥↑</kbd> and <kbd>⌥↓</kbd>, copy with <kbd>⇧⌥↑</kbd> and <kbd>⇧⌥↓</kbd>, go with <kbd>⇧⌘K</kbd>, and comment with <kbd>⌘/</kbd>. With nothing selected, <kbd>⌘X</kbd> and <kbd>⌘C</kbd> take the whole line.</li>
             <li><strong>Find in Files:</strong> Press <kbd>⇧⌘F</kbd> to search the whole project, then click a match to open it on its line.</li>
+            <li><strong>Typing:</strong> Tab and <kbd>⇧Tab</kbd> indent in the file's own style, tabs or spaces, and move every selected line. Return keeps the indent, brackets and quotes close themselves, and Markdown stays as you type it.</li>
+            <li><strong>Changes:</strong> Lines changed since the last commit are marked beside the line numbers, as you or an agent edit. Click a mark to see the file's changes in the review.</li>
           </ul>
+
+          <h3>Hand code to your agent</h3>
+          <p>Select lines and press <kbd>⇧⌘L</kbd>, or right-click and pick Send to your agent. Where they are goes into its prompt, like <code>@src/app.ts#L12-20</code> for Claude Code, without sending, and the keyboard follows so you type your question. On a line with an error, its message goes along, so <kbd>↩</kbd> alone asks for the fix.</p>
+          <p>It goes to the agent in the session, or in another session on the same checkout, like a task's.</p>
           <picture><source type="image/avif" srcset="features/find-in-files-half.avif 1270w, features/find-in-files.avif 2540w" sizes="(max-width: 760px) calc(100vw - 40px), 720px"><img class="doc-shot reveal" src="features/find-in-files.png" width="2540" height="1520" alt="Find in Files searching for pending, with every match in queue.ts listed and the file open on line 7, each match marked" loading="lazy" decoding="async"></picture>
 
           <h3>Language servers</h3>
-          <p>With a language's server on, <kbd>⌘</kbd>-click a name to go to its definition, or on a definition to list its references. <kbd>⌃⌘←</kbd> and <kbd>⌃⌘→</kbd>, or the mouse's side buttons, move back and forward between the places you jumped to.</p>
+          <p>With a language's server on, errors and warnings are underlined as you type. Rest the mouse on one to read it, and <kbd>F8</kbd> and <kbd>⇧F8</kbd> go through them. Resting on a name shows its type and docs.</p>
+          <p><kbd>⌘</kbd>-click a name to go to its definition, or on a definition to list its references. <kbd>⌃⌘←</kbd> and <kbd>⌃⌘→</kbd>, or the mouse's side buttons, move back and forward between the places you jumped to.</p>
           <p>Turn servers on in <strong>Settings → Editor</strong>. Farol finds a server you already have, or installs it with one click. Only the ones you turn on run, one per checkout.</p>
           <ul>
             <li>Go: <code>gopls</code></li>

@@ -6,12 +6,16 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
-- Send lines of a file to your agent with ⇧⌘L, or Send to Claude Code in the code's right-click menu. On a line with an error, its message goes along, so Return alone asks for the fix. Where they are goes into the agent's prompt, like `@src/app.ts#L12-20` for Claude Code, and the keyboard follows so you type your question next.
+- Send lines of a file to your agent with ⇧⌘L, or Send to Claude Code in the code's right-click menu. It finds the agent in the session, or in another session on the same checkout, like a task's. On a line with an error, its message goes along, so Return alone asks for the fix. Where they are goes into the agent's prompt, like `@src/app.ts#L12-20` for Claude Code, and the keyboard follows so you type your question next.
 - Lines changed since the last commit are marked beside the line numbers as you or an agent edit: added, modified, or a wedge where lines were deleted. A click on one shows the file's changes in the review panel.
 - With a language server on, errors and warnings are underlined in the code as you type. Rest the mouse on one to read it, count them in the status bar, and go through them with F8 and ⇧F8.
 - Rest the mouse on a name, with its language server on, to see its type and docs.
-- The file editor types like a code editor. Tab, ⇧Tab, ⌘] and ⌘[ indent in the file's own style, tabs or spaces, and move every selected line. Return keeps the indent, adds one after an opening bracket, and opens `{}` onto its own lines. Brackets and quotes close themselves, wrap a selection, and Backspace takes an empty pair whole. Markdown and plain text are left as you type them.
+- The file editor types like a code editor. Tab and ⇧Tab indent in the file's own style, tabs or spaces, and move every selected line. Return keeps the indent, adds one after an opening bracket, and opens `{}` onto its own lines. Brackets and quotes close themselves, wrap a selection, and Backspace takes an empty pair whole. Markdown and plain text are left as you type them.
 - The bracket that matches the one beside the cursor is marked, and so are the other places a double-clicked word appears.
+
+### Changed
+
+- ⌘] and ⌘[ move between panes from the file pane too, as they do from a terminal.
 
 ### Fixed
 
