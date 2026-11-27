@@ -21,6 +21,8 @@ struct SidebarView: View {
     @AppStorage(SessionStore.groupByRepoKey) private var groupByRepo = false
     /// The projects folded shut, by repo path, one per line.
     @AppStorage("sidebar.folded") private var folded = ""
+    /// Each tagged project as its repo path and tag, a tab between them, one per line.
+    @AppStorage("sidebar.projectTags") private var projectTags = ""
 
     var body: some View {
         let p = state.palette
@@ -30,9 +32,11 @@ struct SidebarView: View {
                     ForEach(store.groups, id: \.key) { group in
                         let name = group.key.map { URL(fileURLWithPath: $0).lastPathComponent }
                         let shut = group.key.map(isFolded) ?? false
+                        let tag = group.key.flatMap(tag(of:))
                         if let key = group.key, let name {
                             ProjectHeader(name: name, sessions: group.items, folded: shut,
                                           holdsSelection: group.items.contains { $0.id == store.selectedID }, palette: p,
+                                          tag: tag, onTag: { setTag($0, of: key) },
                                           onToggle: { toggleFold(key) }, onNew: { commands.newSessionIn(key) })
                         }
                         ForEach(shut ? [] : group.items) { session in
@@ -43,6 +47,7 @@ struct SidebarView: View {
                                 scheduler: scheduler,
                                 palette: p,
                                 highlight: selection,
+                                indent: group.key == nil ? 0 : 14,
                                 // Reselecting would pull focus back into the terminal, which a rename would lose.
                                 onSelect: {
                                     if session.id != store.selectedID || state.showingSettings { store.select(session) }
@@ -105,6 +110,20 @@ struct SidebarView: View {
         folded.split(separator: "\n").contains { $0 == key }
     }
 
+    private func tag(of key: String) -> ProjectTag? {
+        for line in projectTags.split(separator: "\n") {
+            let parts = line.split(separator: "\t")
+            if parts.count == 2, parts[0] == key { return ProjectTag(rawValue: String(parts[1])) }
+        }
+        return nil
+    }
+
+    private func setTag(_ tag: ProjectTag?, of key: String) {
+        var lines = projectTags.split(separator: "\n").filter { !$0.hasPrefix(key + "\t") }.map(String.init)
+        if let tag { lines.append(key + "\t" + tag.rawValue) }
+        projectTags = lines.joined(separator: "\n")
+    }
+
     private func toggleFold(_ key: String) {
         var keys = folded.split(separator: "\n").map(String.init)
         if let index = keys.firstIndex(of: key) { keys.remove(at: index) } else { keys.append(key) }
@@ -119,6 +138,8 @@ private struct SessionRow: View {
     let scheduler: Scheduler
     let palette: Palette
     let highlight: Namespace.ID
+    /// Under a project header, so the session reads as its child.
+    let indent: CGFloat
     let onSelect: () -> Void
     let onRename: (String) -> Void
     let onClose: () -> Void
@@ -140,7 +161,8 @@ private struct SessionRow: View {
                 CloseButton(help: "Close session (⌘W)", palette: palette, action: onClose)
             }
         }
-        .padding(.horizontal, 10)
+        .padding(.leading, 10 + indent)
+        .padding(.trailing, 10)
         .padding(.vertical, 8)
         .background { background }
         .contentShape(Rectangle())
@@ -173,7 +195,7 @@ private struct SessionRow: View {
                     .onChange(of: fieldFocused) { _, focused in if !focused { commit() } }
             } else {
                 let name = Text(session.displayName)
-                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                    .font(.system(size: 13))
                     .foregroundStyle(selected ? palette.text : palette.text.opacity(0.8))
                 if session.isWorktreeCheckout || schedule != nil {
                     // The name gives way first, so the tag stays whole and never shrinks to a stray "w…".
@@ -582,6 +604,8 @@ private struct ProjectHeader: View {
     /// Folded with the session on screen inside, it takes the selection's highlight so you can see where it went.
     let holdsSelection: Bool
     let palette: Palette
+    let tag: ProjectTag?
+    let onTag: (ProjectTag?) -> Void
     let onToggle: () -> Void
     let onNew: () -> Void
 
@@ -595,8 +619,9 @@ private struct ProjectHeader: View {
             }
             .frame(width: Lamp.size)
             Text(name)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(hovering ? palette.text : palette.muted)
+                // As large as a session's name and bolder, so the parent reads first without shouting.
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(palette.text)
             if folded {
                 Text(verbatim: "\(sessions.count)")
                     .font(.system(size: 11, design: .monospaced))
@@ -618,15 +643,68 @@ private struct ProjectHeader: View {
         .padding(.leading, 10)
         .padding(.trailing, 6)
         .padding(.vertical, 4)
-        .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .fill(folded && holdsSelection ? palette.selection : hovering ? palette.hover : .clear))
+        .background { background }
         .contentShape(Rectangle())
         .onTapGesture(perform: onToggle)
         .onClickableHover { hovering = $0 }
         .hoverTip(folded ? "Show \(name)'s sessions" : "Fold \(name)")
+        .contextMenu {
+            Picker("Color", selection: Binding(get: { tag }, set: onTag)) {
+                Text("None").tag(ProjectTag?.none)
+                Divider()
+                ForEach(ProjectTag.allCases, id: \.self) { tag in
+                    Label { Text(tag.title) } icon: { Image(nsImage: swatch(palette.tags[tag.index])) }
+                        .tag(Optional(tag))
+                }
+            }
+        }
         .padding(.top, 10)
     }
+
+    /// A tagged header is washed in its color, stronger under the mouse. Folded over the session on screen, the selection shows through it.
+    /// Open, its sessions already mark the group, so the wash fades and doesn't stack on a selected row below.
+    @ViewBuilder private var background: some View {
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        let tint = tag.map { palette.tags[$0.index] }
+        if folded && holdsSelection {
+            shape.fill(palette.selection).overlay(shape.fill(tint?.opacity(0.25) ?? .clear))
+        } else if let tint {
+            shape.fill(tint.opacity((folded ? 0.22 : 0.18) + (hovering ? 0.08 : 0)))
+        } else if hovering {
+            shape.fill(palette.hover)
+        }
+    }
+
+    /// A menu shows a symbol in its own gray, so a color needs an image of its own.
+    private func swatch(_ color: Color) -> NSImage {
+        NSImage(size: NSSize(width: 12, height: 12), flipped: false) { rect in
+            NSColor(color).setFill()
+            NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: 3, yRadius: 3).fill()
+            return true
+        }
+    }
 }
+
+/// A color someone gives a project so its header is quick to find among many.
+/// Six hues that stay clear of each other washed thin over any theme. Yellow and orange are left out, since over a dark theme they wash to olive and brown.
+enum ProjectTag: String, CaseIterable {
+    case red, green, teal, blue, purple, pink
+
+    var title: String { rawValue.capitalized }
+    var index: Int { Self.allCases.firstIndex(of: self)! }
+
+    var hue: CGFloat {
+        switch self {
+        case .red: 355.0 / 360
+        case .green: 130.0 / 360
+        case .teal: 180.0 / 360
+        case .blue: 215.0 / 360
+        case .purple: 270.0 / 360
+        case .pink: 320.0 / 360
+        }
+    }
+}
+
 
 /// The lamp a folded project shows for its sessions, so an agent waiting inside never goes unseen.
 private struct FoldedLamp: View {

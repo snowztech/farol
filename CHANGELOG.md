@@ -4,6 +4,14 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Right-click a project's header in the sidebar to give it a color, so it's quick to find among many. Six colors, tuned to each theme.
+
+### Changed
+
+- Grouped by project, the sidebar's project names are bolder than the sessions under them, and the sessions sit indented beneath, so it's clear which project each belongs to.
+
 ## [0.70.0] - 2026-11-20
 
 The editor moves and comments lines on VS Code's keys, formats JSON, and stays fast in large files.
