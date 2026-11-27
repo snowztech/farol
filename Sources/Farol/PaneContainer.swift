@@ -903,7 +903,6 @@ final class PaneContainer: NSView {
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
         dragging = dividers.first { grabArea($0).contains(point) }?.node
-        if dragging != nil { tabs?.files.forEach { $0.resizing = true } }
     }
 
     override func mouseDragged(with event: NSEvent) {
@@ -913,6 +912,8 @@ final class PaneContainer: NSView {
             ? (point.x - node.frame.minX) / node.frame.width
             : (point.y - node.frame.minY) / node.frame.height
         node.ratio = min(max(ratio, 0.1), 0.9)
+        // Only once it really moves, so a click on a divider that never drags can't leave the files waiting.
+        tabs?.files.forEach { if !$0.resizing { $0.resizing = true } }
         needsLayout = true
     }
 
