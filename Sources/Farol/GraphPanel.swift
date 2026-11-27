@@ -517,7 +517,7 @@ struct GraphPanel: View {
             if graph.fetching {
                 ProgressView().controlSize(.mini).frame(width: 26, height: 20)
             } else {
-                IconButton(symbol: "arrow.clockwise", help: "Fetch from the server, pruning local remote-tracking refs for branches deleted there", palette: p) {
+                IconButton(symbol: "arrow.clockwise", help: "Fetch from the server", palette: p) {
                     graph.fetch(failed: gitError("Couldn't fetch"))
                 }
             }
@@ -663,7 +663,7 @@ private struct BranchList: View {
         let here = graph.current ?? "HEAD"
         Button(remote ? "Check Out as Local Branch" : "Check Out") { graph.checkout(branch, remote: remote, failed: gitError("Couldn't check out")) }
             .disabled(current)
-        if !remote, let upstream = graph.upstreams[branch] {
+        if !remote, let upstream = graph.upstreams[branch], !upstream.gone {
             Button("Update from \(menuName(upstream.name))") { graph.update(branch, failed: gitError("Couldn't update \(branch)")) }
                 .disabled(upstream.behind == 0)
         }
@@ -744,7 +744,7 @@ private struct BranchList: View {
 
     private func deleteRemote(_ branch: String) {
         confirm("Delete \(branch) on the server?",
-                "It's removed for everyone who uses this remote, and any open pull request from it closes. Your local branch stays. If it was already deleted on the server, a Fetch removes the stale local copy.",
+                "It's removed for everyone who uses this remote, and any open pull request from it closes. Your local branch stays.",
                 button: "Delete on Server", destructive: true) {
             graph.deleteRemote(branch, failed: gitError("Couldn't delete the remote branch"))
         }
