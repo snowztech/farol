@@ -96,6 +96,8 @@ public enum History {
         /// Commits the branch has that the upstream doesn't, and the other way around, as of the last fetch.
         public let ahead: Int
         public let behind: Int
+        /// Git reports that the configured upstream tracking reference is missing, so there is nothing to pull from. A push recreates the server branch.
+        public let gone: Bool
     }
 
     /// Each local branch's upstream, like main to origin/main. Branches that track nothing are left out.
@@ -113,7 +115,7 @@ public enum History {
                     return words.count == 2 && words[0] == word ? Int(words[1]) : nil
                 }.first ?? 0
             }
-            upstreams[fields[0]] = Upstream(name: fields[1], ahead: count("ahead"), behind: count("behind"))
+            upstreams[fields[0]] = Upstream(name: fields[1], ahead: count("ahead"), behind: count("behind"), gone: fields[2] == "gone")
         }
         return upstreams
     }
@@ -161,9 +163,14 @@ public enum History {
     }
 
     /// Deletes a branch on its server, like origin/feat. Everyone who fetches loses it too.
+    /// One already gone there only leaves its copy here, from before the last fetch, so that copy goes and the delete succeeds.
     public static func deleteRemoteBranch(_ branch: String, in directory: String) throws {
         guard let slash = branch.firstIndex(of: "/") else { throw GitError(description: "\(branch) isn't a remote branch.") }
-        try Git.run(["push", String(branch[..<slash]), "--delete", String(branch[branch.index(after: slash)...])], in: directory)
+        do {
+            try Git.run(["push", String(branch[..<slash]), "--delete", String(branch[branch.index(after: slash)...])], in: directory)
+        } catch let error as GitError where error.description.contains("remote ref does not exist") {
+            try Git.run(["branch", "--delete", "--remotes", branch], in: directory)
+        }
     }
 
     /// Brings every remote's branches up to date and drops the ones deleted on the server.

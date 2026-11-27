@@ -663,7 +663,7 @@ private struct BranchList: View {
         let here = graph.current ?? "HEAD"
         Button(remote ? "Check Out as Local Branch" : "Check Out") { graph.checkout(branch, remote: remote, failed: gitError("Couldn't check out")) }
             .disabled(current)
-        if !remote, let upstream = graph.upstreams[branch] {
+        if !remote, let upstream = graph.upstreams[branch], !upstream.gone {
             Button("Update from \(menuName(upstream.name))") { graph.update(branch, failed: gitError("Couldn't update \(branch)")) }
                 .disabled(upstream.behind == 0)
         }
@@ -786,6 +786,8 @@ private struct BranchRow: View {
                 .truncationMode(.middle)
             if remote {
                 Text("remote").font(.system(size: 10)).foregroundStyle(palette.muted).fixedSize()
+            } else if let upstream, upstream.gone {
+                Text("deleted on server").font(.system(size: 10)).foregroundStyle(palette.muted).fixedSize()
             }
             Spacer(minLength: 4)
             // The counts stay out while it runs, since they are about to change.
@@ -820,7 +822,9 @@ private struct BranchRow: View {
             hover($0)
         }
         .onTapGesture { if !current { checkout() } }
-        .hoverTip(([current ? "Checked out" : remote ? "Check out \(name) as a local branch" : "Check out \(name)"] + drift)
+        .hoverTip(([current ? "Checked out" : remote ? "Check out \(name) as a local branch" : "Check out \(name)"]
+            + (upstream.map { $0.gone ? ["\($0.name) was deleted on the server. A push would recreate it."] : [] } ?? [])
+            + drift)
             .joined(separator: "\n"))
     }
 
