@@ -13,6 +13,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 - Grouped by project, the sidebar's project names are bolder than the sessions under them, and the sessions sit indented beneath, so it's clear which project each belongs to.
 - The Git graph fetches from the server when it opens, at most every five minutes, so branches deleted there leave on their own.
 
+### Fixed
+
+- Delete Remote Branch on a branch already deleted on the server clears it from the Git graph instead of failing. A local branch whose server copy is gone says so.
+
 ## [0.70.0] - 2026-11-20
 
 The editor moves and comments lines on VS Code's keys, formats JSON, and stays fast in large files.

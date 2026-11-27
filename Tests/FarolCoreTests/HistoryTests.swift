@@ -162,6 +162,22 @@ private func edges(_ pairs: (Int, Int)...) -> [History.Edge] {
     #expect(History.branches(in: box.repo).local.contains("shared"))
 }
 
+/// Deleted on the server since the last fetch, the branch still shows here, and deleting it clears that copy instead of failing.
+@Test func deletesARemoteBranchAlreadyGoneOnTheServer() throws {
+    let origin = try Sandbox()
+    let box = try Sandbox()
+    try Git.run(["remote", "add", "origin", origin.repo], in: box.repo)
+    try Git.run(["-c", "user.name=Farol", "-c", "user.email=farol@example.com", "commit", "--quiet", "--allow-empty",
+                 "-m", "remote work"], in: origin.repo)
+    try Git.run(["branch", "stale"], in: origin.repo)
+    try Git.run(["fetch", "--quiet", "origin"], in: box.repo)
+    try Git.run(["branch", "-D", "stale"], in: origin.repo)
+    #expect(History.branches(in: box.repo).remote.contains("origin/stale"))
+
+    try History.deleteRemoteBranch("origin/stale", in: box.repo)
+    #expect(!History.branches(in: box.repo).remote.contains("origin/stale"))
+}
+
 @Test func createsDeletesRebasesAndCherryPicks() throws {
     let box = try Sandbox()
     let git = { (args: [String]) in
@@ -314,8 +330,8 @@ private func edges(_ pairs: (Int, Int)...) -> [History.Edge] {
     try Git.run(["branch", "--quiet", "--set-upstream-to=origin/main", "main"], in: box.repo)
     try Git.run(["reset", "--quiet", "--hard", "origin/main"], in: box.repo)
     try Git.run(["branch", "--quiet", "--track", "side", "origin/main"], in: box.repo)
-    #expect(History.upstreams(in: box.repo) == ["main": .init(name: "origin/main", ahead: 0, behind: 0),
-                                                     "side": .init(name: "origin/main", ahead: 0, behind: 0)])
+    #expect(History.upstreams(in: box.repo) == ["main": .init(name: "origin/main", ahead: 0, behind: 0, gone: false),
+                                                     "side": .init(name: "origin/main", ahead: 0, behind: 0, gone: false)])
 
     // A branch deleted on the server goes away on the next fetch.
     try Git.run(["branch", "-D", "gone"], in: origin.repo)
@@ -346,6 +362,27 @@ private func edges(_ pairs: (Int, Int)...) -> [History.Edge] {
     try History.push("main", in: box.repo)
     #expect(History.upstreams(in: box.repo)["main"]?.ahead == 0)
     #expect(try History.commits(in: origin.repo, branch: "main").first?.subject == "local work")
+}
+
+/// A branch whose server copy was deleted keeps up with it, so the graph can say the remote is gone instead of looking in sync.
+@Test func reportsAGoneRemoteBranchSeparately() throws {
+    let origin = try Sandbox()
+    let box = try Sandbox()
+    let git = { (args: [String]) in
+        _ = try Git.run(["-c", "user.name=Farol", "-c", "user.email=farol@example.com"] + args, in: box.repo)
+    }
+    try Git.run(["remote", "add", "origin", origin.repo], in: box.repo)
+    try History.fetch(in: box.repo)
+    try git(["checkout", "--quiet", "-b", "shared", "--track", "origin/main"])
+    try git(["push", "--quiet", "-u", "origin", "shared"])
+    try git(["switch", "--quiet", "main"])
+    #expect(History.upstreams(in: box.repo)["shared"]?.gone == false)
+
+    // Deleted on the server, so only the local shared branch is left once the fetch prunes its twin.
+    try Git.run(["branch", "-D", "shared"], in: origin.repo)
+    try History.fetch(in: box.repo)
+    #expect(!History.branches(in: box.repo).remote.contains("origin/shared"))
+    #expect(History.upstreams(in: box.repo)["shared"]?.gone == true)
 }
 
 @Test func countsWhatIsLeftToPush() throws {
