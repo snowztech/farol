@@ -42,11 +42,6 @@ public enum Typing {
         return eachLine(text, selection) { line in line.isEmpty ? line : unit + line }
     }
 
-    /// ⌘]: the lines move in a level, wherever the cursor is in them.
-    public static func indentLines(_ text: NSString, _ selection: NSRange, unit: String) -> Edit {
-        eachLine(text, selection) { line in line.isEmpty ? line : unit + line }
-    }
-
     /// ⇧Tab: the lines move out a level, as far as they can. Nil when none can.
     public static func outdent(_ text: NSString, _ selection: NSRange, unit: String) -> Edit? {
         let width = unit == "\t" ? 4 : unit.count

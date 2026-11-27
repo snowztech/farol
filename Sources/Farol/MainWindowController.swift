@@ -1067,7 +1067,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private func host(_ session: Session) {
         session.panes.onShowCommit = { [weak self] in self?.showInGraph($0) }
         session.panes.agent = { [weak self, weak session] in
-            session.flatMap { self?.agentPane(in: $0) }.map { ($0.name, $0.ready) }
+            session.flatMap { self?.agentFor(files: $0) }.map { ($0.pane.name, $0.pane.ready) }
         }
         session.panes.onShowChanges = { [weak self] path in
             guard let self else { return }
@@ -1245,11 +1245,18 @@ extension MainWindowController {
     /// ⇧⌘L in a file: its lines go into the agent's prompt unsent, and the keyboard follows, so your question comes next.
     /// On a problem the language server found, its message goes along, so Return alone asks for the fix.
     fileprivate func sendToAgent(_ path: String, _ lines: ClosedRange<Int>, note: String?, in session: Session) {
-        guard let agent = agentPane(in: session), agent.ready else { return NSSound.beep() }
-        let reference = agent.kind.map { $0.reference(to: path, lines: lines, from: session.directory) }
-            ?? AgentFolder.Kind.reference(to: path, lines: lines, from: session.directory)
+        guard let (owner, agent) = agentFor(files: session), agent.ready else { return NSSound.beep() }
+        let reference = agent.kind.map { $0.reference(to: path, lines: lines, from: owner.directory) }
+            ?? AgentFolder.Kind.reference(to: path, lines: lines, from: owner.directory)
         agent.terminal.pasteText(reference + " " + (note.map { "fix: \($0)" } ?? ""))
-        session.panes.focus(agent.terminal)
+        // An agent in another session on the checkout, as a task's, is brought up, so you see where the lines went and type on.
+        if owner !== session { store.select(owner) }
+        owner.panes.focus(agent.terminal)
+    }
+
+    /// The agent a file's lines go to: the session's own, or else one in another session on the same checkout, like a task's.
+    private func agentFor(files session: Session) -> (session: Session, pane: (terminal: TerminalView, kind: AgentFolder.Kind?, name: String, ready: Bool))? {
+        sessions(sharing: session).lazy.compactMap { other in self.agentPane(in: other).map { (other, $0) } }.first
     }
 
     /// Go → Next Problem and Previous Problem, in the file in front.

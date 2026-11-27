@@ -963,6 +963,7 @@ final class PaneContainer: NSView {
         file.onOpenAt = { [weak self] in self?.open($0, line: $1) }
         file.onMovePane = { [weak self] in self?.goto(.direction($0)) }
         file.onZoom = { [weak self] in self?.toggleFileZoom() }
+        file.onCyclePane = { [weak self] in self?.goto($0 ? .next : .previous) }
         file.palette = { [weak self] in self?.palette }
         file.agent = { [weak self] in self?.agent() }
         file.onSendToAgent = { [weak self] in self?.onSendToAgent?($0, $1, $2) }

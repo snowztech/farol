@@ -60,7 +60,7 @@ public struct AgentSkill {
 
     - Appearance: picking the theme and Match system appearance, both written to `theme` in the config file, then the panel style, the app icon, animations, grouping sessions by project and the run button on panes.
     - Agents: connecting Claude Code, Codex, OpenCode and Pi, one row per account, notifications, the Dock badge, the menu bar lighthouse or the status panel at the notch or screen edge, what new sessions start with, whether agent conversations resume when Farol opens, and letting agents start tasks and message sessions.
-    - Editor: the language servers behind go to definition and find references with ⌘-click, one switch per language: Go, TypeScript and JavaScript, Vue, Python, Rust, Swift, and C, C++ and Objective-C. A missing server installs from its row.
+    - Editor: the language servers behind go to definition and find references with ⌘-click, errors underlined as the user types, and a name's type on hover, one switch per language: Go, TypeScript and JavaScript, Vue, Python, Rust, Swift, and C, C++ and Objective-C. A missing server installs from its row.
     - Worktrees: copying ignored `.env` files into each new worktree.
     - Integrations: the `gh`, `glab`, jira-cli and Linear CLI (`linear`) accounts, and which Jira tickets New Task lists.
     - Remote: letting a paired phone in, pairing a phone with Show code, removing one, keeping the Mac awake for agents, the relay, and the servers whose agents show in the sidebar, added with Add Server.
@@ -130,7 +130,7 @@ public struct AgentSkill {
     A `keybind` line adds or changes one, with Ghostty's key and action names: `keybind = cmd+shift+enter=toggle_split_zoom`.
 
     - Rebindable: everything inside the terminal, like copy, paste, clear, font size and scrolling, and these app actions: `new_tab` (a new session), `close_tab`, `goto_tab`, `next_tab`, `previous_tab`, `new_split`, `goto_split`, `resize_split`, `equalize_splits`, `toggle_split_zoom`, `toggle_fullscreen`, `reload_config`, `open_config` (Settings) and `quit`.
-    - Fixed: Farol's own menu shortcuts, like New Task (⇧⌘N), New Worktree Session (⇧⌘T), Switch Session (⌘P), Files (⇧⌘E), Review Changes (⌥⌘R), Commit (⌥⌘C), Push (⌥⌘P), Git Graph (⌥⌘G), Resolve Conflicts (⌥⌘M) and the Farol Inspector (⌥⌘I). Tell the user these stay as they are.
+    - Fixed: Farol's own menu shortcuts, like New Task (⇧⌘N), New Worktree Session (⇧⌘T), Switch Session (⌘P), Files (⇧⌘E), Send to Agent (⇧⌘L), Review Changes (⌥⌘R), Commit (⌥⌘C), Push (⌥⌘P), Git Graph (⌥⌘G), Resolve Conflicts (⌥⌘M) and the Farol Inspector (⌥⌘I). Tell the user these stay as they are.
 
     Every shortcut is listed in Settings → Shortcuts and in the README.
 
