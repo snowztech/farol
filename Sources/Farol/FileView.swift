@@ -234,11 +234,14 @@ final class FileView: NSView {
 
         preview.text.onFocus = { [weak self] in self?.onFocus?() }
         preview.onOpenFile = { [weak self] in self?.onOpenFile?($0) }
+        // Blame is about lines, which the source has. Offered here too, where it switches to the source with the column on.
+        preview.text.extraMenuItems = { [weak self] in
+            guard let self, canBlame else { return [] }
+            return [ActionMenuItem(title: "Show Git Blame") { [weak self] in self?.toggleBlame() }]
+        }
 
         gutter.onResize = { [weak self] in self?.needsLayout = true }
-        gutter.markColors = { [weak self] in
-            self?.palette().map { (NSColor($0.added), NSColor($0.pull), NSColor($0.removed)) }
-        }
+        gutter.markColors = { [weak self] in self?.markTints() }
         gutter.onClickMark = { [weak self] in
             guard let self else { return }
             onShowChanges?(path)
@@ -317,8 +320,10 @@ final class FileView: NSView {
     var canPreview: Bool { Markdown.handles(path) && message.isHidden }
     var isPreviewing: Bool { previewing }
     /// A checkout's file shown as source has someone to blame for each line.
-    var canBlame: Bool { inCheckout && !scroll.isHidden }
-    var isBlaming: Bool { blaming }
+    /// Also from a Markdown preview, where showing blame switches to the source, which has the lines.
+    var canBlame: Bool { inCheckout && message.isHidden }
+    /// Shown, not only chosen: in a preview the column isn't there, so the menu offers to show it.
+    var isBlaming: Bool { blaming && !showsPreview }
 
     func togglePreview() {
         let focused = window?.firstResponder === textView
@@ -393,7 +398,7 @@ final class FileView: NSView {
         DispatchQueue.global(qos: .userInitiated).async {
             let top = Git.topLevel(of: directory)
             DispatchQueue.main.async { [weak self] in
-                guard let self, self.path == path, let top, directory.hasPrefix(top + "/") else { return }
+                guard let self, self.path == path, let top, (directory + "/").hasPrefix(top + "/") else { return }
                 self.inCheckout = true
                 self.loadBlame()
                 self.loadChangeBase()
@@ -404,6 +409,14 @@ final class FileView: NSView {
     }
 
     // MARK: Changes since the last commit
+
+    /// The marks' colors, worked out once per theme rather than on every draw of the gutter, which runs each frame of a scroll.
+    private var tints: (added: NSColor, modified: NSColor, deleted: NSColor)?
+
+    private func markTints() -> (added: NSColor, modified: NSColor, deleted: NSColor)? {
+        if tints == nil { tints = palette().map { (NSColor($0.added), NSColor($0.pull), NSColor($0.removed)) } }
+        return tints
+    }
 
     /// Reads the committed version off the main thread, then marks the lines against it.
     private func loadChangeBase() {
@@ -573,6 +586,19 @@ final class FileView: NSView {
     private var showsBlame: Bool { blaming && inCheckout && !blameMissing && !scroll.isHidden }
 
     func toggleBlame() {
+        // From the preview, the source comes back with the column. Only for this file, so the others still open as a preview.
+        if showsPreview {
+            let focused = window?.firstResponder === textView
+            previewing = false
+            if !blaming {
+                blaming = true
+                UserDefaults.standard.set(true, forKey: Self.blameKey)
+            }
+            loadBlame()
+            updateMode()
+            if focused { window?.makeFirstResponder(textView) }
+            return
+        }
         blaming.toggle()
         UserDefaults.standard.set(blaming, forKey: Self.blameKey)
         loadBlame()
@@ -914,6 +940,7 @@ final class FileView: NSView {
         gutter.colors = (background, background.mixed(with: foreground, 0.35), background.mixed(with: foreground, 0.8))
         text.currentLineColor = background.mixed(with: foreground, 0.045)
         text.matchColor = background.mixed(with: foreground, 0.14)
+        tints = nil
         blame.colors = (background, foreground)
     }
 
@@ -1055,7 +1082,7 @@ private final class CodeTextView: NSTextView {
     private var bracket: (NSRange, NSRange)?
     private var occurrences: [NSRange] = []
     /// Past this, a file is too big to search on every double-click.
-    private static let occurrenceLimit = 1_000_000
+    private static let occurrenceLimit = 300_000
 
     private func findMatches() {
         let selection = selectedRange()
@@ -1077,18 +1104,27 @@ private final class CodeTextView: NSTextView {
         return found.count > 1 ? found.filter { $0 != selection } : []
     }
 
+    /// Only what falls in the area being drawn is measured. Measuring a match far off screen lays out the text up to it.
+    /// In wrapped text, like most Markdown, that moved the lines on screen.
     private func drawMatches(in dirty: NSRect) {
-        guard let color = matchColor, bracket != nil || !occurrences.isEmpty else { return }
+        guard let color = matchColor, bracket != nil || !occurrences.isEmpty, let visible = characters(in: dirty) else { return }
         color.setFill()
-        for range in occurrences {
-            guard let rect = rect(of: range), rect.intersects(dirty) else { continue }
+        for range in occurrences where NSIntersectionRange(range, visible).length > 0 {
+            guard let rect = rect(of: range) else { continue }
             NSBezierPath(roundedRect: rect.insetBy(dx: -1, dy: 0), xRadius: 2, yRadius: 2).fill()
         }
         guard let bracket else { return }
-        for range in [bracket.0, bracket.1] {
-            guard let rect = rect(of: range), rect.intersects(dirty) else { continue }
+        for range in [bracket.0, bracket.1] where NSIntersectionRange(range, visible).length > 0 {
+            guard let rect = rect(of: range) else { continue }
             NSBezierPath(roundedRect: rect.insetBy(dx: -0.5, dy: 0), xRadius: 2, yRadius: 2).fill()
         }
+    }
+
+    /// The characters laid out in a part of the view, from what is already laid out there.
+    private func characters(in area: NSRect) -> NSRange? {
+        guard let layout = layoutManager, let container = textContainer else { return nil }
+        let inside = area.offsetBy(dx: -textContainerOrigin.x, dy: -textContainerOrigin.y)
+        return layout.characterRange(forGlyphRange: layout.glyphRange(forBoundingRect: inside, in: container), actualGlyphRange: nil)
     }
 
     // MARK: Problems
@@ -1122,7 +1158,7 @@ private final class CodeTextView: NSTextView {
     private func drawProblems(in dirty: NSRect) {
         guard !problems.isEmpty, let layout = layoutManager, let container = textContainer else { return }
         let length = (string as NSString).length
-        let visible = layout.characterRange(forGlyphRange: layout.glyphRange(forBoundingRect: dirty, in: container), actualGlyphRange: nil)
+        guard let visible = characters(in: dirty) else { return }
         for problem in problems where NSMaxRange(problem.range) <= length && NSIntersectionRange(problem.range, visible).length > 0 {
             let glyphs = layout.glyphRange(forCharacterRange: problem.range, actualCharacterRange: nil)
             problem.color.setStroke()

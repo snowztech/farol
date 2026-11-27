@@ -388,11 +388,23 @@ final class MarkdownTextView: NSTextView {
         didSet { needsDisplay = true }
     }
     var onFocus: (() -> Void)?
+    /// Items after the text's own, like showing git blame, which takes you to the source.
+    var extraMenuItems: (() -> [NSMenuItem])?
 
     override func becomeFirstResponder() -> Bool {
         let accepted = super.becomeFirstResponder()
         if accepted { onFocus?() }
         return accepted
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = super.menu(for: event) ?? NSMenu()
+        let extra = extraMenuItems?() ?? []
+        if !extra.isEmpty {
+            menu.addItem(.separator())
+            extra.forEach(menu.addItem)
+        }
+        return menu
     }
 
     override func drawBackground(in rect: NSRect) {

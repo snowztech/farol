@@ -4,6 +4,12 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Fixed
+
+- Markdown and other files that wrap their lines no longer jump when you show or hide git blame, select a word or move past a bracket. The highlights measured text far off screen, which made the editor lay it out again.
+- Git blame and the change marks work on files at the top of a repo, like README.md. Only files in its folders had them.
+- Show Git Blame works from a Markdown preview too, in the View menu and the right-click menu. It switches that file to its source with the column on, where before the item was grayed out without saying why.
+
 ## [0.72.0] - 2026-11-27
 
 The file editor hands code to your agent, shows what changed and what's wrong, and types like a code editor.
