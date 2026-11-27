@@ -6,6 +6,10 @@ import FarolCore
 @MainActor
 final class LanguageServers {
     static let shared = LanguageServers()
+    /// Posted with a file's path when its problems change.
+    static let diagnosticsDidChange = Notification.Name("FarolDiagnosticsDidChange")
+    /// What each file's server says is wrong in it now. Files with none are left out.
+    private(set) var diagnostics: [String: [LSP.Diagnostic]] = [:]
     static func enabledKey(_ server: LSP.Server) -> String { "code.languageServers." + server.id }
     /// A server started, stopped or changed state, for the file pane and Settings.
     static let didChange = Notification.Name("FarolLanguageServersDidChange")
@@ -188,6 +192,11 @@ final class LanguageServers {
         let plugins = LSP.servers.filter { $0.command == host.command && isEnabled($0) }.compactMap(\.plugin)
         let started = LanguageServer(server: host, root: root, options: LSP.initializationOptions(loading: plugins))
         started.onStateChange = { [weak self] in self?.changed() }
+        started.onDiagnostics = { [weak self] path, found in
+            guard let self, diagnostics[path] ?? [] != found else { return }
+            diagnostics[path] = found.isEmpty ? nil : found
+            NotificationCenter.default.post(name: Self.diagnosticsDidChange, object: path)
+        }
         running[key] = started
         started.start(executable: executable)
         watchIdle()

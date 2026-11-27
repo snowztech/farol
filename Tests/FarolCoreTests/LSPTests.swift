@@ -145,3 +145,32 @@ import Testing
     #expect(loaded?["languages"] as? [String] == ["vue"])
     #expect(LSP.initializationOptions(loading: [], home: home) == nil)
 }
+
+/// A server's problems for a file, with an error assumed where the severity is left out, and broken entries dropped.
+@Test func readsDiagnostics() {
+    let params: [String: Any] = [
+        "uri": "file:///p/a.go",
+        "diagnostics": [
+            ["range": ["start": ["line": 2, "character": 4], "end": ["line": 2, "character": 9]], "severity": 2, "message": "unused", "source": "vet"],
+            ["range": ["start": ["line": 5, "character": 0], "end": ["line": 6, "character": 1]], "message": "undefined: x"],
+            ["message": "no range"],
+        ],
+    ]
+    let read = LSP.diagnostics(from: params)
+    #expect(read?.path == "/p/a.go")
+    #expect(read?.diagnostics == [
+        LSP.Diagnostic(start: .init(line: 2, character: 4), end: .init(line: 2, character: 9), severity: .warning, message: "unused", source: "vet"),
+        LSP.Diagnostic(start: .init(line: 5, character: 0), end: .init(line: 6, character: 1), severity: .error, message: "undefined: x"),
+    ])
+    #expect(LSP.diagnostics(from: ["uri": "file:///p/b.go", "diagnostics": [Any]()])?.diagnostics == [])
+    #expect(LSP.diagnostics(from: nil) == nil)
+}
+
+/// Hovers come as markup, a plain string, or a list of marked strings. Fences go, the code stays.
+@Test func readsHoverText() {
+    #expect(LSP.hoverText(from: ["contents": ["kind": "markdown", "value": "```go\nfunc F() int\n```\nDoes F."]]) == "func F() int\nDoes F.")
+    #expect(LSP.hoverText(from: ["contents": "plain"]) == "plain")
+    #expect(LSP.hoverText(from: ["contents": [["language": "ts", "value": "x: number"], "the x"]]) == "x: number\n\nthe x")
+    #expect(LSP.hoverText(from: ["contents": ""]) == nil)
+    #expect(LSP.hoverText(from: nil) == nil)
+}

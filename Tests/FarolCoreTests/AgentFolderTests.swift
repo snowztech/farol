@@ -132,3 +132,11 @@ private func home(_ folders: [String: [String]]) throws -> URL {
     #expect(AgentFolder.kind(of: "/Users/me/agent") == nil)
     #expect(AgentFolder.kind(of: "/Users/me/.claudette") == nil)
 }
+
+/// Claude Code attaches `@path#L` lines itself. Others get the compiler form. Paths read from the agent's folder, and stay whole outside it.
+@Test func pointsAnAgentAtLines() {
+    #expect(AgentFolder.Kind.claude.reference(to: "/repo/src/a.swift", lines: 12...20, from: "/repo") == "@src/a.swift#L12-20")
+    #expect(AgentFolder.Kind.codex.reference(to: "/repo/src/a.swift", lines: 7...7, from: "/repo/") == "src/a.swift:7")
+    #expect(AgentFolder.Kind.reference(to: "/other/b.go", lines: 3...4, from: "/repo") == "/other/b.go:3-4")
+    #expect(AgentFolder.Kind.reference(to: "/repository/b.go", lines: 1...1, from: "/repo") == "/repository/b.go:1")
+}

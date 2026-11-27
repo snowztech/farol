@@ -65,6 +65,14 @@ final class FileView: NSView {
     var palette: () -> Palette? = { nil }
     /// The pane now shows another file, which the files panel follows.
     var onPathChange: (() -> Void)?
+    /// The session's agent by name, and whether it can take text now. Nil when none runs.
+    var agent: () -> (name: String, ready: Bool)? = { nil }
+    /// Puts lines of a file in the agent's prompt, with what's wrong there when the language server found a problem in them.
+    var onSendToAgent: ((String, ClosedRange<Int>, String?) -> Void)?
+    /// A click on a change mark: the review panel shows this file's changes.
+    var onShowChanges: ((String) -> Void)?
+    /// The language server's problems in this file changed, for the status bar's counts.
+    var onProblemsChange: (() -> Void)?
 
     /// The file as last read or saved, to tell our own save from someone else's change.
     private var onDisk: String?
@@ -80,6 +88,12 @@ final class FileView: NSView {
     private var blameMissing = false
     private var blameGeneration = 0
     private let blame: BlameColumn
+    /// The file as of the last commit, which the marks beside the numbers compare with. Nil outside a checkout or for an ignored file.
+    private var changeBase: String?
+    private var changeGeneration = 0
+    private var pendingChanges: DispatchWorkItem?
+    /// Watches the repo's refs, so a commit, by you or an agent, clears the marks it took in.
+    private var refsWatcher: FolderWatcher?
     /// Markdown reads as source or rendered. Source until you first pick the preview, then your choice holds for every Markdown file.
     private var previewing = false
     private static let previewKey = "FarolMarkdownPreview"
@@ -114,6 +128,15 @@ final class FileView: NSView {
         wantsLayer = true
 
         blame.onShowCommit = { [weak self] in self?.onShowCommit?($0) }
+        text.leadingMenuItems = { [weak self] in
+            guard let self, canSendToAgent, let agent = agent() else { return [] }
+            let item = ActionMenuItem(title: "Send to \(agent.name)") { [weak self] in self?.sendToAgent() }
+            // Only shown, so the menu teaches the keys.
+            item.keyEquivalent = "l"
+            item.keyEquivalentModifierMask = [.command, .shift]
+            item.isEnabled = agent.ready
+            return [item]
+        }
         text.extraMenuItems = { [weak self] in
             guard let self else { return [] }
             var items: [NSMenuItem] = []
@@ -168,7 +191,19 @@ final class FileView: NSView {
             unmark()
             gutter.textChanged()
             highlightSoon()
+            markChangesSoon()
         }
+
+        NotificationCenter.default.addObserver(forName: LanguageServers.diagnosticsDidChange, object: nil, queue: .main) { [weak self] note in
+            guard let self, note.object as? String == path else { return }
+            MainActor.assumeIsolated { self.showProblems() }
+        }
+        // An edit moves the problems after it along, so their squiggles stay under their words until the server answers again.
+        NotificationCenter.default.addObserver(forName: NSTextStorage.didProcessEditingNotification, object: text.textStorage, queue: nil) { [weak self] note in
+            guard let storage = note.object as? NSTextStorage, storage.editedMask.contains(.editedCharacters) else { return }
+            MainActor.assumeIsolated { self?.text.shiftProblems(after: storage.editedRange, by: storage.changeInLength) }
+        }
+        text.onMouseOver = { [weak self] in self?.hover(at: $0) }
 
         NotificationCenter.default.addObserver(forName: NSTextView.didChangeSelectionNotification, object: text, queue: .main) { [weak self] _ in
             guard let self else { return }
@@ -199,6 +234,13 @@ final class FileView: NSView {
         preview.onOpenFile = { [weak self] in self?.onOpenFile?($0) }
 
         gutter.onResize = { [weak self] in self?.needsLayout = true }
+        gutter.markColors = { [weak self] in
+            self?.palette().map { (NSColor($0.added), NSColor($0.pull), NSColor($0.removed)) }
+        }
+        gutter.onClickMark = { [weak self] in
+            guard let self else { return }
+            onShowChanges?(path)
+        }
         for view in [conflict, blame, gutter, scroll, preview, message] { addSubview(view) }
         show(path)
     }
@@ -280,7 +322,6 @@ final class FileView: NSView {
 
     /// Shows the source or the preview. The preview reads the text being edited, so unsaved edits show too.
     private func updateMode() {
-        let markdown = Markdown.handles(path)
         preview.isHidden = !showsPreview
         scroll.isHidden = !message.isHidden || showsPreview
         gutter.isHidden = scroll.isHidden
@@ -297,6 +338,10 @@ final class FileView: NSView {
         previewing = UserDefaults.standard.bool(forKey: Self.previewKey)
         blaming = UserDefaults.standard.bool(forKey: Self.blameKey)
         inCheckout = false
+        changeBase = nil
+        refsWatcher = nil
+        gutter.marks = []
+        text.problems = []
         blameMissing = false
         blameGeneration += 1
         blameLines = []
@@ -343,9 +388,175 @@ final class FileView: NSView {
                 guard let self, self.path == path, let top, directory.hasPrefix(top + "/") else { return }
                 self.inCheckout = true
                 self.loadBlame()
+                self.loadChangeBase()
+                self.watchRefs()
                 self.updateMode()
             }
         }
+    }
+
+    // MARK: Changes since the last commit
+
+    /// Reads the committed version off the main thread, then marks the lines against it.
+    private func loadChangeBase() {
+        guard inCheckout else { return }
+        let path = path
+        DispatchQueue.global(qos: .userInitiated).async {
+            let base = LineChanges.base(of: path)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.path == path else { return }
+                changeBase = base
+                markChanges()
+            }
+        }
+    }
+
+    private func watchRefs() {
+        let path = path
+        DispatchQueue.global(qos: .utility).async {
+            let repo = Git.repoRoot(of: (path as NSString).deletingLastPathComponent)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.path == path, let repo else { return }
+                refsWatcher = FolderWatcher((repo as NSString).appendingPathComponent(".git"), latency: 0.5) { [weak self] paths in
+                    // A commit or a checkout moves a ref. The index changes far more often and says nothing new here.
+                    guard paths.contains(where: { $0.hasSuffix("/HEAD") || $0.contains("/refs/") || $0.hasSuffix("/packed-refs") }) else { return }
+                    self?.loadChangeBase()
+                }
+            }
+        }
+    }
+
+    /// Typing waits for a pause, so a burst of keys compares once.
+    private func markChangesSoon() {
+        guard changeBase != nil else { return }
+        pendingChanges?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.markChanges() }
+        pendingChanges = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: work)
+    }
+
+    /// Compares in the background, so a large file never holds up a key. The last asked wins.
+    private func markChanges() {
+        changeGeneration += 1
+        guard let base = changeBase, let storage = text.textStorage, message.isHidden else { return gutter.marks = [] }
+        // Bridging copies the storage's mutable string, so the other thread reads text no edit can change.
+        let (generation, current) = (changeGeneration, storage.string)
+        DispatchQueue.global(qos: .userInitiated).async {
+            let marks = LineChanges.marks(from: base, to: current)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, changeGeneration == generation else { return }
+                gutter.marks = marks
+            }
+        }
+    }
+
+    // MARK: Problems the language server found
+
+    /// Errors and warnings get a squiggle, in the theme's red and yellow. Hints and notes would crowd the code, so they stay out.
+    private func showProblems() {
+        let found = (LanguageServers.shared.diagnostics[path] ?? []).filter { $0.severity == .error || $0.severity == .warning }
+        let string = text.string as NSString
+        let colors = palette().map { (error: NSColor($0.removed), warning: NSColor($0.waiting)) }
+        text.problems = found.compactMap { diagnostic in
+            guard let range = range(diagnostic, in: string) else { return nil }
+            let color = diagnostic.severity == .error ? colors?.error ?? .systemRed : colors?.warning ?? .systemYellow
+            return CodeTextView.Problem(range: range, color: color, diagnostic: diagnostic)
+        }.sorted { $0.range.location < $1.range.location }
+        onProblemsChange?()
+    }
+
+    /// The characters a problem is about. One about a single point, like a missing brace, covers the character there so it can be seen.
+    private func range(_ diagnostic: LSP.Diagnostic, in string: NSString) -> NSRange? {
+        func offset(_ position: LSP.Position) -> Int? {
+            guard position.line < gutter.count else { return position.line == gutter.count ? string.length : nil }
+            let start = gutter.start(ofLine: position.line)
+            let line = string.lineRange(for: NSRange(location: start, length: 0))
+            return min(start + position.character, NSMaxRange(line))
+        }
+        guard let start = offset(diagnostic.start), let end = offset(diagnostic.end) else { return nil }
+        if end > start { return NSRange(location: start, length: end - start) }
+        guard string.length > 0 else { return nil }
+        let at = start < string.length && string.character(at: start) != 0x0A ? start : max(start - 1, 0)
+        return NSRange(location: at, length: 1)
+    }
+
+    /// How many errors and warnings, for the status bar.
+    var problemCounts: (errors: Int, warnings: Int) {
+        let errors = text.problems.filter { $0.diagnostic.severity == .error }.count
+        return (errors, text.problems.count - errors)
+    }
+
+    /// F8 and ⇧F8: the next problem after the cursor, round from the last to the first, selected with its message shown under it.
+    func goToProblem(forward: Bool) {
+        let problems = text.problems
+        guard !problems.isEmpty, canSendToAgent else { return NSSound.beep() }
+        let cursor = text.selectedRange().location
+        let next = forward
+            ? problems.first { $0.range.location > cursor } ?? problems[0]
+            : problems.last { $0.range.location < cursor } ?? problems[problems.count - 1]
+        window?.makeFirstResponder(text)
+        text.setSelectedRange(NSRange(location: next.range.location, length: 0))
+        text.scrollRangeToVisible(next.range)
+        showCard(for: next)
+    }
+
+    /// What the mouse rests on: a problem's range, or a name the server may know about.
+    private var hovered: NSRange?
+    private var pendingInfo: DispatchWorkItem?
+
+    /// Resting the mouse on a squiggle says what's wrong. On a name, with its language server on, a moment later its type and docs.
+    private func hover(at index: Int?) {
+        let problem = index.flatMap { index in text.problems.first { NSLocationInRange(index, $0.range) } }
+        let target = problem?.range ?? index.flatMap { links.word(at: $0) }
+        guard target != hovered else { return }
+        hovered = target
+        pendingInfo?.cancel()
+        HoverTip.shared.hide()
+        if let problem { return showCard(for: problem) }
+        guard let index, let target, LanguageServers.shared.isEnabled(for: path) else { return }
+        let work = DispatchWorkItem { [weak self] in
+            self?.links.info(at: index) { [weak self] info in
+                guard let self, hovered == target, let info else { return }
+                showCard(info, over: target)
+            }
+        }
+        pendingInfo = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
+    }
+
+    /// The server's words, then who found it, muted, on the same line. The squiggle's color already says error or warning.
+    /// Below, how to hand it to the agent, the fix most often wanted.
+    private func showCard(for problem: CodeTextView.Problem) {
+        let foreground = themeColors?.foreground ?? .labelColor
+        let muted = themeColors.map { $0.background.mixed(with: $0.foreground, 0.55) } ?? .secondaryLabelColor
+        let card = NSMutableAttributedString(string: problem.diagnostic.message, attributes: [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: foreground])
+        if let source = problem.diagnostic.source {
+            card.append(NSAttributedString(string: "  " + source, attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: muted]))
+        }
+        if let agent = agent(), agent.ready {
+            card.append(NSAttributedString(string: "\n⇧⌘L  ", attributes: [.font: NSFont.monospacedSystemFont(ofSize: 11, weight: .regular), .foregroundColor: muted]))
+            card.append(NSAttributedString(string: "Ask \(agent.name) to fix", attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: muted]))
+        }
+        present(card, over: problem.range)
+    }
+
+    /// A hover's answer: its first line is the name's signature, so it reads as code, then the docs. Long docs are cut short.
+    private func showCard(_ message: String, over range: NSRange) {
+        let foreground = themeColors?.foreground ?? .labelColor
+        var lines = message.components(separatedBy: "\n")
+        if lines.count > 14 { lines = Array(lines.prefix(14)) + ["…"] }
+        let card = NSMutableAttributedString()
+        for (index, line) in lines.enumerated() {
+            let font = index == 0 ? NSFont.monospacedSystemFont(ofSize: 11, weight: .regular) : NSFont.systemFont(ofSize: 12)
+            card.append(NSAttributedString(string: (index > 0 ? "\n" : "") + line, attributes: [.font: font, .foregroundColor: foreground]))
+        }
+        present(card, over: range)
+    }
+
+    /// Over the line, as editors put it, so the code you read next stays in view.
+    private func present(_ card: NSAttributedString, over range: NSRange) {
+        guard let window, let rect = text.rect(of: range) else { return }
+        HoverTip.shared.show(card: card, below: window.convertToScreen(text.convert(rect, to: nil)), in: window, above: true)
     }
 
     // MARK: Git blame
@@ -395,6 +606,32 @@ final class FileView: NSView {
                 updateMode()
             }
         }
+    }
+
+    // MARK: The agent
+
+    /// Source on screen, where lines have numbers to point at.
+    var canSendToAgent: Bool { !scroll.isHidden }
+
+    /// The lines the selection covers, from 1, or the cursor's line. A selection that ends at the start of a line leaves that line out.
+    var selectedLines: ClosedRange<Int> {
+        let range = text.selectedRange()
+        let first = gutter.line(containing: range.location).index + 1
+        let last = gutter.line(containing: range.length > 0 ? NSMaxRange(range) - 1 : range.location).index + 1
+        return first...max(first, last)
+    }
+
+    func sendToAgent() {
+        guard canSendToAgent else { return }
+        let lines = selectedLines
+        onSendToAgent?(path, lines, problemNote(in: lines))
+    }
+
+    /// The problems on those lines, in the server's words, so the agent knows what to fix without being told.
+    private func problemNote(in lines: ClosedRange<Int>) -> String? {
+        let messages = text.problems.filter { lines.contains(gutter.line(containing: $0.range.location).index + 1) }.map(\.diagnostic.message)
+        let unique = messages.reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+        return unique.isEmpty ? nil : unique.joined(separator: " · ")
     }
 
     /// How many lines the file has, for Go to Line to say.
@@ -493,6 +730,13 @@ final class FileView: NSView {
             fitLayout(string)
             text.string = string
             onDisk = string
+            // Go and Makefiles indent with tabs by rule, so a file too short to tell still gets them.
+            let tabs = ["go", "mk"].contains((path as NSString).pathExtension) || (path as NSString).lastPathComponent == "Makefile"
+            text.indentUnit = Typing.indentUnit(of: string as NSString, fallback: tabs ? "\t" : "    ")
+            let kind = (path as NSString).pathExtension.lowercased()
+            text.pairs = language != nil && !Markdown.handles(path)
+            text.colonOpens = ["py", "yaml", "yml"].contains(kind)
+            text.pairsApostrophes = kind != "rs"
             text.isEditable = true
             display(message: nil)
         case .success(.binary):
@@ -510,6 +754,11 @@ final class FileView: NSView {
         gutter.textChanged()
         highlight()
         loadBlame()
+        // An agent's edit is a change too. Reading the base again also catches a commit made with it.
+        if inCheckout { loadChangeBase() }
+        // The server hears of the new text and answers with its problems. Until then, the last ones it gave are placed again.
+        showProblems()
+        links.textChanged()
         if keepingPosition {
             let length = (text.string as NSString).length
             text.setSelectedRange(NSRange(location: min(selection.location, length), length: 0))
@@ -656,6 +905,7 @@ final class FileView: NSView {
         highlight()
         gutter.colors = (background, background.mixed(with: foreground, 0.35), background.mixed(with: foreground, 0.8))
         text.currentLineColor = background.mixed(with: foreground, 0.045)
+        text.matchColor = background.mixed(with: foreground, 0.14)
         blame.colors = (background, foreground)
     }
 
@@ -730,6 +980,18 @@ final class FileView: NSView {
         textView.performTextFinderAction(item)
     }
 
+    /// A divider beside the pane is being dragged. Wrapped text and the Markdown preview wait for it to stop before fitting the new width.
+    /// Wrapping a whole file again on every point of a drag froze it.
+    var resizing = false {
+        didSet { if !resizing { needsLayout = true } }
+    }
+    private var deferringWrap: Bool { resizing || inLiveResize }
+
+    override func viewDidEndLiveResize() {
+        super.viewDidEndLiveResize()
+        needsLayout = true
+    }
+
     override func layout() {
         super.layout()
         let bar = conflict.isHidden ? 0 : Self.barHeight
@@ -746,11 +1008,13 @@ final class FileView: NSView {
         gutter.frame = NSRect(x: blameWidth, y: bar, width: gutter.width, height: body)
         let start = blameWidth + gutter.width
         scroll.frame = NSRect(x: start, y: bar, width: max(0, bounds.width - start), height: body)
-        preview.frame = NSRect(x: 0, y: bar, width: bounds.width, height: body)
+        // While a drag goes on, the preview keeps its width, and only its height follows.
+        let previewWidth = deferringWrap && preview.frame.width > 0 ? preview.frame.width : bounds.width
+        preview.frame = NSRect(x: 0, y: bar, width: previewWidth, height: body)
         // At least as big as the visible area, so short files still fill it and clicks land in the text.
         text.minSize = scroll.contentSize
         // Only on a new width: each resize measures the whole wrapped file again.
-        if wraps, text.frame.width != scroll.contentSize.width { text.setFrameSize(NSSize(width: scroll.contentSize.width, height: text.frame.height)) }
+        if wraps, !deferringWrap, text.frame.width != scroll.contentSize.width { text.setFrameSize(NSSize(width: scroll.contentSize.width, height: text.frame.height)) }
         message.frame = NSRect(x: 12, y: bounds.midY - 10, width: max(0, bounds.width - 24), height: 20)
     }
 }
@@ -767,6 +1031,8 @@ private final class CodeTextView: NSTextView {
 
     override func drawBackground(in rect: NSRect) {
         super.drawBackground(in: rect)
+        drawProblems(in: rect)
+        drawMatches(in: rect)
         guard let color = currentLineColor, let line = currentLine else { return }
         let band = NSRect(x: 0, y: line.minY, width: bounds.width, height: line.height)
         guard band.intersects(rect) else { return }
@@ -774,8 +1040,116 @@ private final class CodeTextView: NSTextView {
         band.fill()
     }
 
+    // MARK: The bracket that matches, and the selected word elsewhere
+
+    /// Behind the other places the selected word is. The matching bracket gets a frame in it.
+    var matchColor: NSColor? { didSet { needsDisplay = true } }
+    private var bracket: (NSRange, NSRange)?
+    private var occurrences: [NSRange] = []
+    /// Past this, a file is too big to search on every double-click.
+    private static let occurrenceLimit = 1_000_000
+
+    private func findMatches() {
+        let selection = selectedRange()
+        let newBracket = selection.length == 0 ? Typing.matchingBracket(text, at: selection.location) : nil
+        let newOccurrences = wordOccurrences(of: selection)
+        guard newBracket?.0 != bracket?.0 || newBracket?.1 != bracket?.1 || newOccurrences != occurrences else { return }
+        bracket = newBracket
+        occurrences = newOccurrences
+        needsDisplay = true
+    }
+
+    /// The selection's other places, when it is one whole word, as a double-click makes it. At most a few hundred, since more is noise.
+    private func wordOccurrences(of selection: NSRange) -> [NSRange] {
+        guard (2...100).contains(selection.length), text.length < Self.occurrenceLimit else { return [] }
+        let word = text.substring(with: selection)
+        guard word.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "_" }),
+              let pattern = try? NSRegularExpression(pattern: "(?<![\\w])" + NSRegularExpression.escapedPattern(for: word) + "(?![\\w])") else { return [] }
+        let found = pattern.matches(in: text as String, range: NSRange(location: 0, length: text.length)).prefix(500).map(\.range)
+        return found.count > 1 ? found.filter { $0 != selection } : []
+    }
+
+    private func drawMatches(in dirty: NSRect) {
+        guard let color = matchColor, bracket != nil || !occurrences.isEmpty else { return }
+        color.setFill()
+        for range in occurrences {
+            guard let rect = rect(of: range), rect.intersects(dirty) else { continue }
+            NSBezierPath(roundedRect: rect.insetBy(dx: -1, dy: 0), xRadius: 2, yRadius: 2).fill()
+        }
+        guard let bracket else { return }
+        for range in [bracket.0, bracket.1] {
+            guard let rect = rect(of: range), rect.intersects(dirty) else { continue }
+            NSBezierPath(roundedRect: rect.insetBy(dx: -0.5, dy: 0), xRadius: 2, yRadius: 2).fill()
+        }
+    }
+
+    // MARK: Problems
+
+    struct Problem {
+        var range: NSRange
+        let color: NSColor
+        let diagnostic: LSP.Diagnostic
+    }
+
+    /// Sorted by where they start. Drawn as squiggles under the text, only where the view is drawing.
+    var problems: [Problem] = [] { didSet { needsDisplay = true } }
+    /// The character under the mouse, or nil when it leaves, for the problem there to say what's wrong.
+    var onMouseOver: ((Int?) -> Void)?
+
+    /// Problems after an edit move with it. One the edit touched is dropped, since its words changed, until the server says again.
+    func shiftProblems(after edited: NSRange, by delta: Int) {
+        guard !problems.isEmpty else { return }
+        let start = edited.location, oldEnd = NSMaxRange(edited) - delta
+        problems = problems.compactMap { problem in
+            var problem = problem
+            if NSMaxRange(problem.range) <= start { return problem }
+            if problem.range.location >= oldEnd {
+                problem.range.location += delta
+                return problem
+            }
+            return nil
+        }
+    }
+
+    private func drawProblems(in dirty: NSRect) {
+        guard !problems.isEmpty, let layout = layoutManager, let container = textContainer else { return }
+        let length = (string as NSString).length
+        let visible = layout.characterRange(forGlyphRange: layout.glyphRange(forBoundingRect: dirty, in: container), actualGlyphRange: nil)
+        for problem in problems where NSMaxRange(problem.range) <= length && NSIntersectionRange(problem.range, visible).length > 0 {
+            let glyphs = layout.glyphRange(forCharacterRange: problem.range, actualCharacterRange: nil)
+            problem.color.setStroke()
+            layout.enumerateEnclosingRects(forGlyphRange: glyphs, withinSelectedGlyphRange: NSRange(location: NSNotFound, length: 0),
+                                           in: container) { [textContainerOrigin] rect, _ in
+                let line = rect.offsetBy(dx: textContainerOrigin.x, dy: textContainerOrigin.y)
+                Self.squiggle(from: line.minX, to: line.maxX, at: line.maxY - 1).stroke()
+            }
+        }
+    }
+
+    /// A wave under the words, two points tall, as editors mark what's wrong.
+    private static func squiggle(from start: CGFloat, to end: CGFloat, at y: CGFloat) -> NSBezierPath {
+        let path = NSBezierPath()
+        path.lineWidth = 1
+        var x = start, up = true
+        path.move(to: NSPoint(x: x, y: y))
+        while x < end {
+            x = min(x + 2, end)
+            path.line(to: NSPoint(x: x, y: up ? y - 2 : y))
+            up.toggle()
+        }
+        return path
+    }
+
+    /// Where characters are drawn, in this view's coordinates.
+    func rect(of range: NSRange) -> NSRect? {
+        guard let layout = layoutManager, let container = textContainer, NSMaxRange(range) <= (string as NSString).length else { return nil }
+        let glyphs = layout.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+        return layout.boundingRect(forGlyphRange: glyphs, in: container).offsetBy(dx: textContainerOrigin.x, dy: textContainerOrigin.y)
+    }
+
     override func setSelectedRanges(_ ranges: [NSValue], affinity: NSSelectionAffinity, stillSelecting: Bool) {
         super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelecting)
+        if !stillSelecting { findMatches() }
         // Only the old and new lines are drawn again, not the whole pane.
         let old = currentLine
         currentLine = cursorLine()
@@ -834,17 +1208,23 @@ private final class CodeTextView: NSTextView {
         super.mouseMoved(with: event)
         hover(holding: event.modifierFlags)
         if linkRect != nil { pointAtLink() }
+        // Only over a character itself, not the empty space past the end of its line.
+        let point = convert(event.locationInWindow, from: nil)
+        let index = character(at: point).flatMap { rect(of: NSRange(location: $0, length: 1))?.insetBy(dx: 0, dy: -1).contains(point) == true ? $0 : nil }
+        onMouseOver?(index)
     }
 
     override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
         onCommandHover?(nil)
+        onMouseOver?(nil)
     }
 
     /// The text under the mouse moves, so the name lit is another one.
     override func scrollWheel(with event: NSEvent) {
         super.scrollWheel(with: event)
         hover(holding: NSEvent.modifierFlags)
+        onMouseOver?(nil)
     }
 
     /// Pressing or letting go of ⌘ with the mouse still is a change too.
@@ -887,6 +1267,8 @@ private final class CodeTextView: NSTextView {
     }
 
     // MARK: Menus
+    /// Items before the text's own, for what a right-click in code is most often for.
+    var leadingMenuItems: (() -> [NSMenuItem])?
     /// Items after the text's own, like git blame, where a right-click in the code finds them.
     var extraMenuItems: (() -> [NSMenuItem])?
 
@@ -919,6 +1301,11 @@ private final class CodeTextView: NSTextView {
         if isEditable {
             let paste = menu.items.firstIndex { $0.action == #selector(paste(_:)) }
             menu.insertItem(linesMenu(), at: paste.map { $0 + 1 } ?? menu.items.count)
+        }
+        let leading = leadingMenuItems?() ?? []
+        if !leading.isEmpty {
+            menu.insertItem(.separator(), at: 0)
+            leading.reversed().forEach { menu.insertItem($0, at: 0) }
         }
         let extra = extraMenuItems?() ?? []
         if !extra.isEmpty {
@@ -956,6 +1343,8 @@ private final class CodeTextView: NSTextView {
 
     /// ⌥↑ and ⌥↓ move lines, with ⇧ they copy them. A Mac text view would jump to a paragraph's ends, which code rarely needs.
     override func keyDown(with event: NSEvent) {
+        // Typing means the eyes are on the cursor, so a card under the mouse goes.
+        onMouseOver?(nil)
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.numericPad, .function, .capsLock])
         let up = event.keyCode == 126
         guard event.keyCode == 125 || up, flags == .option || flags == [.option, .shift] else { return super.keyDown(with: event) }
@@ -973,6 +1362,11 @@ private final class CodeTextView: NSTextView {
         }
         if key == "k", flags == [.command, .shift] {
             deleteLines()
+            return true
+        }
+        // ⌘] and ⌘[ move the lines in and out, as in Xcode and VS Code. Matched by the character, which needs ⌥ on some keyboards.
+        if key == "]" || key == "[", flags.subtracting(.option) == .command {
+            indentLines(key == "[")
             return true
         }
         return super.performKeyEquivalent(with: event)
@@ -1008,13 +1402,49 @@ private final class CodeTextView: NSTextView {
         NSPasteboard.general.setString(line, forType: .string)
     }
 
-    /// A new line starts at the same indent as the one before, which is most of what code needs.
+    // MARK: Typing, as code editors do
+
+    /// The file's own indent, a tab or some spaces, which Tab, Return and Backspace follow.
+    var indentUnit = "    "
+    /// Brackets and quotes pair up in code. In prose, like Markdown or plain text, they'd get in the way.
+    var pairs = true
+    /// A colon starts a block in Python and YAML, so Return after one adds a level.
+    var colonOpens = false
+    /// Rust writes lifetimes like `&'a`, where a paired quote would be in the way.
+    var pairsApostrophes = true
+
+    /// Return keeps the indent, adds a level after an opener, and opens `{}` onto its own lines.
     override func insertNewline(_ sender: Any?) {
-        let string = self.string as NSString
-        let line = string.lineRange(for: NSRange(location: selectedRange().location, length: 0))
-        let indent = string.substring(with: line).prefix { $0 == " " || $0 == "\t" }
-        super.insertNewline(sender)
-        if !indent.isEmpty { insertText(String(indent), replacementRange: selectedRange()) }
+        apply(Typing.newline(text, selectedRange(), unit: indentUnit, colonOpens: colonOpens))
+    }
+
+    /// Tab indents, in the file's style, and over several lines moves them all.
+    override func insertTab(_ sender: Any?) {
+        apply(Typing.indent(text, selectedRange(), unit: indentUnit))
+    }
+
+    override func insertBacktab(_ sender: Any?) {
+        apply(Typing.outdent(text, selectedRange(), unit: indentUnit))
+    }
+
+    func indentLines(_ out: Bool) {
+        apply(out ? Typing.outdent(text, selectedRange(), unit: indentUnit) : Typing.indentLines(text, selectedRange(), unit: indentUnit))
+    }
+
+    /// Brackets and quotes come in pairs. Not while an input method composes, like a dead key for an accent.
+    override func insertText(_ string: Any, replacementRange: NSRange) {
+        if pairs, let typed = string as? String, typed.count == 1, !hasMarkedText(), replacementRange.location == NSNotFound,
+           typed != "'" || pairsApostrophes,
+           let edit = Typing.type(typed, text, selectedRange()) {
+            return apply(edit)
+        }
+        super.insertText(string, replacementRange: replacementRange)
+    }
+
+    /// Backspace takes an empty pair whole, and an indent a level at a time.
+    override func deleteBackward(_ sender: Any?) {
+        if pairs, let edit = Typing.deleteBackward(text, selectedRange(), unit: indentUnit) { return apply(edit) }
+        super.deleteBackward(sender)
     }
 }
 
@@ -1030,6 +1460,21 @@ private final class LineNumbers: NSView {
     var onResize: (() -> Void)?
     /// `current` is the cursor's line number, brighter so your place is easy to find.
     var colors = (background: NSColor.black, text: NSColor.gray, current: NSColor.white) { didSet { needsDisplay = true } }
+    /// Lines changed since the last commit, as a bar at the gutter's edge: added, modified, and a wedge where lines were deleted.
+    var marks: [LineChanges.Mark] = [] {
+        didSet {
+            guard marks != oldValue else { return }
+            byLine = Dictionary(marks.map { ($0.line, $0.kind) }, uniquingKeysWith: { first, _ in first })
+            needsDisplay = true
+            window?.invalidateCursorRects(for: self)
+        }
+    }
+    private var byLine: [Int: LineChanges.Kind] = [:]
+    var markColors: () -> (added: NSColor, modified: NSColor, deleted: NSColor)? = { nil }
+    var onClickMark: (() -> Void)?
+    private static let markWidth: CGFloat = 3
+    /// Where the marks are drawn, and a click on them lands: the gutter's right edge, beside the text.
+    private var markStrip: NSRect { NSRect(x: width - Self.markWidth - 2, y: 0, width: Self.markWidth + 2, height: bounds.height) }
 
     init(textView: NSTextView) {
         self.textView = textView
@@ -1068,12 +1513,57 @@ private final class LineNumbers: NSView {
         var current = attributes
         current[.foregroundColor] = colors.current
         let cursor = textView.map { lines.line(atOrBefore: $0.selectedRange().location) }
+        let tints = byLine.isEmpty ? nil : markColors()
         forEachVisibleLine { line, top, height in
             let label = "\(line + 1)" as NSString
             let style = line == cursor ? current : attributes
             let size = label.size(withAttributes: style)
             label.draw(at: NSPoint(x: width - size.width - 10, y: top + (height - size.height) / 2), withAttributes: style)
+            guard let tints else { return }
+            drawMark(byLine[line], top: top, height: height, tints)
+            // Lines deleted from the end leave their wedge under the last line.
+            if line == lines.starts.count - 1, byLine[lines.starts.count] == .deleted { drawMark(.deleted, top: top + height, height: 0, tints) }
         }
+    }
+
+    private func drawMark(_ kind: LineChanges.Kind?, top: CGFloat, height: CGFloat, _ tints: (added: NSColor, modified: NSColor, deleted: NSColor)) {
+        let x = width - Self.markWidth - 2
+        switch kind {
+        case .added, .modified:
+            (kind == .added ? tints.added : tints.modified).setFill()
+            NSBezierPath(roundedRect: NSRect(x: x, y: top, width: Self.markWidth, height: height), xRadius: 1, yRadius: 1).fill()
+        case .deleted:
+            // A wedge pointing at the gap the lines left, between this line and the one above.
+            tints.deleted.setFill()
+            let wedge = NSBezierPath()
+            wedge.move(to: NSPoint(x: x, y: top - 4))
+            wedge.line(to: NSPoint(x: x + 5, y: top))
+            wedge.line(to: NSPoint(x: x, y: top + 4))
+            wedge.close()
+            wedge.fill()
+        case nil:
+            break
+        }
+    }
+
+    /// A click on a mark opens the changes. Anywhere else in the gutter picks the pane, as before.
+    override func mouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        guard markStrip.contains(point), let line = line(at: point.y), byLine[line] != nil || byLine[line + 1] == .deleted else {
+            return super.mouseDown(with: event)
+        }
+        onClickMark?()
+    }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        if !byLine.isEmpty { addCursorRect(markStrip, cursor: .pointingHand) }
+    }
+
+    private func line(at y: CGFloat) -> Int? {
+        var found: Int?
+        forEachVisibleLine { line, top, height in if y >= top, y < top + height { found = line } }
+        return found
     }
 
     /// The lines on screen, each with its top and height in this view's own coordinates.
@@ -1094,6 +1584,9 @@ private final class LineNumbers: NSView {
     }
 
     var count: Int { lines.starts.count }
+
+    /// Where a line starts, from 0.
+    func start(ofLine line: Int) -> Int { lines.starts[min(max(line, 0), lines.starts.count - 1)] }
 
     /// The line holding `location`, from 0, and where it starts.
     func line(containing location: Int) -> (index: Int, start: Int) {

@@ -47,6 +47,20 @@ public struct AgentFolder: Equatable, Hashable {
         /// Listed before it is set up, as the two agents most people use. The others show once their folder is there.
         var listedWhenMissing: Bool { self == .claude || self == .codex }
 
+        /// How a prompt points at lines of a file, from the folder the agent runs in. Claude Code reads `@path#L12-20` and attaches those lines.
+        /// The others get the `path:12-20` that compilers print, which every agent understands.
+        public func reference(to path: String, lines: ClosedRange<Int>, from directory: String) -> String {
+            Self.reference(to: path, lines: lines, from: directory, claude: self == .claude)
+        }
+
+        /// The same for an agent Farol doesn't know, which gets the plain form.
+        public static func reference(to path: String, lines: ClosedRange<Int>, from directory: String, claude: Bool = false) -> String {
+            let prefix = directory.hasSuffix("/") ? directory : directory + "/"
+            let shown = path.hasPrefix(prefix) ? String(path.dropFirst(prefix.count)) : path
+            let span = lines.count == 1 ? "\(lines.lowerBound)" : "\(lines.lowerBound)-\(lines.upperBound)"
+            return claude ? "@\(shown)#L\(span)" : "\(shown):\(span)"
+        }
+
         /// What starts it on a first prompt, as words for a shell.
         func prompt(_ task: String) -> [String] {
             (self == .opencode ? ["--prompt"] : []) + [NewTask.shellQuoted(task)]

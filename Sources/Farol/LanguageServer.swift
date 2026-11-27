@@ -16,6 +16,10 @@ final class LanguageServer {
         didSet { if state != oldValue { onStateChange?() } }
     }
     var onStateChange: (() -> Void)?
+    /// The problems the server found in a file, which replace the ones before. An empty list clears them.
+    var onDiagnostics: ((String, [LSP.Diagnostic]) -> Void)?
+    /// Files it has reported problems for, cleared when it stops so no problem outlives the server that found it.
+    private var diagnosed: Set<String> = []
     /// When it last answered something for you, so an idle one can be stopped.
     private(set) var lastUsed = Date()
     /// What the server says it is, like gopls's "v0.21.1", once it has started.
@@ -103,6 +107,7 @@ final class LanguageServer {
         pending = [:]
         queued = []
         documents = [:]
+        clearDiagnostics()
         if state == .running { send(["jsonrpc": "2.0", "id": takeID(), "method": "shutdown"]) }
         send(["jsonrpc": "2.0", "method": "exit"])
         state = .stopped
@@ -129,6 +134,8 @@ final class LanguageServer {
 
     /// Tells the server what the file holds now, opening it the first time. The whole text, which servers all accept.
     func sync(_ path: String, text: String) {
+        // Typing in a file is using its server, so it doesn't stop for being idle under you.
+        lastUsed = Date()
         guard state == .running else {
             if state == .starting { queued.append { [weak self] in self?.sync(path, text: text) } }
             return
@@ -170,6 +177,8 @@ final class LanguageServer {
                     "synchronization": ["dynamicRegistration": false],
                     "definition": ["linkSupport": true],
                     "references": [String: Any](),
+                    "publishDiagnostics": ["relatedInformation": false],
+                    "hover": ["contentFormat": ["plaintext", "markdown"]],
                 ],
             ],
         ]
@@ -192,6 +201,10 @@ final class LanguageServer {
         for message in reader.read(data) {
             if let method = message["method"] as? String {
                 if let id = message["id"] { answer(method, id: id, params: message["params"]) }
+                if method == "textDocument/publishDiagnostics", let (path, found) = LSP.diagnostics(from: message["params"]) {
+                    if found.isEmpty { diagnosed.remove(path) } else { diagnosed.insert(path) }
+                    onDiagnostics?(path, found)
+                }
                 if method == "window/logMessage" || method == "window/showMessage",
                    let text = (message["params"] as? [String: Any])?["message"] as? String {
                     append(text + "\n")
@@ -221,7 +234,13 @@ final class LanguageServer {
         pending = [:]
         queued = []
         documents = [:]
+        clearDiagnostics()
         state = .failed("It stopped with status \(status). Open Logs shows why.")
+    }
+
+    private func clearDiagnostics() {
+        diagnosed.forEach { onDiagnostics?($0, []) }
+        diagnosed = []
     }
 
     private func notify(_ method: String, _ params: [String: Any]) {

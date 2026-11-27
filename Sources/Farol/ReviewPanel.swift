@@ -731,6 +731,15 @@ final class ReviewModel: ObservableObject {
         refresh()
     }
 
+    /// Your changes to a file, from a mark beside its lines in the file pane. The diff may still be loading, so it waits for it.
+    func showChanges(in path: String) {
+        guard let root, path.hasPrefix(root + "/") else { return }
+        let relative = String(path.dropFirst(root.count + 1))
+        if scope.isYours, files.contains(where: { $0.path == relative }) { return reveal(relative) }
+        pendingFocus = relative
+        if !showYours() { refresh() }
+    }
+
     /// Goes back from a commit or a request to the changes shown before it. False when your own changes are shown.
     func showYours() -> Bool {
         guard isOpen, !scope.isYours, let root else { return false }

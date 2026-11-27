@@ -62,14 +62,20 @@ final class DefinitionLinks {
     }
 
     /// An edit moves the text under the underline and can change what names mean.
+    /// The server hears of it after a pause in typing, so its problems follow the text without a message per key.
     func textChanged() {
         reset()
+        pendingSync?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.warm() }
+        pendingSync = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
     }
+    private var pendingSync: DispatchWorkItem?
 
-    /// The file came to the front: its server starts loading the project now, so a ⌘-click a moment later is answered at once.
-    /// The text goes along, which also opens the file in the server.
+    /// The file came to the front, or its text changed: the server gets the text as it is, which opens the file there the first time.
+    /// It starts loading the project now, so a ⌘-click a moment later is answered at once, and it reports the file's problems.
     func warm() {
-        guard LanguageServers.shared.isEnabled(for: path), LanguageServers.shared.existing(for: path) == nil else { return }
+        guard LanguageServers.shared.isEnabled(for: path) else { return }
         let (file, content) = (path, text.string)
         LanguageServers.shared.server(for: file) { $0?.sync(file, text: content) }
     }
@@ -78,6 +84,24 @@ final class DefinitionLinks {
     func closed() {
         LanguageServers.shared.close(path)
     }
+
+    /// What the server says about the name at `index`, like its type and docs. Nil when it says nothing, or servers are off.
+    func info(at index: Int, then done: @escaping (String?) -> Void) {
+        guard LanguageServers.shared.isEnabled(for: path), wordRange(at: index) != nil else { return done(nil) }
+        let (file, content) = (path, text.string)
+        let position = LSP.position(of: index, in: content)
+        LanguageServers.shared.server(for: file) { server in
+            guard let server else { return done(nil) }
+            server.sync(file, text: content)
+            server.request("textDocument/hover", LSP.place(file, position)) { [weak self] result in
+                guard self?.path == file else { return done(nil) }
+                done(LSP.hoverText(from: result))
+            }
+        }
+    }
+
+    /// The name at `index`, for a hover to ask about only when the mouse moves to another.
+    func word(at index: Int) -> NSRange? { wordRange(at: index) }
 
     // MARK: Asking the server
 

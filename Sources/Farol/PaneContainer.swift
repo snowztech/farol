@@ -96,6 +96,11 @@ final class PaneContainer: NSView {
     var onShowCommit: ((String) -> Void)?
     /// The file pane shows another file, or closes, so the files panel can highlight the one in view.
     var onFileChange: ((String?) -> Void)?
+    /// The session's agent, for a file to send it lines.
+    var agent: () -> (name: String, ready: Bool)? = { nil }
+    var onSendToAgent: ((String, ClosedRange<Int>, String?) -> Void)?
+    /// A file's change marks asked for its changes in the review panel.
+    var onShowChanges: ((String) -> Void)?
 
     var terminals: [TerminalView] { root.leaves }
 
@@ -898,6 +903,7 @@ final class PaneContainer: NSView {
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
         dragging = dividers.first { grabArea($0).contains(point) }?.node
+        if dragging != nil { tabs?.files.forEach { $0.resizing = true } }
     }
 
     override func mouseDragged(with event: NSEvent) {
@@ -911,7 +917,10 @@ final class PaneContainer: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
-        if dragging != nil { onLayoutChange?() }
+        if dragging != nil {
+            onLayoutChange?()
+            tabs?.files.forEach { $0.resizing = false }
+        }
         dragging = nil
     }
 
@@ -955,6 +964,9 @@ final class PaneContainer: NSView {
         file.onMovePane = { [weak self] in self?.goto(.direction($0)) }
         file.onZoom = { [weak self] in self?.toggleFileZoom() }
         file.palette = { [weak self] in self?.palette }
+        file.agent = { [weak self] in self?.agent() }
+        file.onSendToAgent = { [weak self] in self?.onSendToAgent?($0, $1, $2) }
+        file.onShowChanges = { [weak self] in self?.onShowChanges?($0) }
         // A preview tab shows another file in the same view, which the files panel follows when it's the one in front.
         file.onPathChange = { [weak self, weak file] in
             if let file, file === self?.file { self?.onFileChange?(file.path) }
