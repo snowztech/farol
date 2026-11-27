@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.71.0] - 2026-11-27
+
+Projects in the sidebar read as groups and can take a color, and the Git graph keeps up with the server on its own.
+
 ### Added
 
 - Right-click a project's header in the sidebar to give it a color, so it's quick to find among many. Six colors, tuned to each theme.
