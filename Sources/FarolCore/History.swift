@@ -163,9 +163,14 @@ public enum History {
     }
 
     /// Deletes a branch on its server, like origin/feat. Everyone who fetches loses it too.
+    /// One already gone there only leaves its copy here, from before the last fetch, so that copy goes and the delete succeeds.
     public static func deleteRemoteBranch(_ branch: String, in directory: String) throws {
         guard let slash = branch.firstIndex(of: "/") else { throw GitError(description: "\(branch) isn't a remote branch.") }
-        try Git.run(["push", String(branch[..<slash]), "--delete", String(branch[branch.index(after: slash)...])], in: directory)
+        do {
+            try Git.run(["push", String(branch[..<slash]), "--delete", String(branch[branch.index(after: slash)...])], in: directory)
+        } catch let error as GitError where error.description.contains("remote ref does not exist") {
+            try Git.run(["branch", "--delete", "--remotes", branch], in: directory)
+        }
     }
 
     /// Brings every remote's branches up to date and drops the ones deleted on the server.

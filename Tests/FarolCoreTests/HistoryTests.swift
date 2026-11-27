@@ -162,6 +162,22 @@ private func edges(_ pairs: (Int, Int)...) -> [History.Edge] {
     #expect(History.branches(in: box.repo).local.contains("shared"))
 }
 
+/// Deleted on the server since the last fetch, the branch still shows here, and deleting it clears that copy instead of failing.
+@Test func deletesARemoteBranchAlreadyGoneOnTheServer() throws {
+    let origin = try Sandbox()
+    let box = try Sandbox()
+    try Git.run(["remote", "add", "origin", origin.repo], in: box.repo)
+    try Git.run(["-c", "user.name=Farol", "-c", "user.email=farol@example.com", "commit", "--quiet", "--allow-empty",
+                 "-m", "remote work"], in: origin.repo)
+    try Git.run(["branch", "stale"], in: origin.repo)
+    try Git.run(["fetch", "--quiet", "origin"], in: box.repo)
+    try Git.run(["branch", "-D", "stale"], in: origin.repo)
+    #expect(History.branches(in: box.repo).remote.contains("origin/stale"))
+
+    try History.deleteRemoteBranch("origin/stale", in: box.repo)
+    #expect(!History.branches(in: box.repo).remote.contains("origin/stale"))
+}
+
 @Test func createsDeletesRebasesAndCherryPicks() throws {
     let box = try Sandbox()
     let git = { (args: [String]) in
