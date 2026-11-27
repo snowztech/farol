@@ -132,9 +132,8 @@ private struct ServerHeader: View {
                     Lamp(activity: loudest, selected: false, palette: palette)
                 } else if settingUp || state.connection == .connecting {
                     // Breathing while it connects, so an empty group never reads as a server with nothing on it.
-                    ServerIcon(palette: palette).opacity(0.5)
-                        .phaseAnimator([false, true]) { icon, bright in icon.opacity(bright ? 1 : 0.4) }
-                            animation: { _ in Motion.enabled ? .easeInOut(duration: 0.9) : nil }
+                    // A symbol effect only fades, where a phase animator's slow animation also dragged the icon behind its row on a fold.
+                    ServerIcon(palette: palette).symbolEffect(.pulse, isActive: Motion.enabled)
                 } else {
                     ServerIcon(palette: palette)
                 }
