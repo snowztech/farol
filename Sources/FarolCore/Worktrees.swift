@@ -163,4 +163,32 @@ public struct Worktrees {
         try WorktreeScripts.tearDown(in: path)
         try Git.run(["worktree", "remove", path], in: root)
     }
+
+    /// A worktree whose branch was merged on the forge: the request, and the branch the worktree is on.
+    public struct MergedTask: Equatable {
+        public let request: Forge.Merged
+        public let branch: String
+    }
+
+    /// The worktrees whose branch was merged, asking the forge once per repo. Talks to the forge, so call it off the main thread.
+    /// Only a branch still on the commit the request merged counts: one with commits since holds work the merge didn't take.
+    public static func merged(_ worktrees: [String]) -> [String: MergedTask] {
+        var byRepo: [String: [String: Forge.Merged]] = [:]
+        var found: [String: MergedTask] = [:]
+        for worktree in worktrees {
+            guard let repo = Git.repoRoot(of: worktree), let branch = Git.branch(of: worktree),
+                  let tip = try? Git.run(["rev-parse", "HEAD"], in: worktree) else { continue }
+            if byRepo[repo] == nil { byRepo[repo] = Forge.detect(in: worktree)?.mergedRequests(in: worktree) ?? [:] }
+            if let request = byRepo[repo]?[branch], request.head == tip { found[worktree] = MergedTask(request: request, branch: branch) }
+        }
+        return found
+    }
+
+    /// Removes a merged task's worktree, then its branch. The branch goes with -D, since a squash merge leaves it looking unmerged to git.
+    /// The caller checked the merge took everything on it.
+    public func finish(_ path: String, branch: String) throws {
+        guard let root = Git.repoRoot(of: path) else { throw GitError(description: "\(path) is not inside a git repository.") }
+        try remove(path)
+        try Git.run(["branch", "-D", branch], in: root)
+    }
 }

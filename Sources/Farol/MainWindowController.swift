@@ -82,6 +82,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private var sessionsChange: AnyCancellable?
     private(set) lazy var remote = RemoteBridge(store: store, worktrees: worktreeSettings)
     private(set) lazy var scheduler = Scheduler(store: store, worktrees: worktreeSettings)
+    /// When the forge was last asked which tasks merged, so coming back to Farol often asks at most every few minutes.
+    var mergedCheckedAt = Date.distantPast
     private(set) lazy var servers = ServerLinks()
     /// Servers whose setup you watched finish, by ssh name, waiting on their first list to land you on one of their sessions.
     var landing: Set<String> = []
@@ -116,6 +118,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             newSession: { [weak self] in self?.newSession() },
             newTask: { [weak self] in self?.newTask() },
             closeSession: { [weak self] in self?.requestClose($0) },
+            finishTask: { [weak self] in self?.finishTask($0) },
             toggleSidebar: { [weak self] in self?.toggleSidebar() },
             toggleFiles: { [weak self] in self?.toggleFiles() },
             toggleGraph: { [weak self] in self?.toggleGraph() },
@@ -423,6 +426,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             self?.leaveAskToTerminal()
             self?.notch.refresh()
+            // Back from merging on the forge's site is when a task is most likely to have just finished.
+            self?.checkMergedTasks()
         }
         NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
             self?.notch.refresh()

@@ -6,6 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
+- A task whose pull request or merge request was merged says so in the sidebar. Finish Task in its right-click menu closes it and removes its worktree and branch in one go. Farol checks when you come back to it, at most every five minutes, and only offers this when nothing was committed after the merge. A scheduled task's run finishes the same way and its schedule stays.
 - Send lines of a file to your agent with ⇧⌘L, or Send to Claude Code in the code's right-click menu. On a line with an error, its message goes along, so Return alone asks for the fix. Where they are goes into the agent's prompt, like `@src/app.ts#L12-20` for Claude Code, and the keyboard follows so you type your question next.
 - Lines changed since the last commit are marked beside the line numbers as you or an agent edit: added, modified, or a wedge where lines were deleted. A click on one shows the file's changes in the review panel.
 - With a language server on, errors and warnings are underlined in the code as you type. Rest the mouse on one to read it, count them in the status bar, and go through them with F8 and ⇧F8.

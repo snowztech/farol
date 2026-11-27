@@ -151,6 +151,66 @@ extension MainWindowController {
         }
     }
 
+    // MARK: Finishing merged tasks
+
+    /// Asks the forge which worktree sessions' branches merged, once per repo, at most every five minutes.
+    /// A task across repos is left out: its repos merge one by one, and none alone says the task is done.
+    func checkMergedTasks(force: Bool = false) {
+        guard force || Date().timeIntervalSince(mergedCheckedAt) > 300 else { return }
+        let sessions = store.sessions.filter { $0.worktree != nil && $0.taskFolder == nil && !$0.isRemote }
+        guard !sessions.isEmpty else { return }
+        mergedCheckedAt = Date()
+        let worktrees = sessions.compactMap(\.worktree)
+        DispatchQueue.global(qos: .utility).async {
+            let merged = Worktrees.merged(worktrees)
+            DispatchQueue.main.async {
+                for session in sessions {
+                    let found = session.worktree.flatMap { merged[$0] }
+                    if session.merged != found { session.merged = found }
+                }
+            }
+        }
+    }
+
+    /// Finish Task: closes the session, then removes its worktree and branch. The merge took everything on the branch, so nothing is lost.
+    /// A scheduled task's run goes the same way, and its schedule stays.
+    func finishTask(_ session: Session) {
+        guard let merged = session.merged, let worktree = session.worktree, let window else { return }
+        let alert = NSAlert()
+        alert.messageText = "Finish this task?"
+        alert.informativeText = "Request #\(merged.request.number) is merged, so the worktree and the branch \(merged.branch) go and nothing is lost."
+        if session.hasRunningProcess { alert.informativeText += " The session closes, with what runs in it." }
+        if let schedule = scheduler.schedule(of: session), schedule.once == nil {
+            alert.informativeText += " \(schedule.name) stays scheduled and runs again on its days."
+        }
+        if WorktreeScripts.hasTeardown(in: worktree) { alert.informativeText += " Farol runs .farol/teardown first." }
+        alert.addButton(withTitle: "Finish Task")
+        alert.addButton(withTitle: "Cancel")
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard let self, response == .alertFirstButtonReturn else { return }
+            // Checked again as it goes, since the agent may have written since the label showed.
+            DispatchQueue.global(qos: .userInitiated).async {
+                guard !Worktrees.default.hasUncommittedChanges(worktree) else {
+                    return DispatchQueue.main.async { [weak self] in
+                        session.merged = nil
+                        self?.showError("Task kept", "It has changes that aren't committed, so its worktree and branch stay.")
+                    }
+                }
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    store.close(session)
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        do {
+                            try Worktrees.default.finish(worktree, branch: merged.branch)
+                        } catch {
+                            DispatchQueue.main.async { [weak self] in self?.showError("Task not finished", "\(error)") }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Offers to remove the session's worktree, but only when that is possible and safe.
     private func closeAskingAboutWorktree(_ session: Session) {
         if let file = session.panes.unsavedFile() {

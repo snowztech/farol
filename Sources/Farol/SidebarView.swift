@@ -53,7 +53,8 @@ struct SidebarView: View {
                                     if session.id != store.selectedID || state.showingSettings { store.select(session) }
                                 },
                                 onRename: { store.rename(session, to: $0) },
-                                onClose: { commands.closeSession(session) })
+                                onClose: { commands.closeSession(session) },
+                                onFinish: { commands.finishTask(session) })
                             .onDrag {
                                 dragging = session
                                 return NSItemProvider(object: session.id.uuidString as NSString)
@@ -143,6 +144,7 @@ private struct SessionRow: View {
     let onSelect: () -> Void
     let onRename: (String) -> Void
     let onClose: () -> Void
+    let onFinish: () -> Void
 
     @State private var hovering = false
     @State private var editing = false
@@ -171,6 +173,11 @@ private struct SessionRow: View {
         .simultaneousGesture(TapGesture(count: 2).onEnded { startEditing() })
         .onClickableHover { hovering = $0 }
         .contextMenu {
+            // First when it applies, since finishing is what a merged task is waiting for.
+            if session.merged != nil {
+                Button("Finish Task…", action: onFinish)
+                Divider()
+            }
             Button("Rename", action: startEditing)
             Button("Close Session", action: onClose)
             if let schedule { ScheduleItems(schedule: schedule, scheduler: scheduler) }
@@ -208,7 +215,12 @@ private struct SessionRow: View {
                                 .layoutPriority(1)
                                 .hoverTip(schedule.runTip)
                         }
-                        if session.isWorktreeCheckout {
+                        // Merged replaces the worktree tag, as what's next: finish it from the right-click menu.
+                        if let merged = session.merged {
+                            Badge(text: "merged", small: true, palette: palette)
+                                .layoutPriority(1)
+                                .hoverTip("#\(merged.request.number) merged · Finish Task in the right-click menu")
+                        } else if session.isWorktreeCheckout {
                             Badge(text: "worktree", small: true, palette: palette)
                                 .layoutPriority(1)
                                 .hoverTip("Worktree · \(session.topLevel ?? session.taskFolder ?? session.directory)")

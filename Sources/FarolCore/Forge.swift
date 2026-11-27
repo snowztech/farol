@@ -213,6 +213,41 @@ public struct Forge: Equatable {
         return Self.requests(from: output)
     }
 
+    /// A merged pull request, or merge request, and the commit its branch ended on.
+    public struct Merged: Equatable {
+        public let number: Int
+        public let url: URL
+        /// The branch's last commit when it merged. A local branch still on it holds nothing the merge didn't take.
+        public let head: String
+    }
+
+    /// The recently merged requests, by the branch they came from. Talks to the forge, so call it off the main thread.
+    /// Empty when the tool is missing or can't answer, so nothing is marked rather than something wrong.
+    public func mergedRequests(in directory: String) -> [String: Merged] {
+        guard let path = kind.toolPath else { return [:] }
+        let arguments = switch kind {
+        case .github: ["pr", "list", "--state", "merged", "--json", "number,url,headRefName,headRefOid", "--limit", "100"]
+        case .gitlab: ["mr", "list", "--merged", "--output", "json", "--per-page", "100"]
+        }
+        guard let output = try? Git.run(path, arguments, in: directory) else { return [:] }
+        return Self.merged(from: output)
+    }
+
+    /// Reads either tool's JSON list: gh says headRefName and headRefOid, glab says source_branch and sha.
+    /// The newest comes first, so a branch merged twice keeps its latest.
+    static func merged(from json: String) -> [String: Merged] {
+        let list = (try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]]) ?? []
+        var merged: [String: Merged] = [:]
+        for item in list {
+            guard let number = (item["number"] ?? item["iid"]) as? Int,
+                  let url = ((item["url"] ?? item["web_url"]) as? String).flatMap(URL.init(string:)),
+                  let branch = (item["headRefName"] ?? item["source_branch"]) as? String,
+                  let head = (item["headRefOid"] ?? item["sha"]) as? String, merged[branch] == nil else { continue }
+            merged[branch] = Merged(number: number, url: url, head: head)
+        }
+        return merged
+    }
+
     /// Reads either tool's JSON list: gh says headRefName and baseRefName, glab says source_branch and target_branch.
     static func requests(from json: String) -> [String: Request] {
         let list = (try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]]) ?? []

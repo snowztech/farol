@@ -293,3 +293,16 @@ import Testing
     #expect(Forge.Check.duration(3900) == "1h 5m")
     #expect(Forge.Check.duration(-5) == "0s")
 }
+
+/// Both tools' merged lists, by branch, with the commit each ended on. The newest of two merges from one branch wins.
+@Test func readsMergedRequests() {
+    let github = """
+    [{"number":9,"url":"https://github.com/o/r/pull/9","headRefName":"fix","headRefOid":"abc"},
+     {"number":3,"url":"https://github.com/o/r/pull/3","headRefName":"fix","headRefOid":"old"},
+     {"number":4,"url":"https://github.com/o/r/pull/4","headRefName":"no-sha"}]
+    """
+    #expect(Forge.merged(from: github) == ["fix": Forge.Merged(number: 9, url: URL(string: "https://github.com/o/r/pull/9")!, head: "abc")])
+    let gitlab = #"[{"iid":12,"web_url":"https://gitlab.com/o/r/-/merge_requests/12","source_branch":"feat","sha":"def"}]"#
+    #expect(Forge.merged(from: gitlab)["feat"]?.head == "def")
+    #expect(Forge.merged(from: "not json").isEmpty)
+}

@@ -183,3 +183,16 @@ struct Sandbox {
     #expect(box.worktrees.root(of: path) == resolved)
     #expect(box.worktrees.root(of: box.repo) == nil)
 }
+
+/// Finishing takes the folder and the branch. A worktree with uncommitted work is refused, and keeps both.
+@Test func finishesAMergedTask() throws {
+    let box = try Sandbox()
+    let path = try box.worktrees.create(branch: "done-task", from: box.repo)
+    try "x".write(toFile: path + "/new.txt", atomically: true, encoding: .utf8)
+    #expect(throws: GitError.self) { try box.worktrees.finish(path, branch: "done-task") }
+    #expect(FileManager.default.fileExists(atPath: path))
+    try FileManager.default.removeItem(atPath: path + "/new.txt")
+    try box.worktrees.finish(path, branch: "done-task")
+    #expect(!FileManager.default.fileExists(atPath: path))
+    #expect(!History.branches(in: box.repo).local.contains("done-task"))
+}

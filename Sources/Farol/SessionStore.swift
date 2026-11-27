@@ -68,6 +68,8 @@ final class Session: ObservableObject, Identifiable {
     var onGitStateChange: ((Activity) -> Void)?
     /// Set when the session runs in one of Farol's worktrees, even after `cd` into a subfolder.
     let worktree: String?
+    /// The worktree's branch was merged on the forge, with nothing committed since, so the task can be finished.
+    @Published var merged: Worktrees.MergedTask?
     /// Set when the session runs in a task folder holding a worktree of several repos.
     let taskFolder: String?
     /// The worktrees in the task folder, in order.

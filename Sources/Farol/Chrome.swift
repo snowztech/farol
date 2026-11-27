@@ -49,6 +49,8 @@ struct Commands {
     let newSession: () -> Void
     let newTask: () -> Void
     let closeSession: (Session) -> Void
+    /// Closes a merged task's session and removes its worktree and branch, after asking.
+    let finishTask: (Session) -> Void
     let toggleSidebar: () -> Void
     let toggleFiles: () -> Void
     let toggleGraph: () -> Void
