@@ -6,8 +6,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Changed
 
-- Project names in the sidebar are larger and bolder than the sessions under them, so grouped projects read clearly as the parent level of the hierarchy.
-- Right-click a project header to give it a color, shown as the header's background, and its sessions sit indented under it like a file tree.
+- Grouped by project, the sidebar's project names are bolder than the sessions under them, and the sessions sit indented beneath, so it's clear which project each belongs to.
 
 ## [0.70.0] - 2026-11-20
 

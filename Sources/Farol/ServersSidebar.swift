@@ -141,9 +141,10 @@ private struct ServerHeader: View {
             .frame(width: Lamp.size)
             HStack(spacing: 6) {
                 if folded, loudest != nil { ServerIcon(palette: palette) }
+                // Matches a project's header, since both are parents of the sessions under them.
                 Text(name)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(hovering ? palette.text : palette.muted)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(palette.text)
             }
             if let word = settingUp ? "setting up" : offline ? "offline" : nil {
                 Text(word).font(.system(size: 11)).foregroundStyle(palette.muted.opacity(0.7))
@@ -209,7 +210,7 @@ private struct ServerSessionRow: View {
             Lamp(activity: Session.Activity(session.status), selected: selected, palette: palette)
             VStack(alignment: .leading, spacing: 1) {
                 Text(session.name)
-                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                    .font(.system(size: 13))
                     .foregroundStyle(selected ? palette.text : palette.text.opacity(0.8))
                     .truncationMode(.tail)
                 if let detail {
@@ -231,7 +232,9 @@ private struct ServerSessionRow: View {
                 CloseButton(help: "End the session on the server", palette: palette, action: onEnd)
             }
         }
-        .padding(.horizontal, 10)
+        // Indented like a project's sessions, under the server's header.
+        .padding(.leading, 24)
+        .padding(.trailing, 10)
         .padding(.vertical, 8)
         .background {
             let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -264,7 +267,8 @@ private struct QuietRow: View {
             Spacer(minLength: 0)
         }
         .foregroundStyle(hovering ? palette.text : palette.muted)
-        .padding(.horizontal, 10)
+        .padding(.leading, 24)
+        .padding(.trailing, 10)
         .padding(.vertical, 6)
         .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(hovering ? palette.hover : .clear))
         .contentShape(Rectangle())
