@@ -61,6 +61,8 @@ final class FileView: NSView {
     var onMovePane: ((TerminalRequest.Direction) -> Void)?
     /// ⇧⌘↩, which zooms a terminal pane, zooms the file pane here.
     var onZoom: (() -> Void)?
+    /// ⌘] and ⌘[: the next or previous pane, as in a terminal.
+    var onCyclePane: ((_ forward: Bool) -> Void)?
     /// The theme's colors, for the list of definitions or references to look like the rest of Farol.
     var palette: () -> Palette? = { nil }
     /// The pane now shows another file, which the files panel follows.
@@ -276,6 +278,12 @@ final class FileView: NSView {
         }
         if Self.isZoom(event) {
             onZoom?()
+            return true
+        }
+        // Matched by the character, which takes ⌥ on some keyboards.
+        let key = event.charactersIgnoringModifiers
+        if key == "]" || key == "[", event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.option, .capsLock]) == .command {
+            onCyclePane?(key == "]")
             return true
         }
         return super.performKeyEquivalent(with: event)
@@ -1364,11 +1372,6 @@ private final class CodeTextView: NSTextView {
             deleteLines()
             return true
         }
-        // ⌘] and ⌘[ move the lines in and out, as in Xcode and VS Code. Matched by the character, which needs ⌥ on some keyboards.
-        if key == "]" || key == "[", flags.subtracting(.option) == .command {
-            indentLines(key == "[")
-            return true
-        }
         return super.performKeyEquivalent(with: event)
     }
 
@@ -1425,10 +1428,6 @@ private final class CodeTextView: NSTextView {
 
     override func insertBacktab(_ sender: Any?) {
         apply(Typing.outdent(text, selectedRange(), unit: indentUnit))
-    }
-
-    func indentLines(_ out: Bool) {
-        apply(out ? Typing.outdent(text, selectedRange(), unit: indentUnit) : Typing.indentLines(text, selectedRange(), unit: indentUnit))
     }
 
     /// Brackets and quotes come in pairs. Not while an input method composes, like a dead key for an accent.
