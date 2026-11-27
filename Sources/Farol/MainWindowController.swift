@@ -1066,6 +1066,17 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     private func host(_ session: Session) {
         session.panes.onShowCommit = { [weak self] in self?.showInGraph($0) }
+        session.panes.agent = { [weak self, weak session] in
+            session.flatMap { self?.agentPane(in: $0) }.map { ($0.name, $0.ready) }
+        }
+        session.panes.onShowChanges = { [weak self] path in
+            guard let self else { return }
+            if !review.isOpen { toggleReview() }
+            review.showChanges(in: path)
+        }
+        session.panes.onSendToAgent = { [weak self, weak session] path, lines, note in
+            if let session { self?.sendToAgent(path, lines, note: note, in: session) }
+        }
         // Only the session on screen drives the panel, since another's file pane may change in the background.
         session.panes.onFileChange = { [weak self, weak session] path in
             guard let self, let session, session === self.store.selected else { return }
@@ -1217,12 +1228,36 @@ extension MainWindowController {
     }
 
     private func runningAgent(in session: Session) -> ReviewAgent? {
+        guard let agent = agentPane(in: session) else { return nil }
+        let refusal = agent.ready ? nil : "\(agent.name) is waiting on a question. Answer it first, then send."
+        return ReviewAgent(name: agent.name, kind: agent.kind, refusal: refusal) { [weak terminal = agent.terminal] in terminal?.submit($0) }
+    }
+
+    /// The session's agent: the focused pane's when it runs one, or else the first pane that does.
+    /// Not ready while it waits on a question, since that answer is yours to give, as `farol send` holds back too.
+    fileprivate func agentPane(in session: Session) -> (terminal: TerminalView, kind: AgentFolder.Kind?, name: String, ready: Bool)? {
         let panes = [session.panes.focused] + session.panes.terminals
         guard let terminal = panes.first(where: { session.agent(in: $0) != nil }), let program = session.agent(in: terminal) else { return nil }
         let kind = AgentFolder.Kind(rawValue: program)
-        let name = kind?.title ?? program
-        // As `farol send` does: an answer to its question is yours to give, not a review to type over it.
-        let refusal = session.status(of: terminal) == .waiting ? "\(name) is waiting on a question. Answer it first, then send." : nil
-        return ReviewAgent(name: name, kind: kind, refusal: refusal) { [weak terminal] in terminal?.submit($0) }
+        return (terminal, kind, kind?.title ?? program, session.status(of: terminal) != .waiting)
     }
+
+    /// ⇧⌘L in a file: its lines go into the agent's prompt unsent, and the keyboard follows, so your question comes next.
+    /// On a problem the language server found, its message goes along, so Return alone asks for the fix.
+    fileprivate func sendToAgent(_ path: String, _ lines: ClosedRange<Int>, note: String?, in session: Session) {
+        guard let agent = agentPane(in: session), agent.ready else { return NSSound.beep() }
+        let reference = agent.kind.map { $0.reference(to: path, lines: lines, from: session.directory) }
+            ?? AgentFolder.Kind.reference(to: path, lines: lines, from: session.directory)
+        agent.terminal.pasteText(reference + " " + (note.map { "fix: \($0)" } ?? ""))
+        session.panes.focus(agent.terminal)
+    }
+
+    /// Go → Next Problem and Previous Problem, in the file in front.
+    var canStepProblem: Bool { focusedFile.map { $0.problemCounts.errors + $0.problemCounts.warnings > 0 } ?? false }
+    func stepProblem(forward: Bool) { focusedFile?.goToProblem(forward: forward) }
+
+    /// Session → Send to Agent, named after the one running.
+    var sendToAgentTitle: String { focusedFile.flatMap { $0.agent()?.name }.map { "Send to \($0)" } ?? "Send to Agent" }
+    var canSendToAgent: Bool { focusedFile.map { $0.canSendToAgent && $0.agent()?.ready == true } ?? false }
+    func sendSelectionToAgent() { focusedFile?.sendToAgent() }
 }

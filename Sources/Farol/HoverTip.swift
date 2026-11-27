@@ -46,9 +46,10 @@ final class HoverTip {
     }
 
     /// A larger tip with its own styling, starting at the left of `rect` so it reads from where the mouse is.
-    func show(card: NSAttributedString, below rect: NSRect, in window: NSWindow) {
+    /// `above` puts it over `rect` instead, as for code, where what's below is what you read next.
+    func show(card: NSAttributedString, below rect: NSRect, in window: NSWindow, above: Bool = false) {
         pending?.cancel()
-        let work = DispatchWorkItem { [weak self] in self?.present(card, below: rect, in: window, leading: true) }
+        let work = DispatchWorkItem { [weak self] in self?.present(card, below: rect, in: window, leading: true, above: above) }
         pending = work
         DispatchQueue.main.asyncAfter(deadline: .now() + wait, execute: work)
     }
@@ -68,16 +69,17 @@ final class HoverTip {
         panel.orderOut(nil)
     }
 
-    private func present(_ text: NSAttributedString, below rect: NSRect, in window: NSWindow, leading: Bool) {
+    private func present(_ text: NSAttributedString, below rect: NSRect, in window: NSWindow, leading: Bool, above: Bool = false) {
         guard NSApp.isActive, window.isVisible else { return }
         bubble.text = text
         let size = bubble.text.size()
         let width = ceil(size.width) + 2 * Bubble.padding.width, height = ceil(size.height) + 2 * Bubble.padding.height
-        var origin = NSPoint(x: leading ? rect.minX : rect.midX - width / 2, y: rect.minY - 6 - height)
-        // Stays on screen when the control sits near an edge.
+        var origin = NSPoint(x: leading ? rect.minX : rect.midX - width / 2, y: above ? rect.maxY + 4 : rect.minY - 6 - height)
+        // Stays on screen when the control sits near an edge, going to the other side when there's no room.
         if let screen = window.screen?.visibleFrame {
             origin.x = min(max(origin.x, screen.minX + 4), screen.maxX - width - 4)
             if origin.y < screen.minY { origin.y = rect.maxY + 6 }
+            if origin.y + height > screen.maxY { origin.y = rect.minY - 6 - height }
         }
         let frame = NSRect(origin: origin, size: NSSize(width: width, height: height))
         // Fades in and settles a few points away from the control, so it arrives rather than blinks on.

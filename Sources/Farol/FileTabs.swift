@@ -53,6 +53,7 @@ final class FileTabs: NSView {
         model.closeAll = { [weak self] in self?.close(except: nil) }
         model.openServerMenu = { [weak self] in self?.openServerMenu() }
         model.askLine = { [weak self] in self?.askLine() }
+        model.nextProblem = { [weak self] in self?.goToProblem(forward: true) }
         model.openFormatMenu = { [weak self] in self?.openFormatMenu() }
         model.expand = { [weak self] in self?.onExpand?() }
         addSubview(bar)
@@ -90,6 +91,9 @@ final class FileTabs: NSView {
             refreshFacts()
             // Back in the file after installing its server in a pane: notice it. Throttled, and only while it's missing.
             if model.server?.state == .missing { refreshServer() }
+        }
+        file.onProblemsChange = { [weak self, weak file] in
+            if let file, file === self?.current { self?.refreshProblems() }
         }
         file.onStateChange = { [weak self, weak file] in
             // An edit keeps the file, so the next click through doesn't replace work in progress.
@@ -185,7 +189,17 @@ final class FileTabs: NSView {
         model.previewing = current?.isPreviewing == true
         refreshFacts()
         refreshServer()
+        refreshProblems()
     }
+
+    private func refreshProblems() {
+        let counts = current.map { FileTabsModel.Problems(errors: $0.problemCounts.errors, warnings: $0.problemCounts.warnings) }
+        let shown = counts.flatMap { $0.errors + $0.warnings > 0 ? $0 : nil }
+        if model.problems != shown { model.problems = shown }
+    }
+
+    /// The status bar's counts: the next problem after the cursor.
+    func goToProblem(forward: Bool) { current?.goToProblem(forward: forward) }
 
     // MARK: Status bar
 
@@ -304,6 +318,14 @@ final class FileTabsModel: ObservableObject {
     /// The file in front's language server, beside its language in the status bar. Nil with language servers off.
     @Published var server: Server?
     @Published var facts: Facts?
+    /// The language server's errors and warnings in the file in front. Nil with none.
+    @Published var problems: Problems?
+    var nextProblem: () -> Void = {}
+
+    struct Problems: Equatable {
+        let errors: Int
+        let warnings: Int
+    }
 
     struct Facts: Equatable {
         let cursor: String
@@ -472,6 +494,17 @@ struct FileStatusBar: View {
                 StatusButton(palette: p, tip: "Go to Line (⌘L)", action: model.askLine) { _ in
                     Text(facts.cursor).monospacedDigit()
                 }
+                // Gray like the rest of the bar: the squiggles in the code carry the color.
+                if let problems = model.problems {
+                    StatusButton(palette: p, tip: "Next Problem (F8)", action: model.nextProblem) { _ in
+                        HStack(spacing: 8) {
+                            if problems.errors > 0 { Label("\(problems.errors)", systemImage: "xmark.circle") }
+                            if problems.warnings > 0 { Label("\(problems.warnings)", systemImage: "exclamationmark.triangle") }
+                        }
+                        .labelStyle(TightLabel())
+                        .monospacedDigit()
+                    }
+                }
                 Spacer(minLength: 8)
                 // JSON has no language server, so its name opens what Farol does for it instead.
                 if model.canFormat {
@@ -509,6 +542,16 @@ struct FileStatusBar: View {
             }
         }
         .opacity(server.state == .off || server.state == .missing ? 0.7 : 1)
+    }
+}
+
+/// An icon and its count, closer than a label sets them.
+private struct TightLabel: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 3) {
+            configuration.icon.font(.system(size: 10))
+            configuration.title
+        }
     }
 }
 

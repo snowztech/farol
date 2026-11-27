@@ -101,6 +101,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func toggleGraph(_ sender: Any?) { windowController.toggleGraph() }
     @objc func toggleBlame(_ sender: Any?) { windowController.toggleBlame() }
     @objc func goToLine(_ sender: Any?) { windowController.goToLine() }
+    @objc func sendToAgent(_ sender: Any?) { windowController.sendSelectionToAgent() }
+    @objc func nextProblem(_ sender: Any?) { windowController.stepProblem(forward: true) }
+    @objc func previousProblem(_ sender: Any?) { windowController.stepProblem(forward: false) }
     @objc func toggleReview(_ sender: Any?) { windowController.toggleReview() }
     @objc func toggleExpanded(_ sender: Any?) {
         if windowController.canExpand { windowController.toggleExpanded() }
@@ -141,6 +144,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             item.title = windowController.isBlaming ? "Hide Git Blame" : "Show Git Blame"
             return windowController.canToggleBlame
         }
+        if item.action == #selector(sendToAgent) {
+            item.title = windowController.sendToAgentTitle
+            return windowController.canSendToAgent
+        }
         if item.action == #selector(toggleExpanded) {
             // Named after what it does now.
             item.title = windowController.isExpanded ? "Show Terminal" : "Expand Review"
@@ -149,6 +156,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return switch item.action {
         case #selector(saveFile): windowController.canSaveFile
         case #selector(goToLine): windowController.canGoToLine
+        case #selector(nextProblem), #selector(previousProblem): windowController.canStepProblem
         case #selector(checkForUpdates): windowController.canCheckForUpdates
         case #selector(nextResult), #selector(previousResult): windowController.canStepResult
         case #selector(goBack): windowController.canGoBack
@@ -215,6 +223,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         sessions.addItem(withTitle: "Close Session", action: #selector(closeSession), keyEquivalent: "w")
         sessions.addItem(withTitle: "Save File", action: #selector(saveFile), keyEquivalent: "s")
         sessions.addItem(withTitle: "Go to Line…", action: #selector(goToLine), keyEquivalent: "l")
+        sessions.addItem(withTitle: "Send to Agent", action: #selector(sendToAgent), keyEquivalent: "L")
         sessions.addItem(withTitle: "Next File Tab", action: #selector(nextTab), keyEquivalent: "\t").keyEquivalentModifierMask = [.control]
         sessions.addItem(withTitle: "Previous File Tab", action: #selector(previousTab), keyEquivalent: "\t")
             .keyEquivalentModifierMask = [.control, .shift]
@@ -243,6 +252,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             .keyEquivalentModifierMask = [.command, .control]
         go.addItem(withTitle: "Forward", action: #selector(goForward), keyEquivalent: right)
             .keyEquivalentModifierMask = [.command, .control]
+        // F8, as VS Code and Zed have it.
+        let f8 = String(Character(UnicodeScalar(NSF8FunctionKey)!))
+        go.addItem(.separator())
+        go.addItem(withTitle: "Next Problem", action: #selector(nextProblem), keyEquivalent: f8).keyEquivalentModifierMask = []
+        go.addItem(withTitle: "Previous Problem", action: #selector(previousProblem), keyEquivalent: f8).keyEquivalentModifierMask = [.shift]
         main.addItem(submenu: go, title: "Go")
 
         let view = NSMenu(title: "View")

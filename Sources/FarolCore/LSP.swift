@@ -293,6 +293,58 @@ public enum LSP {
         }
     }
 
+    /// A problem the server found in a file, like an error or a warning, over the characters it is about.
+    public struct Diagnostic: Equatable, Sendable {
+        public enum Severity: Int, Sendable { case error = 1, warning, information, hint }
+        public let start: Position
+        public let end: Position
+        public let severity: Severity
+        public let message: String
+        /// Who found it, like "go vet" or "ts", when the server says.
+        public let source: String?
+
+        public init(start: Position, end: Position, severity: Severity, message: String, source: String? = nil) {
+            self.start = start
+            self.end = end
+            self.severity = severity
+            self.message = message
+            self.source = source
+        }
+    }
+
+    /// What a `textDocument/publishDiagnostics` notice says: the file, and every problem in it now, which replace the ones before.
+    /// A server that leaves the severity out means an error, as the protocol says a client may read it.
+    public static func diagnostics(from params: Any?) -> (path: String, diagnostics: [Diagnostic])? {
+        guard let params = params as? [String: Any], let uri = params["uri"] as? String, let path = path(fromURI: uri) else { return nil }
+        let items = params["diagnostics"] as? [[String: Any]] ?? []
+        func position(_ value: Any?) -> Position? {
+            guard let value = value as? [String: Any], let line = value["line"] as? Int, let character = value["character"] as? Int else { return nil }
+            return Position(line: line, character: character)
+        }
+        let found = items.compactMap { item -> Diagnostic? in
+            guard let range = item["range"] as? [String: Any], let start = position(range["start"]), let end = position(range["end"]),
+                  let message = item["message"] as? String else { return nil }
+            let severity = (item["severity"] as? Int).flatMap(Diagnostic.Severity.init) ?? .error
+            return Diagnostic(start: start, end: end, severity: severity, message: message, source: item["source"] as? String)
+        }
+        return (path, found)
+    }
+
+    /// What a hover answered, as plain text: the type or signature, then the docs. Code fences go, keeping the code.
+    /// Nil when there's nothing to say.
+    public static func hoverText(from result: Any?) -> String? {
+        func text(_ value: Any?) -> [String] {
+            if let string = value as? String { return [string] }
+            if let list = value as? [Any] { return list.flatMap(text) }
+            if let item = value as? [String: Any], let value = item["value"] as? String { return [value] }
+            return []
+        }
+        let joined = text((result as? [String: Any])?["contents"]).joined(separator: "\n\n")
+        let lines = joined.components(separatedBy: "\n").filter { !$0.hasPrefix("```") }
+        let cleaned = lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? nil : cleaned
+    }
+
     static func textDocument(_ path: String) -> [String: Any] { ["uri": uri(for: path)] }
 
     /// The parameters of a request about a place in a file, like a definition.
