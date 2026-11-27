@@ -58,6 +58,8 @@ struct Palette: Equatable {
     let pull: Color
     /// Git graph branches: 64 colors, each far from the ones before it, as bright and saturated as the theme's own colors.
     let lanes: [Color]
+    /// A project's tag, by `ProjectTag`, at the theme's own saturation and brightness.
+    let tags: [Color]
     /// Tint for macOS switches and pickers. A mid gray, since white on a switch would hide its white knob.
     let control: Color
     let code: SyntaxColors
@@ -118,6 +120,7 @@ struct Palette: Equatable {
         diff = DiffColors(background: bg, foreground: fg, added: ansi.count > 2 ? ansi[2] : fg, removed: ansi.count > 1 ? ansi[1] : fg,
                           highlight: ansi.count > 3 ? ansi[3] : fg)
         lanes = Self.lanes(matching: Array(ansi.dropFirst().prefix(6)), dark: bg.isDark)
+        tags = Self.tags(matching: Array(ansi.dropFirst().prefix(6)), dark: bg.isDark)
         let ansi = { (i: Int) in Color(nsColor: ansi.count > i ? ansi[i] : fg) }
         working = ansi(6)
         waiting = ansi(3)
@@ -129,13 +132,25 @@ struct Palette: Equatable {
 }
 
 extension Palette {
-    /// A theme has six hues, too few for a busy graph, and mixing them gives muddy look-alikes.
-    /// Evenly spaced hues stay apart, and the theme's average saturation and brightness keep them in its style.
-    static func lanes(matching colors: [NSColor], dark: Bool) -> [Color] {
+    /// The theme's average saturation and brightness, kept vivid enough to tell hues apart.
+    private static func tone(of colors: [NSColor], dark: Bool) -> (CGFloat, CGFloat) {
         let hsb = colors.compactMap { $0.usingColorSpace(.sRGB) }.map { ($0.saturationComponent, $0.brightnessComponent) }
         let count = CGFloat(max(hsb.count, 1))
         let saturation = max(hsb.map(\.0).reduce(0, +) / count, 0.55)
         let brightness = dark ? max(hsb.map(\.1).reduce(0, +) / count, 0.8) : min(hsb.map(\.1).reduce(0, +) / count, 0.7)
+        return (saturation, brightness)
+    }
+
+    /// Fixed hues in the theme's style. Not the theme's ANSI colors, which some themes give other hues, like Rose Pine's pink cyan.
+    static func tags(matching colors: [NSColor], dark: Bool) -> [Color] {
+        let (saturation, brightness) = tone(of: colors, dark: dark)
+        return ProjectTag.allCases.map { Color(nsColor: NSColor(hue: $0.hue, saturation: saturation, brightness: brightness, alpha: 1)) }
+    }
+
+    /// A theme has six hues, too few for a busy graph, and mixing them gives muddy look-alikes.
+    /// Evenly spaced hues stay apart, and the theme's average saturation and brightness keep them in its style.
+    static func lanes(matching colors: [NSColor], dark: Bool) -> [Color] {
+        let (saturation, brightness) = tone(of: colors, dark: dark)
         // Each hue turns by the golden angle, so it lands in the widest gap left by the ones before and never comes back.
         // Past the first dozen the hues get close, so every dozen also changes tone: full, then softer, then deeper.
         return (0..<64).map { index in
