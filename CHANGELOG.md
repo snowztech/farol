@@ -4,9 +4,13 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.72.0] - 2026-11-27
+
+The file editor hands code to your agent, shows what changed and what's wrong, and types like a code editor.
+
 ### Added
 
-- Send lines of a file to your agent with ⇧⌘L, or Send to Claude Code in the code's right-click menu. It finds the agent in the session, or in another session on the same checkout, like a task's. On a line with an error, its message goes along, so Return alone asks for the fix. Where they are goes into the agent's prompt, like `@src/app.ts#L12-20` for Claude Code, and the keyboard follows so you type your question next.
+- Send lines of a file to your agent with ⇧⌘L, or Send to Claude Code in the code's right-click menu. Where they are goes into the agent's prompt, like `@src/app.ts#L12-20` for Claude Code, and the keyboard follows so you type your question next. On a line with an error, its message goes along, so Return alone asks for the fix. It finds the agent in the session, or in another session on the same checkout, like a task's.
 - Lines changed since the last commit are marked beside the line numbers as you or an agent edit: added, modified, or a wedge where lines were deleted. A click on one shows the file's changes in the review panel.
 - With a language server on, errors and warnings are underlined in the code as you type. Rest the mouse on one to read it, count them in the status bar, and go through them with F8 and ⇧F8.
 - Rest the mouse on a name, with its language server on, to see its type and docs.
@@ -1433,7 +1437,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.71.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.72.0...HEAD
+[0.72.0]: https://github.com/snowztech/farol/releases/tag/v0.72.0
 [0.71.0]: https://github.com/snowztech/farol/releases/tag/v0.71.0
 [0.70.0]: https://github.com/snowztech/farol/releases/tag/v0.70.0
 [0.69.0]: https://github.com/snowztech/farol/releases/tag/v0.69.0
