@@ -1416,7 +1416,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.70.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.71.0...HEAD
+[0.71.0]: https://github.com/snowztech/farol/releases/tag/v0.71.0
 [0.70.0]: https://github.com/snowztech/farol/releases/tag/v0.70.0
 [0.69.0]: https://github.com/snowztech/farol/releases/tag/v0.69.0
 [0.68.0]: https://github.com/snowztech/farol/releases/tag/v0.68.0
