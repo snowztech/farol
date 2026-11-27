@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+## [0.72.1] - 2026-11-27
+
+Wrapped files stay still, and git blame works on README.md and from a Markdown preview.
+
 ### Fixed
 
 - Markdown and other files that wrap their lines no longer jump when you show or hide git blame, select a word or move past a bracket. The highlights measured text far off screen, which made the editor lay it out again.
@@ -1443,7 +1447,8 @@ The first tagged version. Build it from source with `make install`. Signed downl
 - The search bar's field no longer collapses, and its buttons are centered.
 - Settings controls line up on the same edge.
 
-[Unreleased]: https://github.com/snowztech/farol/compare/v0.72.0...HEAD
+[Unreleased]: https://github.com/snowztech/farol/compare/v0.72.1...HEAD
+[0.72.1]: https://github.com/snowztech/farol/releases/tag/v0.72.1
 [0.72.0]: https://github.com/snowztech/farol/releases/tag/v0.72.0
 [0.71.0]: https://github.com/snowztech/farol/releases/tag/v0.71.0
 [0.70.0]: https://github.com/snowztech/farol/releases/tag/v0.70.0
