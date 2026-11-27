@@ -14,7 +14,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Fixed
 
-- The Git graph identifies branches whose tracked upstream has disappeared, and Fetch explains how it removes stale local remote-tracking references.
+- Delete Remote Branch on a branch already deleted on the server clears it from the Git graph instead of failing. A local branch whose server copy is gone says so.
 
 ## [0.70.0] - 2026-11-20
 
