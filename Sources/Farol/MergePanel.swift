@@ -265,12 +265,11 @@ struct MergePanel: View {
     }
 
     private func confirmAbort(_ operation: Merge.Operation) {
-        let alert = NSAlert()
+        let alert = FarolAlert()
         alert.messageText = operation.kind == .am ? "Stop applying the patches?" : "Abort the \(operation.kind.command)?"
         alert.informativeText = "Everything goes back to how it was before it started. What you resolved here is lost."
         alert.addButton(withTitle: "Abort")
         alert.addButton(withTitle: "Cancel")
-        alert.buttons.first?.hasDestructiveAction = true
         guard let window = NSApp.keyWindow else { return }
         alert.beginSheetModal(for: window) { response in
             if response == .alertFirstButtonReturn { merge.abort(failed: showGitError) }
@@ -910,10 +909,10 @@ private struct MergeEditorView: NSViewRepresentable {
 
 /// Git's own message, under a title saying what didn't happen.
 private func showGitError(_ title: String, _ message: String) {
-    let alert = NSAlert()
+    let alert = FarolAlert()
     alert.messageText = title
     alert.informativeText = message
-    if let window = NSApp.keyWindow { alert.beginSheetModal(for: window) } else { alert.runModal() }
+    alert.show()
 }
 
 /// The command that runs this checkout's tests. Farol remembers it per checkout.

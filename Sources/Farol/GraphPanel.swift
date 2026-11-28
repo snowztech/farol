@@ -747,7 +747,7 @@ private struct BranchList: View {
             graph.delete(branch, force: false, alsoRemote: alsoRemote) { message in
                 guard message.contains("not fully merged") else { return gitError("Couldn't delete the branch")(message) }
                 confirm("\(branch) isn't merged. Delete it anyway?",
-                        "Commits that are only on \(branch) will be lost.", button: "Delete Anyway", destructive: true) {
+                        "Commits that are only on \(branch) will be lost.", button: "Delete Anyway") {
                     graph.delete(branch, force: true, alsoRemote: alsoRemote, failed: gitError("Couldn't delete the branch"))
                 }
             }
@@ -757,7 +757,7 @@ private struct BranchList: View {
     private func deleteRemote(_ branch: String) {
         confirm("Delete \(branch) on the server?",
                 "It's removed for everyone who uses this remote, and any open pull request from it closes. Your local branch stays.",
-                button: "Delete on Server", destructive: true) {
+                button: "Delete on Server") {
             graph.deleteRemote(branch, failed: gitError("Couldn't delete the remote branch"))
         }
     }
@@ -1332,53 +1332,46 @@ private func menuName(_ branch: String) -> String {
 /// Shows git's own message, which says why and often what to do next, like resolving a conflict.
 private func gitError(_ title: String) -> (String) -> Void {
     { message in
-        let alert = NSAlert()
+        let alert = FarolAlert()
         alert.messageText = title
         alert.informativeText = message
         show(alert) { _ in }
     }
 }
 
-private func confirm(_ title: String, _ info: String, button: String, destructive: Bool = false, _ action: @escaping () -> Void) {
-    let alert = NSAlert()
+private func confirm(_ title: String, _ info: String, button: String, _ action: @escaping () -> Void) {
+    let alert = FarolAlert()
     alert.messageText = title
     alert.informativeText = info
-    let ok = alert.addButton(withTitle: button)
-    ok.hasDestructiveAction = destructive
+    alert.addButton(withTitle: button)
     alert.addButton(withTitle: "Cancel")
     show(alert) { if $0 == .alertFirstButtonReturn { action() } }
 }
 
 /// The checkbox is only there when the branch has a twin on a server, and starts unchecked since that delete reaches everyone.
 private func confirmDelete(_ branch: String, twin: String?, _ action: @escaping (String?) -> Void) {
-    let alert = NSAlert()
+    let alert = FarolAlert()
     alert.messageText = "Delete the local branch \(branch)?"
     alert.informativeText = "Only your copy goes. The branch on the server, if there is one, stays."
-    let box = NSButton(checkboxWithTitle: twin.map { "Also delete \($0) on the server" } ?? "", target: nil, action: nil)
-    if twin != nil { alert.accessoryView = box }
-    let ok = alert.addButton(withTitle: "Delete")
-    ok.hasDestructiveAction = true
+    alert.checkbox = twin.map { "Also delete \($0) on the server" }
+    alert.addButton(withTitle: "Delete")
     alert.addButton(withTitle: "Cancel")
-    show(alert) { if $0 == .alertFirstButtonReturn { action(twin != nil && box.state == .on ? twin : nil) } }
+    show(alert) { if $0 == .alertFirstButtonReturn { action(twin != nil && alert.checked ? twin : nil) } }
 }
 
 private func askBranchName(from start: String, suggested: String, _ action: @escaping (String) -> Void) {
-    let alert = NSAlert()
+    let alert = FarolAlert()
     alert.messageText = "New branch from \(start)"
     alert.informativeText = "The new branch is checked out right away."
-    let field = NSTextField(string: suggested)
-    field.placeholderString = "Branch name"
-    field.frame = NSRect(x: 0, y: 0, width: 280, height: 24)
-    alert.accessoryView = field
+    alert.field = ("Branch name", suggested)
     alert.addButton(withTitle: "Create")
     alert.addButton(withTitle: "Cancel")
-    alert.window.initialFirstResponder = field
     show(alert) { response in
-        let name = field.stringValue.trimmingCharacters(in: .whitespaces)
+        let name = alert.fieldValue.trimmingCharacters(in: .whitespaces)
         if response == .alertFirstButtonReturn, !name.isEmpty { action(name) }
     }
 }
 
-private func show(_ alert: NSAlert, _ done: @escaping (NSApplication.ModalResponse) -> Void) {
-    if let window = NSApp.keyWindow { alert.beginSheetModal(for: window, completionHandler: done) } else { done(alert.runModal()) }
+private func show(_ alert: FarolAlert, _ done: @escaping (NSApplication.ModalResponse) -> Void) {
+    alert.show(done)
 }

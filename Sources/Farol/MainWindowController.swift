@@ -509,7 +509,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             return file.confirmClose({ [weak self] in self?.confirmQuit(reply) }, cancelled: { reply(false) })
         }
         guard runtime.hasRunningProcesses, let window else { return reply(true) }
-        let alert = NSAlert()
+        let alert = FarolAlert()
         alert.messageText = "Quit Farol?"
         alert.informativeText = "Programs are still running. Quitting stops them."
         alert.addButton(withTitle: "Quit")
@@ -926,7 +926,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         defer { settings.configErrors = errors }
         guard !errors.isEmpty, errors != settings.configErrors else { return }
         guard let window else { return }
-        let alert = NSAlert()
+        let alert = FarolAlert()
         alert.messageText = "Farol skipped part of your config"
         alert.informativeText = errors.joined(separator: "\n")
             + "\n\nThe rest of the file applies. What was skipped stays in the file until you fix or remove it."
@@ -940,6 +940,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private func applyTheme(style: UIStyle? = nil) {
         let bg = runtime.backgroundColor
         state.palette = Palette(runtime, style: style ?? state.style)
+        FarolAlert.palette = state.palette
         menuBar.apply(state.palette)
         notch.apply(state.palette)
         HoverTip.shared.colors = (bg, runtime.foregroundColor)
@@ -1030,7 +1031,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         do {
             try file.save()
         } catch {
-            NSAlert(error: error).beginSheetModal(for: window)
+            FarolAlert(error: error).beginSheetModal(for: window)
         }
     }
 
@@ -1124,7 +1125,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     private func confirm(_ request: ClipboardRequest, reply: @escaping (Bool) -> Void) {
         guard let window else { return reply(false) }
-        let alert = NSAlert()
+        let alert = FarolAlert()
         let preview = request.text.count > 400 ? request.text.prefix(400) + "…" : Substring(request.text)
         switch request.kind {
         case .paste:
