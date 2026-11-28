@@ -82,20 +82,17 @@ extension MainWindowController {
     private func askForBranch(from directory: String, repo: String, base: String, setup: Bool) {
         // Checked here too: a second press can arrive while git is still answering the first.
         guard let window, window.attachedSheet == nil else { return }
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
-        field.placeholderString = "Branch name"
-        let alert = NSAlert()
+        let alert = FarolAlert()
         alert.messageText = "New worktree session in \(repo)"
         alert.informativeText = "A new branch starts from \(base). An existing branch opens as it is."
             + (setup ? " Farol runs .farol/setup in the new worktree before starting a command." : "")
-        alert.accessoryView = field
+        alert.field = ("Branch name", "")
         alert.addButton(withTitle: "Create")
         alert.addButton(withTitle: "Cancel")
-        alert.window.initialFirstResponder = field
 
         alert.beginSheetModal(for: window) { [weak self] response in
             guard response == .alertFirstButtonReturn else { return }
-            guard let branch = Worktrees.branchName(from: field.stringValue) else {
+            guard let branch = Worktrees.branchName(from: alert.fieldValue) else {
                 self?.showError("No branch name", "Use letters, numbers, dashes or slashes.")
                 return
             }
@@ -121,7 +118,7 @@ extension MainWindowController {
             _ = session.panes.remove(terminal)
             return
         }
-        let alert = NSAlert()
+        let alert = FarolAlert()
         alert.messageText = "Close this pane?"
         alert.informativeText = "A program is still running in it. Closing stops it."
         alert.addButton(withTitle: "Close")
@@ -139,7 +136,7 @@ extension MainWindowController {
     /// Closes a whole session. Asks first when a program is still running, then whether to remove its worktree.
     func requestClose(_ session: Session) {
         guard session.hasRunningProcess, let window else { return closeAskingAboutWorktree(session) }
-        let alert = NSAlert()
+        let alert = FarolAlert()
         alert.messageText = "Close this session?"
         alert.informativeText = "A program is still running in it. Closing stops it."
         alert.addButton(withTitle: "Close")
@@ -177,7 +174,7 @@ extension MainWindowController {
 
     private func offerToRemove(_ worktree: String, isTask: Bool, closing session: Session) {
         guard let window else { return store.close(session) }
-        let alert = NSAlert()
+        let alert = FarolAlert()
         if isTask {
             alert.messageText = "Remove the task's worktrees too?"
             alert.informativeText = "Each repo keeps the branch, so no commits are lost. Only the folder goes."
@@ -230,7 +227,7 @@ extension MainWindowController {
 
     func showError(_ title: String, _ message: String, then: (() -> Void)? = nil) {
         guard let window else { return }
-        let alert = NSAlert()
+        let alert = FarolAlert()
         alert.messageText = title
         alert.informativeText = message.replacingOccurrences(of: "fatal: ", with: "")
         alert.beginSheetModal(for: window) { _ in then?() }

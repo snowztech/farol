@@ -198,10 +198,10 @@ private struct CheckMark: View {
 
 /// Git's own message, which carries what a hook printed or why the push was refused.
 private func gitFailure(_ title: String, _ info: String) {
-    let alert = NSAlert()
+    let alert = FarolAlert()
     alert.messageText = title
     alert.informativeText = info
-    if let window = NSApp.keyWindow { alert.beginSheetModal(for: window) } else { alert.runModal() }
+    alert.show()
 }
 
 /// The quiet bordered button of the review panel, also used at the end of a settings row.

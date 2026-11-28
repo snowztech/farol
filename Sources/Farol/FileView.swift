@@ -852,7 +852,7 @@ final class FileView: NSView {
     /// Runs `proceed` once unsaved edits are saved or thrown away. Asks first, and runs `cancelled` on Cancel.
     func confirmClose(_ proceed: @escaping () -> Void, cancelled: (() -> Void)? = nil) {
         guard isDirty, let window else { return proceed() }
-        let alert = NSAlert()
+        let alert = FarolAlert()
         alert.messageText = "Save changes to \((path as NSString).lastPathComponent)?"
         alert.informativeText = "Your changes are lost if you don't save them."
         alert.addButton(withTitle: "Save")
@@ -866,7 +866,7 @@ final class FileView: NSView {
                     try self.save()
                 } catch {
                     cancelled?()
-                    return NSAlert(error: error).beginSheetModal(for: window)
+                    return FarolAlert(error: error).beginSheetModal(for: window)
                 }
             case .alertSecondButtonReturn:
                 self.load(keepingPosition: true)

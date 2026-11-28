@@ -323,12 +323,12 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         graph.onShowInReview = { [weak self] commit, file in
             guard let self else { return }
             review.show(commit: commit.hash, subject: commit.subject, file: file)
-            if !review.isOpen { toggleReview() }
+            if !review.isOpen { toggleReview(fromGraph: true) }
         }
         graph.onShowRequest = { [weak self] request in
             guard let self else { return }
             review.show(request: request)
-            if !review.isOpen { toggleReview() }
+            if !review.isOpen { toggleReview(fromGraph: true) }
         }
         graph.onRunInTerminal = { command in
             guard let session = store.selected else { return }
@@ -509,7 +509,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             return file.confirmClose({ [weak self] in self?.confirmQuit(reply) }, cancelled: { reply(false) })
         }
         guard runtime.hasRunningProcesses, let window else { return reply(true) }
-        let alert = NSAlert()
+        let alert = FarolAlert()
         alert.messageText = "Quit Farol?"
         alert.informativeText = "Programs are still running. Quitting stops them."
         alert.addButton(withTitle: "Quit")
@@ -588,6 +588,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private func setGraph(visible open: Bool) {
         remember { $0.graph = open }
         let width = open ? clampedGraphWidth(savedGraphWidth) : 0
+        // Two panels and a terminal too narrow to read is worse than one panel: the review makes way.
+        if open, review.isOpen, !state.reviewExpanded, terminalRoom(sides: reviewWidth.constant + width) < Self.terminalRoom { toggleReview(closing: true) }
         withAnimation(Self.panelMotion) {
             state.graphVisible = open
             state.graphWidth = width
@@ -610,8 +612,16 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// Room for the terminal stays, however wide the panel is dragged.
     private func clampedGraphWidth(_ width: CGFloat) -> CGFloat {
-        let available = (window?.frame.width ?? 1200) - sidebarWidth.constant - filesWidth.constant - reviewWidth.constant - 360
+        let available = (window?.frame.width ?? 1200) - sidebarWidth.constant - filesWidth.constant - reviewWidth.constant - Self.terminalRoom
         return min(max(width, 280), max(available, 280))
+    }
+
+    /// The width the terminal keeps beside the panels, below which it wraps too much to read.
+    static let terminalRoom: CGFloat = 360
+
+    /// What the terminal gets with the right panels at `sides` in all.
+    private func terminalRoom(sides: CGFloat) -> CGFloat {
+        (window?.frame.width ?? 1200) - sidebarWidth.constant - filesWidth.constant - sides
     }
 
     /// Text opens in the file pane. Images, PDFs and media open in their Mac app.
@@ -632,7 +642,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// Opens or closes the review panel at the width you last gave it.
-    func toggleReview(closing: Bool = false) {
+    /// `fromGraph` keeps the graph open, as when a click there asked for the review: closing what you just clicked would lose your place.
+    func toggleReview(closing: Bool = false, fromGraph: Bool = false) {
         if !closing, leaveSettings(), review.isOpen { return }
         // Over a commit or a request, "Review changes" brings your changes back. Closing the panel there would hide what you asked for.
         if !closing, review.showYours() { return graph.select(nil) }
@@ -644,6 +655,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         }
         let saved = UserDefaults.standard.double(forKey: Self.reviewWidthKey)
         let width = review.isOpen ? clampedReviewWidth(saved > 0 ? saved : ReviewPanel.defaultWidth) : 0
+        // The graph makes way when both would leave the terminal too narrow to read.
+        if review.isOpen, !fromGraph, state.graphVisible, terminalRoom(sides: graphWidth.constant + width) < Self.terminalRoom { setGraph(visible: false) }
         withAnimation(Self.panelMotion) { state.reviewWidth = width }
         animatePanels { self.reviewWidth.animator().constant = width }
     }
@@ -716,7 +729,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     /// Room for the terminal stays, however wide the panel is dragged.
     private func clampedReviewWidth(_ width: CGFloat) -> CGFloat {
-        let available = (window?.frame.width ?? 1200) - sidebarWidth.constant - filesWidth.constant - graphWidth.constant - 360
+        let available = (window?.frame.width ?? 1200) - sidebarWidth.constant - filesWidth.constant - graphWidth.constant - Self.terminalRoom
         return min(max(width, 320), max(available, 320))
     }
 
@@ -913,7 +926,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         defer { settings.configErrors = errors }
         guard !errors.isEmpty, errors != settings.configErrors else { return }
         guard let window else { return }
-        let alert = NSAlert()
+        let alert = FarolAlert()
         alert.messageText = "Farol skipped part of your config"
         alert.informativeText = errors.joined(separator: "\n")
             + "\n\nThe rest of the file applies. What was skipped stays in the file until you fix or remove it."
@@ -927,6 +940,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
     private func applyTheme(style: UIStyle? = nil) {
         let bg = runtime.backgroundColor
         state.palette = Palette(runtime, style: style ?? state.style)
+        FarolAlert.palette = state.palette
         menuBar.apply(state.palette)
         notch.apply(state.palette)
         HoverTip.shared.colors = (bg, runtime.foregroundColor)
@@ -1017,7 +1031,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         do {
             try file.save()
         } catch {
-            NSAlert(error: error).beginSheetModal(for: window)
+            FarolAlert(error: error).beginSheetModal(for: window)
         }
     }
 
@@ -1111,7 +1125,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
 
     private func confirm(_ request: ClipboardRequest, reply: @escaping (Bool) -> Void) {
         guard let window else { return reply(false) }
-        let alert = NSAlert()
+        let alert = FarolAlert()
         let preview = request.text.count > 400 ? request.text.prefix(400) + "…" : Substring(request.text)
         switch request.kind {
         case .paste:

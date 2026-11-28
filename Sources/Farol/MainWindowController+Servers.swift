@@ -68,7 +68,7 @@ extension MainWindowController {
             }
         }
         guard session.status == .working || session.status == .waiting, let window else { return end() }
-        let alert = NSAlert()
+        let alert = FarolAlert()
         alert.messageText = "End \(session.name) on \(server.name)?"
         alert.informativeText = "Its agent is still at work. Ending the session stops it on the server."
         alert.addButton(withTitle: "End Session")
@@ -165,7 +165,7 @@ extension MainWindowController {
 
     private func askToUpdate(_ server: Server) {
         guard let window else { return }
-        let alert = NSAlert()
+        let alert = FarolAlert()
         alert.messageText = "Update farol-host on \(server.name)"
         alert.informativeText = "Its farol-host is too old to open sessions from the Mac. Farol can install the latest one over ssh."
         alert.addButton(withTitle: "Update")
@@ -197,24 +197,21 @@ extension MainWindowController {
 
     private func renameServer(_ server: Server) {
         guard let window else { return }
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
-        field.stringValue = server.name
-        let alert = NSAlert()
+        let alert = FarolAlert()
         alert.messageText = "Rename \(server.name)"
         alert.informativeText = "The name the sidebar and notifications use. ssh still connects to \(server.ssh)."
-        alert.accessoryView = field
+        alert.field = ("Name", server.name)
         alert.addButton(withTitle: "Rename")
         alert.addButton(withTitle: "Cancel")
-        alert.window.initialFirstResponder = field
         alert.beginSheetModal(for: window) { [weak self] response in
             guard response == .alertFirstButtonReturn else { return }
-            self?.servers.rename(server, to: field.stringValue.trimmingCharacters(in: .whitespaces))
+            self?.servers.rename(server, to: alert.fieldValue.trimmingCharacters(in: .whitespaces))
         }
     }
 
     func removeServer(_ server: Server) {
         guard let window else { return }
-        let alert = NSAlert()
+        let alert = FarolAlert()
         alert.messageText = "Remove \(server.name)?"
         alert.informativeText = "Its agents leave the sidebar and the server stops letting this Mac in. They keep running there, and your phone still sees them."
         alert.addButton(withTitle: "Remove")

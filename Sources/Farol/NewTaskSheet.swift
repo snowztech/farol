@@ -149,17 +149,22 @@ struct NewTaskSheet: View {
         return "what \(repo) has checked out then"
     }
 
+    /// A branch name kept on one line, since a break after its slash or hyphen reads as two names.
+    private func unbroken(_ name: String) -> String {
+        name.replacingOccurrences(of: "/", with: "/\u{2060}").replacingOccurrences(of: "-", with: "\u{2011}")
+    }
+
     private var subtitle: String {
         let start = whenLabel.prefix(1).lowercased() + whenLabel.dropFirst()
         let rule = weekdays == Schedule.everyDay || weekdays == Schedule.workweek ? start : "on \(start)"
         switch (starts, several) {
-        case (.later, false): return "Starts \(start) in its own worktree, on a new branch from \(laterBase)."
-        case (.repeats, false): return "Starts \(rule), each time in its own worktree from \(laterBase)."
+        case (.later, false): return "Starts \(start) in its own worktree, on a new branch from \(unbroken(laterBase))."
+        case (.repeats, false): return "Starts \(rule), each time in its own worktree from \(unbroken(laterBase))."
         case (.later, true): return "Starts \(start) with a worktree of each repo you pick, side by side in one folder."
         case (.repeats, true): return "Starts \(rule), each time with new worktrees of the repos you pick, side by side in one folder."
         case (.now, _): break
         }
-        if repos.isEmpty, sources.count < 2 { return "The agent starts in its own worktree, on a new branch from \(base)." }
+        if repos.isEmpty, sources.count < 2 { return "The agent starts in its own worktree, on a new branch from \(unbroken(base))." }
         return "Each repo you pick gets its own worktree on the same branch, side by side in one folder. The agent starts there and sees them all."
     }
 
