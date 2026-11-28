@@ -7,7 +7,6 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 ### Added
 
 - Indent guides in the file editor: a faint line at each indent level, so nesting reads at a glance.
-- The editor's status bar says how the file indents, like `4 spaces` or `tabs`, which is what Tab types.
 
 ### Changed
 

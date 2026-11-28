@@ -43,9 +43,6 @@ final class FileView: NSView {
     /// The cursor moved or the selection changed, for the status bar.
     var onCursorChange: (() -> Void)?
 
-    /// How the file indents, as Tab types it: "tabs" or "4 spaces".
-    var indent: String { text.indentUnit == "\t" ? "tabs" : "\(text.indentUnit.count) spaces" }
-
     /// Where the cursor is, from 1, and how many characters are selected. From the gutter's index of lines, so a move costs nothing.
     var cursor: (line: Int, column: Int, selected: Int) {
         let range = text.selectedRange()
