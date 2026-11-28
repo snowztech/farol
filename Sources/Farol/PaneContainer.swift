@@ -33,6 +33,9 @@ final class PaneContainer: NSView {
     }
 
     private static let divider: CGFloat = 1
+    /// Breathing room between the text and the window's panels. It shares the terminal background, so it reads as terminal.
+    /// The file pane goes without, so its tab bar lines up with the headers beside it.
+    private static let margin = NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 8)
     private static let unfocusedAlpha: CGFloat = 0.7
 
     private(set) var root: Node
@@ -464,12 +467,21 @@ final class PaneContainer: NSView {
     private func place(_ node: Node, in rect: CGRect) {
         node.frame = rect
         if let view = node.view {
-            view.frame = rect.integral
+            view.frame = (view is TerminalView ? padded(rect) : rect).integral
             return
         }
         let (first, second) = split(rect, node.axis, node.ratio)
         place(node.children[0], in: first)
         place(node.children[1], in: second)
+    }
+
+    /// The margin on the sides of `rect` that are the container's own edges. Between panes the divider is enough.
+    private func padded(_ rect: CGRect) -> CGRect {
+        let m = Self.margin
+        let left = rect.minX <= bounds.minX ? m.left : 0, right = rect.maxX >= bounds.maxX ? m.right : 0
+        let top = rect.minY <= bounds.minY ? m.top : 0, bottom = rect.maxY >= bounds.maxY ? m.bottom : 0
+        return CGRect(x: rect.minX + left, y: rect.minY + top,
+                      width: max(0, rect.width - left - right), height: max(0, rect.height - top - bottom))
     }
 
     private func split(_ rect: CGRect, _ axis: Node.Axis, _ ratio: CGFloat) -> (CGRect, CGRect) {
@@ -889,6 +901,8 @@ final class PaneContainer: NSView {
     }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
+        // Every session's panes stay in the window, hidden when it isn't on screen. One of those must not take a drag meant for the divider you see.
+        guard !isHiddenOrHasHiddenAncestor else { return nil }
         let local = convert(point, from: superview)
         if dividers.contains(where: { grabArea($0).contains(local) }) { return self }
         return super.hitTest(point)

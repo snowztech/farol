@@ -945,6 +945,7 @@ final class FileView: NSView {
         gutter.colors = (background, background.mixed(with: foreground, 0.35), background.mixed(with: foreground, 0.8))
         text.currentLineColor = background.mixed(with: foreground, 0.045)
         text.matchColor = background.mixed(with: foreground, 0.14)
+        text.guideColor = background.mixed(with: foreground, 0.1)
         tints = nil
         blame.colors = (background, foreground)
     }
@@ -1080,11 +1081,37 @@ private final class CodeTextView: NSTextView {
         super.drawBackground(in: rect)
         drawProblems(in: rect)
         drawMatches(in: rect)
+        defer { drawGuides(in: rect) }
         guard let color = currentLineColor, let line = currentLine else { return }
         let band = NSRect(x: 0, y: line.minY, width: bounds.width, height: line.height)
         guard band.intersects(rect) else { return }
         color.setFill()
         band.fill()
+    }
+
+    // MARK: Indent guides
+
+    /// A faint line at each indent level, in the space a line starts with, so nesting reads at a glance.
+    var guideColor: NSColor? { didSet { needsDisplay = true } }
+
+    /// Only the lines in the area being drawn, from what is already laid out, as with the matches.
+    /// A wrapped line's later rows start at the left edge, under its text, so they get none.
+    private func drawGuides(in dirty: NSRect) {
+        guard let color = guideColor, let font, let layout = layoutManager, let container = textContainer else { return }
+        let glyphs = layout.glyphRange(forBoundingRect: dirty.offsetBy(dx: -textContainerOrigin.x, dy: -textContainerOrigin.y), in: container)
+        guard glyphs.length > 0 else { return }
+        let step = indentUnit == "\t" ? NSParagraphStyle.default.tabStops.first?.location ?? 28
+            : (" " as NSString).size(withAttributes: [.font: font]).width * CGFloat(indentUnit.count)
+        let left = textContainerOrigin.x + container.lineFragmentPadding, top = textContainerOrigin.y
+        let text = text, unit = indentUnit
+        color.setFill()
+        layout.enumerateLineFragments(forGlyphRange: glyphs) { rect, _, _, range, _ in
+            let start = layout.characterIndexForGlyph(at: range.location)
+            guard start == text.lineRange(for: NSRange(location: start, length: 0)).location else { return }
+            for level in 0..<Typing.indentLevel(text, at: start, unit: unit) {
+                NSRect(x: (left + CGFloat(level) * step).rounded(), y: rect.minY + top, width: 1, height: rect.height).fill()
+            }
+        }
     }
 
     // MARK: The bracket that matches, and the selected word elsewhere

@@ -135,6 +135,42 @@ public enum Typing {
         return Edit(range: selection, replacement: replacement, selection: NSRange(location: selection.location + (inner as NSString).length, length: 0))
     }
 
+    // MARK: Indent guides
+
+    /// How many indent levels the line at `location` is in, for the guides drawn in its leading space.
+    /// A blank line takes the lesser of the lines around it, so guides run unbroken through a block's blank lines but not past its end.
+    /// `reach` bounds the look for those lines, in lines each way.
+    public static func indentLevel(_ text: NSString, at location: Int, unit: String, reach: Int = 200) -> Int {
+        let line = text.lineRange(for: NSRange(location: location, length: 0))
+        if let level = level(text, line, unit) { return level }
+        func near(_ step: Int) -> Int {
+            var at = line
+            for _ in 0..<reach {
+                let next = step > 0 ? NSMaxRange(at) : at.location - 1
+                guard next >= 0, next < text.length else { return 0 }
+                at = text.lineRange(for: NSRange(location: next, length: 0))
+                if let level = level(text, at, unit) { return level }
+            }
+            return 0
+        }
+        return min(near(-1), near(1))
+    }
+
+    /// Whole units of leading space, a tab counting as one. Nil for a blank line.
+    private static func level(_ text: NSString, _ line: NSRange, _ unit: String) -> Int? {
+        let width = unit == "\t" ? 4 : max(1, unit.count)
+        var spaces = 0, tabs = 0
+        for at in line.location..<NSMaxRange(line) {
+            switch text.character(at: at) {
+            case 0x20: spaces += 1
+            case 0x09: tabs += 1
+            case 0x0A, 0x0D: return nil
+            default: return tabs + spaces / width
+            }
+        }
+        return nil
+    }
+
     // MARK: Brackets
 
     /// The bracket beside the cursor, just before it first, and the one that matches it. Nil when there's none, or no match within reach.

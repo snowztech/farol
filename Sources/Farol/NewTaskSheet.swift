@@ -207,7 +207,7 @@ struct NewTaskSheet: View {
                             }
                         }
                     }
-                    Text("↩ \(starts == .now ? "start" : "schedule") · ⇧↩ new line · paste or drop pictures and files")
+                    Text("↩ \(starts == .now ? "start" : "schedule") · ⌥↩ new line · paste or drop pictures and files")
                         .font(.system(size: 11))
                         .foregroundStyle(p.muted)
                 }

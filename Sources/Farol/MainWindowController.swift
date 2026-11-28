@@ -227,11 +227,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         graphWidth = graphPanel.widthAnchor.constraint(equalToConstant: state.graphWidth)
         reviewWidth = reviewPanel.widthAnchor.constraint(equalToConstant: 0)
         contentClosed = content.widthAnchor.constraint(equalToConstant: 0)
-        // Below the window's hold on its size, so with no room while the review fills the window, the margin gives way rather than the window growing.
-        let sides = [terminalContainer.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 12),
-                     terminalContainer.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -8)]
-        sides.forEach { $0.priority = .init(490) }
-        NSLayoutConstraint.activate(sides)
+        NSLayoutConstraint.activate([terminalContainer.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+                                     terminalContainer.trailingAnchor.constraint(equalTo: content.trailingAnchor)])
         panels = [sidebar, filesPanel, content, reviewPanel, graphPanel]
         var edge = root.leadingAnchor
         for panel in panels {
@@ -287,9 +284,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
             reviewPanel.topAnchor.constraint(equalTo: topBar.bottomAnchor),
             reviewWidth,
 
-            // Breathing room around the text. It shares the terminal background, so it reads as terminal.
-            terminalContainer.topAnchor.constraint(equalTo: content.topAnchor, constant: 8),
-            terminalContainer.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -8),
+            // The margin around the text is the panes' own, see PaneContainer.
+            terminalContainer.topAnchor.constraint(equalTo: content.topAnchor),
+            terminalContainer.bottomAnchor.constraint(equalTo: content.bottomAnchor),
 
             settingsView.topAnchor.constraint(equalTo: content.topAnchor),
             settingsView.leadingAnchor.constraint(equalTo: filesPanel.leadingAnchor),
