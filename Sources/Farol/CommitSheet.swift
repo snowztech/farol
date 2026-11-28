@@ -508,11 +508,11 @@ private struct CommitSheet: View {
 
     private var chosenAgent: AgentFolder? { AgentFolder.choice(agent, in: agents) }
 
-    /// "⌥↩ for a new line", Restore after the agent wrote over a message, and what went wrong if it failed.
+    /// The keys, Restore after the agent wrote over a message, and what went wrong if it failed.
     private func hints(_ p: Palette) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
-                Text("⌥↩ for a new line")
+                Text("↩ commit · ⌥↩ new line")
                 if let replaced, message == generated {
                     Button("Restore") { message = replaced }
                         .buttonStyle(.plain)

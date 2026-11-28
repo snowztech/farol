@@ -4,6 +4,19 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- Indent guides in the file editor: a faint line at each indent level, so nesting reads at a glance.
+
+### Changed
+
+- New Task and Commit both say ⌥↩ for a new line.
+
+### Fixed
+
+- Dragging the line between a terminal and the file editor works every time. A session out of sight with a split in the same place could take the drag, and nothing moved.
+- The file editor's tab bar lines up with the headers of the panels beside it. It sat a few points lower.
+
 ## [0.73.0] - 2026-11-28
 
 ⌘J takes you to the agent that needs you, and Farol's sheets wear your theme.

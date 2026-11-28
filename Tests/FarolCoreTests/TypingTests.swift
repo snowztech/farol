@@ -79,3 +79,13 @@ private func run(_ text: String, _ edit: (NSString, NSRange) -> LineEditing.Edit
     #expect(Typing.matchingBracket("ab" as NSString, at: 1) == nil)
     #expect(Typing.matchingBracket("(a" as NSString, at: 1) == nil)
 }
+
+@Test func measuresIndentLevelsForGuides() {
+    let text = "f {\n    a\n\n        b\n    c\n}\n\ng\n" as NSString
+    let level = { (line: Int) in
+        Typing.indentLevel(text, at: (text as String).components(separatedBy: "\n").prefix(line).map { ($0 as NSString).length + 1 }.reduce(0, +), unit: "    ")
+    }
+    #expect([0, 1, 2, 3, 4, 5, 6, 7].map(level) == [0, 1, 1, 2, 1, 0, 0, 0])
+    #expect(Typing.indentLevel("\t\tx" as NSString, at: 0, unit: "\t") == 2)
+    #expect(Typing.indentLevel("  x" as NSString, at: 0, unit: "    ") == 0)
+}
