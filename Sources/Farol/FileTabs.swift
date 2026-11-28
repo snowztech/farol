@@ -209,7 +209,7 @@ final class FileTabs: NSView {
         let cursor = current.cursor
         let facts = FileTabsModel.Facts(
             cursor: "\(cursor.line):\(cursor.column)" + (cursor.selected > 0 ? " (\(cursor.selected) selected)" : ""),
-            line: cursor.line, lines: current.lineCount)
+            line: cursor.line, lines: current.lineCount, indent: current.indent)
         if model.facts != facts { model.facts = facts }
     }
 
@@ -331,6 +331,7 @@ final class FileTabsModel: ObservableObject {
         let cursor: String
         let line: Int
         let lines: Int
+        let indent: String
     }
 
     struct Server: Equatable {
@@ -506,6 +507,8 @@ struct FileStatusBar: View {
                     }
                 }
                 Spacer(minLength: 8)
+                // What Tab types, found from the file, so you know before pressing it. Padded like the buttons beside it.
+                Text(facts.indent).padding(.horizontal, 6).hoverTip("Tab indents with \(facts.indent), as this file does")
                 // JSON has no language server, so its name opens what Farol does for it instead.
                 if model.canFormat {
                     StatusButton(palette: p, tip: nil, action: model.openFormatMenu) { _ in Text("json") }
