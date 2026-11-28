@@ -10,6 +10,7 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ### Changed
 
+- The file editor uses the terminal's font and size from Settings, so code reads the same in both. It follows when you change them.
 - New Task and Commit both say ⌥↩ for a new line.
 
 ### Fixed

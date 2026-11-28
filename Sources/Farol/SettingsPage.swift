@@ -315,7 +315,7 @@ struct SettingsPage: View {
     }
 
     @ViewBuilder private func terminal(_ p: Palette) -> some View {
-        Heading(title: "Terminal", detail: "Applies to every session.", palette: p)
+        Heading(title: "Terminal", detail: "Applies to every session and the file editor.", palette: p)
 
         GroupTitle(title: "Font", first: true, palette: p)
         Card(palette: p) {

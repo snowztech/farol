@@ -24,7 +24,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
         settings = Settings()
         let agents = AgentSettings()
-        settings.onChange = { runtime.reloadConfig() }
+        // The editor takes the terminal's font, now and whenever settings or the config file change it.
+        let follow = { [settings = settings!] in CodeText.follow(family: settings.fontFamily, size: settings.fontSize) }
+        follow()
+        settings.onChange = {
+            runtime.reloadConfig()
+            follow()
+        }
         let worktrees = WorktreeSettings()
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let socket = support.appendingPathComponent("Farol/\(Bundle.main.bundleIdentifier ?? "farol").sock").path
