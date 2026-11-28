@@ -4,6 +4,16 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- Confirmations and errors, like closing a session, removing a worktree, saving a file or deleting a branch, are drawn in Farol's own sheet style, in your theme's colors, like New Task and Commit. Return and Esc work as before.
+- Opening the git graph or the review when the terminal would be left too narrow to read closes the other one. Opening the review from a commit or a pull request in the graph keeps the graph open.
+
+### Fixed
+
+- The git graph's header lines up with the files and review panels beside it.
+- New Task keeps a branch name like `feat/offline-sync` on one line instead of breaking it after the slash.
+
 ## [0.72.1] - 2026-11-27
 
 Wrapped files stay still, and git blame works on README.md and from a Markdown preview.
