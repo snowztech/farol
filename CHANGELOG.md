@@ -4,6 +4,10 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Changed
+
+- The file editor uses the terminal's font and size from Settings, so code reads the same in both. It follows when you change them.
+
 ## [0.73.0] - 2026-11-28
 
 ⌘J takes you to the agent that needs you, and Farol's sheets wear your theme.
