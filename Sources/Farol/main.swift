@@ -84,6 +84,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func nextTab(_ sender: Any?) { windowController.stepTab(1) }
     @objc func previousTab(_ sender: Any?) { windowController.stepTab(-1) }
     @objc func nextSession(_ sender: Any?) { store.selectNext(offset: 1) }
+    @objc func nextNeedingYou(_ sender: Any?) {
+        guard let next = store.nextNeedingYou() else { return NSSound.beep() }
+        store.select(next)
+    }
     @objc func previousSession(_ sender: Any?) { store.selectNext(offset: -1) }
     @objc func selectSession(_ sender: NSMenuItem) { store.select(index: sender.tag) }
     @objc func switchSession(_ sender: Any?) { windowController.switchSession() }
@@ -156,6 +160,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return switch item.action {
         case #selector(saveFile): windowController.canSaveFile
         case #selector(goToLine): windowController.canGoToLine
+        case #selector(nextNeedingYou): store.nextNeedingYou() != nil
         case #selector(nextProblem), #selector(previousProblem): windowController.canStepProblem
         case #selector(checkForUpdates): windowController.canCheckForUpdates
         case #selector(nextResult), #selector(previousResult): windowController.canStepResult
@@ -232,6 +237,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         sessions.addItem(withTitle: "Run Project Command…", action: #selector(showRunMenu), keyEquivalent: "k")
             .keyEquivalentModifierMask = [.command, .option]
         sessions.addItem(.separator())
+        // The move Farol is for: the agent that needs you, wherever it is.
+        sessions.addItem(withTitle: "Next Agent That Needs You", action: #selector(nextNeedingYou), keyEquivalent: "j")
         sessions.addItem(withTitle: "Next Session", action: #selector(nextSession), keyEquivalent: "]")
             .keyEquivalentModifierMask = [.command, .shift]
         sessions.addItem(withTitle: "Previous Session", action: #selector(previousSession), keyEquivalent: "[")
