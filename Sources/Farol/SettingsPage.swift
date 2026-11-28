@@ -1100,6 +1100,7 @@ struct SettingsPage: View {
             ("New session", ["⌘T", "⌘N"]),
             ("New worktree session", ["⇧⌘T"]),
             ("Close pane or session", ["⌘W"]),
+            ("Next agent that needs you", ["⌘J"]),
             ("Next and previous session", ["⇧⌘]", "⇧⌘["]),
             ("Go to session 1 to 9", ["⌘1…⌘9"]),
             ("Search sessions, files and folders", ["⌘P"]),

@@ -145,6 +145,8 @@ private struct SessionRow: View {
     let onClose: () -> Void
 
     @State private var hovering = false
+    /// A beam crossing the row once, when its agent finishes while you're elsewhere.
+    @State private var sweeping = false
     @State private var editing = false
     @State private var draft = ""
     @FocusState private var fieldFocused: Bool
@@ -165,6 +167,11 @@ private struct SessionRow: View {
         .padding(.trailing, 10)
         .padding(.vertical, 8)
         .background { background }
+        .overlay { if sweeping { Beam(color: palette.done) { sweeping = false } } }
+        .onChange(of: session.activity) { before, now in
+            // Only a finish you didn't see: on screen, the session is acknowledged at once.
+            if before == .working, now == .done, !selected, Motion.enabled { sweeping = true }
+        }
         .contentShape(Rectangle())
         .onTapGesture(perform: onSelect)
         // Alongside the single tap, not instead of it, so selecting never waits for a possible second click.
@@ -681,6 +688,27 @@ private struct ProjectHeader: View {
             NSColor(color).setFill()
             NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: 3, yRadius: 3).fill()
             return true
+        }
+    }
+}
+
+/// A soft band of light that crosses the row once, like a lighthouse beam passing, then is gone.
+private struct Beam: View {
+    let color: Color
+    let done: () -> Void
+    @State private var across = false
+
+    var body: some View {
+        GeometryReader { geometry in
+            LinearGradient(colors: [.clear, color.opacity(0.22), .clear], startPoint: .leading, endPoint: .trailing)
+                .frame(width: geometry.size.width * 0.6)
+                .offset(x: across ? geometry.size.width : -geometry.size.width * 0.6)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .allowsHitTesting(false)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.9)) { across = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { done() }
         }
     }
 }

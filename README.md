@@ -230,6 +230,7 @@ Each tmux window there shows up on the phone next to your Mac's sessions. `farol
 | New session | ⌘T or ⌘N |
 | New worktree session | ⇧⌘T |
 | Close pane or session | ⌘W |
+| Next agent that needs you: waiting, then stopped, then done | ⌘J |
 | Next or previous session | ⇧⌘] and ⇧⌘[ |
 | Go to session 1 to 9 | ⌘1 to ⌘9 |
 | Search sessions, files and folders | ⌘P |

@@ -790,6 +790,19 @@ final class SessionStore: ObservableObject {
         select(ordered[index])
     }
 
+    /// The next session that needs you, after the one on screen in sidebar order and round to the start.
+    /// One waiting on you comes first, then one git stopped in a merge, then one done that you haven't looked at.
+    func nextNeedingYou() -> Session? {
+        let ordered = ordered
+        guard !ordered.isEmpty else { return nil }
+        let start = ordered.firstIndex { $0.id == selectedID } ?? -1
+        let after = (1...ordered.count).map { ordered[(start + $0) % ordered.count] }.filter { $0.id != selectedID }
+        for state in [Session.Activity.waiting, .stopped, .done] {
+            if let next = after.first(where: { $0.activity == state }) { return next }
+        }
+        return nil
+    }
+
     func selectNext(offset: Int) {
         let ordered = ordered
         guard let current = ordered.firstIndex(where: { $0.id == selectedID }), !ordered.isEmpty else { return }

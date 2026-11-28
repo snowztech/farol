@@ -4,6 +4,11 @@ Notable changes to Farol. The format follows [Keep a Changelog](https://keepacha
 
 ## [Unreleased]
 
+### Added
+
+- ⌘J goes to the next agent that needs you: one waiting on you first, then one stopped in a merge, then one that finished while you were elsewhere. Also in the Session menu.
+- When an agent finishes while you're in another session, a soft beam crosses its row once, like a lighthouse's. Off with animations.
+
 ### Changed
 
 - Confirmations and errors, like closing a session, removing a worktree, saving a file or deleting a branch, are drawn in Farol's own sheet style, in your theme's colors, like New Task and Commit. Return and Esc work as before.
