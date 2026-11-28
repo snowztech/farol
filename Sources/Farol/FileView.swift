@@ -168,7 +168,7 @@ final class FileView: NSView {
         conflict.addSubview(conflictText)
 
         CodeText.configure(text)
-        text.font = CodeText.editorFont
+        text.font = CodeFont.shared.font
         text.allowsUndo = true
         // Code keeps its lines: no wrapping, scroll sideways instead.
         text.isHorizontallyResizable = true
@@ -197,7 +197,7 @@ final class FileView: NSView {
             markChangesSoon()
         }
 
-        NotificationCenter.default.addObserver(forName: CodeText.editorFontDidChange, object: nil, queue: .main) { [weak self] _ in
+        NotificationCenter.default.addObserver(forName: CodeFont.didChange, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.followFont() }
         }
         NotificationCenter.default.addObserver(forName: LanguageServers.diagnosticsDidChange, object: nil, queue: .main) { [weak self] note in
@@ -285,6 +285,10 @@ final class FileView: NSView {
         }
         if Self.isZoom(event) {
             onZoom?()
+            return true
+        }
+        if let step = CodeFont.step(for: event) {
+            CodeFont.shared.zoom(step)
             return true
         }
         // Matched by the character, which takes ⌥ on some keyboards.
@@ -939,7 +943,7 @@ final class FileView: NSView {
         message.textColor = background.mixed(with: foreground, 0.55)
         scroll.backgroundColor = background
         CodeText.apply(to: text, background: background, foreground: foreground)
-        text.typingAttributes[.font] = CodeText.editorFont
+        text.typingAttributes[.font] = CodeFont.shared.font
         plainColor = foreground
         highlight()
         gutter.colors = (background, background.mixed(with: foreground, 0.35), background.mixed(with: foreground, 0.8))
@@ -952,8 +956,8 @@ final class FileView: NSView {
 
     /// The terminal's font changed in settings. Only on that change does the whole file lay out again.
     private func followFont() {
-        text.font = CodeText.editorFont
-        text.typingAttributes[.font] = CodeText.editorFont
+        text.font = CodeFont.shared.font
+        text.typingAttributes[.font] = CodeFont.shared.font
         gutter.needsDisplay = true
     }
 

@@ -25,7 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         settings = Settings()
         let agents = AgentSettings()
         // The editor takes the terminal's font, now and whenever settings or the config file change it.
-        let follow = { [settings = settings!] in CodeText.follow(family: settings.fontFamily, size: settings.fontSize) }
+        let follow = { [settings = settings!] in CodeFont.shared.follow(family: settings.fontFamily, size: settings.fontSize) }
         follow()
         settings.onChange = {
             runtime.reloadConfig()
