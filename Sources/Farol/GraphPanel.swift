@@ -614,7 +614,8 @@ private struct BranchList: View {
             }
             .padding(.leading, 14)
             .padding(.trailing, 8)
-            .frame(height: 30)
+            // As tall as the files and review panels' headers, so the three line up when open side by side.
+            .frame(height: 38)
             let entries = self.entries
             ScrollView {
                 LazyVStack(spacing: 0) {
