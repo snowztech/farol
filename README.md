@@ -255,6 +255,7 @@ Each tmux window there shows up on the phone next to your Mac's sessions. `farol
 | Back and forward through the files and lines you jumped between, also on the mouse's side buttons | ⌃⌘← and ⌃⌘→ |
 | Go to a definition, or list references from one (with its language server on) | ⌘ click |
 | Send the selected lines to the agent | ⇧⌘L |
+| Bigger, smaller, or back to the size in settings, for the editor and the review's diff | ⌘+, ⌘− and ⌘0 |
 | Next or previous problem (with its language server on) | F8 and ⇧F8 |
 | Indent or outdent the lines | Tab and ⇧Tab |
 | Review changes | ⌥⌘R |

@@ -54,6 +54,8 @@ struct DiffMarks: Equatable {
 
 /// One file's diff in the review panel, as a SwiftUI view.
 struct DiffText: NSViewRepresentable {
+    /// So a new size in settings or ⌘+ sizes the rows and draws the text again.
+    @ObservedObject var codeFont = CodeFont.shared
     let file: Diff.File
     /// The rows to show, when comments split the file into parts. Nil shows them all.
     var rows: Range<Int>? = nil
@@ -137,10 +139,18 @@ final class DiffScrollView: NSScrollView {
 /// One text view per file, so a selection can run across lines and uses the theme's color, like the file pane.
 /// Each line carries its kind and number as attributes, and drawBackground paints the tints and numbers under the text.
 final class DiffTextView: NSTextView {
-    static let rowHeight: CGFloat = 20
+    static var rowHeight: CGFloat { CodeFont.shared.rowHeight }
+
+    /// ⌘+, ⌘− and ⌘0 size the code here as in the file editor, while the keyboard is in the diff.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard window?.firstResponder === self, let step = CodeFont.step(for: event) else { return super.performKeyEquivalent(with: event) }
+        CodeFont.shared.zoom(step)
+        return true
+    }
+
     static let gutter: CGFloat = 58
 
-    private var shown: (file: Diff.File, rows: Range<Int>?, colors: DiffColors, syntax: SyntaxColors, expandable: Bool)?
+    private var shown: (file: Diff.File, rows: Range<Int>?, colors: DiffColors, syntax: SyntaxColors, expandable: Bool, font: NSFont)?
     /// Where each row's text starts in the view, for the rows it shows.
     private var rowStarts: [Int: Int] = [:]
     private var shownMarks: DiffMarks?
@@ -298,11 +308,11 @@ final class DiffTextView: NSTextView {
     func show(_ file: Diff.File, rows slice: Range<Int>? = nil, colors: DiffColors, syntax: SyntaxColors, marks: DiffMarks? = nil) {
         let expandable = onExpand != nil
         if let shown, shown.file == file, shown.rows == slice, shown.colors == colors, shown.syntax == syntax,
-           shown.expandable == expandable {
+           shown.expandable == expandable, shown.font == CodeFont.shared.font {
             if marks != shownMarks { mark(marks) }
             return
         }
-        shown = (file, slice, colors, syntax, expandable)
+        shown = (file, slice, colors, syntax, expandable, CodeFont.shared.font)
         diffColors = colors
         CodeText.apply(to: self, background: colors.background, foreground: colors.foreground)
 
@@ -310,9 +320,9 @@ final class DiffTextView: NSTextView {
         paragraph.minimumLineHeight = Self.rowHeight
         paragraph.maximumLineHeight = Self.rowHeight
         // Centers the text in its row, which is taller than the font's own line.
-        let baseline = (Self.rowHeight - diffLayout.defaultLineHeight(for: CodeText.font)) / 2
+        let baseline = (Self.rowHeight - diffLayout.defaultLineHeight(for: CodeFont.shared.font)) / 2
         let base: [NSAttributedString.Key: Any] = [
-            .font: CodeText.font, .foregroundColor: colors.foreground, .paragraphStyle: paragraph, .baselineOffset: baseline,
+            .font: CodeFont.shared.font, .foregroundColor: colors.foreground, .paragraphStyle: paragraph, .baselineOffset: baseline,
         ]
         let text = NSMutableAttributedString()
         let rows = Self.rows(file)

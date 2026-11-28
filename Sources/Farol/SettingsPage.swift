@@ -1139,6 +1139,7 @@ struct SettingsPage: View {
             ("Next and previous problem (with its language server on)", ["F8", "⇧F8"]),
             ("Go to a definition, or list references from one (with its language server on)", ["⌘ click"]),
             ("Back and forward between the places you jumped to, or the mouse's side buttons", ["⌃⌘←", "⌃⌘→"]),
+            ("Bigger, smaller, or back to the size in settings, for the editor and the review's diff", ["⌘+", "⌘−", "⌘0"]),
         ]),
         ShortcutGroup(title: "Terminal", items: [
             ("Copy, paste, select all", ["⌘C", "⌘V", "⌘A"]),
